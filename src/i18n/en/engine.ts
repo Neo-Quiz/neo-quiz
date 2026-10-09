@@ -27,6 +27,8 @@ export const EN_ENGINE = {
 	"engine.image.fit": "Fit to the window",
 	"engine.image.actualSize": "Real size",
 	"engine.image.viewer": "Picture",
+	"engine.image.previous": "Previous picture",
+	"engine.image.next": "Next picture",
 	"engine.passage.expand": "Show the document",
 
 	/* ── Styles de lecture d'un cours (engine/lecture-rendu.ts) ── */

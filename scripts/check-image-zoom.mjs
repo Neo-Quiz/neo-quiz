@@ -15,8 +15,8 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 await withSrcModule("src/engine/image-zoom.ts", ({ zoomAutour, ajuster, echelleAjustee, ZOOM_MAX }) => {
 	const r = makeReporter("Zoom of a quiz picture");
 
-	r.check("fit: the picture fills the window minus a margin, the limiting side wins",
-		[echelleAjustee(1000, 500, 1048, 2000), echelleAjustee(1000, 1000, 2000, 548)], [1, 0.5]);
+	r.check("fit: 86 % of the width or all the height, the limiting side wins",
+		[echelleAjustee(860, 500, 1000, 2000), echelleAjustee(1000, 1000, 4000, 500)], [1, 0.5]);
 	r.check("fit: a small picture is enlarged at most twice, a bad size gives 1",
 		[echelleAjustee(100, 100, 2000, 2000), echelleAjustee(0, 100, 800, 600)], [2, 1]);
 

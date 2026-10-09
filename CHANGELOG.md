@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The picture viewer takes the look of a lightbox: blurred backdrop, rounded framed picture, close button on its corner, its name under it, and arrows (or ← →) to the other pictures of the same card; zoom stays one wheel or pinch away.
+
 ## [1.20.56] - 2026-10-09
 
 ### Changed

@@ -1,9 +1,16 @@
 /* ══════════════════════════════════════════════════════════
    THE PICTURE VIEWER (engine/image-zoom.ts, redone 2026-10-09)
-   Over the whole window, as Windows Photos: a dark backdrop, the picture
-   growing out of its thumbnail, a floating bar. Only Windows' own cursors:
-   the system hand on a picture that opens, the system four-way arrow on a
-   zoomed picture that drags.
+   The look of the owner's Obsidian plugin `image-lightbox`: a translucent,
+   blurred backdrop (the page stays guessable behind it), the picture in a
+   rounded frame with a deep shadow, a round close button on its corner, its
+   name and "n / N" under it. Plus a small zoom row. Only Windows' own
+   cursors: the hand on what can be clicked, the arrow elsewhere, the
+   four-way arrow on a zoomed picture that drags.
+
+   The blur goes on the VIEWER's background, which holds the picture as an
+   absolutely placed child: the plugin learnt that a `backdrop-filter` on the
+   container of the picture itself could keep the picture from painting;
+   here the picture is never inside a filtered box of its own.
 ══════════════════════════════════════════════════════════ */
 
 .quiz-card img:not(.quiz-option img){
@@ -20,9 +27,11 @@
   user-select: none;
   outline: none;
   cursor: default;
-  background: rgb(0 0 0 / calc(0.9 * var(--voile-opacite, 1)));
+  background: rgb(0 0 0 / calc(0.55 * var(--voile-opacite, 1)));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity 200ms ease;
   -webkit-app-region: no-drag;
 }
 
@@ -43,104 +52,200 @@
   max-height: none;
   transform-origin: 0 0;
   will-change: transform;
-  border-radius: 4px;
-  box-shadow: 0 12px 48px rgb(0 0 0 / 0.5);
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.55);
   -webkit-user-drag: none;
 }
 
-.qbd-visionneuse-image.is-anime{
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.qbd-visionneuse.is-anime .qbd-visionneuse-image{
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The next picture of the card appears as the plugin's did. */
+.qbd-visionneuse-image.is-entree{
+  animation: qbd-visionneuse-entree 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes qbd-visionneuse-entree{
+  from{ opacity: 0; }
+  to{ opacity: 1; }
 }
 
 .qbd-visionneuse.is-zoome .qbd-visionneuse-image{
   cursor: move;
+  border-radius: 0;
 }
 
-/* The floating bar: top right on a computer, bottom centre on a phone. */
-.qbd-visionneuse-barre{
+/* The close button, glued to the picture's top-right corner (placed in JS,
+   kept inside the window when the picture is larger than it). */
+.qbd-visionneuse-fermer{
   position: absolute;
-  top: calc(12px + var(--nq-inset-haut, 0px));
-  right: 12px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 12px;
-  background: rgb(28 28 30 / 0.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
-  color: rgb(255 255 255 / 0.9);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 50%;
+  background: rgb(20 20 20 / 0.92);
+  color: #fff;
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.qbd-visionneuse-fermer:hover{
+  background: rgb(45 45 45 / 0.98);
+  opacity: 1;
+}
+
+.qbd-visionneuse-fermer:active{
+  transform: scale(0.9);
+}
+
+.qbd-visionneuse-fermer svg{
+  width: 14px;
+  height: 14px;
+}
+
+/* Under the picture: arrows around the name, the counter, the zoom row. */
+.qbd-visionneuse-bas{
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  color: #fff;
   transition: opacity 180ms ease;
 }
 
-.qbd-visionneuse.is-saisie .qbd-visionneuse-barre{
+.qbd-visionneuse.is-saisie .qbd-visionneuse-bas{
   opacity: 0.35;
 }
 
-.qbd-visionneuse-bouton,
+.qbd-visionneuse-navigation{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.qbd-visionneuse-nom{
+  min-width: 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  opacity: 0.92;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.qbd-visionneuse-compteur{
+  font-size: 0.78em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+
+.qbd-visionneuse-compteur:empty{
+  display: none;
+}
+
+.qbd-visionneuse-fleche,
+.qbd-visionneuse-outil,
 .qbd-visionneuse-niveau{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
+  padding: 0;
+  color: #fff;
   box-shadow: none;
   cursor: pointer;
   font: inherit;
+  transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
-.qbd-visionneuse-bouton{
+.qbd-visionneuse-fleche{
+  flex: none;
   width: 36px;
-  padding: 0;
+  height: 36px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.08);
+  opacity: 0.8;
+}
+
+.qbd-visionneuse-fleche[hidden]{
+  display: none;
+}
+
+.qbd-visionneuse-fleche:hover{
+  background: rgb(255 255 255 / 0.2);
+  opacity: 1;
+}
+
+.qbd-visionneuse-fleche:active,
+.qbd-visionneuse-outil:active{
+  transform: scale(0.9);
+}
+
+.qbd-visionneuse-outils{
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.qbd-visionneuse-outil{
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.75;
 }
 
 .qbd-visionneuse-niveau{
-  min-width: 58px;
-  padding: 0 6px;
-  font-size: 13px;
+  min-width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  opacity: 0.8;
 }
 
-.qbd-visionneuse-bouton:hover,
+.qbd-visionneuse-outil:hover,
 .qbd-visionneuse-niveau:hover{
-  background: rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.14);
+  opacity: 1;
 }
 
-.qbd-visionneuse-bouton:focus-visible,
-.qbd-visionneuse-niveau:focus-visible{
+.qbd-visionneuse-fleche svg{ width: 20px; height: 20px; }
+.qbd-visionneuse-outil svg{ width: 16px; height: 16px; }
+
+.qbd-visionneuse button:focus-visible{
   outline: 2px solid rgb(255 255 255 / 0.7);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 
-.qbd-visionneuse-bouton svg{
-  width: 18px;
-  height: 18px;
-}
-
-.is-mobile .qbd-visionneuse-barre{
-  top: auto;
-  right: auto;
-  left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-}
-
-.is-mobile .qbd-visionneuse-bouton,
-.is-mobile .qbd-visionneuse-niveau{
-  height: 44px;
-}
-
-.is-mobile .qbd-visionneuse-bouton{
-  width: 44px;
-}
+.is-mobile .qbd-visionneuse-fleche{ width: 44px; height: 44px; }
+.is-mobile .qbd-visionneuse-outil{ width: 40px; height: 40px; }
+.is-mobile .qbd-visionneuse-niveau{ height: 40px; }
+.is-mobile .qbd-visionneuse-fermer{ width: 36px; height: 36px; }
 
 @media (prefers-reduced-motion: reduce){
   .qbd-visionneuse,
-  .qbd-visionneuse-image.is-anime{
+  .qbd-visionneuse.is-anime .qbd-visionneuse-image,
+  .qbd-visionneuse-image.is-entree{
     transition: none;
+    animation: none;
   }
 }
