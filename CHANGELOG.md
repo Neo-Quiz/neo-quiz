@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Interactive HTML pages (readings and "Explain" answers) now run on Android: the page is served from the app under its own restrictive policy instead of inheriting the app's, so clicks work and the frame height follows the content.
+
 ## [1.20.64] - 2026-10-09
 
 ### Changed

@@ -412,6 +412,11 @@ export interface HostPlatform {
 	    « en-US »). C'est la source du mode « auto » de `src/i18n.ts` : sous
 	    Obsidian, la langue d'Obsidian ; dans l'app, celle du système. */
 	uiLanguage: string;
+	/** OPTIONAL. A host whose own CSP is inherited by `srcdoc` documents (the Android WebView: `script-src 'self'`)
+	    keeps the document of an interactive quiz page and returns a same-origin path an iframe can load it from,
+	    with a CSP of its own (`engine/html-frame-core.ts`); `null` when refused. Absent on the desktop app, where
+	    the page goes by `srcdoc`. */
+	publishHtmlFrame?(doc: string): Promise<string | null>;
 }
 
 /**

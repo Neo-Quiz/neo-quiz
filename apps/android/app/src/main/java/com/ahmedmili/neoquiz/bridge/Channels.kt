@@ -16,6 +16,7 @@ object Channels {
         "android.suivreChats",
         "android.quizDemande",
         "android.fichierRecu",
+        "android.publierCadre",
         "android.barre",
         "android.haptique",
         "android.partagerPrompt",

@@ -58,5 +58,11 @@ export function createWindowsPlatform(): HostPlatform {
 		get uiLanguage(): string {
 			return globalThis.navigator?.language || "en";
 		},
+		/* Android only: the WebView's CSP is inherited by `srcdoc`, so the page of an interactive frame is
+		   served by the app under its own CSP (`bridge/HtmlFrameRoute.kt`). Absent on Windows. */
+		get publishHtmlFrame(): HostPlatform["publishHtmlFrame"] {
+			const android = estMobile() ? (globalThis as { window?: { neo?: { android?: { publierCadre(doc: string): Promise<string | null> } } } }).window?.neo?.android : undefined;
+			return android ? (doc: string) => android.publierCadre(doc) : undefined;
+		},
 	};
 }

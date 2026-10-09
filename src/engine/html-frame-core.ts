@@ -114,19 +114,29 @@ export function acceptHeight(data: unknown, fromFrame: boolean): number | null {
 	return Math.min(FRAME_MAX_HEIGHT, Math.max(FRAME_MIN_HEIGHT, Math.round(m.h)));
 }
 
+/** The only path a host may answer `publishHtmlFrame` with (Android: `bridge/HtmlFrameRoute.kt`): same origin, 128-bit id. */
+const FRAME_ROUTE = /^\/__frame\/[0-9a-f]{32}$/;
+
+/** The path to load a published frame from, or null for anything else (an iframe `src` is never set to a free-form value). */
+export function acceptFrameUrl(v: unknown): string | null {
+	return typeof v === "string" && FRAME_ROUTE.test(v) ? v : null;
+}
+
 export function escapeAttr(s: string): string {
 	return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export interface FrameLabels { title: string; showCode: string; hideCode: string; tooLarge: string }
 
-/** The markup of one frame: its toolbar, the iframe and the (hidden) source. */
-export function frameMarkup(source: unknown, theme: FrameTheme, labels: FrameLabels): string {
+/** The markup of one frame: its toolbar, the iframe and the (hidden) source. With `byRoute` (the host publishes
+    pages, `HostPlatform.publishHtmlFrame`) the document waits in `data-nq-doc` and `brancherCadres` points the
+    iframe at its route; it is never loaded as `srcdoc` first. */
+export function frameMarkup(source: unknown, theme: FrameTheme, labels: FrameLabels, byRoute = false): string {
 	const doc = buildSrcdoc(source, theme);
 	if (!doc.ok) return doc.reason === "tooLarge" ? `<div class="nq-html-frame nq-html-frame--refused">${escapeAttr(labels.tooLarge)}</div>` : "";
 	const code = escapeAttr(String(source));
 	return `<div class="nq-html-frame" data-nq-frame="1">`
-		+ `<iframe class="nq-html-frame-view" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" allow="" title="${escapeAttr(labels.title)}" srcdoc="${escapeAttr(doc.srcdoc)}" style="height:120px"></iframe>`
+		+ `<iframe class="nq-html-frame-view" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" allow="" title="${escapeAttr(labels.title)}" ${byRoute ? "data-nq-doc" : "srcdoc"}="${escapeAttr(doc.srcdoc)}" style="height:120px"></iframe>`
 		+ `<button type="button" class="nq-html-frame-code" aria-expanded="false" data-show="${escapeAttr(labels.showCode)}" data-hide="${escapeAttr(labels.hideCode)}">${escapeAttr(labels.showCode)}</button>`
 		+ `<pre class="nq-html-frame-source" hidden><code>${code}</code></pre></div>`;
 }
