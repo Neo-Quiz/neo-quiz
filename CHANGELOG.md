@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- The assistant chat of a question can now improve the question itself when you ask (or when it finds a real error): rephrase the statement, fix an option or the right answer, improve the explanation or the hint. It shows a before/after, says plainly when the right answer changes, and writes nothing until you click "Apply to the question"; "Undo" restores the note exactly. When the right answer changes, your answer to that question is judged again and the question is marked to review.
+
 ## [1.20.64] - 2026-10-09
 
 ### Changed

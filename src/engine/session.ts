@@ -354,3 +354,27 @@ export interface SessionSink {
 export function canSnapshot(o: { exam: boolean; locked: boolean; onQuestion: boolean }): boolean {
 	return !o.exam && !o.locked && o.onQuestion;
 }
+
+/**
+ * The RIGHT ANSWER of question `id` changed under the learner (the assistant
+ * chat rewrote it, 2026-10-09). The answer they gave was judged against the
+ * old key, so that judgement is withdrawn: the question reopens unchecked,
+ * their selection or text kept so that checking again judges it against the
+ * new key, and in a Learn it is marked TO REVIEW (missed, back in the retry
+ * queue). The review journal is not touched: `journalisee` stays, so a new
+ * check writes no second line. A question without state is left alone. PURE:
+ * returns a new snapshot.
+ */
+export function marquerARevoir(photo: SessionQuiz, id: string): SessionQuiz {
+	const e = photo.questions[id];
+	if (!e) return photo;
+	const { verifiee: _v, verifieeLearn: _vl, enAttente: _a, note: _n, reprise: _r, ...reste } = e;
+	const q: EtatQuestion = { ...reste };
+	const out: SessionQuiz = { ...photo, questions: { ...photo.questions, [id]: q } };
+	if (e.verdict) {
+		q.verdict = "missed";
+		q.ratees = Math.max(e.ratees ?? 0, 1);
+		out.file = [...(photo.file ?? []).filter(f => f.id !== id), { id, depuis: 0 }];
+	}
+	return out;
+}

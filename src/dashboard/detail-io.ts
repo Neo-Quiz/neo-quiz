@@ -9,7 +9,7 @@ import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { applyKeepExam, type KeepExam } from "./exam-keep";
-import { applyCardEdit } from "./card-edit";
+import { applyCardEdit, applyQuestionEdit } from "./card-edit";
 
 /* ══════════════════════════════════════════════════════════
    DETAIL I/O — lecture / écriture du bloc quiz-blocks d'une note
@@ -288,6 +288,15 @@ async function rewriteBlock(path: string, expectedBlock: string, compute: (sourc
  */
 export function saveCardEdit(path: string, expectedBlock: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>): Promise<BlockRewrite> {
 	return rewriteBlock(path, expectedBlock, (source) => applyCardEdit(source, qi, expected, fields));
+}
+
+/**
+ * Rewrites ONE question (whitelisted fields only, `applyQuestionEdit`) after
+ * the learner clicked "Apply to the question" in the assistant chat. Same
+ * compare-and-swap; nothing else of the note moves.
+ */
+export function saveQuestionEdit(path: string, expectedBlock: string, qi: number, expected: Record<string, unknown>, fields: Record<string, unknown>): Promise<BlockRewrite> {
+	return rewriteBlock(path, expectedBlock, (source) => applyQuestionEdit(source, qi, expected, fields));
 }
 
 /**

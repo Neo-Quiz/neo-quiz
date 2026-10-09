@@ -27,6 +27,7 @@ import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { extractExamOptions, findQuizModeConfigIndex, parseQuizSource, QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { idsForRawItems } from "../../../../src/quiz-ids";
+import { marquerARevoir } from "../../../../src/engine/session";
 import type { SessionQuiz } from "../../../../src/engine/session";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { monterBoutonExpliquer } from "./explain";
@@ -267,17 +268,28 @@ export async function openQuizPage(
 	   where a session snapshot says (`courante`, the card's id), the answers
 	   already given included; with none to keep, a snapshot without answers
 	   carries only the position. Nothing leaves the screen but its content. */
-	const recharger = async (nouvelle: string, qi: number): Promise<Record<string, unknown>[]> => {
+	/* A QUESTION rewritten by the assistant (2026-10-09) reloads the same way.
+	   `aReviser`: its right answer changed, so the learner's answer to it is
+	   judged again (`marquerARevoir`). `garderEcran`: a handed-in Test keeps
+	   its results on screen (re-rendering would start a new attempt); only the
+	   questions the chat sees are read again. */
+	const recharger = async (nouvelle: string, qi: number, opts: { aReviser?: boolean; garderEcran?: boolean } = {}): Promise<Record<string, unknown>[]> => {
 		const m = nouvelle.match(QUIZ_BLOCK_RE);
 		if (!m) throw new Error("no quiz block");
 		const quiz = parseQuizSource(m[1]);
 		const jouees = extractExamOptions(quiz).questions as unknown as Record<string, unknown>[];
+		if (opts.garderEcran) {
+			source = nouvelle;
+			questionsJouees = jouees;
+			return jouees;
+		}
 		const config = findQuizModeConfigIndex(quiz);
 		const id = idsForRawItems(quiz)[qi + (config >= 0 && config <= qi ? 1 : 0)] ?? null;
 		hote.__quizDestroy?.();
 		hote.replaceChildren();
 		const puits = sessions?.puits(entry.path);
-		const gardee = sessions?.lire(entry.path) ?? null;
+		const lue = sessions?.lire(entry.path) ?? null;
+		const gardee = lue && id && opts.aReviser ? marquerARevoir(lue, id) : lue;
 		const initiale: SessionQuiz = { ...(gardee ?? { v: 1, questions: {} }), v: 1, courante: id, ecrite: Date.now() } as SessionQuiz;
 		await renderInteractiveQuiz({
 			container: hote,

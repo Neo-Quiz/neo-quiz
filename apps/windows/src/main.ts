@@ -5,6 +5,7 @@ import "./assets/zoom.css";
 import "./assets/shell.css";
 import "./assets/perles.css";
 import "./assets/quiz-bars.css";
+import "./assets/question-edit.css";
 import "./assets/modal.css";
 import "./assets/moodle-modal.css";
 import "./assets/math.css";
