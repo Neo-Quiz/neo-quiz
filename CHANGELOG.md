@@ -13,22 +13,26 @@ release notes.
 
 ## [Unreleased]
 
-## [1.20.67] - 2026-10-09
-
-### Changed
-
-- The plan usage bars use claude.ai's colours: blue, amber from 75 % and red from 90 %, with a track tinted to match.
-### Changed
-
-- Backspace and Delete no longer remove the attachments of the composer; only their × button does.
 ### Added
 
 - Claude Code can now read and search the files of a quiz's folder itself, with read-only tools, once you trust that folder: Neo Quiz asks the first time, every file it reads or search it runs shows in a folded "AI work" block (refused steps included), and Settings › AI lists the trusted folders with Remove.
 
 ### Changed
 
+- Backspace and Delete no longer remove the attachments of the composer; only their × button does.
+- A request you sent and ran on this device no longer shows a "this device" origin line.
 - An image from the web in a generated quiz now shows as a plain link and is never loaded; images from your folder still show.
 - When Claude Code looks at attached pictures, it can read those pictures and nothing else.
+
+### Fixed
+
+- Quiz HTML could keep an event handler or a javascript: link nested inside a tag the sanitizer removes; such content is now cleaned too.
+
+## [1.20.67] - 2026-10-09
+
+### Changed
+
+- The plan usage bars use claude.ai's colours: blue, amber from 75 % and red from 90 %, with a track tinted to match.
 
 ## [1.20.66] - 2026-10-09
 
