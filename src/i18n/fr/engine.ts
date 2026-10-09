@@ -110,7 +110,6 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.learn.summaryMissed": "À revoir",
 	"engine.learn.rateTitle": "Votre réponse était-elle juste ?",
 	"engine.learn.feedbackRight": "Bien joué",
-	"engine.learn.feedbackWrong": "Courage",
 	"engine.learn.summaryTitle": "Votre bilan",
 	"engine.learn.summaryAccuracy": "Précision",
 	"engine.learn.summaryTime": "Temps",

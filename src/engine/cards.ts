@@ -37,7 +37,6 @@ const DUREE_ARRIVEE_MS = 900;
 const ICON_TRIANGLE_ALERTE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
 const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
 const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
 /** THE HINT BADGE (spec 2026-09-29-test-practice-exam-design §2.3): a dot
@@ -727,7 +726,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 	    encouragement line, then the explanation. */
 	function stepCorrectionHtml(qi: number): string {
 		const right = ctx.isCorrect(qi);
-		const lead = `<p class="quiz-correction-lead">${right ? ICON_CHECK : ICON_X}<span>${t(right ? "engine.learn.feedbackRight" : "engine.learn.feedbackWrong")}</span></p>`;
+		/* A wrong answer gets no encouragement line (2026-10-09: "Courage" read
+		   as empty words): the option marked wrong and the explanation say it. */
+		const lead = right ? `<p class="quiz-correction-lead">${ICON_CHECK}<span>${t("engine.learn.feedbackRight")}</span></p>` : "";
 		return `<div class="quiz-correction ${right ? "is-right" : "is-wrong"}">${lead}${explanationHtml(qi)}</div>`;
 	}
 

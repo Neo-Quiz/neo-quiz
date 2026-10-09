@@ -126,7 +126,6 @@ export const EN_ENGINE = {
 	"engine.learn.summaryMissed": "To review",
 	"engine.learn.rateTitle": "Was your answer right?",
 	"engine.learn.feedbackRight": "Well done",
-	"engine.learn.feedbackWrong": "Keep going",
 	"engine.learn.summaryTitle": "Your summary",
 	"engine.learn.summaryAccuracy": "Accuracy",
 	"engine.learn.summaryTime": "Time",

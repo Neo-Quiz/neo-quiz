@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A wrong answer in a Learn no longer shows « Keep going »: the answer marked wrong and the explanation say it.
+
 ## [1.20.55] - 2026-10-09
 
 ### Added
