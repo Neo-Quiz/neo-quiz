@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.64] - 2026-10-09
+
 ### Changed
 
 - The plan usage under the composer (Generate and Explain) now stacks one bar per window with an "Updated ..." line, and opens a popover on click with each limit's share used, share remaining and time to reset. Reads are spaced at least 30 s apart for every block, back off after a rate-limit answer, and can be refreshed by hand from the popover.
