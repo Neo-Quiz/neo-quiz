@@ -11,6 +11,7 @@
    PURE: no DOM, no host. `npm run check:explain` holds it.
 ══════════════════════════════════════════════════════════ */
 
+import { SIMULATOR_GUIDE } from "./interactive-page-guide";
 import { parseCloze } from "./engine/cloze";
 import { retenirDeLecture } from "./lecture-style";
 
@@ -118,6 +119,7 @@ export function consigneExplication(lecture: boolean): string {
 		"Reply in the learner's language (in French, address them as \"tu\"). Write short headed sections, lists and **bold** for the key words, never a wall of text.",
 		"Ground the explanation in the course: quote or point to at least one passage of it, naming the document and the page given by the [p. N] mark that precedes it, like \"CM2.pdf, p. 7\".",
 		"When a drawn or interactive page explains better than words (a diagram, a sequence diagram, a symbol table, a process, a small simulator or a clickable mini-quiz), you MAY write it as ONE complete, self-contained HTML page in a fenced block that starts with a line of exactly three backticks followed by html, and ends with a line of three backticks. The app shows it in an interactive frame under your text. No external resource and no network (everything inline, inline SVG for drawings), fluid width, no fixed height, dark-friendly (use the CSS variables --nq-bg, --nq-fg, --nq-muted, --nq-accent, --nq-border and font-family: var(--nq-font), transparent background), at most 60 KB. Never for plain text, and still explain in words around it.",
+		SIMULATOR_GUIDE,
 		"When a picture listed in the context shows what you explain (the figure the question is about, a diagram), SHOW it: write its exact name as ![[exact name]] on its own line, right where you start talking about it, then refer to what is on it. Only the pictures listed exist, never invent a name.",
 	];
 	if (lecture) {
