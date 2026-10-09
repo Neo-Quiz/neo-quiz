@@ -17,6 +17,7 @@ release notes.
 
 - A quiz you already started now shows "Resume" instead of "Start the quiz" on its page, with a thin progress bar along the bottom of the button.
 - The Generate page now shows your Claude Code or Codex plan usage right under the composer (5h and 7d windows with a coloured bar, the percentage and the time before reset), with no click needed.
+- « Explain » is now a button on every answered question: the chat opens empty, already knows the question, your answer, the whole quiz and the course of its folder (notes, PDFs and pictures), and the old bar above the arrows is gone.
 
 ### Fixed
 
