@@ -1,8 +1,8 @@
 {
-  "versionCode": 25,
-  "versionName": "0.2.23",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.23/NeoQuiz-0.2.23.apk",
-  "sha256": "f0bad0db94ce3479fbe18ca919e68ec50560bc44d2036af2f5239bf400652822",
-  "size": 56012161,
-  "notes": "Plan usage details on tap"
+  "versionCode": 26,
+  "versionName": "0.2.24",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.24/NeoQuiz-0.2.24.apk",
+  "sha256": "34b5d3a1a4e7cbed07477b66e57a538ecac20ada7081a60747153841afb0f5a3",
+  "size": 56048765,
+  "notes": "Interactive pages on Android, AI assistant, progress merged per question"
 }
