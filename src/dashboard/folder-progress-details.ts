@@ -8,6 +8,8 @@ import { quizDeLaCarte, type CarteCours } from "./course-pairs";
 import { computeQuizState } from "./quiz-mastery";
 import { quizModeLabel } from "./quiz-card";
 import { formatDateHeure } from "./format-date";
+import { isDeletableResultsPath, trashResultsFile } from "../results-files";
+import { LOG_PREFIX } from "../branding";
 
 /* ══════════════════════════════════════════════════════════
    LES TUILES DU BAS de l'onglet « Progression » (2026-09-25) :
@@ -161,7 +163,10 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 		annuler.type = "button";
 		annuler.addEventListener("click", () => {
 			registre.delete(cle);
-			ctx.statsStore.restaurerTentative(q.path, tentative);
+			// Its results file already went to the trash: the attempt comes
+			// back without the link (the file is recovered from the trash).
+			const { results: _gone, ...sansFichier } = tentative;
+			ctx.statsStore.restaurerTentative(q.path, sansFichier);
 			redessiner();
 		});
 		return;
@@ -181,5 +186,19 @@ function renderLigneTentative(parent: HTMLElement, ctx: DashboardShellCtx, q: Qu
 		if (!retiree) return;
 		registre.set(cle, retiree);
 		redessiner();
+		trashAttemptResults(q.path, retiree);
+	});
+}
+
+/** Deleting an attempt also moves its saved results file (2026-10-09) to the
+    host's trash. `results` comes from a synced file: only a `.json` directly
+    in THIS quiz's results folder is touched (`isDeletableResultsPath`). */
+function trashAttemptResults(quizPath: string, tentative: Tentative): void {
+	const host = currentHost();
+	const dir = host.paths.resultsDirFor(quizPath);
+	if (!isDeletableResultsPath(tentative.results, dir)) return;
+	trashResultsFile(host.fs, dir, tentative.results).catch((e: unknown) => {
+		console.warn(LOG_PREFIX, "results file of a deleted attempt not trashed", tentative.results, e);
+		host.ui.notice(t("engine.result.deleteError", { message: (e as { message?: string })?.message || t("engine.result.unknownError") }));
 	});
 }

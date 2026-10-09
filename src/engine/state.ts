@@ -2,6 +2,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 import type { PracticeMode, QuizResult, StatsRecord } from "../types/quiz";
 import type { ReviewGrade } from "../scheduler";
 import { isExamSetup } from "../test-setup";
+import { attemptDateOf } from "../results-files";
 import { t } from "../i18n";
 
 /** Sous-ensemble du store de stats (dashboard/stats-store) réellement lu ici. */
@@ -246,13 +247,12 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		if (ctx.textOnly?.isTextOnlyMode?.()) {
 			return JSON.stringify({
 				mode: ctx.quizState.practiceMode,
-				results: ctx.textOnly.computeResults(),
-				savedResultsPath: ctx.quizState.savedResultsPath || null
+				results: ctx.textOnly.computeResults()
 			});
 		}
 		const { pct, correct, total } = computeScorePercent();
 		const learn = ctx.learn?.isActive?.() ? ctx.learn.summary() : null;
-		return JSON.stringify({ mode: ctx.quizState.practiceMode, locked: ctx.quizState.locked, pct, correct, total, learn, savedResultsPath: ctx.quizState.savedResultsPath || null });
+		return JSON.stringify({ mode: ctx.quizState.practiceMode, locked: ctx.quizState.locked, pct, correct, total, learn });
 	};
 
 	function clearNavTabPressState(tab: HTMLElement | null): void {
@@ -464,7 +464,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// Recommencer, c'est une NOUVELLE session : elle a le droit d'être
 		// comptée à son tour.
 		ctx.quizState.resultsCounted = false;
-		ctx.quizState.savedResultsPath = null;
+		ctx.resultsSaver?.reset?.();
 		if (nextMode === "text") ctx.stopExamTimer?.();
 
 		if (ctx.isSubmitSlideIndex(ctx.quizState.current) || ctx.isResultsSlideIndex(ctx.quizState.current)) {
@@ -609,6 +609,11 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		if (!ctx.quizState.resultsCounted) {
 			ctx.quizState.resultsCounted = true;
 
+			/* The results file of this attempt is decided NOW, before the
+			   history attempt is recorded: that attempt carries its path, so
+			   deleting it later (folder progress) can trash the file too. */
+			const resultsPath = ctx.resultsSaver?.planPath?.() ?? null;
+			let attemptRecord: unknown = null;
 			const statsStore = ctx.statsSink;
 			if (statsStore && ctx.sourcePath) {
 				/* A Learn (engine/learn.ts) has a real score even with written
@@ -647,16 +652,18 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				}
 				// A Test's attempt keeps its "right with a hint" count (spec §2.2).
 				const withHint = ctx.quizMode !== "lesson" ? countRightWithHint() : 0;
-				statsStore.updateRecord(ctx.sourcePath, {
+				attemptRecord = statsStore.updateRecord(ctx.sourcePath, {
 					bestScore: modeTexte ? 0 : pct,
 					questionsDone,
 					totalQuestions: (total + pendingWritten) || ctx.quiz.length,
 					texteLibre: modeTexte,
 					...(withHint > 0 ? { withHint } : {}),
 					// Whether Exam mode was on (spec 2026-09-29-test-setup-modal-design.md §3).
-					...(ctx.testSetup ? { exam: isExamSetup(ctx.testSetup) } : {})
+					...(ctx.testSetup ? { exam: isExamSetup(ctx.testSetup) } : {}),
+					...(resultsPath ? { results: resultsPath } : {})
 				});
 			}
+			ctx.resultsSaver?.handIn?.(resultsPath, attemptDateOf(attemptRecord, resultsPath));
 
 			/* The scheduler counts PER QUESTION. A "read" card is neither right
 			   nor wrong (`seen`), nor is an abandoned pre-question (`skipped`):
@@ -713,6 +720,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 
 		updateNavHighlight();
 		goToSlide(ctx.SLIDE_RESULTS_INDEX, { forceRender: false });
+		/* Saved automatically, once per attempt: a second arrival here (the
+		   Results tab clicked again) finds the attempt already saved. */
+		void ctx.resultsSaver?.autoSave?.();
 	}
 
 	function resetQuiz({ preserveSliding = false }: { preserveSliding?: boolean } = {}): void {
@@ -736,7 +746,7 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		ctx.quizState.locked = false;
 		ctx.container?.classList?.remove("quiz-is-locked");
 		ctx.quizState.pendingResultsLock = false;
-		ctx.quizState.savedResultsPath = null;
+		ctx.resultsSaver?.reset?.();
 		ctx.quizState.shuffleMap = ctx.buildShuffleMap();
 		ctx.quizState.orderingPick = ctx.initOrderingPicks();
 		ctx.quizState.matchPick = ctx.initMatchPicks();

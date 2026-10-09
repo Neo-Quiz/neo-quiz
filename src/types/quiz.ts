@@ -413,7 +413,8 @@ export interface QuizState {
 	    seule session (engine/state.ts goToResults). Remis à faux par
 	    `resetQuiz`, qui recommence bien une session. */
 	resultsCounted: boolean;
-	savedResultsPath: string | null;
+	/** The automatic save of this attempt's results (src/results-files.ts). */
+	resultsSave: ResultsSaveState;
 	shuffleMap: QuestionShuffleEntry[];
 	/** Élément en cours de sélection pour glisser-déposer, question de classement (engine/interactions.js). */
 	orderingPick: Array<number | null>;
@@ -528,6 +529,21 @@ export interface StatsRecord {
 	    2026-09-29-test-setup-modal-design.md §3); absent otherwise and for a
 	    host that asks for no setup. */
 	exam?: boolean;
+	/** The results file saved for this attempt (src/results-files.ts). */
+	results?: string;
+}
+
+/** Where the automatic save of a finished quiz's results stands. */
+export interface ResultsSaveState {
+	/** Grows at each hand-in and each "Start over". */
+	attempt: number;
+	status: "none" | "pending" | "saving" | "saved" | "failed" | "deleting" | "deleted";
+	/** The results file of this attempt, decided at hand-in. */
+	path: string | null;
+	/** The date of the history attempt recorded at the same hand-in. */
+	attemptDate: number | null;
+	/** The reason of the last failure. */
+	error: string | null;
 }
 
 /**

@@ -150,7 +150,9 @@ export interface EngineCtx {
 	 * `plugin._statsStore`, ce qui le liait au greffon pour une seule
 	 * fonction ; l'app n'a pas de `Plugin`.
 	 */
-	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown };
+	/** `supprimerTentative`: "Delete these results" also removes the attempt
+	    recorded at the same hand-in (engine/results-save.ts). */
+	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown; supprimerTentative?(path: string, date: number): unknown };
 	sessionSink?: import("../engine/session").SessionSink;
 	/** Snapshots the state and stores it (no effect without a sink, off a
 	    question, once handed in, in a legacy Exam, or before the launch). */

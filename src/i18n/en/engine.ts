@@ -218,12 +218,18 @@ export const EN_ENGINE = {
 	"engine.result.pendingWritten.other": "{count} written answers are not self-assessed yet — they don't count in the score.",
 	"engine.result.retry": "Start over",
 
-	/* ── Sauvegarde des résultats ── */
-	"engine.result.save": "Save my results",
-	"engine.result.saved": "Results saved",
+	/* ── Results save (automatic since 2026-10-09) ── */
+	"engine.result.retrySave": "Retry saving",
+	"engine.result.delete": "Delete these results",
+	"engine.result.deleting": "Deleting...",
+	"engine.result.deleted": "Results deleted",
+	"engine.result.deleteError": "Could not delete the results: {message}",
+	"engine.result.deleteConfirmTitle": "Delete these results?",
+	"engine.result.deleteConfirmMessage": "The results file of this attempt goes to the trash, and the attempt leaves your progress history.",
+	"engine.result.deleteConfirmAction": "Delete",
+	"engine.result.deleteConfirmCancel": "Cancel",
 	"engine.result.saving": "Saving...",
 	"engine.result.savedIn": "Saved to {path}",
-	"engine.result.savedNotice": "Results saved: {path}",
 	"engine.result.saveError": "Could not save the results: {message}",
 	"engine.result.unknownError": "unknown error",
 

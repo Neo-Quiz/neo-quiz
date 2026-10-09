@@ -199,13 +199,19 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.result.pendingWritten.other": "{count} réponses écrites ne sont pas encore auto-évaluées — elles ne comptent pas dans le score.",
 	"engine.result.retry": "Recommencer",
 
-	/* ── Sauvegarde des résultats ── */
-	"engine.result.save": "Sauvegarder mes résultats",
-	"engine.result.saved": "Résultats sauvegardés",
+	/* ── Results save (automatic since 2026-10-09) ── */
+	"engine.result.retrySave": "Réessayer la sauvegarde",
+	"engine.result.delete": "Supprimer ces résultats",
+	"engine.result.deleting": "Suppression...",
+	"engine.result.deleted": "Résultats supprimés",
+	"engine.result.deleteError": "Impossible de supprimer les résultats : {message}",
+	"engine.result.deleteConfirmTitle": "Supprimer ces résultats ?",
+	"engine.result.deleteConfirmMessage": "Le fichier de résultats de cette tentative part dans la corbeille, et la tentative quitte l'historique de votre progression.",
+	"engine.result.deleteConfirmAction": "Supprimer",
+	"engine.result.deleteConfirmCancel": "Annuler",
 	"engine.result.saving": "Sauvegarde...",
 	"engine.result.savedIn": "Sauvegardé dans {path}",
-	"engine.result.savedNotice": "Résultats sauvegardés : {path}",
-	"engine.result.saveError": "Erreur sauvegarde résultats : {message}",
+	"engine.result.saveError": "Impossible de sauvegarder les résultats : {message}",
 	"engine.result.unknownError": "erreur inconnue",
 
 	/* ── Bouton ressource (pièce jointe) ── */

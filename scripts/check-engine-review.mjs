@@ -457,6 +457,31 @@ await withSrcModule(
 	}
 
 	{
+		/* Automatic results save (2026-10-09): the file is decided at the
+		   hand-in, BEFORE the history attempt, which carries its path; a second
+		   arrival on the results asks the saver again, which is idempotent per
+		   attempt (tested on the real saver at the end of this script). */
+		const r = makeReporter("goToResults - results file decided once per hand-in");
+		const quiz = [{ id: "q1", title: "Q1", options: ["a", "b"], correctIndex: 0 }];
+		const updates = [];
+		const statsStore = { updateRecord(path, u) { updates.push(u); return { lastPlayed: 777, tentatives: [{ date: 777, results: u.results }] }; } };
+		const { ctx } = makeCtx({ quiz, selections: [0], isLessonMode: false, statsStore });
+		const calls = { plan: 0, handIn: [], auto: 0 };
+		ctx.resultsSaver = {
+			planPath: () => { calls.plan++; return `R/file-${calls.plan}.json`; },
+			handIn: (path, date) => calls.handIn.push([path, date]),
+			autoSave: async () => { calls.auto++; },
+		};
+		ctx.goToResults();
+		ctx.goToResults();
+		r.check("one path planned for one hand-in", calls.plan, 1);
+		r.check("the history attempt carries the results path", updates.map(u => u.results), ["R/file-1.json"]);
+		r.check("the saver learns the path and the attempt's date", calls.handIn, [["R/file-1.json", 777]]);
+		r.check("each arrival asks the (idempotent) saver", calls.auto, 2);
+		r.done();
+	}
+
+	{
 		/* Minor promu : le journal de l'ordonnanceur ne doit plus dépendre de
 		   la présence d'un `statsSink` — un store sans rapport avec lui. */
 		const r = makeReporter("goToResults — le journal ne dépend pas du statsStore (minor)");
@@ -1354,5 +1379,113 @@ await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, fo
 	r.check("summary: the total never falls under the answered count", learnFigures({ first: 3, retried: 0, missed: 0 }, 1).total, 3);
 	r.check("elapsed m:ss", formatElapsed(132_000), "2:12");
 	r.check("elapsed h:mm:ss", formatElapsed(3_725_000), "1:02:05");
+	r.done();
+});
+
+/* Automatic results save and deletion (2026-10-09): the pure rules
+   (src/results-files.ts) and the REAL saver (engine/results-save.ts) on an
+   in-memory file system. */
+await withSrcModule(["src/results-files.ts", "src/engine/results-save.ts"], async (rf, { createResultsSaver }) => {
+	const { isDeletableResultsPath, noResultsSave, handedInResults, resetResultsSave, canStartResultsSave, attemptDateOf } = rf;
+	const r = makeReporter("Results files - gate, idempotence, deletion");
+	const D = "Cours/.neo-quiz/results";
+	r.check("a .json directly in the results folder is deletable", isDeletableResultsPath(`${D}/2026-10-09_quiz_qcm-abc123.json`, D), true);
+	r.check("a trailing slash on the folder changes nothing", isDeletableResultsPath(`${D}/x.json`, `${D}/`), true);
+	r.check("never the quiz note", isDeletableResultsPath("Cours/Quiz.md", D), false);
+	r.check("never a note inside the folder", isDeletableResultsPath(`${D}/x.md`, D), false);
+	r.check("never the latest.json mirror", isDeletableResultsPath(`${D}/latest.json`, D), false);
+	r.check("never a sub-folder", isDeletableResultsPath(`${D}/sub/x.json`, D), false);
+	r.check("never a traversal", isDeletableResultsPath(`${D}/../../Quiz.json`, D), false);
+	r.check("never a backslash", isDeletableResultsPath(`${D}/..\\x.json`, D), false);
+	r.check("never a stream", isDeletableResultsPath(`${D}/x.json:evil`, D), false);
+	r.check("never a hidden name", isDeletableResultsPath(`${D}/.json`, D), false);
+	r.check("never a sibling folder sharing the prefix", isDeletableResultsPath(`${D}-evil/x.json`, D), false);
+	r.check("never another quiz folder's results", isDeletableResultsPath("Autre/.neo-quiz/results/x.json", D), false);
+	r.check("never a non-string", isDeletableResultsPath(42, D), false);
+	r.check("never with an empty folder", isDeletableResultsPath("/x.json", ""), false);
+
+	const s0 = noResultsSave();
+	const s1 = handedInResults(s0, `${D}/a.json`, 5);
+	r.check("a hand-in is a new attempt, pending", [s1.attempt, s1.status, s1.path, s1.attemptDate], [1, "pending", `${D}/a.json`, 5]);
+	r.check("a pending attempt starts its save", canStartResultsSave(s1), true);
+	r.check("an attempt being saved never starts again", canStartResultsSave({ ...s1, status: "saving" }), false);
+	r.check("a saved attempt never saves again", canStartResultsSave({ ...s1, status: "saved" }), false);
+	r.check("a saved attempt never saves again, even on retry", canStartResultsSave({ ...s1, status: "saved" }, true), false);
+	r.check("a failed save restarts only on retry", [canStartResultsSave({ ...s1, status: "failed" }), canStartResultsSave({ ...s1, status: "failed" }, true)], [false, true]);
+	r.check("deleted results are never saved again", canStartResultsSave({ ...s1, status: "deleted" }, true), false);
+	r.check("without a note nothing is saved", canStartResultsSave(handedInResults(s0, null, null)), false);
+	r.check("Start over moves to the next attempt, nothing saved", [resetResultsSave(s1).attempt, resetResultsSave(s1).status], [2, "none"]);
+	r.check("the attempt date is the one carrying the path",
+		attemptDateOf({ lastPlayed: 9, tentatives: [{ date: 3, results: "p" }, { date: 9 }] }, "p"), 3);
+	r.check("else the last attempt", attemptDateOf({ lastPlayed: 9, tentatives: [] }, "p"), 9);
+	r.check("a store that returns nothing gives no date", attemptDateOf(undefined, "p"), null);
+
+	/* The real saver on an in-memory host. */
+	const files = new Map();
+	const trashed = [];
+	let failWrites = 0;
+	const deleted = [];
+	const notices = [];
+	const fs = {
+		mkdirs: async () => {},
+		exists: async (p) => files.has(p),
+		read: async (p) => { if (!files.has(p)) throw new Error("absent"); return files.get(p); },
+		write: async (p, d) => { if (failWrites > 0) { failWrites--; throw new Error("disk full"); } files.set(p, d); },
+		trash: async (p) => { trashed.push(p); files.delete(p); },
+	};
+	const ctx = {
+		sourcePath: "Cours/Quiz.md",
+		host: { fs, paths: { resultsDirFor: () => D }, ui: { notice: (m) => notices.push(m) } },
+		quiz: [],
+		quizMode: "quiz",
+		quizState: { resultsSave: noResultsSave(), resultsCounted: true, selections: [] },
+		textOnly: { isTextOnlyMode: () => false },
+		computeScorePercent: () => ({ pct: 100, correct: 1, total: 1, pendingWritten: 0 }),
+		isReadingCard: () => false,
+		hasAnyAnswer: () => true,
+		statsSink: { updateRecord() {}, supprimerTentative: (path, date) => deleted.push([path, date]) },
+	};
+	const saver = createResultsSaver(ctx);
+	const own = () => [...files.keys()].filter(p => !p.endsWith("/latest.json"));
+	const path1 = saver.planPath();
+	r.check("the planned file sits in the results folder", isDeletableResultsPath(path1, D), true);
+	saver.handIn(path1, 1000);
+	await Promise.all([saver.autoSave(), saver.autoSave()]);
+	await saver.autoSave();
+	r.check("three arrivals on the results write ONE file", own(), [path1]);
+	r.check("saved, with no notice", [ctx.quizState.resultsSave.status, notices.length], ["saved", 0]);
+	r.check("the file names its history attempt", JSON.parse(files.get(path1)).attemptDate, 1000);
+	saver.refreshSaved();
+	await new Promise(res => setTimeout(res, 0));
+	r.check("an answer judged after the save rewrites the SAME file", [own(), ctx.quizState.resultsSave.status], [[path1], "saved"]);
+
+	saver.reset();
+	const path2 = saver.planPath();
+	saver.handIn(path2, 2000);
+	r.check("Start over then a new hand-in plans another file", path2 !== path1, true);
+	failWrites = 1;
+	await saver.autoSave();
+	r.check("a failed save shows its reason and waits for Retry", [ctx.quizState.resultsSave.status, notices.length, own().length], ["failed", 1, 1]);
+	await saver.autoSave();
+	r.check("without Retry, a failure is not retried", own().length, 1);
+	await saver.autoSave({ retry: true });
+	r.check("Retry saves the new attempt: one more file", [ctx.quizState.resultsSave.status, own().length], ["saved", 2]);
+
+	await saver.deleteSaved();
+	r.check("Delete moves THIS attempt's file to the trash", trashed.includes(path2) && !files.has(path2), true);
+	r.check("and the mirror that pointed to it", trashed.includes(`${D}/latest.json`), true);
+	r.check("the first attempt's file stays", files.has(path1), true);
+	r.check("the attempt recorded at the same hand-in leaves the history", deleted, [["Cours/Quiz.md", 2000]]);
+	r.check("the button becomes 'Results deleted'", ctx.quizState.resultsSave.status, "deleted");
+	await saver.autoSave({ retry: true });
+	r.check("deleted results are never written again", files.has(path2), false);
+
+	/* A path that is not a results file (forged state) is refused: nothing trashed. */
+	const before = trashed.length;
+	ctx.quizState.resultsSave = { attempt: 99, status: "saved", path: "Cours/Quiz.md", attemptDate: 1, error: null };
+	files.set("Cours/Quiz.md", "note");
+	await saver.deleteSaved();
+	r.check("a quiz note is never trashed", [trashed.length - before, files.has("Cours/Quiz.md")], [0, true]);
+	r.check("the refusal is said, the results stay offered", ctx.quizState.resultsSave.status, "saved");
 	r.done();
 });

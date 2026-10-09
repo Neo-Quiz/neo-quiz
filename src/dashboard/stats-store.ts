@@ -22,6 +22,9 @@ export interface Tentative {
 	withHint?: number;
 	/** Played in Exam mode (hints off and a time limit); absent otherwise. */
 	exam?: true;
+	/** The results file saved at this hand-in (src/results-files.ts). Synced
+	    from other devices: checked by `isDeletableResultsPath` before use. */
+	results?: string;
 }
 
 /** Au-delà, les plus anciennes tombent — la meilleure est toujours gardée. */
@@ -164,6 +167,7 @@ export function createStatsStore(host: StatsStoreHost): StatsStore {
 			pct: update.texteLibre ? null : (update.bestScore || 0),
 			...(update.withHint && update.withHint > 0 ? { withHint: update.withHint } : {}),
 			...(update.exam ? { exam: true as const } : {}),
+			...(typeof update.results === "string" && update.results ? { results: update.results } : {}),
 		};
 		const base: QuizStatRecord = {
 			...existing,

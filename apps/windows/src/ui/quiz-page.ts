@@ -86,7 +86,7 @@ export async function openQuizPage(
 	   par quiz (`types/engine-ctx.ts`), jamais son implémentation — c'est ce
 	   qui permet à `StatsStore` (obsidian.Plugin ou réglages de l'app) de
 	   servir les deux hôtes sans que le moteur sache lequel l'appelle. */
-	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown },
+	statsSink?: { updateRecord(path: string, update: StatsRecord): unknown; supprimerTentative?(path: string, date: number): unknown },
 	/* Les SESSIONS en cours (2026-09-26) : reprendre le quiz là où on
 	   s'était arrêté. Optionnel comme les deux puits ci-dessus, pour les
 	   mêmes raisons. */

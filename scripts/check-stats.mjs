@@ -97,6 +97,16 @@ await withSrcModule("src/dashboard/stats-store.ts", ({ createStatsStore, tentati
 	sExamen.restaurerTentative("h.md", retireeExamen);
 	r.check("… through a deletion and its undo", tentativesDe(sExamen.getRecord("h.md")).find(x => x.date === examen.date)?.exam, true);
 
+	/* The results file saved at a hand-in (2026-10-09) rides on its attempt:
+	   deleting the attempt from the folder progress trashes that file too. */
+	const { store: sFichier } = fabriquer();
+	const recFichier = sFichier.updateRecord("k.md", { bestScore: 60, questionsDone: 1, totalQuestions: 1, results: "R/k-1.json" });
+	sFichier.updateRecord("k.md", { bestScore: 70, questionsDone: 1, totalQuestions: 1 });
+	const [sansLien, avecLien] = tentativesDe(sFichier.getRecord("k.md"));
+	r.check("an attempt keeps its results file, another has none", [avecLien.results, "results" in sansLien], ["R/k-1.json", false]);
+	r.check("the store's return names the attempt carrying the file", recFichier.tentatives.find(x => x.results === "R/k-1.json")?.date, avecLien.date);
+	r.check("a deletion hands back the file to trash", sFichier.supprimerTentative("k.md", avecLien.date)?.results, "R/k-1.json");
+
 	/* RELOAD (the synced folder delivered other devices' attempts): the store
 	   takes the host's table again, UNLESS a save of its own is still pending:
 	   reloading then would drop the attempt that save is about to write. */

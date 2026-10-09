@@ -18,6 +18,7 @@ import { createHintHandlers } from "./engine/hint";
 import { createQuestionHandlers } from "./engine/questions";
 import { createTextOnlyHandlers } from "./engine/text-only";
 import { createResultsSaver } from "./engine/results-save";
+import { noResultsSave } from "./results-files";
 import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
@@ -469,7 +470,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		locked: false,
 		pendingResultsLock: false,
 		resultsCounted: false,
-		savedResultsPath: null,
+		resultsSave: noResultsSave(),
 		shuffleMap: buildShuffleMap(),
 		orderingPick: initOrderingPicks(),
 		matchPick: initMatchPicks(),
@@ -569,8 +570,10 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 	/* False while the launch modal is open: no state to snapshot yet. */
 	let launched = !usesSetup;
 
+	/* Every interaction calls this: after the hand-in, the saved results
+	   file follows an answer judged on the results screen (same file). */
 	ctx.invalidateSavedResults = () => {
-		quizState.savedResultsPath = null;
+		resultsSaver.refreshSaved();
 		ctx.saveSession();
 	};
 

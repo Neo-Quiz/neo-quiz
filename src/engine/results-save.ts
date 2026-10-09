@@ -10,7 +10,8 @@ import type {
 } from "../types/quiz";
 import { t } from "../i18n";
 import { LOG_PREFIX } from "../branding";
-import { reserveFreePath, releaseReservedPath } from "../unique-path";
+import { reservePath } from "../unique-path";
+import { RESULTS_MIRROR, canStartResultsSave, handedInResults, resetResultsSave, trashResultsFile } from "../results-files";
 
 export interface OptionEntry {
 	index: number;
@@ -39,6 +40,8 @@ export interface ResultsPayload {
 	quizMode: QuizMode;
 	practiceMode: string;
 	quizTitle: string;
+	/** The date of the history attempt recorded at the same hand-in (schema 3). */
+	attemptDate: number | null;
 	exam: {
 		enabled: boolean;
 		started: boolean;
@@ -51,14 +54,16 @@ export interface ResultsPayload {
 	questions: QuestionResult[];
 }
 
-export interface SavedResults {
-	path: string;
-}
-
 export interface ResultsSaverHandlers {
 	RESULTS_DIR: string;
 	buildPayload(): ResultsPayload;
-	saveCurrentResults(): Promise<SavedResults>;
+	/** The file of the attempt being handed in; `null` without a note. */
+	planPath(): string | null;
+	handIn(path: string | null, attemptDate: number | null): void;
+	reset(): void;
+	autoSave(opts?: { retry?: boolean }): Promise<void>;
+	refreshSaved(): void;
+	deleteSaved(): Promise<void>;
 }
 
 export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
@@ -388,35 +393,40 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 		};
 	}
 
-	/* Le payload est un ARTEFACT DE DONNÉES (JSON versionné par schemaVersion,
-	   écrit dans RESULTS_DIR), pas de l'UI : ses clés, ses `kind` (« text »,
-	   « ordering »…) et ses libellés de repli (« Option 3 », « Question 2 ») ne
-	   passent PAS par le dictionnaire — les traduire rendrait deux exports de la
-	   même session illisibles côté outillage. Seul `selfEvaluation.label` suit la
-	   langue de l'UI : c'est le doublon lisible de `selfEvaluation.value`, qui
-	   reste la clé stable (« understood » / « partial » / « review »).
+	/* The payload is a DATA ARTEFACT (JSON versioned by schemaVersion,
+	   written to RESULTS_DIR), not UI: its keys, its `kind` values ("text",
+	   "ordering"...) and its fallback labels ("Option 3", "Question 2") do
+	   NOT go through the dictionary — translating them would make two exports
+	   of the same session unreadable to tooling. Only `selfEvaluation.label`
+	   follows the UI language: it is the readable twin of
+	   `selfEvaluation.value`, which stays the stable key ("understood" /
+	   "partial" / "review").
 
-	   Historique du schéma :
-	   - 2 (2026-08-31, round 1 de revue task 0) : `questions[].learnText` →
-	     `lessonText` (mode "learn" renommé "lesson") ; `quizMode` ne vaut plus
-	     jamais "learn" non plus, seulement "lesson". Trois fichiers de résultats
-	     déjà écrits par l'utilisateur restent au schéma 1 — le plugin ne les
-	     relit jamais, seul l'outillage externe a besoin de ce numéro pour
-	     distinguer les deux formes.
-	   - 1 : forme initiale. */
+	   Schema history:
+	   - 3 (2026-10-09, automatic save): `attemptDate`, the date of the
+	     dashboard history attempt recorded at the same hand-in; one file per
+	     attempt, rewritten (never duplicated) when an answer is judged after
+	     the hand-in.
+	   - 2 (2026-08-31, review round 1 of task 0): `questions[].learnText` →
+	     `lessonText` (mode "learn" renamed "lesson"); `quizMode` is never
+	     "learn" any more, only "lesson". Three results files the user had
+	     already written stay at schema 1 — the app never reads them back, only
+	     external tooling needs this number to tell the two shapes apart.
+	   - 1: initial shape. */
 	function buildPayload(): ResultsPayload {
 		const mode = ctx.textOnly?.isTextOnlyMode?.() ? "training" : "qcm";
 		const now = new Date();
 		const elapsedMs = ctx.examStartTime ? Math.max(0, Date.now() - ctx.examStartTime) : null;
 
 		return {
-			schemaVersion: 2,
+			schemaVersion: 3,
 			plugin: "quiz-blocks",
 			savedAt: now.toISOString(),
 			sourcePath: ctx.sourcePath || null,
 			quizMode: ctx.quizMode,
 			practiceMode: mode,
 			quizTitle: sourceBaseName(),
+			attemptDate: ctx.quizState.resultsSave?.attemptDate ?? null,
 			exam: {
 				enabled: !!ctx.isExamMode,
 				started: !!ctx.examStarted,
@@ -431,64 +441,143 @@ export function createResultsSaver(ctx: EngineCtx): ResultsSaverHandlers {
 	}
 
 	/**
-	 * Chemin libre pour un fichier de résultats.
+	 * The results file of the attempt being handed in, decided SYNCHRONOUSLY:
+	 * the history attempt recorded at the same hand-in carries it
+	 * (`Tentative.results`), so it must be known before the first `await`.
 	 *
-	 * Le suffixe est TIRÉ AU SORT, pas incrémenté : `exists` puis `write` n'est
-	 * pas atomique, et deux fenêtres d'Obsidian sauvegardant le même quiz dans
-	 * la même seconde choisissaient exactement le même `-2` — la seconde
-	 * écrasait la première (revue codex 2026-07-31). Un compteur les fait
-	 * converger ; le hasard les sépare.
+	 * The suffix is RANDOM and the name is reserved in memory: two saves of
+	 * the same quiz in the same second (two windows, or two devices writing to
+	 * the synced folder) never pick the same name. A counter made them
+	 * converge on the same `-2`, and the second overwrote the first (review
+	 * 2026-07-31).
 	 */
-	async function uniquePath(basePath: string, ext: string): Promise<string> {
-		/* `reserveFreePath` (src/unique-path.ts) : le nom est RÉSERVÉ en mémoire
-		   en plus d'être testé sur le disque, et l'échec est bruyant. Un
-		   `exists` puis `write` laissait deux sauvegardes du même quiz choisir
-		   le même fichier, et la seconde écrasait la première. */
-		return reserveFreePath(basePath, `.${ext}`,
-			(chemin) => ctx.host.fs.exists(chemin),
-			() => `-${Math.random().toString(36).slice(2, 7)}`);
+	function planPath(): string | null {
+		if (!ctx.sourcePath) return null;
+		const mode = ctx.textOnly?.isTextOnlyMode?.() ? "training" : "qcm";
+		const base = `${RESULTS_DIR}/${formatLocalTimestamp(new Date())}_${slugify(sourceBaseName())}_${mode}`;
+		for (let n = 0; n < 20; n++) {
+			const path = `${base}-${Math.random().toString(36).slice(2, 8).padEnd(6, "0")}.json`;
+			if (reservePath(path)) return path;
+		}
+		return null;
 	}
 
-	async function saveCurrentResults(): Promise<SavedResults> {
+	/** Called by `goToResults` once per hand-in: a new attempt, its file. */
+	function handIn(path: string | null, attemptDate: number | null): void {
+		ctx.quizState.resultsSave = handedInResults(ctx.quizState.resultsSave, path, attemptDate);
+	}
+
+	/** Called by "Start over" (and a change of practice mode). */
+	function reset(): void {
+		ctx.quizState.resultsSave = resetResultsSave(ctx.quizState.resultsSave);
+	}
+
+	function errorText(error: unknown): string {
+		return (error as { message?: string })?.message || t("engine.result.unknownError");
+	}
+
+	/* The button is updated IN PLACE, never by re-rendering the results
+	   slide: the save ends while that slide may still be sliding in. */
+	function rerender(): void {
+		try { ctx.cards?.syncResultsFileButton?.(); } catch (_) { /* no results slide (tests) */ }
+	}
+
+	/* The payload is built right before each write, never across an `await`
+	   that a "Start over" could cross: `current()` stops the loop as soon as
+	   the attempt is no longer the one being saved. `dirty`: an answer judged
+	   on the results screen after the save (a written answer's verdict)
+	   rewrites the SAME file, never a second one. */
+	let dirty = false;
+	const current = (attempt: number): boolean => ctx.quizState.resultsSave?.attempt === attempt;
+
+	async function writeAttempt(attempt: number, path: string): Promise<void> {
 		await ctx.host.fs.mkdirs(RESULTS_DIR);
+		do {
+			dirty = false;
+			if (!current(attempt)) return;
+			const payload = buildPayload();
+			await ctx.host.fs.write(path, `${JSON.stringify(payload, null, 2)}
+`);
+			try {
+				await ctx.host.fs.write(`${RESULTS_DIR}/${RESULTS_MIRROR}`, `${JSON.stringify({ ...payload, savedResultPath: path }, null, 2)}
+`);
+			} catch (_) { /* the mirror is best-effort */ }
+		} while (dirty && current(attempt) && ctx.quizState.resultsSave.status === "saving");
+	}
 
-		const payload = buildPayload();
-		const timestamp = formatLocalTimestamp(new Date());
-		const fileBase = `${RESULTS_DIR}/${timestamp}_${slugify(sourceBaseName())}_${payload.practiceMode}`;
-		const path = await uniquePath(fileBase, "json");
-		const json = `${JSON.stringify(payload, null, 2)}\n`;
-
+	/**
+	 * Saves this attempt's results, ONCE: a second call for the same attempt
+	 * (re-render of the results, the Results tab clicked again) does nothing.
+	 * `retry`: the "Retry" button after a failure. No notice on success; a
+	 * failure shows its reason (permissions, full disk) and offers "Retry".
+	 */
+	async function autoSave({ retry = false }: { retry?: boolean } = {}): Promise<void> {
+		const state = ctx.quizState.resultsSave;
+		if (!canStartResultsSave(state, retry) || !state.path) return;
+		const { attempt, path } = state;
+		ctx.quizState.resultsSave = { ...state, status: "saving", error: null };
+		rerender();
 		try {
-			await ctx.host.fs.write(path, json);
-		} catch (e) {
-			// Le nom était réservé pour CE fichier : il redevient libre, sinon
-			// la prochaine sauvegarde sauterait un nom disponible.
-			releaseReservedPath(path);
-			/* On relance l'erreur D'ORIGINE au lieu d'un message maison :
-			   l'appelant (engine/interactions.ts) l'affiche déjà dans son
-			   toast « Erreur sauvegarde résultats : … », et un libellé
-			   maison masquait la cause réelle (permissions, disque plein) —
-			   en plus de parler du « vault », qui n'existe pas dans
-			   l'application. Le `mkdirs` juste au-dessus laisse déjà remonter
-			   sa vraie cause : deux pannes voisines, un seul comportement. */
-			console.warn(LOG_PREFIX, "échec d'écriture du fichier de résultats", path, e);
-			throw e;
+			await writeAttempt(attempt, path);
+			if (!current(attempt)) return;
+			ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "saved", error: null };
+		} catch (error) {
+			console.warn(LOG_PREFIX, "results file not written", path, error);
+			if (!current(attempt)) return;
+			ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "failed", error: errorText(error) };
+			ctx.host.ui.notice(t("engine.result.saveError", { message: errorText(error) }));
 		}
-		try {
-			await ctx.host.fs.write(`${RESULTS_DIR}/latest.json`, `${JSON.stringify({ ...payload, savedResultPath: path }, null, 2)}\n`);
-		} catch (_) { /* le fichier latest.json est un miroir best-effort */ }
+		rerender();
+	}
 
-		/* `absolutePath` est supprimé, pas rendu optionnel : il n'existait que
-		   sur le FileSystemAdapter d'Obsidian (desktop), absent du contrat.
-		   Le laisser optionnel garderait un appelant qui croit lire un chemin
-		   absolu et en affiche un relatif. Le toast de confirmation
-		   (interactions.ts) montre le chemin relatif, aussi lisible. */
-		return { path };
+	/** The answers changed after the hand-in: the saved file follows. */
+	function refreshSaved(): void {
+		const state = ctx.quizState.resultsSave;
+		if (!state?.path || !ctx.quizState.resultsCounted) return;
+		if (state.status === "saving") { dirty = true; return; }
+		if (state.status !== "saved") return;
+		const { attempt, path } = state;
+		ctx.quizState.resultsSave = { ...state, status: "saving" };
+		writeAttempt(attempt, path).then(
+			() => { if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "saved" }; },
+			(error) => {
+				console.warn(LOG_PREFIX, "results file not rewritten", path, error);
+				if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "saved" };
+			});
+	}
+
+	/**
+	 * "Delete these results": the file goes to the HOST'S TRASH (never a
+	 * permanent delete), and the history attempt recorded at the same
+	 * hand-in leaves the history — both are this one attempt. Only a path
+	 * this saver decided, inside its results folder (`trashResultsFile`).
+	 */
+	async function deleteSaved(): Promise<void> {
+		const state = ctx.quizState.resultsSave;
+		if (!state?.path || (state.status !== "saved" && state.status !== "failed")) return;
+		const { attempt, path, attemptDate } = state;
+		ctx.quizState.resultsSave = { ...state, status: "deleting" };
+		rerender();
+		try {
+			await trashResultsFile(ctx.host.fs, RESULTS_DIR, path);
+			if (attemptDate !== null && ctx.sourcePath) ctx.statsSink?.supprimerTentative?.(ctx.sourcePath, attemptDate);
+			if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: "deleted", error: null };
+		} catch (error) {
+			console.warn(LOG_PREFIX, "results file not deleted", path, error);
+			if (current(attempt)) ctx.quizState.resultsSave = { ...ctx.quizState.resultsSave, status: state.status };
+			ctx.host.ui.notice(t("engine.result.deleteError", { message: errorText(error) }));
+		}
+		rerender();
 	}
 
 	return {
 		RESULTS_DIR,
 		buildPayload,
-		saveCurrentResults
+		planPath,
+		handIn,
+		reset,
+		autoSave,
+		refreshSaved,
+		deleteSaved
 	};
 }

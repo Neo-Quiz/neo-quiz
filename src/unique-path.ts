@@ -83,3 +83,15 @@ export async function reserveFreePath(
 export function releaseReservedPath(chemin: string): void {
 	reserves.delete(cle(chemin));
 }
+
+/**
+ * Reserves `chemin` SYNCHRONOUSLY, without asking the disk: `false` when it
+ * was already handed out in this session. For a name that must be known
+ * before any `await` and that carries its own random suffix (the results
+ * file of an attempt, engine/results-save.ts).
+ */
+export function reservePath(chemin: string): boolean {
+	if (reserves.has(cle(chemin))) return false;
+	reserves.add(cle(chemin));
+	return true;
+}

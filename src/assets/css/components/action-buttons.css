@@ -110,35 +110,30 @@
   .quiz-action-btn.success{ transition: none; }
 }
 
-.quiz-action-btn.quiz-save-results-btn{
-  border-color: color-mix(in srgb, var(--interactive-accent) 56%, var(--background-modifier-border));
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary)) 0%,
-      color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)) 100%
-    );
-  color: var(--text-normal);
-  box-shadow:
-    0 2px 10px rgba(0,0,0,0.12),
-    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent) inset;
+.quiz-action-btn.quiz-results-file-btn[hidden]{
+  display: none;
 }
 
-.quiz-action-btn.quiz-save-results-btn:hover,
-.quiz-action-btn.quiz-save-results-btn:focus-visible{
-  border-color: var(--interactive-accent);
-  box-shadow:
-    0 0 0 1.5px color-mix(in srgb, var(--interactive-accent) 24%, transparent),
-    0 0 22px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+/* The results are saved automatically (2026-10-09): what is left is a
+   SECONDARY action. "Delete these results" is the plain button with a
+   discreet danger tint (text and border), never a filled red block next to
+   "Start over"; "Retry saving" keeps the plain look. */
+.quiz-action-btn.quiz-results-file-btn.is-delete{
+  color: var(--text-error, #e5484d);
+  border-color: color-mix(in srgb, var(--text-error, #e5484d) 34%, var(--background-modifier-border));
 }
 
-.quiz-action-btn.quiz-save-results-btn.is-saved:disabled{
-  opacity: 1;
-  color: var(--quiz-accent-text);
-  background: var(--quiz-success);
-  border-color: var(--quiz-success);
-  box-shadow:
-    0 2px 10px color-mix(in srgb, #000 12%, transparent),
-    0 0 0 1px color-mix(in srgb, #ffffff 8%, transparent) inset;
+.quiz-action-btn.quiz-results-file-btn.is-delete:hover,
+.quiz-action-btn.quiz-results-file-btn.is-delete:focus-visible{
+  border-color: color-mix(in srgb, var(--text-error, #e5484d) 64%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--text-error, #e5484d) 8%, var(--background-primary));
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-error, #e5484d) 18%, transparent);
+}
+
+.quiz-action-btn.quiz-results-file-btn.is-deleted:disabled,
+.quiz-action-btn.quiz-results-file-btn.is-busy:disabled{
+  color: var(--text-muted);
+  filter: none;
 }
 
 /* Précédente / suivante sous chaque question (2026-09-23) : deux

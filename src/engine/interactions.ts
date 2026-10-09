@@ -3,6 +3,7 @@ import type { OrderingQuestion, MatchingQuestion } from "../types/quiz";
 import { t } from "../i18n";
 import { stepMembers } from "./step-page";
 import { bindSwipe, hapticTick, prefersReducedMotion, settleDuration, SETTLE_EASING } from "../swipe";
+import { openConfirmModal } from "../editor/modals";
 
 /** Charge utile du drag-and-drop (ordering/matching), sérialisée en JSON dans le dataTransfer. */
 interface DragPayload {
@@ -515,28 +516,22 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 		// #17) : rendu par writtenReviewSectionHtml (cards.ts resultsSlideHtml),
 		// câblé ici comme les autres contrôles de cette diapositive.
 		ctx.textOnly?.bindWrittenReviewControls?.(rootEl);
-		const saveBtn = rootEl.querySelector<HTMLButtonElement>(".quiz-save-results-btn");
-		if (saveBtn) saveBtn.addEventListener("click", async e => {
+		/* The results are saved automatically at the hand-in (state.ts
+		   goToResults). Its button is redrawn in place as the save goes
+		   (cards.ts syncResultsFileButton), hence ONE delegated listener on
+		   the slide rather than one on a button that gets replaced. */
+		rootEl.addEventListener("click", e => {
+			const btn = (e.target as Element | null)?.closest?.<HTMLButtonElement>(".quiz-results-file-btn");
+			if (!btn || btn.disabled) return;
 			e.preventDefault();
-			if (saveBtn.dataset.saving === "1") return;
-			saveBtn.dataset.saving = "1";
-			saveBtn.disabled = true;
-			const previousText = saveBtn.textContent;
-			saveBtn.textContent = t("engine.result.saving");
-
-			try {
-				const saved = await ctx.resultsSaver.saveCurrentResults();
-				ctx.quizState.savedResultsPath = saved.path;
-				ctx.host.ui.notice(t("engine.result.savedNotice", { path: saved.path }), 5000);
-				ctx.cards.refreshMetaSlides({ force: true });
-			} catch (error) {
-				console.error("Quiz results save error:", error);
-				saveBtn.disabled = false;
-				saveBtn.textContent = previousText || t("engine.result.save");
-				delete saveBtn.dataset.saving;
-				ctx.host.ui.notice(t("engine.result.saveError", {
-					message: (error as { message?: string })?.message || t("engine.result.unknownError")
-				}));
+			if (btn.dataset.resultsAction === "retry") void ctx.resultsSaver.autoSave({ retry: true });
+			else if (btn.dataset.resultsAction === "delete") {
+				openConfirmModal(
+					t("engine.result.deleteConfirmTitle"),
+					t("engine.result.deleteConfirmMessage"),
+					t("engine.result.deleteConfirmAction"),
+					t("engine.result.deleteConfirmCancel"),
+					(confirmed) => { if (confirmed) void ctx.resultsSaver.deleteSaved(); });
 			}
 		});
 

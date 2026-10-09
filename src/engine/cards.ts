@@ -68,6 +68,8 @@ export interface CardHandlers {
 	submitSlideHtml(): string;
 	resultsSlideHtml(): string;
 	refreshMetaSlides(opts?: { force?: boolean }): void;
+	/** Redraws the results-file button in place (engine/results-save.ts). */
+	syncResultsFileButton(): void;
 	questionCardHtml(qi: number): string;
 	stepSlideHtml(step: StepSlide): string;
 	/** One card of a step page (a `section`), for a repaint in place. */
@@ -532,14 +534,33 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			+ `</div></div></div>`;
 	}
 
-	function saveResultsButtonHtml(): string {
-		const savedPath = ctx.quizState.savedResultsPath;
-		const saved = !!savedPath;
-		// Garde sur `savedPath` (et non sur `saved`, sa copie booléenne) : même
-		// condition au runtime, mais TS narrow ici string|null → string, ce
-		// qu'exige le typage des variables de t().
-		const titleAttr = savedPath ? ` title="${ctx.escapeHtmlAttr(t("engine.result.savedIn", { path: savedPath }))}"` : "";
-		return `<button class="quiz-action-btn quiz-save-results-btn${saved ? " is-saved" : ""}" type="button" data-save-results="1"${saved ? " disabled" : ""}${titleAttr}>${t(saved ? "engine.result.saved" : "engine.result.save")}</button>`;
+	/** The results of an attempt are saved automatically (2026-10-09): this
+	    button only offers what is left to do — "Retry" after a failure,
+	    "Delete these results" once saved. Always present (hidden when there is
+	    nothing to show) so that `syncResultsFileButton` can redraw it in place. */
+	function resultsFileButtonHtml(): string {
+		const st = ctx.quizState.resultsSave;
+		const status = st?.status ?? "none";
+		const base = "quiz-action-btn quiz-results-file-btn";
+		if (status === "none" || !st?.path) return `<button class="${base}" type="button" hidden></button>`;
+		if (status === "failed") {
+			const title = ctx.escapeHtmlAttr(t("engine.result.saveError", { message: st.error || t("engine.result.unknownError") }));
+			return `<button class="${base} is-retry" type="button" data-results-action="retry" title="${title}">${t("engine.result.retrySave")}</button>`;
+		}
+		if (status === "saved") {
+			const title = ctx.escapeHtmlAttr(t("engine.result.savedIn", { path: st.path }));
+			return `<button class="${base} is-delete" type="button" data-results-action="delete" title="${title}">${t("engine.result.delete")}</button>`;
+		}
+		const key = status === "deleted" ? "engine.result.deleted" : status === "deleting" ? "engine.result.deleting" : "engine.result.saving";
+		return `<button class="${base} is-${status === "deleted" ? "deleted" : "busy"}" type="button" disabled>${t(key)}</button>`;
+	}
+
+	function syncResultsFileButton(): void {
+		ctx.container?.querySelectorAll?.(".quiz-results-file-btn").forEach(btn => {
+			const hadFocus = document.activeElement === btn;
+			btn.outerHTML = resultsFileButtonHtml();
+			if (hadFocus) ctx.container.querySelector<HTMLElement>(".quiz-results-file-btn:not([disabled])")?.focus({ preventScroll: true });
+		});
 	}
 
 	function resultsSlideHtml(): string {
@@ -569,7 +590,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			// même quand cette tranche affiche déjà la grille compris/partiel/
 			// à revoir (legacy `practiceMode: "text"`).
 			const writtenReview = ctx.textOnly.writtenReviewSectionHtml();
-			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div>${writtenReview}<div class="quiz-actions">${correctionBtn}${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
+			return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-textonly-result"><h2 class="quiz-result-title" style="font-weight:900;">${title}</h2><p>${t("engine.result.ratedLabel")} <strong>${results.rated}/${results.total}</strong></p>${correctionHint}<div class="quiz-textonly-result-grid"><div class="quiz-textonly-result-stat understood"><strong>${results.understood}</strong><span>${t("engine.rating.understood")}</span></div><div class="quiz-textonly-result-stat partial"><strong>${results.partial}</strong><span>${t("engine.rating.partial")}</span></div><div class="quiz-textonly-result-stat review"><strong>${results.review}</strong><span>${t("engine.rating.review")}</span></div>${results.pending > 0 ? `<div class="quiz-textonly-result-stat pending"><strong>${results.pending}</strong><span>${t(results.pending > 1 ? "engine.result.pending.other" : "engine.result.pending.one")}</span></div>` : ""}</div>${writtenReview}<div class="quiz-actions">${correctionBtn}${resultsFileButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 		}
 		const { pct, correct, total, pendingWritten } = ctx.computeScorePercent();
 		// Le score n'inclut pas les réponses écrites pas encore auto-évaluées
@@ -594,7 +615,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const withHint = ctx.handIn.isTest() ? ctx.countRightWithHint() : 0;
 		const withHintNote = withHint > 0 ? `<span class="quiz-result-with-hint">, ${t("engine.result.withHint", { count: withHint })}</span>` : "";
 		// The score ("12/20", "60 %") stays code: only the label is translated.
-		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong>${withHintNote}</p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${saveResultsButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
+		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result"><h2 class="quiz-result-title" style="font-weight:900;">${t("engine.result.title")}</h2><p style="font-size:48px;font-weight:900;margin:18px 0 6px;">${pct}%</p><p>${t("engine.result.correctLabel")} <strong>${correct}/${total}</strong>${withHintNote}</p>${learnSummary}${pendingNote}${writtenReview}<div class="quiz-actions">${resultsFileButtonHtml()}<button class="quiz-action-btn success quiz-retry-btn" type="button">${t("engine.result.retry")}</button></div></section></div>`;
 	}
 
 
@@ -621,7 +642,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				<div class="quiz-learn-gauge" role="img" aria-label="${ctx.escapeHtmlAttr(t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total }))}">${seg("first", sum.first)}${seg("retried", sum.retried)}${seg("missed", sum.missed)}${seg("rest", rest)}</div>
 				<ul class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</ul>
 			</div>
-			<div class="quiz-actions quiz-learn-actions"><button class="quiz-action-btn success quiz-learn-done-btn" type="button">${t("engine.learn.done")}</button><button class="quiz-action-btn quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${saveResultsButtonHtml()}</div>
+			<div class="quiz-actions quiz-learn-actions"><button class="quiz-action-btn success quiz-learn-done-btn" type="button">${t("engine.learn.done")}</button><button class="quiz-action-btn quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${resultsFileButtonHtml()}</div>
 			${pendingNote}${writtenReview}
 		</section></div>`;
 	}
@@ -942,6 +963,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		submitSlideHtml,
 		resultsSlideHtml,
 		refreshMetaSlides,
+		syncResultsFileButton,
 		questionCardHtml,
 		stepSlideHtml,
 		stepCardHtml: (qi: number) => cardParts(qi, true).section
