@@ -1,8 +1,8 @@
 {
-  "versionCode": 11,
-  "versionName": "0.2.9",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.9/NeoQuiz-0.2.9.apk",
-  "sha256": "7bb9a13ecf0876f9a58a577e19ce91bb06072b0a807e0c0867766a3fc53eb87f",
-  "size": 55988009,
-  "notes": "Tap a quiz picture to open it full size and pinch to zoom."
+  "versionCode": 12,
+  "versionName": "0.2.10",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.10/NeoQuiz-0.2.10.apk",
+  "sha256": "989772733283ae23229bacb194f7592134880af4951685a5e48170455dea28d0",
+  "size": 55989501,
+  "notes": "Quiz progress now follows you between your phone and your PC; pictures open full screen."
 }
