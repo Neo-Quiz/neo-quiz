@@ -140,6 +140,52 @@ await withSrcModule("src/dashboard/file-generation.ts", (F) => {
 		r.check("a line saved before chats is restored with none of them", [re.lignes[1].demande.chatId, re.lignes[1].demande.requestId], [undefined, undefined]);
 	}
 
+	/* CONCURRENT CHATS (2026-10-09, spec 2026-10-09-concurrent-chats-design):
+	   one running line per chat, chats side by side up to 8, Antigravity and
+	   remote requests one at a time across chats. */
+	{
+		const regles = { max: 8, chat: d => d.chat ?? "legacy", groupe: d => (d.agy ? "agy" : d.remote ? "remote" : null) };
+		const lance = (g, t) => F.demarrerPrets(g, t, regles);
+		let g = F.fileVide();
+		g = F.ajouter(g, { chat: "A" }).file;
+		g = F.ajouter(g, { chat: "B" }).file;
+		g = F.ajouter(g, { chat: "A" }).file;
+		let x = lance(g, 10);
+		r.check("two chats start together, the second request of chat A waits", [x.lignes.map(l => l.id), x.file.lignes.map(l => l.etat)], [[1, 2], ["cours", "cours", "attente"]]);
+		g = F.terminer(x.file, 1, { titre: "q", chemin: "q.md" });
+		x = lance(g, 20);
+		r.check("chat A's next request starts once its first is done", [x.lignes.map(l => l.id), x.lignes[0]?.debut], [[3], 20]);
+		// A stopped line holds its chat until it is settled.
+		let h = F.fileVide();
+		h = F.ajouter(h, { chat: "A" }).file;
+		h = F.ajouter(h, { chat: "A" }).file;
+		h = lance(h, 1).file;
+		h = F.annuler(h, 1).file;
+		r.check("a stopped line (arret) still holds its chat", lance(h, 2).lignes, []);
+		h = F.solder(h, 1);
+		r.check("… and frees it once settled", lance(h, 3).lignes.map(l => l.id), [2]);
+		// The global cap.
+		let k = F.fileVide();
+		for (let i = 0; i < 10; i++) k = F.ajouter(k, { chat: "C" + i }).file;
+		const pk = lance(k, 1);
+		r.check("at most 8 run at once, in send order", [pk.lignes.length, pk.lignes.map(l => l.id).join(",")], [8, "1,2,3,4,5,6,7,8"]);
+		r.check("past the cap, nothing more starts", lance(pk.file, 2).lignes, []);
+		// Groups.
+		let m = F.fileVide();
+		m = F.ajouter(m, { chat: "A", agy: true }).file;
+		m = F.ajouter(m, { chat: "B", agy: true }).file;
+		m = F.ajouter(m, { chat: "C" }).file;
+		m = F.ajouter(m, { chat: "D", remote: true }).file;
+		m = F.ajouter(m, { chat: "E", remote: true }).file;
+		r.check("Antigravity waits for Antigravity, not Claude; a remote request waits for a remote one", lance(m, 1).lignes.map(l => l.id), [1, 3, 4]);
+		// A line without a chat belongs to the legacy chat.
+		let n = F.fileVide();
+		n = F.ajouter(n, {}).file;
+		n = F.ajouter(n, {}).file;
+		r.check("two lines without a chat share the legacy chat", lance(n, 1).lignes.map(l => l.id), [1]);
+		r.check("nothing waiting: nothing starts, the same file", (() => { const e = F.fileVide(); return lance(e, 1).file === e; })(), true);
+	}
+
 	r.done();
 });
 

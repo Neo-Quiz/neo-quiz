@@ -2,9 +2,10 @@
    LA FILE DE GÉNÉRATION — LE NOYAU PUR
 
    Spec 2026-09-26 « File de génération » : envoyer une demande ne bloque
-   plus la page. Chaque envoi devient une LIGNE, et les générations partent
-   une par une, dans l'ordre d'envoi — le verrou par outil du processus
-   principal (`process.ts`) n'en admet de toute façon qu'une par CLI.
+   plus la page. Chaque envoi devient une LIGNE. Les demandes partent dans
+   l'ordre d'envoi : chaque chat tourne côte à côte, une génération à la fois
+   dans un même chat (`demarrerPrets`, 2026-10-09). Le verrou par outil du
+   processus principal (`process.ts`) n'en admet de toute façon qu'une par CLI.
 
    Ce module ne connaît ni DOM, ni hôte, ni horloge : l'heure de départ est
    une ENTRÉE (`maintenant`). Chaque fonction rend une NOUVELLE file ; aucune
@@ -93,6 +94,47 @@ export function demarrerSuivant<D, R>(file: FileGeneration<D, R>, maintenant: nu
 	if (!suivante) return { file, ligne: null };
 	const partie: LigneFile<D, R> = { ...suivante, etat: "cours", debut: maintenant };
 	return { file: remplacer(file, suivante.id, () => partie), ligne: partie };
+}
+
+/** What may run at once (2026-10-09, concurrent chats). */
+export interface ReglesDemarrage<D> {
+	/** At most this many lines running (`cours` or `arret`) at once. */
+	max: number;
+	/** The chat a request belongs to: one running line per chat. */
+	chat(demande: D): string;
+	/** A group whose lines run one at a time across chats (Antigravity,
+	    remote requests), or null. */
+	groupe(demande: D): string | null;
+}
+
+/**
+ * Starts, in send order, EVERY waiting line allowed to run (2026-10-09, as
+ * MonoCode runs sessions side by side): its chat has no line running or
+ * stopping (a chat stays a conversation), its group (if any) has none
+ * either, and fewer than `max` lines run. A stopped line (`arret`) holds its
+ * chat, its group and its slot until `solder`: its process is still dying.
+ * `lignes` are the lines just started; the same `file` when none.
+ */
+export function demarrerPrets<D, R>(file: FileGeneration<D, R>, maintenant: number, regles: ReglesDemarrage<D>): { file: FileGeneration<D, R>; lignes: LigneFile<D, R>[] } {
+	const actives = file.lignes.filter(l => l.etat === "cours" || l.etat === "arret");
+	const chats = new Set(actives.map(l => regles.chat(l.demande)));
+	const groupes = new Set(actives.map(l => regles.groupe(l.demande)).filter((g): g is string => g !== null));
+	let nombre = actives.length;
+	const parties: LigneFile<D, R>[] = [];
+	for (const l of file.lignes) {
+		if (nombre >= regles.max) break;
+		if (l.etat !== "attente") continue;
+		const chat = regles.chat(l.demande);
+		const groupe = regles.groupe(l.demande);
+		if (chats.has(chat) || (groupe !== null && groupes.has(groupe))) continue;
+		chats.add(chat);
+		if (groupe !== null) groupes.add(groupe);
+		nombre++;
+		parties.push({ ...l, etat: "cours", debut: maintenant });
+	}
+	if (!parties.length) return { file, lignes: [] };
+	const parId = new Map(parties.map(p => [p.id, p]));
+	return { file: { ...file, lignes: file.lignes.map(l => parId.get(l.id) ?? l) }, lignes: parties };
 }
 
 /** La génération en cours (ou le nouvel essai d'enregistrement) a produit
