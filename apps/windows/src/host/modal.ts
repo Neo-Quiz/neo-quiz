@@ -26,8 +26,10 @@ import { poserIcone } from "./ui";
     `src/modal-base.ts`, et pour la même raison : une animation coupée ou un
     onglet masqué ne déclenche jamais `animationend`, et le panneau ne se
     détacherait plus jamais. Doit rester ≥ la durée de `qbd-modal-out`
-    (0,16 s, `components/modal-anim.css`). */
-const SORTIE_MS = 240;
+    (0,16 s, `components/modal-anim.css`). The Explain window's closing lasts
+    340 ms (`nq-explain-glisse-out`, ui/explain.ts): the net must wait longer,
+    or the window is taken out in the middle of its slide. */
+const SORTIE_MS = 400;
 
 /** Numérote les titres pour que `aria-labelledby` désigne le BON : deux
     modales peuvent être ouvertes en même temps (une confirmation par-dessus

@@ -73,6 +73,9 @@ export function attachQuizBars(host: HTMLElement): () => void {
 
 	const refresh = (): void => {
 		frame = 0;
+		// The Explain window is moving (ui/explain.ts): the quiz card changes width
+		// frame by frame, so the slide height waits for the end of the motion.
+		if (document.body.classList.contains("nq-explain-motion")) return;
 		const found = host.closest<HTMLElement>(".qbd-qz");
 		if (found && found !== panel) {
 			panel?.removeEventListener("wheel", onWheel);
@@ -153,6 +156,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 	const schedule = (): void => {
 		if (!frame) frame = requestAnimationFrame(refresh);
 	};
+	window.addEventListener("nq-explain-motion-end", schedule);
 
 	const resize = new ResizeObserver(schedule);
 	resize.observe(host);
@@ -176,6 +180,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 
 	return () => {
 		host.removeEventListener("scroll", onScroll, { capture: true });
+		window.removeEventListener("nq-explain-motion-end", schedule);
 		if (frame) cancelAnimationFrame(frame);
 		resize.disconnect();
 		mutations.disconnect();

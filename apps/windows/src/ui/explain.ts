@@ -83,6 +83,62 @@ function poserLargeur(w: number): void {
 	document.documentElement.style.setProperty("--nq-explain-w", w + "px");
 }
 
+/* THE MOTION (2026-10-09). The quiz card and the chat move together, by FLIP:
+   the card's box is measured before and after the layout change, and
+   `element.animate` carries it from one to the other with `width` and
+   `translateX` (never `scaleX`, which would stretch the text). Nothing else
+   animates the card, so no CSS transition fights it. While it runs, the body
+   carries `nq-explain-motion`, and ui/quiz-bars.ts holds its slide-height
+   refresh until `nq-explain-motion-end`. */
+const CARTE_QUIZ = "#neo-quiz-root > .qbd-qz";
+const COURBE = "cubic-bezier(0.36, 0.66, 0, 1)";
+const DUREE_OUVERTURE_MS = 420;
+const DUREE_FERMETURE_MS = 340;
+let mouvementCarte: Animation | null = null;
+
+interface BoiteCarte { left: number; width: number }
+
+function mouvementReduit(): boolean {
+	return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function carteQuiz(): HTMLElement | null {
+	return document.querySelector<HTMLElement>(CARTE_QUIZ);
+}
+
+function mesurerCarte(carte: HTMLElement): BoiteCarte {
+	return { left: carte.getBoundingClientRect().left, width: parseFloat(getComputedStyle(carte).width) };
+}
+
+function finirMouvement(): void {
+	mouvementCarte = null;
+	document.body.classList.remove("nq-explain-motion");
+	window.dispatchEvent(new Event("nq-explain-motion-end"));
+}
+
+/** Plays the quiz card from its box `avant` to its box `apres`. The layout the
+    motion runs in is the split one, anchored at `ancrage` (its left edge), so
+    the offsets are measured from there: the card's own layout never moves.
+    `fin` runs when the motion is over. */
+function jouerMouvement(carte: HTMLElement, avant: BoiteCarte, apres: BoiteCarte, ancrage: number, duree: number, fin?: () => void): void {
+	mouvementCarte?.cancel();
+	mouvementCarte = null;
+	const depart = avant.left - ancrage;
+	const arrivee = apres.left - ancrage;
+	const termine = (): void => { fin?.(); finirMouvement(); };
+	if (Math.abs(depart - arrivee) < 0.5 && Math.abs(avant.width - apres.width) < 0.5) { termine(); return; }
+	const anim = carte.animate(
+		[
+			{ transform: `translateX(${depart}px)`, width: `${avant.width}px` },
+			{ transform: `translateX(${arrivee}px)`, width: `${apres.width}px` },
+		],
+		{ duration: duree, easing: COURBE },
+	);
+	mouvementCarte = anim;
+	// A `cancel()` (a new motion, a reopening) never reaches `onfinish`: only the last motion ends the state.
+	anim.onfinish = () => { if (mouvementCarte === anim) termine(); };
+}
+
 /** The raw prompt of a question, for the panel's subtitle (rendered like the statement). */
 function texteQuestion(q: Record<string, unknown> | undefined): string {
 	return typeof q?.prompt === "string" ? q.prompt : typeof q?.title === "string" ? q.title : "";
@@ -95,6 +151,10 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 	const conteneur = panneau.parentElement;
 	if (!conteneur) return;
 	conteneur.classList.add("nq-explain-conteneur");
+	// The quiz card's box BEFORE the split layout (the FLIP starts here).
+	const carte = carteQuiz();
+	const avant = carte && !mouvementReduit() ? mesurerCarte(carte) : null;
+	if (avant) document.body.classList.add("nq-explain-motion");
 	// Not a modal: the quiz beside it stays usable.
 	panneau.setAttribute("aria-modal", "false");
 	poserLargeur(largeurInitiale());
@@ -142,15 +202,39 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 		window.addEventListener("pointerup", finir);
 		window.addEventListener("pointercancel", finir);
 	});
-	// The quiz gets its width back as soon as the closing slide starts.
-	const obs = new MutationObserver(() => { if (conteneur.classList.contains("qbd-closing")) document.body.classList.remove("nq-explain-open"); });
+	if (carte && avant) {
+		const ouverte = mesurerCarte(carte);
+		jouerMouvement(carte, avant, ouverte, ouverte.left, DUREE_OUVERTURE_MS);
+	}
+	else if (avant) finirMouvement();
+	// The closing: the card goes back to its own width by the same FLIP, and the
+	// split class goes only at the END of that motion (`jouerMouvement`'s `fin`).
+	const obs = new MutationObserver(() => {
+		if (!conteneur.classList.contains("qbd-closing")) return;
+		const cadre = carteQuiz();
+		if (!cadre || mouvementReduit() || !document.body.classList.contains("nq-explain-open")) {
+			document.body.classList.remove("nq-explain-open");
+			return;
+		}
+		// The split layout is the anchor: a running opening is ended first, so the layout is the open one.
+		mouvementCarte?.cancel();
+		mouvementCarte = null;
+		const ouverte = mesurerCarte(cadre);
+		document.body.classList.add("nq-explain-motion");
+		// The box the card goes back to: measured without the split, then the split is put back in the same task (nothing painted).
+		document.body.classList.remove("nq-explain-open");
+		const fermee = mesurerCarte(cadre);
+		document.body.classList.add("nq-explain-open");
+		jouerMouvement(cadre, ouverte, fermee, ouverte.left, DUREE_FERMETURE_MS, () => document.body.classList.remove("nq-explain-open"));
+	});
 	obs.observe(conteneur, { attributes: true, attributeFilter: ["class"] });
 	nettoyagePanneau = () => { obs.disconnect(); window.removeEventListener("resize", surRedim); finir(); nettoyagePanneau = null; };
 }
 
 function demonterPanneau(): void {
 	nettoyagePanneau?.();
-	document.body.classList.remove("nq-explain-open");
+	// While the card is still moving back, its own motion removes the split class at the end.
+	if (!mouvementCarte) document.body.classList.remove("nq-explain-open");
 	document.querySelector(".qz-explain-btn-icone")?.classList.remove("is-active");
 }
 

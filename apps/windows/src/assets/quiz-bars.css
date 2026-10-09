@@ -445,15 +445,16 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-m
 	border-radius: var(--nq-panel-radius);
 	box-shadow: none;
 	overflow: hidden;
-	animation: nq-explain-glisse-in 500ms cubic-bezier(0.36, 0.66, 0, 1) backwards;
+	animation: nq-explain-glisse-in 420ms cubic-bezier(0.36, 0.66, 0, 1) backwards;
 }
-.nq-explain-modal .modal-content { animation: nq-explain-fondu 500ms cubic-bezier(0.36, 0.66, 0, 1) backwards; }
+.nq-explain-modal .modal-content { animation: nq-explain-fondu 420ms cubic-bezier(0.36, 0.66, 0, 1) backwards; }
 html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing {
-	animation: nq-explain-glisse-out 400ms cubic-bezier(0.36, 0.66, 0, 1) forwards;
+	animation: nq-explain-glisse-out 340ms cubic-bezier(0.36, 0.66, 0, 1) forwards;
 }
-@keyframes nq-explain-glisse-in { from { transform: translateX(calc(var(--nq-explain-w) + var(--nq-panel-gap, 16px))) scaleX(0.97); } to { transform: none; } }
+/* The chat enters from the right and leaves the same way (the quiz card moves by FLIP, ui/explain.ts). */
+@keyframes nq-explain-glisse-in { from { opacity: 0; transform: translateX(24px) scale(0.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
 @keyframes nq-explain-fondu { from { opacity: 0; } to { opacity: 1; } }
-@keyframes nq-explain-glisse-out { from { transform: none; } to { transform: translateX(calc(var(--nq-explain-w) + var(--nq-panel-gap, 16px))) scaleX(0.97); } }
+@keyframes nq-explain-glisse-out { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 0; transform: translateX(24px) scale(0.98); } }
 
 .nq-explain-modal .modal-title {
 	flex: none;
@@ -522,17 +523,18 @@ body.nq-explain-redimension { cursor: col-resize; user-select: none; }
 body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
 
 /* The quiz card gives up the width of the Explain card and the gap between them. */
-#neo-quiz-root > .qbd-qz { position: relative; transition: width 500ms cubic-bezier(0.36, 0.66, 0, 1), margin 500ms cubic-bezier(0.36, 0.66, 0, 1); }
-/* The closing is a little quicker, on the same curve (the class goes at the start of the slide out). */
-body:not(.nq-explain-open) #neo-quiz-root > .qbd-qz { transition: width 400ms cubic-bezier(0.36, 0.66, 0, 1), margin 400ms cubic-bezier(0.36, 0.66, 0, 1); }
+/* No CSS transition here: the card's width moves by FLIP (ui/explain.ts), and a
+   transition would start a second motion from the same frame. */
+#neo-quiz-root > .qbd-qz { position: relative; }
 @media (min-width: 701px) {
 	body.nq-explain-open:not(.is-mobile) #neo-quiz-root > .qbd-qz {
+		/* Anchored to the start edge: the centring of the closed layout must not move the card while its width changes. */
+		align-self: flex-start;
 		width: calc(100% - var(--nq-explain-w) - 3 * var(--nq-panel-gap));
 		max-width: none;
 		margin: 0 calc(2 * var(--nq-panel-gap) + var(--nq-explain-w)) 0 var(--nq-panel-gap);
 	}
-	body.nq-explain-redimension #neo-quiz-root > .qbd-qz { transition: none; }
-}
+	}
 
 /* An interactive page takes the whole answer column. */
 .nq-explain-modal .nq-html-frame { margin: 12px 0; width: 100%; }
@@ -542,7 +544,6 @@ body:not(.nq-explain-open) #neo-quiz-root > .qbd-qz { transition: width 400ms cu
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal,
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing { animation: none !important; }
 	.nq-explain-modal .modal-content { animation: none !important; }
-	#neo-quiz-root > .qbd-qz { transition: none !important; }
 }
 
 /* PHONE (and any window under 700 px): a full-screen sheet over the quiz.
