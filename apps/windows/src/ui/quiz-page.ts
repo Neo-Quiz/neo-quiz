@@ -79,6 +79,8 @@ export async function openQuizPage(
 	reviewSink?: {
 		record(entries: Array<{ q: string; grade: ReviewGrade; role?: QuestionRole }>): void;
 		keyOf(path: string, id: string): string;
+		/** Read only: the learner's attempts and misses on a question key. */
+		history?(key: string): { attempts: number; misses: number } | null;
 	},
 	/* Même principe que `reviewSink` : la FORME du puits des statistiques
 	   par quiz (`types/engine-ctx.ts`), jamais son implémentation — c'est ce
@@ -292,7 +294,17 @@ export async function openQuizPage(
 	};
 	const debrancherCitations = brancherCitations(hote, entry.path);
 	const demonterExpliquer = aiSettings && questionsJouees.length
-		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source, recharger })
+		? monterBoutonExpliquer(hote, {
+			questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source, recharger,
+			historique: reviewSink?.history ? (qi) => {
+				try {
+					const quiz = parseQuizSource(source.match(QUIZ_BLOCK_RE)?.[1] ?? "[]");
+					const config = findQuizModeConfigIndex(quiz);
+					const id = idsForRawItems(quiz)[qi + (config >= 0 && config <= qi ? 1 : 0)];
+					return id ? reviewSink.history!(reviewSink.keyOf(entry.path, id)) : null;
+				} catch { return null; }
+			} : undefined,
+		})
 		: null;
 	let fait = false;
 	return {

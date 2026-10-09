@@ -382,12 +382,7 @@
 .nq-explain-modal .modal-content.nq-explain-vide .nq-explain-fil {
 	display: none;
 }
-/* The usage gauge keeps its distance from the tools on its right. */
-.qz-mini-pied > .qz-mini-usage {
-	margin-right: auto;
-}
-/* In the Explain window the footer spans the whole card: the usage gauge on
-   the left, the provider, model, effort and send arrow on the right. */
+/* In the Explain window the footer spans the whole card: the provider, model, effort and send arrow on the right. */
 .nq-explain-composer .qz-mini-pied {
 	width: 100%;
 	margin-left: 0;
@@ -463,4 +458,19 @@
 .nq-explain-edit-msg {
 	color: var(--text-muted);
 	font-size: 12.5px;
+}
+
+/* A course picture the tutor shows in its answer: inline, never wider than the
+   answer, opens in the viewer on click. */
+.nq-explain-image {
+	margin: 10px 0;
+}
+.nq-explain-image img {
+	display: block;
+	max-width: 100%;
+	max-height: 320px;
+	object-fit: contain;
+	border-radius: 8px;
+	background: #fff;
+	cursor: zoom-in;
 }

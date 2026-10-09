@@ -18,6 +18,7 @@ import {
 	nomDe, ordreCours, sansQuiz,
 } from "../../../../src/explain-course";
 import type { CourseDoc, ImageFile } from "../../../../src/explain-course";
+import type { ImageJointe } from "../../../../src/explain-images";
 
 /** Over this a PDF is not even opened: its text would fill the budget alone. */
 const PDF_MAX_OCTETS = 60 * 1024 * 1024;
@@ -28,6 +29,8 @@ export interface Cours {
 	images: ImagePayload[];
 	/** The file names of `images`, for a provider that cannot see them. */
 	nomsImages: string[];
+	/** The same pictures with their paths: what the answer may cite and show. */
+	jointes: ImageJointe[];
 	/** A document or a picture failed to read: the caller does not keep this result. */
 	incomplet: boolean;
 }
@@ -98,15 +101,25 @@ export async function lireCours(quizPath: string, note: string, questions: Recor
 	const choisies = choisirImages(dimensionnes, citees);
 	const payloads: ImagePayload[] = [];
 	const noms: string[] = [];
+	const jointes: ImageJointe[] = [];
 	for (const f of choisies) {
 		try {
 			const ext = nomDe(f.name).split(".").pop()!.toLowerCase();
 			payloads.push({ base64: enBase64(await host.fs.readBinary(f.path)), mediaType: IMAGE_MEDIA[ext] });
 			noms.push(f.name);
+			jointes.push({ name: f.name, path: f.path, relatif: f.path.startsWith(prefixe) ? f.path.slice(prefixe.length) : f.name });
 		} catch (e) {
 			incomplet = true;
 			console.warn(`${LOG_PREFIX} Explain: ${f.path} unreadable:`, e);
 		}
 	}
-	return { texte: assemblerCours(lus, COURSE_MAX_CHARS, horsBudget), images: payloads, nomsImages: noms, incomplet };
+	/* A folder that lists nothing, or documents of which none gave a text, is not a course
+	   to keep: the caller reads it again at the next message. */
+	if (!fichiers.length || (candidats.length && !lus.length)) {
+		incomplet = true;
+		console.warn(`${LOG_PREFIX} Explain: nothing read from "${prefixe}" (${fichiers.length} files listed, ${candidats.length} documents)`);
+	}
+	const texte = assemblerCours(lus, COURSE_MAX_CHARS, horsBudget);
+	console.info(`${LOG_PREFIX} Explain: course read, folder "${prefixe}", ${fichiers.length} files listed, ${candidats.length} documents, ${lus.length} read, ${texte.length} chars, ${payloads.length} pictures${incomplet ? ", INCOMPLETE" : ""}`);
+	return { texte, images: payloads, nomsImages: noms, jointes, incomplet };
 }

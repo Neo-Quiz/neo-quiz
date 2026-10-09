@@ -5,6 +5,7 @@ import {
 	applyRenames, DEFAULT_PARAMS, planToday, dayOutcome as dayOutcomeOf,
 	type DayOutcome, type LogLine, type Plan, type ReviewEvent, type ReviewGrade, type ScheduledItem, type SchedulerParams,
 } from "../scheduler";
+import { signalOf } from "../scheduler/state";
 import type { QuestionRole } from "../types/quiz";
 import type { LogFile } from "./log-file";
 import { createJournalSet } from "./journal-set";
@@ -80,6 +81,10 @@ export interface ReviewStore {
 	    home page week (spec 2026-09-29-home-page-design.md §3.2). */
 	dayOutcome(dayStart: number): DayOutcome;
 	keyOf(path: string, id: string): string;
+	/** READ ONLY: how many times the learner answered this question (a key of the
+	    contract) and how many were missed. `null` when a journal is not loaded or
+	    holds nothing about it. */
+	history(key: string): { attempts: number; misses: number } | null;
 	destroy(): void;
 }
 
@@ -254,6 +259,20 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		deps.watcher.onRenameDir(ev => renamed(ev.from, ev.to)),
 	];
 
+	function history(key: string): { attempts: number; misses: number } | null {
+		if (detruit) return null;
+		for (const { fichier } of journaux.values()) if (!fichier.loaded()) return null;
+		let attempts = 0, misses = 0;
+		for (const e of applyRenames(toutesLesLignes())) {
+			if (e.q !== key) continue;
+			const signal = signalOf(e);
+			if (signal === null) continue; // pre-test, reading card, skipped: not an attempt
+			attempts++;
+			if (signal === "fail") misses++;
+		}
+		return attempts ? { attempts, misses } : null;
+	}
+
 	function plan(now: number): Plan {
 		const d = new Date(now);
 		// Seul l'hôte connaît le fuseau : le noyau ne manipule aucun calendrier.
@@ -289,7 +308,7 @@ export function createReviewStore(deps: ReviewStoreDeps): ReviewStore {
 		for (const { fichier } of journaux.values()) fichier.destroy();
 	}
 
-	return { load, record, renamed, moved, plan, dayOutcome, keyOf: keyOfQuestion, destroy };
+	return { load, record, renamed, moved, plan, dayOutcome, keyOf: keyOfQuestion, history, destroy };
 }
 
 /** Construit les seules données que le noyau comprend. `moduleForQuiz` reste

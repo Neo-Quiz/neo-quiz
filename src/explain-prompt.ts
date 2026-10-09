@@ -94,8 +94,50 @@ export function htmlEnTexte(html: unknown): string {
 		.trim();
 }
 
+/** What the review journal says about one question (read only). */
+export interface HistoireQuestion { attempts: number; misses: number }
+
+/** Misses from which the explanation must go back to the basics. */
+export const RATES_FONDAMENTAL = 3;
+
+/** The one-line history of the learner on the question on screen; `null` (no
+    line) when the journal has nothing readable about it. */
+export function ligneHistorique(h: HistoireQuestion | null | undefined): string | null {
+	if (!h || !Number.isInteger(h.attempts) || !Number.isInteger(h.misses) || h.attempts < 1 || h.misses < 0 || h.misses > h.attempts) return null;
+	const base = `Learner's history on this question: ${h.attempts} attempt${h.attempts === 1 ? "" : "s"}, ${h.misses} missed.`;
+	return h.misses >= RATES_FONDAMENTAL ? base + " Missed repeatedly: rebuild the underlying concept from the basics, do not just restate the answer." : base;
+}
+
+/**
+ * How the tutor must explain, appended to the context of every message. Kept
+ * here (pure) so that `check:explain` holds each step. A reading card is
+ * rephrased; a question gets the full method.
+ */
+export function consigneExplication(lecture: boolean): string {
+	const commun = [
+		"Reply in the learner's language (in French, address them as \"tu\"). Write short headed sections, lists and **bold** for the key words, never a wall of text.",
+		"Ground the explanation in the course: quote or point to at least one passage of it, naming the document and the page given by the [p. N] mark that precedes it, like \"CM2.pdf, p. 7\".",
+		"When a picture listed in the context shows what you explain (the figure the question is about, a diagram), SHOW it: write its exact name as ![[exact name]] on its own line, right where you start talking about it, then refer to what is on it. Only the pictures listed exist, never invent a name.",
+	];
+	if (lecture) {
+		return "HOW TO EXPLAIN (this is a reading card):\n" + [
+			"1. Rephrase the card more simply, in plain words, defining each term the first time.",
+			"2. Then give one concrete example.",
+			...commun,
+		].join("\n");
+	}
+	return "HOW TO EXPLAIN (this is a question):\n" + [
+		"1. First spot the likely reasoning error behind the learner's WRONG answer, in one or two sentences (skip if they were right).",
+		"2. Explain the notion step by step, starting from zero.",
+		"3. Say why the right answer is right AND why each option the learner chose wrongly is wrong.",
+		"4. Give one concrete example or an analogy.",
+		"5. End with ONE short check question the learner can answer in their head, without giving its answer.",
+		...commun,
+	].join("\n");
+}
+
 /** One question of the quiz, as a block of the context. */
-function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAnswer?: string; correct?: boolean | null }): string {
+function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAnswer?: string; correct?: boolean | null; history?: HistoireQuestion | null }): string {
 	const lecture = q.role === "read";
 	const lignes: string[] = [`[Q${n}]${courant ? " <<< QUESTION ON SCREEN >>>" : ""}${lecture ? " (reading card, not a question)" : ""}`];
 	const titre = texte(q.title);
@@ -131,6 +173,8 @@ function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAn
 		lignes.push(`Learner's answer: ${mine || "(none)"}`);
 		if (extra.correct === true) lignes.push("The learner's answer is RIGHT.");
 		else if (extra.correct === false) lignes.push("The learner's answer is WRONG.");
+		const histoire = ligneHistorique(extra.history);
+		if (histoire) lignes.push(histoire);
 	}
 	return lignes.join("\n");
 }
@@ -140,7 +184,7 @@ function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAn
  * on screen (`courant`, an index in `questions`) marked with the learner's
  * answer. An out-of-range `courant` marks nothing.
  */
-export function contexteQuiz(questions: Q[], extra: { quiz: string; folder?: string; courant: number; ordre?: number[]; myAnswer?: string; correct?: boolean | null }): string {
+export function contexteQuiz(questions: Q[], extra: { quiz: string; folder?: string; courant: number; ordre?: number[]; myAnswer?: string; correct?: boolean | null; history?: HistoireQuestion | null }): string {
 	const tete = [`QUIZ: ${extra.quiz.trim()}`];
 	if (extra.folder?.trim()) tete.push(`FOLDER: ${extra.folder.trim()}`);
 	tete.push("The question marked \"QUESTION ON SCREEN\" is the one the learner is looking at; the others are the rest of the same quiz.");

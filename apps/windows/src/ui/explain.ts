@@ -35,7 +35,10 @@ import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../s
 import type { OpenProviderMenuOptions, ProviderBrandOption } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
-import { contexteQuiz } from "../../../../src/explain-prompt";
+import { consigneExplication, contexteQuiz } from "../../../../src/explain-prompt";
+import { ancrerImagesCitees } from "../../../../src/explain-images";
+import type { ImageJointe } from "../../../../src/explain-images";
+import { poserImagesCitees } from "./explain-images";
 import { CARD_EDIT_MAX_CHARS, consigneEditionCarte, splitCardEdit, validateCardEdit } from "../../../../src/explain-edit";
 import type { CardEditResult, CardFields } from "../../../../src/explain-edit";
 import { renderInlineText, sanitizeQuizHtml } from "../../../../src/engine/sanitizer";
@@ -44,12 +47,14 @@ import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { lireCours } from "./explain-cours";
 import type { Cours } from "./explain-cours";
-import { attacherUsage } from "./comptes";
+import { mountUsageLine } from "../../../../src/dashboard/usage-line";
+import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/** The default longest explanation, in characters: about a screen. */
-export const EXPLAIN_MAX_CHARS_DEFAUT = 1500;
+/** The default longest explanation, in characters: a full explanation (error
+    diagnosis, steps, every wrong option, example, check question) fits. */
+export const EXPLAIN_MAX_CHARS_DEFAUT = 4000;
 
 /** "0:07" — the time the model has worked. */
 function duree(ms: number): string {
@@ -141,6 +146,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	/** Re-renders the quiz page on a rewritten note, on the same screen, and
 	    returns its questions again. Absent: a reading cannot be rewritten. */
 	recharger?: (note: string, qi: number) => Promise<Record<string, unknown>[]>;
+	/** The learner's attempts and misses on question `qi`, from the review journal (read only). */
+	historique?: (qi: number) => { attempts: number; misses: number } | null;
 }): () => void {
 	const host = currentHost();
 	/* The questions and the note, as the page last read them: a rewritten card
@@ -348,18 +355,21 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		if (!q) return null;
 		const ordre = slide ? [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig)) : [];
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
-		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: slide ? maReponse(slide) : "", correct: slide ? estJuste(slide) : null });
+		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: slide ? maReponse(slide) : "", correct: slide ? estJuste(slide) : null, history: q.role === "read" ? null : deps.historique?.(qi) ?? null });
+		const avecConsigne = base + "\n" + consigneExplication(q.role === "read");
 		/* A reading card may be rewritten by the chat (only if the app can re-render the page). */
-		return q.role === "read" && deps.recharger ? base + "\n" + consigneEditionCarte(q) : base;
+		return q.role === "read" && deps.recharger ? avecConsigne + "\n" + consigneEditionCarte(q) : avecConsigne;
 	};
 	/* The course (notes, PDFs, pictures) is read ONCE per quiz page, at the
 	   first opening of the window or the first send, then reused. */
 	let cours: Promise<Cours> | null = null;
 	let coursPret = false;
+	/* The pictures attached to the course, which an answer may cite. */
+	let jointesCours: ImageJointe[] = [];
 	const coursDuQuiz = (): Promise<Cours> => (cours ??= lireCours(deps.chemin, note, questions)
 		/* A course that could not be read whole is read again at the next message. */
-		.then((c) => { coursPret = true; if (c.incomplet) cours = null; return c; })
-		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; cours = null; return { texte: "", images: [], nomsImages: [], incomplet: true }; }));
+		.then((c) => { coursPret = true; jointesCours = c.jointes; if (c.incomplet) cours = null; return c; })
+		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; cours = null; return { texte: "", images: [], nomsImages: [], jointes: [], incomplet: true }; }));
 
 /* Hidden in an Exam (the engine puts its clock straight into the host) and
 	   until the question is corrected. */
@@ -419,7 +429,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const conv = conversationDe(qi);
 		conv.contexte = contexte;
 		let horloge = 0;
-		let fermerUsage: (() => void) | null = null;
+		let ligneForfait: UsageLine | null = null;
 		requireHost("modals").open({
 			className: "nq-explain-modal",
 			title: t("ai.explain.title"),
@@ -431,14 +441,6 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				champ.placeholder = t("ai.explain.ownQuestion");
 				const majPlaceholder = (): void => { champ.placeholder = t(conv.messages.length ? "ai.explain.followUp" : "ai.explain.ownQuestion"); };
 				const pied = ajouter(composer, "div", "qz-mini-pied");
-				/* The consumption of the provider, where the Settings already show
-				   it: a gauge that opens its popover (Claude Code and Codex). */
-				const usageBtn = ajouter(pied, "button", "qbd-select qz-mini-fournisseur qz-mini-usage");
-				usageBtn.type = "button";
-				host.ui.setIcon(usageBtn, "gauge");
-				usageBtn.title = t("ai.usage.title");
-				usageBtn.setAttribute("aria-label", t("ai.usage.title"));
-				fermerUsage = attacherUsage(usageBtn, () => (courant === "codex" ? "codex" : "claude"));
 				const outils = ajouter(pied, "div", "qz-mini-outils");
 				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
 				fournisseurBtn.type = "button";
@@ -451,6 +453,21 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const envoi = ajouter(outils, "button", "qz-mini-envoi");
 				envoi.type = "button";
 
+				/* The plan status line of the Generate page, as is (`usage-line.ts`), right
+				   under the composer; remounted when the provider changes. */
+				const lireForfait = host.process?.usageCompte;
+				let outilForfait: UsageTool | null = null;
+				const monterForfait = (): void => {
+					const outil: UsageTool | null = !lireForfait || !peutExpliquer() ? null : courant === "claude-code" ? "claude" : courant === "codex" ? "codex" : null;
+					if (outil === outilForfait && (ligneForfait || !outil)) return;
+					ligneForfait?.destroy();
+					ligneForfait = null;
+					outilForfait = outil;
+					if (!outil || !lireForfait) return;
+					const place = ajouter(m.contentEl, "div", "qbd-ai-usage-slot");
+					composer.after(place);
+					ligneForfait = mountUsageLine(place, outil, (o) => lireForfait.call(host.process, o));
+				};
 				const peindreOutils = (): void => {
 					fournisseurBtn.replaceChildren();
 					if (peutExpliquer()) {
@@ -463,8 +480,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					}
 					m.panelEl.dataset.nqFournisseur = courant;
 					modeleBtn.hidden = !peutExpliquer();
-					// The gauge and the effort button exist for Claude Code and Codex only.
-					usageBtn.hidden = effortBtn.hidden = !peutExpliquer() || !aBoutonEffort();
+					// The effort button exists for Claude Code and Codex only.
+					effortBtn.hidden = !peutExpliquer() || !aBoutonEffort();
+					monterForfait();
 					if (peutExpliquer()) {
 						modeleLabel.textContent = libelleModele();
 						const ev = effortCourant();
@@ -656,7 +674,9 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						const decoupe = conv.lecture ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
 						else if (decoupe.shown) {
-							prose.innerHTML = renderMarkdownPreview(decoupe.shown);
+							const ancre = ancrerImagesCitees(decoupe.shown, jointesCours);
+							prose.innerHTML = renderMarkdownPreview(ancre.texte);
+							poserImagesCitees(prose, ancre.images);
 							if (decoupe.shown.includes("$")) void mathifyElement(prose);
 						}
 						else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
@@ -727,6 +747,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						rep.lecture = false;
 						rep.duree = Date.now() - (rep.debut ?? Date.now());
 						conv.enCours = false;
+						ligneForfait?.refresh();
 						conv.repeindre?.();
 					}
 				};
@@ -747,7 +768,7 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 				champ.focus();
 			},
 			// Closing the window keeps the conversation; only the painting stops.
-			onClose: () => { window.clearInterval(horloge); fermerUsage?.(); conv.repeindre = null; },
+			onClose: () => { window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
 		});
 	}
 

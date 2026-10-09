@@ -946,3 +946,34 @@ await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/
 	}
 	r.done();
 });
+
+await withSrcModule("src/review/review-store.ts", async ({ createReviewStore }) => {
+	// `history(key)`: read only, for the Explain window. Attempts count real
+	// answers; a pre-test, a reading card and a skip are not attempts.
+	const r = makeReporter("Adaptateur — historique d'une question (lecture seule)");
+	const T = 1_700_000_000_000;
+	let n = 0;
+	const ligne = (q, grade, role) => JSON.stringify({ t: "answer", q, at: T + n++, grade, ...(role ? { role } : {}) });
+	const journal = [
+		ligne("Cours/reseau.md::q1", "wrong"), ligne("Cours/reseau.md::q1", "wrong"), ligne("Cours/reseau.md::q1", "correct"),
+		ligne("Cours/reseau.md::q1", "wrong", "pre"), ligne("Cours/reseau.md::q1", "seen"), ligne("Cours/reseau.md::q1", "skipped"),
+		ligne("Cours/reseau.md::q2", "correct"),
+	].join("\n") + "\n";
+	const { host, ecritures } = fauxHote({ fichiers: { "B/.neo-quiz/review-log.jsonl": journal } });
+	const store = createReviewStore({
+		fs: host.fs, watcher: host.watcher, paths: host.paths,
+		catalogue: () => [], horizons: () => ({}), now: () => T,
+	});
+	const cle = id => store.keyOf("B/Cours/reseau.md", id);
+	r.check("journal pas encore chargé : aucune histoire", store.history(cle("q1")), null);
+	await store.load();
+	r.check("deux ratés sur trois essais, le pré-test, la lecture et l'abandon ne comptent pas", store.history(cle("q1")), { attempts: 3, misses: 2 });
+	r.check("une autre question a sa propre histoire", store.history(cle("q2")), { attempts: 1, misses: 0 });
+	r.check("une question jamais posée : rien", store.history(cle("q9")), null);
+	const avant = ecritures.length;
+	store.history(cle("q1"));
+	store.destroy();
+	await tick();
+	r.check("la lecture n'écrit rien", ecritures.length, avant);
+	r.done();
+});

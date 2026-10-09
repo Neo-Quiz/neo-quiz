@@ -68,7 +68,7 @@ import type { ProviderBrandOption, ProviderMenuHandle } from "./ui-select";
 import { formatHotkey, eventToHotkey } from "../hotkey-format";
 import { attachMentionPicker } from "./mention-picker";
 import type { MentionPickerHandle } from "./mention-picker";
-import { formatTokens, formatCost, formatDuration, totalTokens, tightestRow, usageRowLabel, providerPublishesPlan } from "./usage-format";
+import { formatTokens, formatCost, formatDuration, totalTokens } from "./usage-format";
 import type { AiUsage, AiUsageEntry, PlanUsage } from "./usage-format";
 import { mountUsageLine } from "./usage-line";
 import type { UsageLine } from "./usage-line";
@@ -775,7 +775,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/* Dernier état de forfait CONNU — sert au seul survol du bouton d'usage :
 	   passer la souris ne déclenche jamais de lecture réseau, c'est le modal
 	   qui va chercher des chiffres frais quand on l'ouvre. */
-	let lastPlan: PlanUsage | null = null;
 	/* The plan status line under the composer (one at a time: the page redraws
 	   the composer often). Refreshed when a generation or reply ends. */
 	let planLine: UsageLine | null = null;
@@ -2110,28 +2109,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const ty = typesResume(effectiveTypes());
 			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
 		});
-
-		/* Consultation du forfait, à sa place de contrôle : dans le composer,
-		   avec le « + » et les options (référence Ahmed 2026-07-30). Savoir ce
-		   qu'il reste n'a d'intérêt que si on peut le demander SANS dépenser,
-		   d'où un bouton toujours accessible plutôt qu'un badge d'après-coup.
-		   Réservé aux fournisseurs qui publient réellement un forfait — et aux
-		   hôtes qui savent le lire (`deps.usage`, le greffon seul). */
-		const usage = deps.usage;
-		if (usage && host.platform.isDesktopApp && providerPublishesPlan(settings().aiProvider || "")) {
-			const usageBtn = ajouter(composerBottom, "button", "qbd-ai-composer-usage");
-			usageBtn.type = "button";
-			host.ui.setIcon(usageBtn, "gauge");
-			labelIconButton(usageBtn, t("ai.usage.title"));
-			attachHoverTip(usageBtn, (tip) => {
-				ajouter(tip, "div", "qbd-hover-tip-title", t("ai.usage.title"));
-				const tightest = tightestRow(lastPlan?.rows || []);
-				if (tightest) {
-					ajouter(tip, "div", "qbd-hover-tip-body", `${usageRowLabel(tightest)} · ${t("ai.usage.usedPercent", { n: Math.round(tightest.usedPercent) })}`);
-				}
-			});
-			usageBtn.addEventListener("click", () => void openUsage(usage));
-		}
 
 		/* Plan status line, right under the composer: always visible, no click.
 		   Only for a provider that publishes a plan, on a host that can read it. */
@@ -3692,23 +3669,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			if (!m) return;
 			if (k % 2 === 1) ajouter(parent, "strong", "qbd-ai-web-em", m);
 			else parent.appendChild(document.createTextNode(m));
-		});
-	}
-
-	/** Ouvre l'écran d'usage en lui passant la dernière lecture connue (il ne
-	    rappellera l'endpoint que si elle a vieilli) et retient ce qu'il lit,
-	    pour que le survol du bouton puisse le résumer sans relire. */
-	async function openUsage(usage: AiUsageDeps): Promise<void> {
-		/* L'écran d'usage lit lui aussi l'instantané de `~/.claude.json` (Fable
-		   proposé ?, notes promo en cours) par `ai-providers`. Une entrée
-		   d'affichage de plus, donc un `await` de plus — le seul du fichier avec
-		   le menu de modèles. */
-		await aiProviders.refreshCliCaches();
-		await usage.open({
-			provider: settings().aiProvider || "",
-			usage: lastUsage,
-			known: lastPlan,
-			onData: (data) => { lastPlan = data; }
 		});
 	}
 

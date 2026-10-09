@@ -53,7 +53,6 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	   de la page « Générer » (`dashboard/usage-format.ts`), consommées par
 	   l'APPLICATION. */
 	"ai.usage.badge": "{tokens} tokens",
-	"ai.usage.title": "Usage",
 	"ai.usage.sessionCurrent": "Session actuelle",
 	"ai.usage.allModels": "Tous les modèles",
 	"ai.usage.usedPercent": "{n} % utilisés",

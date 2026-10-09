@@ -67,7 +67,6 @@ export const EN_AI = {
 	   `dashboard/usage-format.ts` compose encore pour le badge et l'infobulle
 	   de la page « Générer » elle-même, consommées par l'APPLICATION. */
 	"ai.usage.badge": "{tokens} tokens",
-	"ai.usage.title": "Usage",
 	"ai.usage.sessionCurrent": "Current session",
 	"ai.usage.allModels": "All models",
 	// Sans espace avant le %, contrairement au français : c'est la typographie

@@ -172,3 +172,45 @@ await withSrcModule(["src/explain-edit.ts", "src/explain-prompt.ts", "src/lectur
 		[true, true, true, true, true, true, true, false]);
 	r.done();
 });
+
+await withSrcModule(["src/explain-prompt.ts", "src/explain-images.ts", "src/markdown-preview.ts"], ({ consigneExplication, contexteQuiz, ligneHistorique }, { ancrerImagesCitees, imageNommee, JETON_RE }, { renderMarkdownPreview }) => {
+	const r = makeReporter("Explain method, history and cited pictures");
+
+	// ── the method
+	const q = consigneExplication(false);
+	r.check("the method for a question: error diagnosis, steps from zero, why right AND why each wrong option, example, ONE check question, page citation, picture syntax",
+		[/WRONG answer/.test(q), /step by step, starting from zero/.test(q), /why each option the learner chose wrongly is wrong/.test(q), /example or an analogy/.test(q), /ONE short check question/.test(q), /CM2.pdf, p. 7/.test(q), /[p. N]/.test(q), /SHOW it/.test(q), q.includes("![[exact name]]"), /"tu"/.test(q)],
+		[true, true, true, true, true, true, true, true, true, true]);
+	const c = consigneExplication(true);
+	r.check("a reading card is rephrased more simply then given an example, without the question steps",
+		[/Rephrase the card more simply/.test(c), /concrete example/.test(c), /WRONG answer/.test(c), /check question/.test(c), c.includes("![[exact name]]")], [true, true, false, false, true]);
+
+	// ── the history of the question on screen
+	const single = { title: "A", prompt: "?", options: ["x", "y"], correctIndex: 0 };
+	const avec = h => contexteQuiz([single], { quiz: "Q", courant: 0, myAnswer: "B. y", correct: false, history: h });
+	r.check("history: one short line with attempts and misses",
+		[avec({ attempts: 4, misses: 2 }).includes("Learner's history on this question: 4 attempts, 2 missed."), avec({ attempts: 1, misses: 0 }).includes("1 attempt, 0 missed.")], [true, true]);
+	r.check("history: three misses ask for the basics, two do not",
+		[avec({ attempts: 5, misses: 3 }).includes("from the basics"), avec({ attempts: 5, misses: 2 }).includes("from the basics")], [true, false]);
+	r.check("history: absent, empty or incoherent gives no line",
+		[avec(null).includes("history"), avec(undefined).includes("history"), avec({ attempts: 0, misses: 0 }).includes("history"), avec({ attempts: 2, misses: 5 }).includes("history"), ligneHistorique({ attempts: 2.5, misses: 1 })], [false, false, false, false, null]);
+	r.check("history: only on the question on screen",
+		contexteQuiz([single, single], { quiz: "Q", courant: 0, history: { attempts: 3, misses: 1 } }).split("history on this question").length - 1, 1);
+
+	// ── the cited pictures
+	const jointes = [
+		{ name: "diagramme-cas.png", path: "Cours/Schémas/diagramme-cas.png", relatif: "Schémas/diagramme-cas.png" },
+		{ name: "racine.png", path: "Cours/racine.png", relatif: "racine.png" },
+	];
+	const a = ancrerImagesCitees("Voir ![[Schémas/diagramme-cas.png]] et ![[racine.png]] puis ![[diagramme-cas.png]].", jointes);
+	r.check("an attached picture (relative path or bare name) becomes a token, once per picture", [a.images.map(i => i.name), [...a.texte.matchAll(JETON_RE)].length], [["diagramme-cas.png", "racine.png"], 3]);
+	const inconnu = ancrerImagesCitees("![[autre.png]] ![[../secret.png]] ![[Schémas/../racine.png]] ![[C:/x.png]] ![[a\b.png]]", jointes);
+	r.check("an unknown name or a path with .. is shown as text and never loaded", [inconnu.images.length, inconnu.texte.includes("![["), inconnu.texte.includes("autre.png")], [0, false, true]);
+	r.check("the match ignores case and the size/alias suffix", imageNommee("RACINE.png|300", jointes)?.name, "racine.png");
+	const forge = ancrerImagesCitees("\uE000" + "0" + "\uE001 faux", jointes);
+	r.check("a token forged by the model is stripped", [forge.images.length, [...forge.texte.matchAll(JETON_RE)].length], [0, 0]);
+	const hostile = ancrerImagesCitees("![[<img src=x onerror=alert(1)>.png]] <script>alert(1)</script>", jointes);
+	const html = renderMarkdownPreview(hostile.texte);
+	r.check("a hostile name comes out as inert text once rendered", [html.includes("<img"), html.includes("<script"), html.includes("&lt;img")], [false, false, true]);
+	r.done();
+});

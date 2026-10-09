@@ -17,9 +17,14 @@ release notes.
 
 - PDF sources under a Learn's title: one chip per document its cards cite, which opens the PDF in a built-in viewer (lazy pages, zoom, page counter, selectable text); a reading's source line opens the PDF at its page. Works on PC and Android.
 
+### Changed
+
+- The Explain window answers like a tutor: it spots the likely reasoning error behind a wrong answer, explains step by step, says why each wrong option is wrong, cites the course with its page, shows the course picture it refers to (click to enlarge), and ends with a short check question. It knows how often you missed the question, and its answers are no longer cut at 1500 characters. The plan usage line replaces the gauge button under its composer, as on the Generate page.
+
 ### Fixed
 
 - A quiz in progress is no longer overwritten by another device: snapshots are merged question by question after the last restart, so a Learn at 100 % no longer drops back when a phone reopens an old snapshot.
+- Explain no longer keeps an empty course: a folder that lists nothing, or documents that give no text, is read again at the next message, and any unreadable file is logged with its path.
 - The installer no longer gives up on a first run when the download hits a transient problem (connection reset, a release still being uploaded, a file Defender still holds): it re-reads the release information and retries a few times, never relaxing the integrity check, and its error messages now say to try again in a minute.
 
 ## [1.20.60] - 2026-10-09
