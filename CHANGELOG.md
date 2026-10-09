@@ -15,6 +15,7 @@ release notes.
 
 ### Fixed
 
+- A quiz in progress is no longer overwritten by another device: snapshots are merged question by question after the last restart, so a Learn at 100 % no longer drops back when a phone reopens an old snapshot.
 - The installer no longer gives up on a first run when the download hits a transient problem (connection reset, a release still being uploaded, a file Defender still holds): it re-reads the release information and retries a few times, never relaxing the integrity check, and its error messages now say to try again in a minute.
 
 ## [1.20.60] - 2026-10-09

@@ -67,6 +67,11 @@ export interface SessionQuiz {
 	questions: Record<string, EtatQuestion>;
 	/** Write timestamp (ms): the most recent session wins. */
 	ecrite: number;
+	/** When the attempt this snapshot belongs to began (ms). A restart or a
+	    finished quiz begins a new one; snapshots of an older attempt never
+	    merge into it (shared-state/session-merge.ts). Absent from a snapshot
+	    taken before this existed: an attempt begun at an unknown date. */
+	depuis?: number;
 	/** A Test's setup (hints, time limit), only written by a host that asks
 	    for one. Absent from a snapshot taken before the setup existed. */
 	setup?: TestSetup;

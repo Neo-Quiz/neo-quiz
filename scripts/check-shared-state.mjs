@@ -620,3 +620,108 @@ await withSrcModule("apps/windows/src/host/shared-sessions.ts", async (ses) => {
 		[s3.toutes()["Efrei/XTI303 bis/cours.md"]?.courante, s3.toutes()[P]], ["q4", undefined]);
 	r.done();
 });
+
+/* THE MERGE OF A QUIZ'S SNAPSHOTS ACROSS DEVICES (`src/shared-state/session-merge.ts`,
+   2026-10-09). Defect prevented: "the latest snapshot wins whole" let a phone that
+   reopened an old snapshot overwrite a 54-question Learn with 6 questions (the
+   card went from 100 % to 11 %). */
+await withSrcModule(["src/shared-state/session-merge.ts", "apps/windows/src/host/shared-sessions.ts"], async (sm, ses) => {
+	const r = makeReporter("Shared state - snapshot merge");
+	const ok = { verifieeLearn: true, verdict: "first" };
+	// Anonymised copy of the real case: the laptop held 54 questions (stopped on d10-lecture) at
+	// 11:55; a phone that reopened an old snapshot wrote 6 (on d2-lecture) at 14:58.
+	const ids = Array.from({ length: 54 }, (_, i) => `q${i + 1}`);
+	const laptop = { v: 1, courante: "d10-lecture", ecrite: 1_100, questions: Object.fromEntries(ids.map(id => [id, { ...ok }])) };
+	const phone = { v: 1, courante: "d2-lecture", ecrite: 1_400, questions: Object.fromEntries(ids.slice(0, 6).map(id => [id, { ...ok }])) };
+	const verifiees = (s) => Object.values(s.questions).filter(q => q.verifieeLearn).length;
+	const m = sm.fusionnerPhotos([phone, laptop]);
+	r.check("real case: 54 against 6 gives 54 questions, not 6", verifiees(m), 54);
+	r.check("real case: reopening does not go back (the 54-question snapshot's question)", m.courante, "d10-lecture");
+	r.check("real case: the order of the entries does not matter", sm.fusionnerPhotos([laptop, phone]), m);
+
+	// Two devices did different questions: the union.
+	const a = { v: 1, courante: "q2", ecrite: 10, questions: { q1: { ...ok }, q2: { ...ok } } };
+	const b = { v: 1, courante: "q4", ecrite: 20, questions: { q3: { ...ok }, q4: { ...ok } } };
+	r.check("different questions on two devices: the union", Object.keys(sm.fusionnerPhotos([a, b]).questions).sort(), ["q1", "q2", "q3", "q4"]);
+
+	// The same question: checked beats unchecked even when older; then the latest.
+	const verif = { v: 1, courante: null, ecrite: 10, questions: { q1: { ...ok } } };
+	const brouillon = { v: 1, courante: null, ecrite: 20, questions: { q1: { selection: 2 } } };
+	r.check("the same question: checked beats a later unchecked entry", sm.fusionnerPhotos([verif, brouillon]).questions.q1, { ...ok });
+	const t1 = { v: 1, courante: null, ecrite: 10, questions: { q1: { selection: 1 } } };
+	const t2 = { v: 1, courante: null, ecrite: 20, questions: { q1: { selection: 2 } } };
+	r.check("the same question, equally advanced: the latest", sm.fusionnerPhotos([t1, t2]).questions.q1.selection, 2);
+	const rate = { v: 1, courante: null, ecrite: 10, questions: { q1: { verifieeLearn: true, verdict: "missed" } } };
+	const repris = { v: 1, courante: null, ecrite: 5, questions: { q1: { ...ok, verdict: "retried" } } };
+	r.check("a missed question settled elsewhere counts as settled", sm.fusionnerPhotos([rate, repris]).questions.q1.verdict, "retried");
+
+	// courante: the latest snapshot's when not behind; else the most advanced one's, or the first unchecked.
+	r.check("courante: the latest snapshot's when it is not behind", sm.fusionnerPhotos([a, b]).courante, "q4");
+	const cheminant = { v: 1, courante: "q1", ecrite: 30, questions: { q1: { ...ok } } };
+	const avance = { v: 1, courante: "q9", ecrite: 10, questions: { q1: { ...ok }, q2: { ...ok }, q3: { ...ok } } };
+	r.check("courante behind: the most advanced snapshot's question", sm.fusionnerPhotos([cheminant, avance]).courante, "q9");
+	const avanceCoche = { ...avance, courante: "q3" };
+	r.check("courante behind and already checked: the first unchecked, with the order", sm.fusionnerPhotos([cheminant, avanceCoche], ["q1", "q2", "q3", "q4", "q5"]).courante, "q4");
+
+	// Restart: a snapshot of a newer attempt (depuis) leaves the older ones out, even later-written ones.
+	const vieille = { v: 1, courante: "q50", ecrite: 100, depuis: 10, questions: { q1: { ...ok }, q50: { ...ok } } };
+	const reprise = { v: 1, courante: "q1", ecrite: 300, depuis: 200, questions: { q1: { selection: 0 } } };
+	r.check("a restart: the old attempt does not come back", Object.keys(sm.fusionnerPhotos([vieille, reprise]).questions), ["q1"]);
+	const vieilleTardive = { ...vieille, ecrite: 400 };
+	r.check("a restart: an old attempt written later (a device that has not synced) is still left out", sm.fusionnerPhotos([vieilleTardive, reprise]).questions.q1, { selection: 0 });
+	r.check("a restart: same attempt on two devices merges", Object.keys(sm.fusionnerPhotos([{ ...reprise, questions: { q2: { selection: 1 } } }, reprise]).questions).sort(), ["q1", "q2"]);
+
+	// The retry queue: every device's entries, minus the questions settled since.
+	const fa = { v: 1, courante: null, ecrite: 10, file: [{ id: "q1", depuis: 1 }, { id: "q2", depuis: 2 }], questions: { q1: { verifieeLearn: true, verdict: "missed" }, q2: { verifieeLearn: true, verdict: "missed" } } };
+	const fb = { v: 1, courante: null, ecrite: 20, file: [{ id: "q3", depuis: 1 }], questions: { q2: { ...ok, verdict: "retried" }, q3: { verifieeLearn: true, verdict: "missed" } } };
+	r.check("the retry queue: both devices' entries, minus a question settled elsewhere", sm.fusionnerPhotos([fa, fb]).file.map(e => e.id).sort(), ["q1", "q3"]);
+
+	// Tombstones.
+	r.check("a tombstone newer than every snapshot leaves the quiz reset", sm.fusionnerPhotos([laptop, phone, { tombe: true, ecrite: 2_000 }]), null);
+	r.check("a snapshot after the tombstone counts alone", Object.keys(sm.fusionnerPhotos([laptop, { tombe: true, ecrite: 1_200 }, phone]).questions).length, 6);
+	r.check("a tie between a snapshot and a tombstone: reset", sm.fusionnerPhotos([phone, { tombe: true, ecrite: 1_400 }]), null);
+
+	// Snapshots written before `depuis` existed merge as an attempt begun at an unknown date.
+	r.check("no `depuis`: legacy snapshots merge", [Object.keys(sm.fusionnerPhotos([a, b]).questions).length, "depuis" in sm.fusionnerPhotos([a, b])], [4, false]);
+	r.check("a legacy snapshot older than the attempt's start is left out", Object.keys(sm.fusionnerPhotos([a, { ...b, depuis: 15 }]).questions).sort(), ["q3", "q4"]);
+	r.check("a legacy snapshot after the attempt's start merges", Object.keys(sm.fusionnerPhotos([a, { ...b, depuis: 5 }]).questions).length, 4);
+
+	// A damaged snapshot is dropped alone; a bad `depuis` is dropped from its snapshot only.
+	const t = ses.lireTableSessions({ "R/ok.md": laptop, "R/abime.md": { v: 1, questions: "x", ecrite: 1 }, "R/dep.md": { ...a, depuis: 99 } }, "R", 1e6);
+	r.check("a damaged snapshot is ignored alone", Object.keys(t).sort(), ["R/dep.md", "R/ok.md"]);
+	r.check("a `depuis` after the write stamp is dropped, the snapshot kept", [t["R/dep.md"].depuis, Object.keys(t["R/dep.md"].questions).length], [undefined, 2]);
+	r.check("a damaged entry among questions is skipped", Object.keys(sm.fusionnerPhotos([{ ...a, questions: { q1: "mauvais", q2: { ...ok } } }]).questions), ["q2"]);
+
+	// Hosts: the real files across devices, and what a device writes.
+	const files = new Map();
+	const fsOf = () => {
+		const mf = memFs(files);
+		return { ...mf, size: async (p) => (files.has(p) ? files.get(p).length : null), readBounded: async (p) => mf.read(p) };
+	};
+	const P = "R/quiz.md";
+	files.set("R/.neo-quiz/sessions/laptop.json", JSON.stringify({ [P]: laptop }));
+	files.set("R/.neo-quiz/sessions/phone.json", JSON.stringify({ [P]: phone }));
+	const mkDev = (id, t0) => { let t = t0; return ses.createSharedSessions({ fs: fsOf(), roots: () => ["R"], deviceId: id, now: () => (t += 1) }); };
+	const tel = mkDev("phone", 1_500);
+	await tel.load();
+	r.check("the host view of the real files: 54 questions", verifiees(tel.toutes()[P]), 54);
+	// The phone plays one more question from its OLD view (6 questions): what it publishes is the merge.
+	tel.poser(P, { v: 1, courante: "q7", ecrite: 1, questions: { ...phone.questions, q7: { ...ok } } });
+	await tel.ecrire();
+	r.check("a device writes the MERGED snapshot in its own file (not its local view)", verifiees(JSON.parse(files.get("R/.neo-quiz/sessions/phone.json"))[P]), 54);
+	r.check("... the laptop's file is untouched", JSON.parse(files.get("R/.neo-quiz/sessions/laptop.json"))[P], laptop);
+	// A restart on the phone: the laptop's older progress does not come back, even after the phone plays on.
+	tel.effacer(P);
+	r.check("a restart on one device: the quiz is reset for all of them", tel.toutes()[P], undefined);
+	tel.poser(P, { v: 1, courante: "q1", ecrite: 1, questions: { q1: { selection: 0 } } });
+	await tel.ecrire();
+	const portable = mkDev("laptop", 1_600);
+	await portable.load();
+	r.check("after the restart and a new answer, the other device sees only the new attempt", Object.keys(portable.toutes()[P].questions), ["q1"]);
+	r.check("... which carries its start (`depuis`)", typeof portable.toutes()[P].depuis, "number");
+	portable.poser(P, { v: 1, courante: "q2", ecrite: 1, questions: { q1: { selection: 0 }, q2: { ...ok } } });
+	await portable.ecrire();
+	await tel.refresh();
+	r.check("both devices then agree on the new attempt", [Object.keys(tel.toutes()[P].questions).sort(), Object.keys(portable.toutes()[P].questions).sort()], [["q1", "q2"], ["q1", "q2"]]);
+	r.done();
+});

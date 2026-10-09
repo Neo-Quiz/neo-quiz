@@ -1,6 +1,7 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import { REVIEW_DIR, isConflictCopy } from "../../../../src/review/paths";
 import type { SessionQuiz } from "../../../../src/engine/session";
+import { derniereEcriture, fusionnerPhotos } from "../../../../src/shared-state/session-merge";
 import type { SharedFs } from "./shared-state";
 
 /* ══════════════════════════════════════════════════════════
@@ -15,8 +16,11 @@ import type { SharedFs } from "./shared-state";
 
    the same scheme as the exams and folder settings (shared-state.ts): a
    device writes ONLY its own file, reads every device's, and merges. For a
-   quiz, the snapshot written LAST (`ecrite`) wins, whichever device wrote
-   it. A quiz finished or restarted leaves a TOMBSTONE (`{ tombe: true,
+   quiz, the snapshots are merged QUESTION BY QUESTION
+   (shared-state/session-merge.ts): the snapshot written last no longer wins
+   whole, it used to bring a 54-question Learn back to 6 when a device
+   reopened an old snapshot. A device writes in its own file the MERGED
+   snapshot of what it sees, so that reopening an old one never republishes it. A quiz finished or restarted leaves a TOMBSTONE (`{ tombe: true,
    ecrite }`), so that the older snapshot of another device does not bring
    it back; tombstones older than 60 days are dropped when the file is
    written.
@@ -57,29 +61,29 @@ export function lireTableSessions(raw: unknown, root: string, now: number): Tabl
 		if (typeof v.ecrite !== "number" || !Number.isFinite(v.ecrite) || v.ecrite > now + FUTUR_MS) continue;
 		if (v.tombe === true) { out[cle] = { tombe: true, ecrite: v.ecrite }; n++; continue; }
 		if (v.v !== 1 || !isRecord(v.questions)) continue;
-		out[cle] = v as unknown as SessionQuiz;
+		const photo = v as unknown as SessionQuiz;
+		// `depuis` only means something as a stamp not after the write.
+		if (photo.depuis !== undefined && !(typeof photo.depuis === "number" && Number.isFinite(photo.depuis) && photo.depuis <= photo.ecrite)) delete photo.depuis;
+		out[cle] = photo;
 		n++;
 	}
 	return out;
 }
 
-/** The entry that wins for each quiz: the latest stamp; on a tie, the
-    tombstone (a finished quiz stays finished). */
-export function gagnantes(tables: readonly TableSessions[]): TableSessions {
-	const out: TableSessions = {};
-	for (const t of tables) {
-		for (const [cle, s] of Object.entries(t)) {
-			const cur = out[cle];
-			if (!cur || s.ecrite > cur.ecrite || (s.ecrite === cur.ecrite && estTombe(s) && !estTombe(cur))) out[cle] = s;
-		}
-	}
+/** Every device's entries for each quiz. */
+function parCle(tables: readonly TableSessions[]): Record<string, SessionStockee[]> {
+	const out: Record<string, SessionStockee[]> = {};
+	for (const t of tables) for (const [cle, s] of Object.entries(t)) (out[cle] ??= []).push(s);
 	return out;
 }
 
-/** The snapshots in progress, every device merged. */
+/** The snapshots in progress, every device merged question by question. */
 export function fusionnerSessions(tables: readonly TableSessions[]): Record<string, SessionQuiz> {
 	const out: Record<string, SessionQuiz> = {};
-	for (const [cle, s] of Object.entries(gagnantes(tables))) if (!estTombe(s)) out[cle] = s;
+	for (const [cle, entrees] of Object.entries(parCle(tables))) {
+		const f = fusionnerPhotos(entrees);
+		if (f) out[cle] = f;
+	}
 	return out;
 }
 
@@ -170,6 +174,7 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 
 	const tables = (): TableSessions[] => [...racines.values()].flatMap(r => [r.own, ...r.autres]);
 	const racineDe = (chemin: string): Racine | null => racines.get(rootOf(chemin)) ?? null;
+	const entrees = (chemin: string): SessionStockee[] => tables().flatMap(t => (t[chemin] ? [t[chemin]] : []));
 	const toucher = (chemin: string): void => { modifiees.add(rootOf(chemin)); cache = null; };
 
 	return {
@@ -189,29 +194,39 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 		poser(chemin, s) {
 			const r = racineDe(chemin);
 			if (!r) return;
+			const toutes = entrees(chemin);
+			const au = derniereEcriture(toutes);
 			/* Above whatever any device holds for this quiz, whatever the clocks
 			   say: the snapshot being played is the latest by definition. */
-			let au = 0;
-			for (const t of tables()) { const e = t[chemin]; if (e && e.ecrite > au) au = e.ecrite; }
-			r.own[chemin] = s.ecrite > au ? s : { ...s, ecrite: nextAt(au + 1) };
+			const jouee: SessionQuiz = s.ecrite > au ? { ...s } : { ...s, ecrite: nextAt(au + 1) };
+			/* The attempt it belongs to: the one under way, or a NEW one (nothing
+			   merged: first answer, or right after a restart's tombstone). */
+			const courante = fusionnerPhotos(toutes);
+			if (jouee.depuis === undefined) jouee.depuis = courante?.depuis ?? (courante ? undefined : jouee.ecrite);
+			if (jouee.depuis === undefined) delete jouee.depuis;
+			/* What is written is the MERGE of what this device sees, not its local
+			   view alone: a device that reopened an old snapshot would republish it. */
+			const autres = toutes.filter(e => e !== r.own[chemin]);
+			r.own[chemin] = fusionnerPhotos([jouee, ...autres]) ?? jouee;
 			toucher(chemin);
 		},
 		effacer(chemin) {
 			const r = racineDe(chemin);
 			if (!r) return;
-			const avant = gagnantes(tables())[chemin];
-			if (!avant || estTombe(avant)) return;
-			r.own[chemin] = { tombe: true, ecrite: nextAt(avant.ecrite + 1) };
+			const toutes = entrees(chemin);
+			if (!fusionnerPhotos(toutes)) return;
+			r.own[chemin] = { tombe: true, ecrite: nextAt(derniereEcriture(toutes) + 1) };
 			toucher(chemin);
 		},
 		renommer(de, vers) {
-			const g = gagnantes(tables());
+			const g = fusionnerSessions(tables());
 			for (const [cle, s] of Object.entries(g)) {
-				if (estTombe(s) || !(cle === de || cle.startsWith(de + "/"))) continue;
+				if (!(cle === de || cle.startsWith(de + "/"))) continue;
 				const neuve = vers + cle.slice(de.length);
 				const rv = racineDe(neuve), rd = racineDe(cle);
-				if (rv) { rv.own[neuve] = { ...s, ecrite: nextAt(s.ecrite + 1) }; toucher(neuve); }
-				if (rd) { rd.own[cle] = { tombe: true, ecrite: nextAt(s.ecrite + 1) }; toucher(cle); }
+				const au = derniereEcriture(entrees(cle));
+				if (rv) { rv.own[neuve] = { ...s, ecrite: nextAt(au + 1) }; toucher(neuve); }
+				if (rd) { rd.own[cle] = { tombe: true, ecrite: nextAt(au + 1) }; toucher(cle); }
 			}
 		},
 		migrer(legacy) {
