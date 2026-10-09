@@ -39,6 +39,15 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	r.check("the CSP meta is present", iCsp >= 0, true);
 	r.check("the CSP comes BEFORE the author's page (and the first script)", iCsp >= 0 && iCsp < sd.indexOf("<script>alert(1)"), true);
 	r.check("the neutral <base target=_self> is present", sd.includes('<base target="_self">'), true);
+
+	// --- default styles of native controls: in the head, before the author's content
+	const fin = sd.indexOf("</style>");
+	const controles = ["input[type=range]", "::-webkit-slider-thumb", "::-webkit-slider-runnable-track", "button[aria-pressed=true]",
+		"input[type=text]", "input[type=number]", "textarea", "accent-color:var(--nq-accent)"];
+	r.check("native controls have default styles, inside the head",
+		controles.filter(c => !(sd.indexOf(c) >= 0 && sd.indexOf(c) < fin)), []);
+	r.check("the default control styles come BEFORE the author's content (its own CSS wins)", [fin > 0 && fin < sd.indexOf("<body>"), sd.indexOf("<body>") < sd.indexOf("alert(1)")], [true, true]);
+	r.check("the range fill script runs after the author's page", sd.indexOf('setProperty("--nq-fill"') > sd.indexOf("alert(1)"), true);
 	r.check("no network in the CSP: connect-src none, no http(s) source", [FRAME_CSP.includes("connect-src 'none'"), /https?:/.test(FRAME_CSP)], [true, false]);
 
 	// --- height script after the author's page -------------------------

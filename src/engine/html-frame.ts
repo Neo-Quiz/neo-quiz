@@ -194,8 +194,8 @@ function placerMenu(btn: HTMLElement): void {
 	menu.style.top = top + "px";
 }
 
-/** The ⋯ button of each frame (top right, shown on hover, always on touch):
-    view the code, then the actions the host offers. */
+/** The ⋯ button of each frame (just above its top right corner, shown on hover, always on touch):
+    the actions the host offers, then the code. */
 function poserMenus(racine: ParentNode): void {
 	let platform: HostPlatformLike;
 	try { platform = currentHost().platform; } catch { return; }
@@ -214,9 +214,9 @@ function poserMenus(racine: ParentNode): void {
 			e.preventDefault();
 			e.stopPropagation();
 			const items: ActionMenuItem[] = [];
-			if (currentHost().modals) items.push({ icon: "code", label: t("engine.htmlFrame.showCode"), onClick: () => voirCode(cadre) });
 			if (copy) items.push({ icon: "copy", label: t("engine.htmlFrame.copyImage"), onClick: () => { void copierImage(cadre, copy); } });
 			if (save) items.push({ icon: "download", label: t("engine.htmlFrame.downloadHtml"), onClick: () => { void enregistrerHtml(cadre, save); } });
+			if (currentHost().modals) items.push({ icon: "code", label: t("engine.htmlFrame.showCode"), onClick: () => voirCode(cadre) });
 			if (!items.length) return;
 			openActionMenu(btn, items, { className: "qbd-menu-claude nq-frame-menu" });
 			placerMenu(btn);

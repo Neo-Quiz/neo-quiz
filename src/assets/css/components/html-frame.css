@@ -2,21 +2,23 @@
    The iframe itself is built by engine/html-frame-core.ts (sandbox,
    CSP, height message). It takes the height of its content: never an inner
    scrollbar, the page scrolls instead. */
+/* The top margin is exactly the height of the ⋯ button (28px), which sits in it
+   just above the frame. Adjacent margins collapse, so the gap is 28px, not more. */
 .nq-html-frame {
 	position: relative;
 	display: block;
-	margin: 16px 0;
+	margin: 28px 0 16px;
 	max-width: 100%;
 }
 
-/* The ⋯ menu of a page (copy as image, download as HTML): small, top right,
-   a dark translucent disc so it never hides a control of the page for long.
-   Shown on hover or focus; always on touch screens, which have no hover. */
+/* The ⋯ menu of a page (copy as image, download as HTML, view the code): small,
+   in the margin just above the frame, its right edge on the frame's, so it never
+   covers the page. Shown on hover or focus; always on touch screens, which have no hover. */
 .nq-html-frame-more {
 	appearance: none;
 	position: absolute;
-	top: 8px;
-	right: 8px;
+	top: -28px;
+	right: 0;
 	z-index: 1;
 	display: inline-flex;
 	align-items: center;

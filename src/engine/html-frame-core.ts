@@ -69,8 +69,32 @@ function themeCss(th: FrameTheme): string {
 	return `:root{--nq-bg:${bg};--nq-fg:${fg};--nq-muted:${muted};--nq-accent:${accent};--nq-border:${border};--nq-font:${font};color-scheme:${th.dark ? "dark" : "light"}}`
 		+ `html,body{margin:0;padding:0;overflow:hidden;background:transparent;color:var(--nq-fg);font-family:var(--nq-font);font-size:15px;line-height:1.5}`
 		+ `body{padding:4px}*{box-sizing:border-box}svg{max-width:100%;height:auto}img,video,canvas{max-width:100%}`
-		+ `button{font:inherit;color:inherit}`;
+		+ `button{font:inherit;color:inherit}`
+		+ FRAME_CONTROLS_CSS;
 }
+
+/** Default look of the native controls of a page (range, button, fields), in the
+    app's variables. It sits in the head, so the author's own CSS, later in the
+    document, still wins over it. */
+const FRAME_CONTROLS_CSS = `:root{accent-color:var(--nq-accent)}`
+	+ `input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;margin:0;background:transparent;cursor:pointer}`
+	+ `input[type=range]:focus{outline:none}`
+	+ `input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(to right,var(--nq-accent) var(--nq-fill,0%),var(--nq-border) var(--nq-fill,0%))}`
+	+ `input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border:0;border-radius:50%;background:var(--nq-accent);transition:box-shadow 120ms ease}`
+	+ `input[type=range]:hover::-webkit-slider-thumb{box-shadow:0 0 0 5px var(--nq-border)}`
+	+ `input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 5px color-mix(in srgb,var(--nq-accent) 40%,transparent)}`
+	+ `input[type=range]::-moz-range-track{height:4px;border-radius:4px;background:var(--nq-border)}`
+	+ `input[type=range]::-moz-range-progress{height:4px;border-radius:4px;background:var(--nq-accent)}`
+	+ `input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--nq-accent)}`
+	+ `button{background:transparent;border:1px solid var(--nq-border);border-radius:8px;padding:6px 14px;color:var(--nq-fg);font-family:var(--nq-font);cursor:pointer}`
+	+ `button:hover{background:color-mix(in srgb,var(--nq-fg) 8%,transparent)}`
+	+ `button[aria-pressed=true]{background:var(--nq-fg);border-color:var(--nq-fg);color:var(--nq-bg)}`
+	+ `input[type=text],input[type=number],select,textarea{font-family:var(--nq-font);font-size:inherit;color:var(--nq-fg);background:color-mix(in srgb,var(--nq-fg) 4%,var(--nq-bg));border:1px solid var(--nq-border);border-radius:8px;padding:6px 10px;box-sizing:border-box}`
+	+ `input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{outline:none;border-color:var(--nq-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--nq-accent) 35%,transparent)}`;
+
+/** Keeps the filled part of each range in step with its value (the CSS track
+    has no other way to know it). Runs after the author's page. */
+export const FRAME_CONTROLS_SCRIPT = `(function(){function f(r){var lo=+r.min||0,hi=+r.max||100,v=+r.value;var p=hi>lo?Math.min(100,Math.max(0,(v-lo)/(hi-lo)*100)):0;r.style.setProperty("--nq-fill",p+"%")}function all(){var rs=document.querySelectorAll('input[type=range]');for(var i=0;i<rs.length;i++)f(rs[i])}document.addEventListener("input",function(e){var t=e.target;if(t&&t.type==="range")f(t)},true);all()})();`;
 
 /** Posts the content height to the parent. Appended AFTER the author's page,
     so it sees the final DOM; ResizeObserver covers later changes. Reads
@@ -101,7 +125,7 @@ export function buildSrcdoc(source: unknown, theme: FrameTheme = FRAME_DEFAULT_T
 	const srcdoc = `<!doctype html><html><head><meta charset="utf-8">`
 		+ `<meta http-equiv="Content-Security-Policy" content="${FRAME_CSP}">`
 		+ `<base target="_self"><meta name="viewport" content="width=device-width, initial-scale=1">`
-		+ `<style>${themeCss(theme)}</style></head><body>${source}<script>${FRAME_HEIGHT_SCRIPT}</script></body></html>`;
+		+ `<style>${themeCss(theme)}</style></head><body>${source}<script>${FRAME_CONTROLS_SCRIPT}</script><script>${FRAME_HEIGHT_SCRIPT}</script></body></html>`;
 	return { ok: true, srcdoc };
 }
 
