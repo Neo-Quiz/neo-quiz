@@ -208,8 +208,15 @@
 	line-height: 1.4;
 	min-height: 26px;
 }
-.is-mobile .qbd-ai-composer-bottom {
+/* The composer, not its bottom row, is the containing block of the "Choose a
+   device" bubble (phone-chat.ts, `bottom: 100% + 10px`, `left` from the icon's
+   `offsetLeft`, both measured from the same box). Anchored to the bottom row
+   it hung only 10 px above it, i.e. over the text field; anchored to the
+   composer it clears the whole card. */
+.is-mobile .qbd-ai-stage .qbd-ai-composer {
 	position: relative;
+}
+.is-mobile .qbd-ai-composer-bottom {
 	gap: 8px;
 }
 .is-mobile .qbd-ai-composer-add,
