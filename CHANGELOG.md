@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.65] - 2026-10-09
+
 ### Added
 
 - The AI chat beside a quiz uses the Generate page's composer and usage line, and its popover no longer moves while its content loads. The AI button closes the chat when it is already open, on the desktop rail and on the phone icon.
