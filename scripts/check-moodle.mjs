@@ -1163,7 +1163,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 				await t.svc.demarrerAuto();
 				assert.equal(timers.length, 1, "one hourly timer");
 				assert.equal(timers[0].ms, 3600 * 1000);
-				assert.equal(fs.readdirSync(dest).length, 1, "downloaded at start");
+				// The start check may still be writing when demarrerAuto returns (seen on the Linux CI runner).
+				await wait(() => fs.existsSync(dest) && fs.readdirSync(dest).length === 1);
+				assert.equal(fs.existsSync(dest) && fs.readdirSync(dest).length, 1, "downloaded at start");
 				// every hour
 				fs.rmSync(dest, { recursive: true });
 				clock += 3600 * 1000;
