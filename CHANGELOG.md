@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.54] - 2026-10-09
+
 ### Added
 
 - A quiz that cannot be read shows a card with the file's name and a button to open it, instead of disappearing.
