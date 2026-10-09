@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.52] - 2026-10-09
+
 ### Added
 
 - Your progress in a quiz follows you between your devices: start a quiz on your phone, resume it on your PC where you stopped.
