@@ -1,8 +1,8 @@
 {
-  "versionCode": 15,
-  "versionName": "0.2.13",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.13/NeoQuiz-0.2.13.apk",
-  "sha256": "bbd9d7dc0d26c31b780cff9bb14565122a5e339209c5a506b58bee842b0104cd",
-  "size": 55990433,
-  "notes": "\"Several chats can run at the same time.\""
+  "versionCode": 16,
+  "versionName": "0.2.14",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.14/NeoQuiz-0.2.14.apk",
+  "sha256": "c4b56ad04e436f2bae4d94d511e2c8bde890f683d1eed65e5c76306a2caf0729",
+  "size": 55990545,
+  "notes": "\"Install updates straight from Settings.\""
 }
