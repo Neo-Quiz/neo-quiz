@@ -1,8 +1,8 @@
 {
-  "versionCode": 14,
-  "versionName": "0.2.12",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.12/NeoQuiz-0.2.12.apk",
-  "sha256": "ea1e2c041768cba7670541416f0561b18abf1a6d6c79a63ed2e5e560a1ffcf65",
-  "size": 55990237,
-  "notes": "Readable error for a broken quiz, clearer delete dialogs, layout fixes."
+  "versionCode": 15,
+  "versionName": "0.2.13",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.13/NeoQuiz-0.2.13.apk",
+  "sha256": "bbd9d7dc0d26c31b780cff9bb14565122a5e339209c5a506b58bee842b0104cd",
+  "size": 55990433,
+  "notes": "\"Several chats can run at the same time.\""
 }
