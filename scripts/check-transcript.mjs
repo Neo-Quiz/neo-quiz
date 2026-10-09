@@ -114,6 +114,11 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 		for (let i = 0; i < outils.length; i += size) evs.push(...dec(outils.slice(i, i + size)));
 		r.check(`tools: a stream cut every ${size} characters gives the same steps`, vu(fold(evs)), attendu);
 	}
+	// The CLI's own permission decision is enough, whatever the result's wording.
+	const meta = fold(createTranscriptDecoder("claude")(
+		line({ type: "assistant", message: { content: [{ type: "tool_use", id: "m1", name: "Grep", input: { pattern: "x" } }] } })
+		+ line({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "m1", is_error: true, content: "Blocked." }] }, tool_result_meta: [{ id: "m1", permission_decision: { decision: "reject" } }] })));
+	r.check("tools: a permission decision 'reject' marks the step refused even when its text says nothing of it", meta.tools[0]?.status, "refused");
 	// A refusal is never turned back into a plain error or a success by a later event.
 	const ref = fold([{ kind: "tool", name: "Read", id: "a" }, { kind: "toolResult", id: "a", status: "refused", detail: "denied" }, { kind: "toolResult", id: "a", status: "ok", count: 3, unit: "lines" }]);
 	r.check("tools: refused stays refused", ref.tools[0].status, "refused");
