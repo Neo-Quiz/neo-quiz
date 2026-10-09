@@ -282,10 +282,10 @@ await withSrcModule(["src/dashboard/remote-runner.ts"], async (RU) => {
 		await RU.createRemoteRunner(deps).scan();
 		r.check("a refused write leaves the provider and says so", [st.settings.aiProvider, st.notes.length, st.applied], ["ollama", 1, 0]);
 	}
-	{ // Rate limit: three an hour
+	{ // Rate limit: three an hour overall, two an hour from one sender (MAX_SETTINGS_PER_HOUR_PER_SENDER, 2026-10-09)
 		const { st, deps } = rig(); st.incoming = Array.from({ length: 5 }, (_, i) => setting("lq3k2-rate0" + i));
 		await RU.createRemoteRunner(deps).scan();
-		r.check("three are admitted, two wait", st.log.length, 3);
+		r.check("from one sender, two are admitted, three wait", st.log.length, 2);
 	}
 	{ // Invalid ones do nothing
 		const { st, deps } = rig();
