@@ -7,6 +7,7 @@ import { EN_APP } from "./en/app";
 import { EN_REVIEW } from "./en/review";
 import { EN_INSTALLER } from "./en/installer";
 import { EN_SHARE } from "./en/share";
+import { EN_PDF } from "./en/pdf";
 
 /* ══════════════════════════════════════════════════════════
    Dictionnaire ANGLAIS = référence de l'interface.
@@ -24,4 +25,5 @@ export const EN = {
 	...EN_REVIEW,
 	...EN_INSTALLER,
 	...EN_SHARE,
+	...EN_PDF,
 } as const;

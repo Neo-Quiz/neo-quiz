@@ -109,6 +109,7 @@
     "check:swipe": "node scripts/check-swipe.mjs",
     "check:phone-layout": "node scripts/check-phone-layout.mjs",
     "check:selection": "node scripts/check-selection.mjs",
+    "check:pdf-sources": "node scripts/check-pdf-sources.mjs",
     "check:overscroll": "node scripts/check-overscroll.mjs",
     "check:idle-animations": "node scripts/check-idle-animations.mjs",
     "check:home": "node scripts/check-home.mjs",

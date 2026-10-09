@@ -1,0 +1,269 @@
+/* ══════════════════════════════════════════════════════════
+   PDF SOURCES AND THE PDF VIEWER (2026-10-09)
+   src/pdf-sources-view.ts (the chips), src/pdf-viewer.ts (the modal).
+   ══════════════════════════════════════════════════════════ */
+
+/* ── The chips under a Learn's title: plain text with a faint fill, not a
+   tile. The name is cut in the MIDDLE: its head shrinks with an ellipsis, its
+   tail (end of the name and the extension) never does, so the file type is
+   always visible. No capitals. ── */
+.qbd-pdf-sources {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 8px;
+	min-width: 0;
+	margin-top: 6px;
+}
+
+.qbd-pdf-sources:empty {
+	display: none;
+}
+
+.qbd-qz-sources {
+	/* Under the title of the player: aligned with it, right of the cross. */
+	margin: 0 0 6px 52px;
+	flex-shrink: 0;
+}
+
+.is-mobile .qbd-qz-sources {
+	margin-left: 16px;
+	margin-right: 16px;
+}
+
+.qbd-pdf-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+	max-width: min(100%, 300px);
+	padding: 2px 9px 2px 7px;
+	border: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 12px;
+	line-height: 1.5;
+	cursor: pointer;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+
+.qbd-pdf-chip:hover:not([aria-disabled="true"]) {
+	background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+	color: var(--text-normal);
+}
+
+.qbd-pdf-chip[aria-disabled="true"] {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.qbd-pdf-chip-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+}
+
+.qbd-pdf-chip-icon svg {
+	width: 13px;
+	height: 13px;
+}
+
+.qbd-pdf-chip-name {
+	display: inline-flex;
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.qbd-pdf-chip-head {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.qbd-pdf-chip-tail {
+	flex: 0 0 auto;
+}
+
+/* The `cite` line of a reading opens the PDF at its page. */
+.quiz-lecture-source[data-cite] {
+	cursor: pointer;
+}
+
+.quiz-lecture-source[data-cite]:hover {
+	color: var(--text-normal);
+	text-decoration: underline;
+}
+
+/* ── The viewer ── */
+.modal.qbd-pdf-modal {
+	width: min(980px, 100%);
+	height: 90vh;
+	max-height: 90vh;
+}
+
+.qbd-pdf-modal .modal-content {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.qbd-pdf-body {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.qbd-pdf-message {
+	margin: auto;
+	color: var(--text-muted);
+}
+
+.qbd-pdf-bar {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	flex: 0 0 auto;
+	padding: 0 0 8px;
+}
+
+.qbd-pdf-page-indicator {
+	margin-right: auto;
+	color: var(--text-muted);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-pdf-zoom-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-s);
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.qbd-pdf-zoom-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.qbd-pdf-zoom-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.qbd-pdf-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	/* The pinch is ours; the browser keeps the pan. */
+	touch-action: pan-x pan-y;
+	overscroll-behavior: contain;
+	border-radius: var(--radius-s);
+	background: color-mix(in srgb, var(--text-muted) 10%, var(--background-primary));
+}
+
+.qbd-pdf-pages {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	box-sizing: border-box;
+	width: max-content;
+	min-width: 100%;
+	padding: 12px;
+}
+
+.qbd-pdf-page {
+	position: relative;
+	flex: 0 0 auto;
+	background: #fff;
+	box-shadow: 0 1px 6px rgb(0 0 0 / 0.25);
+}
+
+.qbd-pdf-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* The selectable text, invisible, over the canvas (pdf.js positions it). */
+.qbd-pdf-text {
+	position: absolute;
+	inset: 0;
+	overflow: clip;
+	line-height: 1;
+	text-size-adjust: none;
+	forced-color-adjust: none;
+	transform-origin: 0 0;
+}
+
+.qbd-pdf-text :is(span, br) {
+	position: absolute;
+	color: transparent;
+	white-space: pre;
+	cursor: text;
+	transform-origin: 0% 0%;
+}
+
+.qbd-pdf-text ::selection {
+	background: rgb(0 90 255 / 0.3);
+}
+
+.qbd-pdf-text .endOfContent {
+	display: block;
+	position: absolute;
+	inset: 100% 0 0;
+	z-index: 0;
+	cursor: default;
+	user-select: none;
+}
+
+/* ── A phone: the viewer is a full screen, with no scrollbar. ── */
+html body.is-mobile .modal-container:has(> .qbd-pdf-modal) {
+	padding: var(--nq-inset-haut, 0px) 0 0;
+	align-items: stretch;
+}
+
+html body.is-mobile .modal-container > .modal.qbd-pdf-modal {
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+	height: 100%;
+	max-height: none;
+	margin: 0;
+	padding: 12px 0 0;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.is-mobile .qbd-pdf-modal .modal-title {
+	margin: 0 52px 6px 14px;
+}
+
+.is-mobile .qbd-pdf-bar {
+	padding: 0 12px 8px 14px;
+}
+
+.is-mobile .qbd-pdf-scroll {
+	border-radius: 0;
+	scrollbar-width: none;
+}
+
+.is-mobile .qbd-pdf-scroll::-webkit-scrollbar {
+	display: none;
+}
+
+.is-mobile .qbd-pdf-pages {
+	padding: 8px;
+	gap: 8px;
+}

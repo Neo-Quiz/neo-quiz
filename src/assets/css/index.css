@@ -50,6 +50,7 @@
 @import url('./components/color-picker.css');
 @import url('./components/effort-slider.css');
 @import url('./components/math-input.css');
+@import url('./components/pdf-viewer.css');
 
 /* Pages */
 @import url('./pages/results.css');

@@ -1,5 +1,6 @@
 import { t } from "../i18n";
 import { lireLecture, paragraphes } from "../lecture-style";
+import { lireCitations } from "../pdf-sources";
 import type { LectureStylee, Retenir, TableauLecture } from "../lecture-style";
 
 /* ══════════════════════════════════════════════════════════
@@ -125,9 +126,14 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	   pages, written by the generator — the original to read again. */
 	const cite = (item as { cite?: unknown } | null)?.cite;
 	const source = typeof cite === "string" && cite.trim()
-		? `<div class="quiz-lecture-source">${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
+		? `<div class="quiz-lecture-source"${citeOuvrable(cite) ? ` data-cite="${p.attribut(cite.trim())}" role="button" tabindex="0"` : ""}>${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
 		: "";
 	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${courte ? "" : figureHtml(item, p)}${corps}${retenir}${source}</div>` };
+}
+
+/** Does this `cite` name a PDF the viewer can open? Then the line is a button. */
+function citeOuvrable(cite: string): boolean {
+	return lireCitations(cite).length > 0;
 }
 
 /** The reading's FIGURE (2026-10-08): its `passage` (a diagram drawn from the

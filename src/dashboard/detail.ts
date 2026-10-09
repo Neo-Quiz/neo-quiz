@@ -9,6 +9,7 @@ import { quizFreres } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
+import { monterSourcesDeNote } from "../pdf-sources-view";
 import type { Entete, EnteteAction } from "./detail-head";
 import { glossaryHeaderAction, glossaryMenuItem, texteBadgeGlossaire } from "./glossaire-modal";
 import { openTypePickerModal, openConfirmModal } from "../editor/modals";
@@ -436,6 +437,8 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		const page = ajouter(container, "div", "qbd-qz");
 		markViewEnter(page, entering, "qbd-qz-enter");
 		entete = renderHeader(page, spec);
+		// The PDFs a Learn cites, as chips under its title (read from the note: the draft does not keep `cite`).
+		if (spec.stats) void monterSourcesDeNote(entete.sources, spec.stats.path);
 
 		const body = ajouter(page, "div", "qbd-qz-body");
 		const listCol = ajouter(body, "div", "qbd-qz-list");

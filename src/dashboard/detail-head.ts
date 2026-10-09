@@ -80,6 +80,8 @@ export interface Entete {
 	top: HTMLElement;
 	/** The free slot in the centre of the actions row (the fiche's search). */
 	center: HTMLElement;
+	/** Under the title and the folder: the PDF source chips (pdf-sources-view.ts). */
+	sources: HTMLElement;
 	/** Restarts the sheen of the main button at once (a click on a question
 	    card of the fiche). Nothing without animations or without a button. */
 	attirer(): void;
@@ -135,6 +137,7 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
 	// The title FIRST, the folder as a subtitle under it (2026-09-26).
 	ajouter(titres, "h2", "qbd-fiche-title", deps.title);
 	if (deps.kicker) ajouter(titres, "div", "qbd-fiche-kicker", deps.kicker);
+	const sources = ajouter(titres, "div", "qbd-pdf-sources");
 
 	/* ONE row under the title: the infos on the left, the centre slot, the
 	   actions on the right (2026-09-26: each at its own height, they were
@@ -220,6 +223,7 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
 	return {
 		top,
 		center,
+		sources,
 		attirer: () => {
 			if (!reflet || reduit()) return;
 			for (const a of reflet.getAnimations()) a.currentTime = 0;

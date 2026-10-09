@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- PDF sources under a Learn's title: one chip per document its cards cite, which opens the PDF in a built-in viewer (lazy pages, zoom, page counter, selectable text); a reading's source line opens the PDF at its page. Works on PC and Android.
+
 ### Fixed
 
 - A quiz in progress is no longer overwritten by another device: snapshots are merged question by question after the last restart, so a Learn at 100 % no longer drops back when a phone reopens an old snapshot.

@@ -247,6 +247,10 @@ jobs:
       - name: Card selection
         run: npm run check:selection
 
+      # THE PDF SOURCES of a quiz: which documents it cites and which file each name designates.
+      - name: PDF sources
+        run: npm run check:pdf-sources
+
       # THE OVERSCROLL STRETCH: the damped pull, the edge test, and which boxes can stretch.
       - name: Overscroll stretch
         run: npm run check:overscroll

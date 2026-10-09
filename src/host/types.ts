@@ -852,6 +852,29 @@ export interface HostPdf {
 	 * mais pas dessiner rend la carte sans vignette et l'aperçu en texte.
 	 */
 	renderPages?(data: Uint8Array, opts: { width: number; max?: number; first?: number; figure?: boolean }): Promise<{ pages: string[]; total: number }>;
+	/**
+	 * Opens a document to READ it page by page (the PDF viewer, 2026-10-09).
+	 * The bytes come from `HostFs.readBinary`, never from a URL. Nothing the
+	 * document carries runs: no script, no eval of its functions, and no link
+	 * annotation is drawn, so no external link can open on its own.
+	 * OPTIONAL like `renderPages`: a host that cannot draw has no viewer.
+	 */
+	open?(data: Uint8Array): Promise<HostPdfView>;
+}
+
+/** An opened document, for the viewer. The caller MUST `destroy()` it. */
+export interface HostPdfView {
+	numPages: number;
+	/** Size of page `n` (1-based) in CSS pixels at a scale of 1. */
+	pageSize(n: number): Promise<{ width: number; height: number }>;
+	/**
+	 * Draws page `n` into `canvas` at `scale` (CSS pixels per PDF point) times
+	 * `dpr`, and, when given, the selectable text layer into `textLayer`
+	 * (absolutely positioned over the canvas). `cancel()` abandons a drawing
+	 * the page scrolled away from; `done` then rejects or resolves, never hangs.
+	 */
+	render(n: number, target: { canvas: HTMLCanvasElement; textLayer?: HTMLElement; scale: number; dpr: number }): { done: Promise<void>; cancel(): void };
+	destroy(): Promise<void>;
 }
 
 /**

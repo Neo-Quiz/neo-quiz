@@ -26,7 +26,7 @@
    et rien d'autre.
 ══════════════════════════════════════════════════════════ */
 
-import type { HostPdf } from "../../../../src/host/types";
+import type { HostPdf, HostPdfView } from "../../../../src/host/types";
 import { ouvrirDocument, texteDesPages } from "./pdf-texte";
 import { zoneDeFigure } from "./pdf-figure";
 import type { Boite, CodesOps, ListeOps, TexteSurPage } from "./pdf-figure";
@@ -40,6 +40,8 @@ export function createWindowsPdf(): HostPdf {
 	let moteur: Promise<PdfJsLib> | null = null;
 	/** pdf.js's operator codes, kept when the engine loads (`zoneDeFigure`). */
 	let ops: CodesOps | null = null;
+	/** The engine module itself, for the viewer's text layer. */
+	let brut: typeof import("pdfjs-dist") | null = null;
 	const charger = (): Promise<PdfJsLib> => {
 		if (!moteur) {
 			moteur = import("pdfjs-dist").then(pdfjs => {
@@ -59,11 +61,16 @@ export function createWindowsPdf(): HostPdf {
 				   `create` en `Worker` — même code derrière. */
 				const worker = pdfjs.PDFWorker.create({ port: new PdfWorker() });
 				ops = pdfjs.OPS as unknown as CodesOps;
+				brut = pdfjs;
 				const lib: PdfJsLib = {
 					/* La COPIE des octets, elle, vit dans `ouvrirDocument`
 					   (`./pdf-texte.ts`, pur et éprouvé par `check:pdf`) : c'est la
 					   seule porte des deux entrées du moteur, et c'est là que la règle
 					   se garde. Ici, rien que le worker. */
+					/* A PDF may come from a SHARED quiz. pdf.js 5.7 compiles none of a
+					   document's functions with `new Function` (the `isEvalSupported`
+					   option is gone) and scripting belongs to its viewer, which is not
+					   loaded: `check:pdf-sources` fails if an upgrade brings either back. */
 					getDocument: (src) => pdfjs.getDocument({ ...src, worker }) as unknown as ReturnType<PdfJsLib["getDocument"]>,
 				};
 				return lib;
@@ -94,6 +101,63 @@ export function createWindowsPdf(): HostPdf {
 		return url;
 	}
 	return {
+		/* The viewer's document (2026-10-09): pages drawn on demand into the
+		   canvases the viewer owns, plus a selectable text layer. No annotation
+		   layer is built, so a link inside the PDF is not even clickable. */
+		async open(data): Promise<HostPdfView> {
+			const lib = await charger();
+			const doc = await ouvrirDocument(lib, data);
+			const pdfjs = brut;
+			return {
+				numPages: doc.numPages,
+				async pageSize(n) {
+					const page = await doc.getPage(n);
+					const vp = page.getViewport?.({ scale: 1 });
+					if (!vp) throw new Error("PDF engine cannot measure pages");
+					return { width: vp.width, height: vp.height };
+				},
+				render(n, cible) {
+					let annule = false;
+					let tache: { cancel(): void } | null = null;
+					let couche: { cancel(): void } | null = null;
+					const done = (async () => {
+						const page = await doc.getPage(n) as unknown as PageLecteur;
+						if (annule) return;
+						const viewport = page.getViewport({ scale: cible.scale * cible.dpr });
+						/* Sized on a scratch canvas first and swapped in only when drawn: a
+						   canvas resized while still showing a page flashes blank. */
+						const toile = document.createElement("canvas");
+						toile.width = Math.ceil(viewport.width);
+						toile.height = Math.ceil(viewport.height);
+						const rendu = page.render({ canvas: toile, viewport });
+						tache = rendu;
+						await rendu.promise;
+						if (annule) return;
+						cible.canvas.width = toile.width;
+						cible.canvas.height = toile.height;
+						cible.canvas.getContext("2d")?.drawImage(toile, 0, 0);
+						toile.width = 0;
+						if (cible.textLayer && pdfjs) {
+							cible.textLayer.replaceChildren();
+							cible.textLayer.style.setProperty("--total-scale-factor", String(cible.scale));
+							cible.textLayer.style.setProperty("--scale-factor", String(cible.scale));
+							const calque = new pdfjs.TextLayer({
+								textContentSource: page.streamTextContent(),
+								container: cible.textLayer,
+								viewport: page.getViewport({ scale: cible.scale }) as never,
+							});
+							couche = calque;
+							await calque.render();
+						}
+					})().catch(e => {
+						// A drawing abandoned on purpose is not an error.
+						if (!annule) throw e;
+					});
+					return { done, cancel: () => { annule = true; tache?.cancel(); couche?.cancel(); } };
+				},
+				destroy: () => doc.destroy(),
+			};
+		},
 		async extractText(data) {
 			return texteDesPages(await charger(), data);
 		},
@@ -158,4 +222,11 @@ interface PageDessinable {
 	getTextContent(): Promise<{ items: TexteSurPage[] }>;
 	getViewport(opts: { scale: number; offsetX?: number; offsetY?: number }): { width: number; height: number; convertToViewportRectangle(rect: number[]): number[] };
 	render(params: { canvas: HTMLCanvasElement; viewport: unknown }): { promise: Promise<void> };
+}
+
+/** The surface of a pdf.js page that the viewer needs. */
+interface PageLecteur {
+	getViewport(opts: { scale: number }): { width: number; height: number };
+	render(params: { canvas: HTMLCanvasElement; viewport: unknown }): { promise: Promise<void>; cancel(): void };
+	streamTextContent(): ReadableStream;
 }
