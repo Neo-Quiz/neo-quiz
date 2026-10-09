@@ -22,8 +22,9 @@
    mise à jour — bien pire qu'une attente sans fenêtre.
 
    D'où des LIENS DURS : le dossier d'installation est reflété dans le
-   temporaire, où l'exécutable prend un autre nom. Aucun octet n'est copié, ce
-   sont les mêmes fichiers sous un second nom. Le processus lancé de là échappe
+   temporaire, où l'exécutable prend un autre nom. Ce sont les mêmes fichiers
+   sous un second nom. (Since 2026-10-09, except `app.asar`, which is
+   copied: see `COPIES`.) Le processus lancé de là échappe
    au kill par nom, et le renommage du dossier d'origine reste permis.
 
    ÉPROUVÉ (2026-09-20, sur le vrai arbre Electron de 297 Mo) : 18 liens en
@@ -32,6 +33,7 @@
    neuve s'installe et l'ancien dossier se supprime entièrement.
 ══════════════════════════════════════════════════════════ */
 
+import { copyFileSync, rmSync } from "node:fs";
 import { link, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
@@ -46,9 +48,44 @@ export const DRAPEAU_FENETRE_MAJ = "--neo-quiz-fenetre-maj";
     `nettoyerLiensMaj` ne supprime que ce qui le porte. */
 export const PREFIXE_LIENS = "neo-quiz-maj-";
 
-/** Le nom que prend l'exécutable dans le reflet. TOUT SAUF celui de
-    l'application : c'est par le nom de fichier que NSIS tue. */
-export const NOM_EXECUTABLE_MAJ = "neo-quiz-maj.exe";
+/** The name the executable takes in the mirror. ANYTHING BUT the app's: NSIS
+    kills by file name.
+
+    Not `neo-quiz-maj.exe` any more (2026-10-09): windows under that name
+    hard-linked `resources/app.asar` and kept it open, so the in-place install
+    could not replace it. The new installer kills every process still named
+    `neo-quiz-maj.exe` (`installer/uninstaller.nsh`, `customInit`) to rescue
+    the versions that launch such a window; a window under the new name holds
+    only its own copy of the asar and is never killed. */
+export const NOM_EXECUTABLE_MAJ = "neo-quiz-fenetre.exe";
+
+/** The name of the windows of 1.20.58 and before, killed by the installer. */
+export const ANCIEN_NOM_EXECUTABLE_MAJ = "neo-quiz-maj.exe";
+
+/** Files COPIED into the mirror instead of linked. Electron keeps
+    `app.asar` open for its whole life; through a hard link that is the
+    INSTALLED file, and the installer, which now writes the new version over
+    the old one in place, could not replace it: on a laptop every file of
+    1.20.58 was installed except `app.asar`, still 1.20.55, after a long
+    stall at about 79 %, and the app restarted on the old code. A copy costs
+    about 35 MB in the temp folder for the length of the update. */
+const COPIES = new Set(["app.asar"]);
+
+/** Runs `f` with Electron's asar support off. Electron's patched `fs` reads
+    a `.asar` FILE as a folder: a copy of it fails, and `rm` leaves it behind
+    (every old mirror still held its `app.asar`, about 32 MB each). Only
+    synchronous calls go in here, so no other code of the main process runs
+    while the switch is on. Without Electron the property is inert. */
+function sansAsar<T>(f: () => T): T {
+	const p = process as { noAsar?: boolean };
+	const avant = p.noAsar;
+	p.noAsar = true;
+	try {
+		return f();
+	} finally {
+		p.noAsar = avant;
+	}
+}
 
 /** Le témoin que l'APPLICATION écrit à son démarrage. C'est le signal de fin
     que la fenêtre attend : quand l'application relancée par NSIS l'a touché, la
@@ -79,24 +116,28 @@ export async function refleter(source: string, cible: string, nomExecutable: str
 	}
 	for (const entree of entrees) {
 		const depuis = join(source, entree.name);
-		/* L'exécutable, et lui seul, change de nom. Les autres fichiers gardent
-		   le leur : Electron les cherche par leur nom exact (`resources.pak`,
-		   `icudtl.dat`, `resources/app.asar`…). */
+		/* The executable, and it alone, changes name. The other files keep
+		   theirs: Electron looks them up by exact name (`resources.pak`,
+		   `icudtl.dat`, `resources/app.asar`...). */
 		const nom = entree.name === nomExecutable ? NOM_EXECUTABLE_MAJ : entree.name;
 		const vers = join(cible, nom);
 		try {
-			if (entree.isDirectory()) {
+			if (COPIES.has(entree.name)) {
+				/* Checked first: with asar support on, Electron may describe
+				   `app.asar` as a folder. */
+				sansAsar(() => copyFileSync(depuis, vers));
+			} else if (entree.isDirectory()) {
 				await mkdir(vers, { recursive: true });
 				if (!(await refleter(depuis, vers, nomExecutable))) return false;
 			} else if (entree.isFile()) {
-				/* Le lien dur ne traverse pas les volumes : si le temporaire est sur
-				   un autre disque que l'installation, `link` rejette ici, et la mise à
-				   jour se fera sans fenêtre, comme avant. */
+				/* A hard link does not cross volumes: if the temp folder is on
+				   another disk than the install, `link` throws here and the update
+				   runs without a window, as before. */
 				await link(depuis, vers);
 			}
-			/* Un lien symbolique dans un paquet Electron n'existe pas sous Windows ;
-			   le rencontrer signifie que l'arbre n'est pas celui qu'on croit, et le
-			   refléter à l'aveugle serait pire que renoncer. */
+			/* A symbolic link does not exist in an Electron package on Windows;
+			   meeting one means the tree is not the one we think, and mirroring
+			   it blindly would be worse than giving up. */
 		} catch {
 			return false;
 		}
@@ -144,7 +185,11 @@ export async function nettoyerLiensMaj(base = tmpdir()): Promise<void> {
 	}
 	for (const entree of entrees) {
 		if (!entree.isDirectory() || !entree.name.startsWith(PREFIXE_LIENS)) continue;
-		await rm(join(base, entree.name), { recursive: true, force: true }).catch(() => undefined);
+		try {
+			sansAsar(() => rmSync(join(base, entree.name), { recursive: true, force: true }));
+		} catch {
+			/* A mirror still in use (its window running): the next start. */
+		}
 	}
 }
 

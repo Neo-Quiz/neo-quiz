@@ -26,6 +26,19 @@
        the install. A file the new version no longer ships stays behind: a
        few kilobytes, against an update that never landed. */
     !macro customInit
+        /* THE OLD UPDATE WINDOWS HELD app.asar (2026-10-09). The update
+           window of 1.20.58 and before, `neo-quiz-maj.exe`, ran from hard
+           links to the install folder and kept `resources/app.asar` open:
+           the in-place install below then could not replace it, stalled at
+           about 79 % and left the old code under the new version number.
+           Newer windows have another name and their own copy of the asar
+           (`electron/fenetre-maj-liens.ts`); only the old ones are killed
+           here, the update then runs without its window. */
+        nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM neo-quiz-maj.exe`
+        Pop $0
+        ${If} $0 == 0
+            Sleep 1500
+        ${EndIf}
         DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
         DeleteRegValue HKEY_CURRENT_USER "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
         !ifdef UNINSTALL_REGISTRY_KEY_2

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- An update no longer stalls near 80 % and restarts the app on the old version: the update window kept a file of the app open, so it could not be replaced.
+
 ## [1.20.58] - 2026-10-09
 
 ### Fixed

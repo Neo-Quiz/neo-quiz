@@ -23,7 +23,7 @@
  *
  *     npm run check:fenetre-maj
  */
-import { mkdtemp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -69,6 +69,7 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 	marquerDemarrage,
 	nettoyerLiensMaj,
 	NOM_EXECUTABLE_MAJ,
+	ANCIEN_NOM_EXECUTABLE_MAJ,
 	PREFIXE_LIENS,
 	preparerReflet,
 	refleter,
@@ -96,6 +97,21 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 		r.check("reflet : lien DUR, pas copie — mêmes octets sur le disque",
 			[reflet.ino === original.ino, reflet.nlink >= 2],
 			[true, true]);
+
+		/* app.asar is the one COPY: Electron keeps it open for the window's
+		   whole life, and through a hard link that was the installed file, which
+		   the in-place install then could not replace (a laptop stayed on the old
+		   code after "updating", 2026-10-09). */
+		const asarOrigine = await stat(join(source, "resources", "app.asar"));
+		const asarReflet = await stat(join(cible, "resources", "app.asar"));
+		r.check("mirror: app.asar is a COPY (own inode, same bytes), never a link to the installed file",
+			[asarReflet.ino !== asarOrigine.ino, asarReflet.nlink, asarReflet.size === asarOrigine.size],
+			[true, 1, true]);
+		const nsh = await readFile(join(process.cwd(), "apps", "windows", "installer", "uninstaller.nsh"), "utf8");
+		r.check("installer: customInit kills the old windows, which held the installed app.asar",
+			nsh.includes(`"$SYSDIR\\taskkill.exe" /F /T /IM ${ANCIEN_NOM_EXECUTABLE_MAJ}`), true);
+		r.check("mirror: the window's executable is never named like the old windows the installer kills",
+			[NOM_EXECUTABLE_MAJ !== ANCIEN_NOM_EXECUTABLE_MAJ, NOM_EXECUTABLE_MAJ !== "neo-quiz.exe"], [true, true]);
 
 		/* Une source absente ne doit pas produire un demi-reflet silencieux. */
 		r.check("reflet : une source introuvable échoue, elle ne réussit pas à vide",
