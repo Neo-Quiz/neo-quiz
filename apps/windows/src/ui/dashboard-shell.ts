@@ -1092,7 +1092,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   tab, in bottom-bar order, by clicking that tab's button (the very path of
 	   a tap on the bar: history, highlight and view transition stay the same).
 	   Not on a quiz or folder page (sheets stacked), not under a menu. */
-	const tabButtons = () => Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item"))
+	const tabButtons = () => Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item:not(.nq-maj)"))
 		.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
 	const tabKey = (b: HTMLElement) => b.dataset.nav ?? "settings";
 	const tabTarget = (dir: "next" | "prev"): HTMLElement | null => {

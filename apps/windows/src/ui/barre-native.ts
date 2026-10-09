@@ -38,8 +38,13 @@ function estReglages(btn: HTMLElement): boolean {
 	return !btn.dataset.nav;
 }
 
+/** The tabs of the bar: the rail's buttons, WITHOUT the update button
+    (`.nq-maj`, `mise-a-jour.ts`). It shares the `qbd-nav-item` class for its
+    look, and was published as a fifth tab: a second "Settings" icon labelled
+    "12 MB / 5…" during an Android update (2026-10-09). The update's progress
+    already shows in Settings. */
 function boutons(): HTMLElement[] {
-	return Array.from(document.querySelectorAll<HTMLElement>(".qbd-sidebar .qbd-nav-item"));
+	return Array.from(document.querySelectorAll<HTMLElement>(".qbd-sidebar .qbd-nav-item:not(.nq-maj)"));
 }
 
 /** The key of a rail button: its `data-nav`, or `settings` for the footer button. */
