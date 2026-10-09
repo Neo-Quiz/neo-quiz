@@ -264,25 +264,43 @@ export function monterBanniereMajAndroid(): () => void {
 
 /**
  * The "Updates" row of the phone's Settings: the installed version under the
- * name, and a "Check" button (a manual check ignores the 6 h interval). A
- * version on offer is installed from the banner.
+ * name, and ONE button that follows the updater (2026-10-09: the owner had to
+ * leave Settings to reach the banner's Install). "Check" while nothing is on
+ * offer; a BLUE "Install" as soon as a version is (a manual check ignores the
+ * 6 h interval); then the download's progress, disabled, until Android takes
+ * over.
  */
 export function monterLigneMajAndroid(controle: HTMLElement, aide: HTMLElement): () => void {
 	const bouton = ajouter(controle, "button", "nq-reglages-changer", t("app.update.android.check"));
 	bouton.type = "button";
 	let verification = false;
+	let installable = false;
+	let enCours = false;
+	const peindre = (e: EtatMiseAJour | null): void => {
+		installable = !!e && (e.phase === "disponible" || e.phase === "autorisation" || (e.phase === "erreur" && !!e.version));
+		enCours = !!e && (e.phase === "telechargement" || e.phase === "prete");
+		bouton.classList.toggle("is-installer", installable);
+		bouton.disabled = verification || enCours;
+		bouton.textContent = verification ? t("app.update.android.checking")
+			: e && e.phase === "telechargement" ? (typeof e.pourcent === "number" ? e.pourcent + " %" : t("app.update.android.downloading", { version: e.version ?? "" }))
+				: e && e.phase === "prete" ? t("app.update.android.ready", { version: e.version ?? "" })
+					: installable ? t("app.update.android.install")
+						: t("app.update.android.check");
+	};
+	let dernier: EtatMiseAJour | null = null;
 	bouton.addEventListener("click", () => {
-		if (verification) return;
+		if (verification || enCours) return;
+		if (installable) { void pont().miseAJour.installer(); return; }
 		verification = true;
-		bouton.disabled = true;
-		bouton.textContent = t("app.update.android.checking");
+		peindre(dernier);
 		void pont().miseAJour.verifier().catch(() => false).then(() => {
 			verification = false;
-			bouton.disabled = false;
-			bouton.textContent = t("app.update.android.check");
+			peindre(dernier);
 		});
 	});
 	return abonner(e => {
+		dernier = e;
+		peindre(e);
 		const actuelle = e.actuelle ? t("app.update.android.version", { version: e.actuelle }) : "";
 		const suite = e.phase === "a-jour" ? t("app.update.android.upToDate")
 			: e.phase === "disponible" ? t("app.update.android.available", { version: e.version ?? "" })

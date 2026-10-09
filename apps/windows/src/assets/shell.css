@@ -402,6 +402,16 @@ body::after {
 	cursor: default;
 }
 
+/* "Install" (Updates row, phone): the button turns BLUE once a version is on
+   offer, the one action left to do there (2026-10-09). */
+.nq-reglages-changer.is-installer,
+.nq-reglages-changer.is-installer:hover:not(:disabled) {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 600;
+}
+
 .nq-reglages-retirer:hover {
 	background: var(--background-modifier-border);
 	color: var(--text-normal);
