@@ -59,7 +59,8 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			fill.style.width = pct + "%";
 			ajouter(win, "span", "qbd-ai-usage-pct", t("ai.usage.linePercent", { n: pct }));
 			const reset = usageResetText(row.resetsAt, now, currentLang());
-			if (reset) ajouter(win, "span", "qbd-ai-usage-reset", "(" + reset + ")");
+			// Always a cell, even empty: the rows share one grid (CSS).
+			ajouter(win, "span", "qbd-ai-usage-reset", reset ? "(" + reset + ")" : "");
 		}
 	};
 
