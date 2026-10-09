@@ -85,23 +85,8 @@
   line-height: 1.8;
 }
 
-/* La lettrine de la maquette, telle quelle : serif 44 px, flottante. Elle
-   vise le premier paragraphe, ou le texte lui-même quand il n'en a qu'un
-   (rendu sans <p>). */
-.quiz-lecture--page .quiz-lecture-texte > p:first-child::first-letter,
-.quiz-lecture--page .quiz-lecture-texte:not(:has(> p))::first-letter{
-  float: left;
-  margin: 6px 8px 0 0;
-  font: 700 44px/0.9 Georgia, "Times New Roman", serif;
-  color: color-mix(in srgb, var(--quiz-primary) 82%, white);
-}
-
-/* Un premier paragraphe d'UNE ligne ne descend pas jusqu'au pied de la
-   lettrine : sans `flow-root`, elle débordait dans le paragraphe suivant
-   et le décalait vers la droite. */
-.quiz-lecture--page .quiz-lecture-texte > p:first-child{
-  display: flow-root;
-}
+/* No drop cap (removed 2026-10-09): a giant first letter only got in the
+   way of reading. */
 
 /* Une lecture affichée comme ÉCRAN (style `page`, ou étape sans autre
    question) : la même page que le cours déplié, sur la même surface. Son
