@@ -723,5 +723,18 @@ await withSrcModule(["src/shared-state/session-merge.ts", "apps/windows/src/host
 	await portable.ecrire();
 	await tel.refresh();
 	r.check("both devices then agree on the new attempt", [Object.keys(tel.toutes()[P].questions).sort(), Object.keys(portable.toutes()[P].questions).sort()], [["q1", "q2"], ["q1", "q2"]]);
+	// Two devices start a never-played quiz at once, neither seeing the other (Syncthing not through,
+	// the phone's clock ahead): no restart happened, so neither may drop the other's answers.
+	const N = "R/neuf.md";
+	const pc = mkDev("pc2", 5_000), tel2 = mkDev("tel2", 9_000);
+	await pc.load(); await tel2.load();
+	const dix = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`n${i}`, { ...ok }]));
+	pc.poser(N, { v: 1, courante: "n9", ecrite: 5_000, questions: dix });
+	await pc.ecrire();
+	tel2.poser(N, { v: 1, courante: "m0", ecrite: 9_000, questions: { m0: { ...ok } } });
+	await tel2.ecrire();
+	const tiers = mkDev("tiers", 20_000);
+	await tiers.load();
+	r.check("two devices starting the same new quiz at once: their answers merge, none is dropped", verifiees(tiers.toutes()[N]), 11);
 	r.done();
 });

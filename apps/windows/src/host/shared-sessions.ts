@@ -202,7 +202,13 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 			/* The attempt it belongs to: the one under way, or a NEW one (nothing
 			   merged: first answer, or right after a restart's tombstone). */
 			const courante = fusionnerPhotos(toutes);
-			if (jouee.depuis === undefined) jouee.depuis = courante?.depuis ?? (courante ? undefined : jouee.ecrite);
+			/* A fresh start is stamped only after a restart's tombstone. Two
+			   devices starting a never-played quiz at once (Syncthing not yet
+			   through, or clocks apart) would otherwise each stamp its own start
+			   and the later one would drop the other's answers: unstamped, they
+			   merge. */
+			const apresTombe = toutes.some(e => "tombe" in e && e.tombe === true);
+			if (jouee.depuis === undefined) jouee.depuis = courante?.depuis ?? (courante || !apresTombe ? undefined : jouee.ecrite);
 			if (jouee.depuis === undefined) delete jouee.depuis;
 			/* What is written is the MERGE of what this device sees, not its local
 			   view alone: a device that reopened an old snapshot would republish it. */
