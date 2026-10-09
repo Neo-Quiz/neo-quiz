@@ -56,6 +56,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
 	r.check("Learn: a reading stays under 1800 characters, written in the prompt",
 		[learnP.includes("stays under 1800 characters"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("stays under 1800 characters")], [true, false]);
+	/* 2026-10-09: the readings carry ALL of the course, rephrased to be easier, never copied, and may add related knowledge. */
+	r.check("Learn: readings keep every piece of the course, rephrased, never copied, related additions allowed",
+		["EVERY piece of information", "never copy the course sentence by sentence", "REPHRASE", "ADD related knowledge"].map(m => learnP.includes(m)), [true, true, true, true]);
 	r.check("Learn: a flashcard is for a pure fact or syntax that fits one sentence, one formula or one line of code",
 		learnP.includes("whose answer fits in one sentence, one formula or one line of code"), true);
 	/* Owner 2026-10-07: the typical Learn user did NOT follow the lecture, so
