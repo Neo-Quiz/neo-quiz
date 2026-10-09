@@ -131,8 +131,8 @@ export type Morceau =
 	| { genre: "image"; debut: number; fin: number; alt: string; src: string }
 	| { genre: "lien"; debut: number; fin: number; texteDebut: number; texteFin: number; url: string };
 
-const MOTIF_EMBED = /!\[\[([^\]]+)\]\]/g;
-const MOTIF_LIEN_IMAGE = /(!?)\[([^[\]\n]*)\]\(([^\s()<>]+)\)/g;
+export const MOTIF_EMBED = /!\[\[([^\]]+)\]\]/g;
+export const MOTIF_LIEN_IMAGE = /(!?)\[([^[\]\n]*)\]\(([^\s()<>]+)\)/g;
 const URL_DE_LIEN = /^(https?:\/\/|mailto:)/i;
 
 /** Les codes inline d'un morceau (double accent grave d'abord), en zones. */

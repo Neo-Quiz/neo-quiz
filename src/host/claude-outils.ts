@@ -13,10 +13,10 @@
    main process's copy.
 ══════════════════════════════════════════════════════════ */
 
-export const ARGS_OUTILS_CLAUDE: readonly string[] = [
-	"--tools", "Read,Grep,Glob",
+/** The confinement shared by both forms that give the model a tool. */
+const RESTRICTIONS: readonly string[] = [
 	"--allowedTools", "Read(./**)",
-	"--disallowedTools", "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*",
+	"--disallowedTools", "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*,Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**)",
 	"--permission-mode", "dontAsk",
 	"--permission-prompts", "none",
 	"--restricted",
@@ -26,6 +26,13 @@ export const ARGS_OUTILS_CLAUDE: readonly string[] = [
 	"--strict-mcp-config",
 	"--mcp-config", "{\"mcpServers\":{}}",
 ];
+
+/** Read, search and list, in a folder the user trusted. */
+export const ARGS_OUTILS_CLAUDE: readonly string[] = ["--tools", "Read,Grep,Glob", ...RESTRICTIONS];
+
+/** Read only, to look at the attached pictures, with no trusted folder:
+    the main process runs it IN the temporary folder of the attachments. */
+export const ARGS_IMAGES_CLAUDE: readonly string[] = ["--tools", "Read", ...RESTRICTIONS];
 
 /** True when a CLI's error output says it does not know one of these
     options (a Claude Code older than the one they were measured on): the

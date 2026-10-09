@@ -27,6 +27,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.aiHost.deny": "Annuler",
 	"app.aiTrust.title": "Faire confiance à ce dossier ?",
 	"app.aiTrust.message": "Faire confiance à ce dossier pour Claude Code ?\n\n{folder}",
+	"app.aiTrust.messageLink": "Faire confiance à ce dossier pour Claude Code ?\n\n{folder}\n\nCe dossier pointe vers {real}. C'est ce dossier-là que Claude Code lira.",
 	"app.aiTrust.detail": "Claude Code pourra lire et chercher dans les fichiers de ce dossier et de ses sous-dossiers (cours, PDF, images) pour tes générations et tes conversations.\n\nIl ne pourra lancer aucune commande, ni écrire, modifier ou supprimer un fichier, ni rien lire en dehors de ce dossier. Tu verras chaque fichier qu'il lit.\n\nTu peux retirer ce dossier à tout moment dans Réglages › IA.",
 	"app.aiTrust.trust": "Faire confiance",
 	"app.aiTrust.cancel": "Annuler",

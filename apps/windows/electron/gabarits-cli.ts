@@ -67,7 +67,12 @@ export const ARGS_CODEX_APP_SERVER: readonly string[] = ["app-server"];
      `../outside/secret.txt`; the scoped rule is denied there.
    - `--disallowedTools …`: everything that writes, runs, delegates or talks
      to a server, MCP tools included (`mcp__*`). Even when the model calls
-     `Write` or `Bash`, the CLI answers "No such tool available".
+     `Write` or `Bash`, the CLI answers "No such tool available". And the
+     app's own `.neo-quiz/` folder (review log, chats, requests of other
+     devices) is denied to Read, Grep and Glob: measured on 2.1.296 in a
+     throwaway folder, a Read of `.neo-quiz/x.txt` (also through
+     `.neo-quiz/../.neo-quiz/x.txt`), a Grep in it and a Glob of it are
+     refused, and a Grep or Glob of the whole folder does not list it.
    - `--permission-mode dontAsk` and `--permission-prompts none`: anything
      not pre-approved is denied, nobody can approve it. Never
      `bypassPermissions`, never `--dangerously-skip-permissions`.
@@ -86,15 +91,15 @@ export const OUTILS_LECTURE = "Read,Grep,Glob";
 /** The pre-approved reads: inside the working directory only. */
 export const LECTURE_AUTORISEE = "Read(./**)";
 /** Everything denied by name, MCP included. */
-export const OUTILS_INTERDITS = "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*";
+export const OUTILS_INTERDITS = "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*,Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**)";
 /** The settings passed inline: no hook may run. */
 export const REGLAGES_SANS_HOOK = "{\"disableAllHooks\":true}";
 /** An MCP configuration with no server at all. */
 export const MCP_VIDE = "{\"mcpServers\":{}}";
 
-/** The fixed tail of the tools form, after the model and the effort. */
-const FIN_OUTILS: readonly string[] = [
-	"--tools", OUTILS_LECTURE,
+/** The confinement shared by both forms that give the model a tool, after
+    `--tools`. */
+const RESTRICTIONS: readonly string[] = [
 	"--allowedTools", LECTURE_AUTORISEE,
 	"--disallowedTools", OUTILS_INTERDITS,
 	"--permission-mode", "dontAsk",
@@ -123,11 +128,26 @@ export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unkno
 	const pieces: Piece[] = m ? ["--add-dir", "{{nq-" + m + ":pieces}}"] : [];
 	for (const avecEffort of [false, true]) {
 		for (const avecPieces of m ? [false, true] : [false]) {
-			const forme = [...teteClaude(), ...(avecEffort ? effortClaude : []), ...FIN_OUTILS, ...(avecPieces ? pieces : [])];
+			const forme = [...teteClaude(), ...(avecEffort ? effortClaude : []), "--tools", OUTILS_LECTURE, ...RESTRICTIONS, ...(avecPieces ? pieces : [])];
 			if (correspond(a, forme)) return true;
 		}
 	}
 	return false;
+}
+
+/** True when `args` is the Claude Code call that only READS THE ATTACHED
+    PICTURES, outside any trusted folder (2026-10-09). It used to be the plain
+    form with `--tools Read`, run in the home folder with the user's
+    settings: a Read anywhere on the disk was one prompt injection away. It
+    now carries the same confinement as the tools form, and the main process
+    runs it IN the temporary folder of the attachments (`process.ts`, `run`),
+    so `Read(./**)` and `--restricted` cover the pictures and nothing else
+    (measured: `C:/Windows/win.ini` and `~/.ssh/config` are refused as
+    "outside"). No `--add-dir`: the attachments ARE the working directory. */
+export function argumentsImages(tool: string, args: unknown): boolean {
+	if (tool !== "claude" || !Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	const queue: Piece[] = ["--tools", "Read", ...RESTRICTIONS];
+	return correspond(args, [...teteClaude(), ...queue]) || correspond(args, [...teteClaude(), ...effortClaude, ...queue]);
 }
 
 /** True when `args` is exactly the app-server launch. */
@@ -157,8 +177,8 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json"])
 				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json", "--model", modele]);
 		case "claude":
-			/* `--tools` vaut "" (aucun outil) ou "Read", et Read seulement
-			   quand des images sont jointes : le modèle les lit par leur jeton.
+			/* No tool at all (`--tools ""`); the pictures-only form and the
+			   trusted-folder form are judged above, with their confinement.
 			   The output is a STREAM since 2026-09-29 (live transcript):
 			   `stream-json` requires `--verbose` in print mode, and
 			   `--include-partial-messages` adds the text as it is written.
@@ -167,13 +187,15 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 			{
 				// The read-only tools form, in a trusted folder (see above).
 				if (argumentsAvecOutils(tool, a, marqueur)) return true;
+				// The pictures-only form, run in the attachments folder (see above).
+				if (argumentsImages(tool, a)) return true;
 				const tete = teteClaude();
 				/* The composer's effort (2026-10-08): `--effort` and ONE of the
 				   five levels the CLI documents, or nothing (the CLI's default).
 				   A level only changes how long the model reasons. */
 				const effort = effortClaude;
 				const fin: Piece[] = [
-					"--tools", (t: string) => t === "" || t === "Read",
+					"--tools", "",
 					"--no-session-persistence", "--setting-sources", "",
 					// No --mcp-config, and --strict-mcp-config: the account's connectors are not even listed.
 					"--strict-mcp-config",

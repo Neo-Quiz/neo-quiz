@@ -17,6 +17,11 @@ release notes.
 
 - Claude Code can now read and search the files of a quiz's folder itself, with read-only tools, once you trust that folder: Neo Quiz asks the first time, every file it reads or search it runs shows in a folded "AI work" block (refused steps included), and Settings › AI lists the trusted folders with Remove.
 
+### Changed
+
+- An image from the web in a generated quiz now shows as a plain link and is never loaded; images from your folder still show.
+- When Claude Code looks at attached pictures, it can read those pictures and nothing else.
+
 ## [1.20.66] - 2026-10-09
 
 ### Fixed

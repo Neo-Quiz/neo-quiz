@@ -254,7 +254,8 @@ const REFUS = /permission to use .* (has been )?denied|denied because|is outside
 export function resumeResultat(name: string, content: unknown, isError: boolean, refuseParMeta = false): { status: Exclude<ToolStatus, "running">; count?: number; unit?: ToolUnit; detail?: string } {
 	const { texte, image } = contenuResultat(content);
 	const premiereLigne = texte.replace(/<\/?tool_use_error>/g, "").trim().split("\n")[0] ?? "";
-	if (refuseParMeta || (isError && REFUS.test(texte))) return { status: "refused", detail: couper(premiereLigne, MAX_DETAIL) };
+	// Only the head of the text: a refusal is worded at the start, and a regex with `.*` on a megabyte of output is slow.
+	if (refuseParMeta || (isError && REFUS.test(texte.slice(0, 4000)))) return { status: "refused", detail: couper(premiereLigne, MAX_DETAIL) };
 	if (isError) return { status: "error", detail: couper(premiereLigne, MAX_DETAIL) };
 	if (image) return { status: "ok", unit: "image" };
 	const lignes = texte.replace(/\s+$/, "").split("\n").filter(l => l.trim() !== "");

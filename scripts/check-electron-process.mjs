@@ -1045,7 +1045,7 @@ await withSrcModule("src/host/jetons.ts", async ({
  * juste après : le cas recevrait la réponse du vrai CLI au lieu de celle du
  * faux (défaut vécu, ronde 2 de la tâche 4).
  */
-await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle, resoudreExecutable, run, tuerArbre }) => {
+await withSrcModule(["apps/windows/electron/process.ts", "src/host/claude-outils.ts"], async ({ ollamaInstalle, resoudreExecutable, run, tuerArbre }, { ARGS_IMAGES_CLAUDE }) => {
 	const r = makeReporter("Électron — lancer un CLI");
 	const racine = mkdtempSync(join(tmpdir(), "quiz-lancer-"));
 	const maison = join(racine, "maison");
@@ -1431,6 +1431,21 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaInstalle,
 			);
 			r.check("un CLI qui sort sans lire son entrée ne tue pas le processus principal",
 				{ code: res.code, vivant: true }, { code: 2, vivant: true });
+		});
+
+		await cas(r, "the pictures-only Claude form runs IN the attachments folder, never the home folder, and needs a picture", async () => {
+			/* 2026-10-09: its `Read(./**)` and `--restricted` are relative to the
+			   working directory. Run in the home folder (as before), a Read of
+			   any file there was one prompt injection away. */
+			const faux = poserFauxCli("claude", "process.stdout.write(process.cwd() + '|' + require('fs').readdirSync('.').join(','));");
+			const marq = "0123456789abcdef0123456789abcdef";
+			const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_IMAGES_CLAUDE];
+			const res = await run({ tool: "claude", args, stdin: "", marqueur: marq, fichiers: [{ nom: "photo.png", base64: "AAAA" }] }, { env: envDe(faux.dossier) });
+			const [cwd, contenu] = res.stdout.split("|");
+			const sansImage = await nomDuRejet(run({ tool: "claude", args, stdin: "", marqueur: marq }, { env: envDe(faux.dossier) }));
+			r.check("the pictures-only Claude form runs IN the attachments folder, never the home folder, and needs a picture",
+				{ dossierTemporaire: /neo-quiz-cli-/.test(cwd ?? ""), pasLaMaison: cwd !== envDe(faux.dossier).USERPROFILE, contenu, sansImage },
+				{ dossierTemporaire: true, pasLaMaison: true, contenu: "photo.png", sansImage: "refuse" });
 		});
 
 		await cas(r, "ollamaInstalle cherche ollama dans le PATH étendu, comme run", async () => {

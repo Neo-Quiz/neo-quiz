@@ -62,6 +62,7 @@ import type { AncreTerminal } from "../../../src/host/types";
    deux règles pour un même appel du code partagé. */
 import { extensionsExecutables, ligneCmd, porteSautDeLigne } from "../../../src/host/cli-args";
 import { LOG_PREFIX } from "../../../src/branding";
+import { argumentsImages } from "./gabarits-cli";
 
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
@@ -1605,7 +1606,8 @@ export async function avecFichiers<T>(
 		fichiers?: FichierJoint[];
 		sortieFichier?: string;
 	},
-	executer: (resolu: { args: string[]; stdin: string }) => Promise<T>,
+	/** `pieces`: the temporary folder holding the attachments, "" without one. */
+	executer: (resolu: { args: string[]; stdin: string; pieces: string }) => Promise<T>,
 	env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ resultat: T; sortie?: string }> {
 	const fichiers = spec.fichiers || [];
@@ -1625,7 +1627,7 @@ export async function avecFichiers<T>(
 		const remplacer = (s: string): string => marqueur === undefined
 			? s
 			: substituerJetons(s, { marqueur, chemins, sortie: cheminSortie, maison: dossierPersonnel(env), pieces: fichiers.length > 0 ? dossier : "" });
-		const resultat = await executer({ args: spec.args.map(remplacer), stdin: remplacer(spec.stdin) });
+		const resultat = await executer({ args: spec.args.map(remplacer), stdin: remplacer(spec.stdin), pieces: fichiers.length > 0 ? dossier : "" });
 		let sortie: string | undefined;
 		if (cheminSortie) {
 			// Absent = le CLI ne l'a pas écrit : `undefined`, et l'appelant retombe
@@ -2268,6 +2270,15 @@ export async function run(spec: {
 			if (resolu.args.some(porteSautDeLigne)) {
 				throw erreurCli("refuse", "argument refusé : un saut de ligne ne peut pas être cité");
 			}
+			/* THE PICTURES-ONLY FORM RUNS IN THE ATTACHMENTS FOLDER (2026-10-09,
+			   `gabarits-cli.ts`, `argumentsImages`): its `Read(./**)` and
+			   `--restricted` are relative to the working directory, which must
+			   hold the pictures and nothing else, never the home folder. Without
+			   a picture there is no such folder, and the call is refused. */
+			const images = argumentsImages(spec.tool, spec.args);
+			if (images && !resolu.pieces) {
+				throw erreurCli("refuse", "pictures-only form without any attachment");
+			}
 			return lancer({
 				executable,
 				args: resolu.args,
@@ -2275,7 +2286,7 @@ export async function run(spec: {
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
 				env: environnementEnfant(env),
-				cwd: spec.cwd ?? dossierPersonnel(env),
+				cwd: images ? resolu.pieces : spec.cwd ?? dossierPersonnel(env),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
 				surStdout: options.surStdout,

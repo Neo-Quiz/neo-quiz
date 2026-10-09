@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsAppServer, ARGS_CODEX_APP_SERVER }, { ARGS_OUTILS_CLAUDE }) => {
+await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 	const j = (nom) => `{{nq-${m}:${nom}}}`;
@@ -124,7 +124,7 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	r.check("the update of Claude Code and Codex passes, as the bare word", [argumentsAutorises("claude", ["update"], undefined), argumentsAutorises("codex", ["update"], undefined)], [true, true]);
 	r.check("no update for agy, and no update with anything added", [argumentsAutorises("agy", ["update"], undefined), argumentsAutorises("claude", ["update", "--force"], undefined), argumentsAutorises("codex", ["update", "-c", "x=1"], undefined), argumentsAutorises("claude", ["upgrade"], undefined)], [false, false, false, false]);
 	r.check("agy génération, sans et avec modèle", [argumentsAutorises("agy", agy, m), argumentsAutorises("agy", [...agy, "--model", "gemini-2.5-pro"], m)], [true, true]);
-	r.check("claude sans outil, et avec Read pour les images", [argumentsAutorises("claude", claude("claude-opus-4-1", ""), m), argumentsAutorises("claude", claude("opus[1m]", "Read"), m)], [true, true]);
+	r.check("claude with no tool passes; the old unconfined Read form (home folder, user settings) is refused", [argumentsAutorises("claude", claude("claude-opus-4-1", ""), m), argumentsAutorises("claude", claude("opus[1m]", "Read"), m)], [true, false]);
 	r.check("codex, rapide ou non, avec 0 à 3 images", [argumentsAutorises("codex", codex(false, 0), m), argumentsAutorises("codex", codex(true, 1), m), argumentsAutorises("codex", codex(false, 3), m)], [true, true, true]);
 
 	// A remote request's model reaches the CLI ONLY in the model slot of the fixed shape: ids of a PC's list pass, an option-looking one never does.
@@ -148,8 +148,8 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	/* The composer's effort (2026-10-08): `--effort <level>` right after the
 	   model, one of the five levels of `claude --help`, nothing else. */
 	const avecEffort = (niveau, outils = "") => { const a = claude("opus", outils); a.splice(7, 0, "--effort", niveau); return a; };
-	r.check("claude: each documented effort level passes, with or without Read",
-		[...["low", "medium", "high", "xhigh", "max"].map(n => argumentsAutorises("claude", avecEffort(n), m)), argumentsAutorises("claude", avecEffort("high", "Read"), m)], [true, true, true, true, true, true]);
+	r.check("claude: each documented effort level passes; the unconfined Read form is refused with an effort too",
+		[...["low", "medium", "high", "xhigh", "max"].map(n => argumentsAutorises("claude", avecEffort(n), m)), argumentsAutorises("claude", avecEffort("high", "Read"), m)], [true, true, true, true, true, false]);
 	r.check("claude: an unknown level, an option or an empty level in the effort slot is refused",
 		["ultracode", "--dangerously-skip-permissions", "", "high --mcp-config", "HIGH"].map(n => argumentsAutorises("claude", avecEffort(n), m)), [false, false, false, false, false]);
 	r.check("claude: --effort elsewhere than after the model, twice, or without its level, is refused", [
@@ -160,13 +160,16 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	/* READ-ONLY TOOLS IN A TRUSTED FOLDER (2026-10-09): exactly one tail of
 	   options, measured on Claude Code 2.1.296; anything that would give the
 	   model a command, a write, a server or a bypass is refused. */
+	const INTERDITS = "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*,Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**)";
 	const FIN_OUTILS = ["--tools", "Read,Grep,Glob", "--allowedTools", "Read(./**)",
-		"--disallowedTools", "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*",
+		"--disallowedTools", INTERDITS,
 		"--permission-mode", "dontAsk", "--permission-prompts", "none", "--restricted", "--no-session-persistence",
 		"--setting-sources", "", "--settings", "{\"disableAllHooks\":true}", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}"];
 	const outils = (modele = "haiku", effort = null, pieces = false) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
 		...(effort ? ["--effort", effort] : []), ...FIN_OUTILS, ...(pieces ? ["--add-dir", j("pieces")] : [])];
 	const remplacer = (a, de, vers) => a.map(x => (x === de ? vers : x));
+	const REGLAGES = FIN_OUTILS[FIN_OUTILS.indexOf("--settings") + 1];
+	const MCP = FIN_OUTILS[FIN_OUTILS.indexOf("--mcp-config") + 1];
 	r.check("claude with read-only tools: accepted with and without effort, with the attachments folder",
 		[argumentsAvecOutils("claude", outils(), m), argumentsAvecOutils("claude", outils("opus", "high"), m), argumentsAvecOutils("claude", outils("sonnet", null, true), m),
 			argumentsAutorises("claude", outils(), m), argumentsAutorises("claude", outils("opus", "max", true), m)], [true, true, true, true, true]);
@@ -178,8 +181,10 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 		remplacer(outils(), "Read(./**)", "Read"),
 		remplacer(outils(), "Read(./**)", "Bash"),
 		remplacer(outils(), "Read(./**)", "Read(./**),WebFetch"),
-		remplacer(outils(), "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*", "Write,Edit"),
-	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false, false, false]);
+		remplacer(outils(), INTERDITS, "Write,Edit"),
+		remplacer(outils(), INTERDITS, "Bash,PowerShell,Write,Edit,MultiEdit,NotebookEdit,Task,Agent,WebFetch,WebSearch,mcp__*"),
+		remplacer(outils(), INTERDITS, INTERDITS.replace(",Read(./.neo-quiz/**)", "")),
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false, false, false, false, false]);
 	r.check("claude with tools: a permission bypass in any form is refused", [
 		remplacer(outils(), "dontAsk", "bypassPermissions"),
 		remplacer(outils(), "dontAsk", "acceptEdits"),
@@ -208,6 +213,27 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false]);
 	r.check("the page's list of tools options (src/host/claude-outils.ts) is exactly the form accepted here",
 		argumentsAvecOutils("claude", ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_OUTILS_CLAUDE], m), true);
+	/* PICTURES WITHOUT A TRUSTED FOLDER (2026-10-09): Read only, with the
+	   same confinement as the tools form; run in the attachments folder. */
+	const images = (modele = "haiku", effort = null) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele,
+		...(effort ? ["--effort", effort] : []), "--tools", "Read", ...FIN_OUTILS.slice(2)];
+	r.check("claude pictures-only form: accepted with and without effort, and it is not the trusted-folder form",
+		[argumentsImages("claude", images()), argumentsImages("claude", images("opus", "max")), argumentsAutorises("claude", images(), m), argumentsAvecOutils("claude", images(), m), argumentsImages("codex", images()), argumentsImages("claude", remplacer(images(), "Read", "Read,Grep,Glob"))],
+		[true, true, true, false, false, false]);
+	r.check("claude pictures-only form: Grep, Glob, Bash, a wider read, .neo-quiz no longer denied, a bypass, no --restricted, hooks, MCP or --add-dir are refused", [
+		remplacer(images(), "Read", "Read,Grep"),
+		remplacer(images(), "Read", "Read,Bash"),
+		remplacer(images(), "Read(./**)", "Read"),
+		remplacer(images(), INTERDITS, INTERDITS.replace(",Read(./.neo-quiz/**)", "")),
+		remplacer(images(), "dontAsk", "bypassPermissions"),
+		images().filter(x => x !== "--restricted"),
+		remplacer(images(), REGLAGES, "{}"),
+		remplacer(images(), MCP, "{\"mcpServers\":{\"x\":{\"command\":\"calc.exe\"}}}"),
+		[...images(), "--add-dir", j("pieces")],
+		[...images(), "--add-dir", "C:/Users"],
+	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false, false, false, false, false, false, false]);
+	r.check("the page's pictures-only options (src/host/claude-outils.ts) are exactly the form accepted here",
+		argumentsImages("claude", ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_IMAGES_CLAUDE]), true);
 	r.check("ollama ne passe jamais par process.run", argumentsAutorises("ollama", ["run", "x"], m), false);
 	r.check("un argument non-chaîne : refusé", argumentsAutorises("claude", [1], m), false);
 	r.check("pas de tableau : refusé", argumentsAutorises("claude", "--version", m), false);

@@ -49,6 +49,7 @@ export const EN_APP = {
 	"app.aiHost.deny": "Cancel",
 	"app.aiTrust.title": "Trust this folder?",
 	"app.aiTrust.message": "Trust this folder for Claude Code?\n\n{folder}",
+	"app.aiTrust.messageLink": "Trust this folder for Claude Code?\n\n{folder}\n\nThis folder points to {real}. That is the folder Claude Code will read.",
 	"app.aiTrust.detail": "Claude Code will be able to read and search the files of this folder and its sub-folders (courses, PDFs, pictures) for your generations and conversations.\n\nIt cannot run any command, write, edit or delete a file, or read anything outside this folder. You will see every file it reads.\n\nYou can remove this folder at any time in Settings › AI.",
 	"app.aiTrust.trust": "Trust",
 	"app.aiTrust.cancel": "Cancel",

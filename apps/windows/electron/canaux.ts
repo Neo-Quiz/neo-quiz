@@ -1522,7 +1522,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const options = {
 			type: "question" as const,
 			title: t("app.aiTrust.title"),
-			message: t("app.aiTrust.message", { folder: c.path.replace(/\//g, path.sep) }),
+			/* The folder SHOWN is the one RECORDED: the real path, once links
+			   and junctions are resolved. When the path asked differs (a
+			   junction, a symbolic link), both are shown, so a folder that
+			   points elsewhere is never trusted under a name it does not have. */
+			message: c.path.toLowerCase() === c.real.toLowerCase()
+				? t("app.aiTrust.message", { folder: c.real.replace(/\//g, path.sep) })
+				: t("app.aiTrust.messageLink", { folder: c.path.replace(/\//g, path.sep), real: c.real.replace(/\//g, path.sep) }),
 			detail: t("app.aiTrust.detail"),
 			buttons: [t("app.aiTrust.trust"), t("app.aiTrust.cancel")],
 			defaultId: 1,

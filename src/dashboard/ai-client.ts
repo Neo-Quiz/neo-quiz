@@ -2,7 +2,7 @@ import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
 import { jetonFichier, jetonHome, jetonPieces, jetonSortie, nouveauMarqueur } from "../host/jetons";
-import { ARGS_OUTILS_CLAUDE, optionInconnue } from "../host/claude-outils";
+import { ARGS_IMAGES_CLAUDE, ARGS_OUTILS_CLAUDE, optionInconnue } from "../host/claude-outils";
 import {
 	resolveClaudeModel,
 	resolveCodexModel, resolveAntigravityModel, antigravityModelId, niveauAntigravity, resolveOllamaSelection,
@@ -23,6 +23,7 @@ import { complementCategorie } from "./categorie-prompt";
 import { clarifyPrompt } from "./generation-kind";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
+import { inertRemoteImages } from "./remote-images";
 import { UsageLimitError, cliErrorText, detectUsageLimit } from "./usage-limit";
 import type { TranscriptEvent } from "./transcript";
 
@@ -794,11 +795,11 @@ export function parseOllamaResponse(content: string): ReponseQuiz {
 		// If it's an object with a "questions" key, extract the array
 		if (parsed && !Array.isArray(parsed) && Array.isArray((parsed as { questions?: unknown }).questions)) {
 			const obj = parsed as { questions: unknown[]; title?: unknown; mode?: unknown; objectives?: unknown; glossary?: unknown };
-			return { questions: assemblerQuestionsOllama(obj), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
+			return { questions: inertRemoteImages(assemblerQuestionsOllama(obj)), titre: nettoyerTitre(typeof obj.title === "string" ? obj.title : "") };
 		}
 
 		if (Array.isArray(parsed)) {
-			return { questions: parsed, titre: titreEnCommentaire(cleaned) };
+			return { questions: inertRemoteImages(parsed), titre: titreEnCommentaire(cleaned) };
 		}
 
 		throw new Error("Format inattendu");
@@ -847,6 +848,8 @@ export function nettoyerTitre(brut: string): string | undefined {
  * la closure de `createAiClient` le 2026-09-18 : la page « Générer » la lit
  * aussi pour le canal web. */
 export function parseReponseQuiz(content: string): ReponseQuiz {
+	/* No remote image survives a model's answer (2026-10-09,
+	   `remote-images.ts`): every return below goes through `inertRemoteImages`. */
 	const sansQuiz = content.trim().match(new RegExp("^" + NO_QUIZ_MARKER + "[ \\t]*(?:\\r?\\n|$)"));
 	if (sansQuiz) throw new NoQuizAnswer(content.trim().slice(sansQuiz[0].length).trim());
 	let cleaned = retirerFence(content);
@@ -868,7 +871,7 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		if (repare !== cleaned) {
 			try { parsed = JSON5.parse(repare); lu = true; } catch { /* l'erreur d'origine suit */ }
 		}
-		if (lu && Array.isArray(parsed)) return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+		if (lu && Array.isArray(parsed)) return { questions: inertRemoteImages(sansFauxTitres(parsed)), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
 		   (ligne, colonne), ce qu'aucune paraphrase ne ferait mieux. Une
 		   réponse qui n'est pas un quiz du tout, elle, mérite qu'on dise ce
@@ -886,7 +889,7 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		throw new Error(t("ai.err.notAnArray"));
 	}
 
-	return { questions: sansFauxTitres(parsed), titre: titreEnCommentaire(cleaned) };
+	return { questions: inertRemoteImages(sansFauxTitres(parsed)), titre: titreEnCommentaire(cleaned) };
 }
 
 /** The name of a document for matching a quiz's tag: case, accents and the
@@ -1333,20 +1336,18 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw new Error(t("ai.err.invalidModelClaude", { model }));
 		}
 
-		/* Images : l'HÔTE les écrit en fichiers temporaires (et les efface), et
-		   remplace le jeton de la N-ième par son chemin absolu — ici dans le
-		   PROMPT, que Claude lit ensuite avec le tool Read (multimodal,
-		   read-only). Le MARQUEUR est tiré au sort pour CET appel : le prompt
-		   contient la demande de l'utilisateur et le contenu de ses notes, et une
-		   forme fixe y aurait collisionné (voir `src/host/jetons.ts`).
-		   `--tools` reçoit la liste des outils autorisés, et une chaîne VIDE
-		   quand il n'y a pas d'image : c'est un argument réellement vide, pas
-		   les deux caractères `""` — sous `cp.exec`, le shell retirait les
-		   guillemets de `--tools ""`, et le CLI refuse la paire littérale
-		   (mesuré : « Invalid setting source: "" »). */
+		/* Pictures: the HOST writes them to temporary files (and deletes them),
+		   and replaces the token of the N-th one with its absolute path, here
+		   in the PROMPT, which Claude then reads with the Read tool
+		   (multimodal, read-only). The MARKER is drawn at random for THIS call:
+		   the prompt holds the user's request and the content of their notes,
+		   and a fixed form would have collided there (see `src/host/jetons.ts`).
+		   Without a picture, `--tools` gets an EMPTY string: a really empty
+		   argument, not the two characters `""`; under `cp.exec` the shell
+		   stripped the quotes of `--tools ""`, and the CLI refuses the literal
+		   pair (measured: `Invalid setting source: ""`). */
 		const marqueur = nouveauMarqueur();
 		const fichiers = piecesJointes(images);
-		const tools = fichiers.length > 0 ? "Read" : "";
 		// Instruction au MODÈLE (pas de l'UI) → anglais, comme le prompt
 		// système ; la langue du quiz reste celle de la demande.
 		const imageNote = fichiers.length > 0
@@ -1364,10 +1365,15 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		if (dossier && proc.trustFolder) {
 			try { outils = (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); }
 		}
+		/* Pictures without a trusted folder (2026-10-09): Read only, with the
+		   same confinement as the tools form; the main process runs it IN the
+		   attachments folder. Without a picture, no tool at all. */
 		const argsSansOutils = [
 			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
 			...(effort ? ["--effort", effort] : []),
-			"--tools", tools, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config",
+			...(fichiers.length > 0
+				? ARGS_IMAGES_CLAUDE
+				: ["--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"]),
 		];
 		const argsOutils = [
 			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
