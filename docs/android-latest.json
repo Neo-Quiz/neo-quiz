@@ -1,8 +1,8 @@
 {
-  "versionCode": 12,
-  "versionName": "0.2.10",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.10/NeoQuiz-0.2.10.apk",
-  "sha256": "989772733283ae23229bacb194f7592134880af4951685a5e48170455dea28d0",
-  "size": 55989501,
-  "notes": "Quiz progress now follows you between your phone and your PC; pictures open full screen."
+  "versionCode": 13,
+  "versionName": "0.2.11",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.11/NeoQuiz-0.2.11.apk",
+  "sha256": "92e175865a059b8f35cea7d6d73ecec4a981d73e7bce6f0fd58f451b69ae8b85",
+  "size": 55989485,
+  "notes": "Keeps your most recent quiz progress across devices."
 }
