@@ -1,13 +1,20 @@
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { SessionQuiz, SessionSink } from "../../../../src/engine/session";
 import { ecrireReglage, lireReglage } from "../host/folder";
+import type { SessionsPartagees } from "../host/shared-sessions";
 import { renommerCles } from "./folder-move";
 
 /* ══════════════════════════════════════════════════════════
    LES SESSIONS EN COURS, CÔTÉ APPLICATION (2026-09-26) — reprendre un quiz
-   là où on s'était arrêté. Sur le modèle de `stats.ts` : une clé des
-   RÉGLAGES de l'application (`quizSessions`), lue une fois, tenue en
-   mémoire. Pas partagée avec le greffon (spec, §1 : hors champ).
+   là où on s'était arrêté.
+
+   SYNCED BETWEEN DEVICES since 2026-10-09 (host/shared-sessions.ts): a
+   quiz begun on the phone resumes on the laptop. The snapshots live in each
+   root's `.neo-quiz/sessions/<device>.json`; the latest written wins. The
+   app's settings key `quizSessions` stays as this device's LOCAL MIRROR:
+   it is what an older version of the app reads, and the fallback for a
+   quiz whose root could not be loaded. Its content is copied once into the
+   synced files (`migrer`): progress made before this version is not lost.
 
    Écriture DIFFÉRÉE de 400 ms (une série de clics n'écrit qu'une fois),
    et IMMÉDIATE par `vider()` — au démontage de la page du quiz et à la
@@ -24,36 +31,68 @@ export interface SessionsApp {
 	toutes(): Record<string, SessionQuiz>;
 	/** A quiz (or a folder, by prefix) moved: its snapshots follow it. */
 	renommer(de: string, vers: string): void;
+	/** Reads again the other devices' snapshots (after a sync). */
+	recharger(): Promise<void>;
 	vider(): Promise<void>;
 }
 
-export async function creerSessionsApp(): Promise<SessionsApp> {
-	let cache: Record<string, SessionQuiz> = {};
+export async function creerSessionsApp(partagees?: SessionsPartagees): Promise<SessionsApp> {
+	let locales: Record<string, SessionQuiz> = {};
 	try {
 		const brut = await lireReglage<Record<string, SessionQuiz>>(CLE_SESSIONS);
-		if (brut && typeof brut === "object" && !Array.isArray(brut)) cache = brut;
+		if (brut && typeof brut === "object" && !Array.isArray(brut)) locales = brut;
 	} catch (e) {
 		// Réglages illisibles : aucune reprise, mais l'application s'ouvre.
 		console.warn(LOG_PREFIX, "sessions illisibles:", e);
 	}
+	if (partagees) {
+		try {
+			await partagees.load();
+			// Only what no device has yet: the synced files are newer than the mirror.
+			if (partagees.migrer(locales) > 0) await partagees.ecrire();
+		} catch (e) {
+			console.warn(LOG_PREFIX, "synced sessions not loaded:", e);
+		}
+	}
+	/** The merged view: the synced snapshots, and the mirror for a quiz the
+	    synced files do not know at all (its root was not loaded). */
+	const vue = (): Record<string, SessionQuiz> => {
+		if (!partagees) return locales;
+		const p = partagees.toutes();
+		const out: Record<string, SessionQuiz> = { ...p };
+		for (const [k, s] of Object.entries(locales)) if (!(k in out) && !partagees.gere(k)) out[k] = s;
+		return out;
+	};
+
 	let minuterie = 0;
 	const ecrire = async (): Promise<void> => {
 		if (minuterie) { clearTimeout(minuterie); minuterie = 0; }
-		try { await ecrireReglage(CLE_SESSIONS, cache); } catch (e) { console.warn(LOG_PREFIX, "sessions non écrites:", e); }
+		try { await ecrireReglage(CLE_SESSIONS, locales); } catch (e) { console.warn(LOG_PREFIX, "sessions non écrites:", e); }
+		if (partagees) { try { await partagees.ecrire(); } catch (e) { console.warn(LOG_PREFIX, "synced sessions not written:", e); } }
 	};
 	const planifier = (): void => {
 		if (minuterie) clearTimeout(minuterie);
 		minuterie = window.setTimeout(() => { minuterie = 0; void ecrire(); }, DELAI_MS);
 	};
 	return {
-		lire: chemin => cache[chemin] ?? null,
+		lire: chemin => vue()[chemin] ?? null,
 		puits: chemin => ({
-			initiale: cache[chemin] ?? null,
-			enregistrer: s => { cache[chemin] = s; planifier(); },
-			effacer: () => { if (chemin in cache) { delete cache[chemin]; planifier(); } },
+			initiale: vue()[chemin] ?? null,
+			enregistrer: s => { locales[chemin] = s; partagees?.poser(chemin, s); planifier(); },
+			effacer: () => {
+				const avait = chemin in locales || !!partagees?.toutes()[chemin];
+				delete locales[chemin];
+				partagees?.effacer(chemin);
+				if (avait) planifier();
+			},
 		}),
-		toutes: () => cache,
-		renommer: (de, vers) => { if (renommerCles(cache, de, vers)) planifier(); },
+		toutes: () => vue(),
+		renommer: (de, vers) => {
+			const local = renommerCles(locales, de, vers);
+			partagees?.renommer(de, vers);
+			if (local || partagees) planifier();
+		},
+		recharger: async () => { if (partagees) { try { await partagees.refresh(); } catch (e) { console.warn(LOG_PREFIX, "synced sessions not refreshed:", e); } } },
 		vider: () => ecrire(),
 	};
 }

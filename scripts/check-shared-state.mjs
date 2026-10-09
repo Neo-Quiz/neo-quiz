@@ -535,3 +535,65 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 
 	r.done();
 });
+
+/* QUIZZES IN PROGRESS PER DEVICE (`apps/windows/src/host/shared-sessions.ts`,
+   2026-10-09): a Learn begun on the phone resumes on the laptop. */
+await withSrcModule("apps/windows/src/host/shared-sessions.ts", async (ses) => {
+	const r = makeReporter("Shared state - quizzes in progress");
+	const fsOf = (files = new Map()) => {
+		const m = memFs(files);
+		return { ...m, size: async (p) => (files.has(p) ? files.get(p).length : null), readBounded: async (p) => m.read(p) };
+	};
+	const snap = (ecrite, courante = "q1") => ({ v: 1, courante, questions: { q1: { melange: "0 1" } }, ecrite });
+	const make = (fs, device, t0 = 1_000_000) => { let t = t0; return ses.createSharedSessions({ fs, roots: () => ["Efrei"], deviceId: device, now: () => (t += 10) }); };
+	const P = "Efrei/XTI303/cours.md";
+
+	// The phone plays, writes its file; the laptop, loading, resumes where the phone stopped.
+	const files = new Map();
+	const phone = make(fsOf(files), "phone");
+	await phone.load();
+	phone.poser(P, snap(1_000_100, "q7"));
+	await phone.ecrire();
+	r.check("the phone's snapshot is in ITS file of the synced folder", JSON.parse(files.get("Efrei/.neo-quiz/sessions/phone.json"))[P].courante, "q7");
+	const laptop = make(fsOf(files), "laptop");
+	await laptop.load();
+	r.check("the laptop resumes at the phone's question", laptop.toutes()[P]?.courante, "q7");
+
+	// The laptop plays on: its snapshot is the latest, written in its own file only.
+	laptop.poser(P, snap(900_000, "q9"));
+	await laptop.ecrire();
+	await phone.refresh();
+	r.check("a snapshot played later wins even from a slower clock", [laptop.toutes()[P].courante, phone.toutes()[P].courante], ["q9", "q9"]);
+	r.check("each device wrote only its own file", [...files.keys()].filter(k => k.includes("/sessions/")).sort(), ["Efrei/.neo-quiz/sessions/laptop.json", "Efrei/.neo-quiz/sessions/phone.json"]);
+
+	// The phone finishes the quiz: a tombstone; the laptop's older snapshot does not bring it back.
+	phone.effacer(P);
+	await phone.ecrire();
+	await laptop.refresh();
+	r.check("a finished quiz stays finished on the other device", [phone.toutes()[P], laptop.toutes()[P]], [undefined, undefined]);
+
+	// The legacy settings are copied once, never over a synced entry.
+	const fs2 = fsOf();
+	const s2 = make(fs2, "old");
+	await s2.load();
+	r.check("legacy snapshots are migrated where no device has one",
+		[s2.migrer({ [P]: snap(5), "Efrei/a.md": snap(6), "Autre/b.md": snap(7), "Efrei/bad.md": { v: 2 } }), Object.keys(s2.toutes()).sort()],
+		[2, ["Efrei/XTI303/cours.md", "Efrei/a.md"]]);
+	r.check("… and not over an entry a device already holds", s2.migrer({ [P]: snap(1) }), 0);
+
+	// A hostile or broken file from another device.
+	const t = ses.lireTableSessions({ "Autre/x.md": snap(1), "Efrei/ok.md": snap(1), "Efrei/futur.md": snap(9e15), "Efrei/v2.md": { v: 2, questions: {}, ecrite: 1 }, "Efrei/t.md": { tombe: true, ecrite: 3 }, "Efrei/nan.md": { v: 1, questions: {}, ecrite: NaN } }, "Efrei", 1000);
+	r.check("another root's key, a future stamp, an unknown version or a NaN stamp are dropped", Object.keys(t).sort(), ["Efrei/ok.md", "Efrei/t.md"]);
+	r.check("a tie between a snapshot and a tombstone: the tombstone wins",
+		ses.fusionnerSessions([{ [P]: snap(50) }, { [P]: { tombe: true, ecrite: 50 } }]), {});
+
+	// A move carries the winning snapshot to the new key.
+	const fs3 = fsOf(new Map(files));
+	const s3 = make(fs3, "laptop", 5_000_000);
+	await s3.load();
+	s3.poser(P, snap(5_000_100, "q4"));
+	s3.renommer("Efrei/XTI303", "Efrei/XTI303 bis");
+	r.check("a folder move: the snapshot follows the quiz, the old key is gone",
+		[s3.toutes()["Efrei/XTI303 bis/cours.md"]?.courante, s3.toutes()[P]], ["q4", undefined]);
+	r.done();
+});

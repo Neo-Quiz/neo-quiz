@@ -90,17 +90,46 @@
   padding-top: 30px;
 }
 
-/* On a phone the picture takes the whole screen: no room kept for the
-   desktop rail on the modal layer. */
-.is-mobile .modal-container:has(> .modal.qbd-image-modal){
-  padding: 0;
+
+/* The zoom buttons are flat: no 3D button in a modal. */
+.qbd-image-modal .qbd-image-bouton,
+.qbd-image-modal .qbd-image-bouton:hover,
+.qbd-image-modal .qbd-image-bouton:active{
+  border: 0;
+  box-shadow: none;
+  transform: none;
 }
-.is-mobile .modal.qbd-image-modal{
-  width: 100vw;
-  max-width: 100vw;
-  height: 100dvh;
-  max-height: 100dvh;
+
+/* On a phone the picture is a full page, as Settings is (mobile.css): the
+   layer covers the screen from under the status bar, the panel has no
+   gutter, frame nor corner, and mobile.css's 16 px dialog margins and
+   bounded height do not apply (its rules win on specificity otherwise). */
+body.is-mobile .modal-container:has(> .qbd-image-modal){
+  padding: var(--nq-inset-haut, 0px) 0 0;
+  align-items: stretch;
+  background: var(--background-primary);
+}
+
+.is-mobile .modal-container:has(> .qbd-image-modal) > .modal-bg{
+  display: none;
+}
+
+html.nq-mobile body.is-mobile .modal-container > .modal.qbd-image-modal,
+body.is-mobile .modal-container > .modal.qbd-image-modal{
+  margin: 0;
+  width: 100%;
+  max-width: none;
   min-width: 0;
+  height: auto;
+  max-height: none;
+  align-self: stretch;
+  border: 0;
   border-radius: 0;
-  padding: 12px 8px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: none;
+  padding: 8px 4px 12px;
+}
+
+body.is-mobile .modal-container > .modal.qbd-image-modal,
+body.is-mobile .modal-container > .modal.qbd-image-modal.qbd-closing{
+  animation: none !important;
 }

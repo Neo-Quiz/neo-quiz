@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Your progress in a quiz follows you between your devices: start a quiz on your phone, resume it on your PC where you stopped.
+
+### Fixed
+
+- On a phone, a picture opened full size fills the whole screen, with flat zoom buttons.
+
 ## [1.20.51] - 2026-10-08
 
 ### Added

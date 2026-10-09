@@ -48,6 +48,7 @@ import { setPairedPeers, setPeerConnected } from "../../../src/dashboard/remote-
 import { startChatSync } from "../../../src/dashboard/chat-sync";
 import { creerStatsApp } from "./review/stats";
 import { creerSessionsApp } from "./review/sessions";
+import { createSharedSessions } from "./host/shared-sessions";
 import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
 import { adopterOverrides, chargerReglagesPages, overridesPartages, monterDashboard, reprendre } from "./ui/dashboard-shell";
@@ -735,7 +736,10 @@ async function demarrer(): Promise<void> {
 		/* LES SESSIONS en cours (2026-09-26) : reprendre un quiz là où on
 		   s'était arrêté. À côté du journal et des stats, un troisième
 		   système distinct (voir `review/sessions.ts`). */
-		const sessions = await creerSessionsApp();
+		/* Synced between devices since 2026-10-09 (`host/shared-sessions.ts`):
+		   a quiz begun on the phone resumes on the laptop. Same roots and
+		   device id as the exams and attempts. */
+		const sessions = await creerSessionsApp(createSharedSessions({ fs: currentHost().fs, roots: () => ouvertes.map(r => r.id), deviceId: idAppareil }));
 		/* OTHER DEVICES' CHANGES LANDED (the embedded Syncthing went back to
 		   idle after receiving files): the journals and the shared state are
 		   read from the synced folder only at load time, so without this the
@@ -757,6 +761,7 @@ async function demarrer(): Promise<void> {
 					   `SharedState.refresh`). */
 					await sharedState().refresh(() => stats.reload());
 					relireExamens();
+					await sessions.recharger();
 					await chatSync?.afterSync();
 					remoteScan?.();
 				} while (rechargeDemandee);
