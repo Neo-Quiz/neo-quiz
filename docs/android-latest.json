@@ -1,8 +1,8 @@
 {
-  "versionCode": 13,
-  "versionName": "0.2.11",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.11/NeoQuiz-0.2.11.apk",
-  "sha256": "92e175865a059b8f35cea7d6d73ecec4a981d73e7bce6f0fd58f451b69ae8b85",
-  "size": 55989485,
-  "notes": "Keeps your most recent quiz progress across devices."
+  "versionCode": 14,
+  "versionName": "0.2.12",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.12/NeoQuiz-0.2.12.apk",
+  "sha256": "ea1e2c041768cba7670541416f0561b18abf1a6d6c79a63ed2e5e560a1ffcf65",
+  "size": 55990237,
+  "notes": "Readable error for a broken quiz, clearer delete dialogs, layout fixes."
 }
