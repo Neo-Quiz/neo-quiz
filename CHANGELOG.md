@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.56] - 2026-10-09
+
 ### Changed
 
 - A quiz picture opens in a full-window viewer: it grows out of its thumbnail, zooms with the wheel, a pinch or a double click, drags with momentum, and has a bar with the zoom level, fit, real size and close; Windows' own cursors.
