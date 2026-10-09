@@ -469,7 +469,13 @@ export function sanitizeQuizHtml(html: unknown): string {
 		}
 
 		if (!QUIZ_HTML_ALLOWED_TAGS.has(tag)) {
+			/* The unwrapped children move into the parent, whose own walk has
+			   already taken its snapshot of child nodes: they must be walked
+			   HERE, or `<foo><img src=x onerror=…></foo>` kept its handler
+			   (found 2026-10-09; a shared quiz could run script in the app). */
+			const kids = Array.from(el.childNodes);
 			unwrapQuizHtmlElement(el);
+			kids.forEach(walk);
 			return;
 		}
 
