@@ -5011,12 +5011,22 @@
 	display: none;
 }
 
+/* From 75 %: claude.ai's amber, the track tinted with it too. */
+.qbd-ai-usage-bar[data-level="warn"] {
+	background: color-mix(in srgb, #f5a20f 16%, transparent);
+}
+
 .qbd-ai-usage-bar[data-level="warn"] .qbd-ai-usage-fill {
-	background: var(--color-orange, #e0953a);
+	background: #f5a20f;
+}
+
+/* From 90 %: the same treatment in red. */
+.qbd-ai-usage-bar[data-level="high"] {
+	background: color-mix(in srgb, #ef4444 16%, transparent);
 }
 
 .qbd-ai-usage-bar[data-level="high"] .qbd-ai-usage-fill {
-	background: var(--color-red, #e5484d);
+	background: #ef4444;
 }
 
 .is-mobile .qbd-ai-usage-line {
