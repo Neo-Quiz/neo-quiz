@@ -81,9 +81,16 @@
    sous le terminal d'installation, qui couvre la modale ET l'invite : il
    dépassait de la modale à droite (Ahmed, 2026-09-20). Quand le rail est là,
    la couche des modales lui laisse sa largeur : modale, invite et terminal
-   partagent alors le même axe. */
+   partagent alors le même axe.
+
+   Le côté droit garde la même gouttière de 16 px que `.modal` (`max-width:
+   calc(100vw - 32px)`) : sans elle, sur un écran étroit où la modale est plus
+   large que la place restante (tablette en portrait : 800 - 88 = 712 px pour
+   une modale de 880 px), elle rétrécit jusqu'au bord droit de l'écran et
+   paraît décalée vers la droite, collée au bord sans aucune marge. */
 body:has(.qbd-sidebar) .modal-container {
 	padding-left: 88px;
+	padding-right: 16px;
 }
 
 /* LA REMONTÉE D'UNE MODALE QUI ATTEND UN TERMINAL (installation d'un CLI,
