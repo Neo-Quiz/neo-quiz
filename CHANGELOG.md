@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Several chats can generate at the same time; requests inside one chat still run one after the other.
+
+### Fixed
+
+- Updates install for real: the new version is written over the old one instead of uninstalling it first, the step that failed with « Failed to uninstall old application files ».
+
 ## [1.20.54] - 2026-10-09
 
 ### Added

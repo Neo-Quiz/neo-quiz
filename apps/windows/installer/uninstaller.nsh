@@ -14,6 +14,26 @@
        whole: the new files are simply written over it (the extraction has
        its own retries for a file still in use). Documented hook of
        electron-builder: defining it replaces the failure dialog. */
+
+    /* THE OLD VERSION'S UNINSTALLER IS NOT RUN AT ALL (2026-10-09, the
+       hook below was not enough: the error came back on the laptop with
+       1.20.54). electron-builder runs it only when it finds its
+       `UninstallString` in the registry; removing that value here, before
+       the install section, makes `uninstallOldVersion` return at once. The
+       new files are then written over the old ones in the same folder
+       (`InstallLocation` is kept, so `$INSTDIR` is the same), and
+       `registryAddInstallInfo` writes `UninstallString` back at the end of
+       the install. A file the new version no longer ships stays behind: a
+       few kilobytes, against an update that never landed. */
+    !macro customInit
+        DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
+        DeleteRegValue HKEY_CURRENT_USER "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
+        !ifdef UNINSTALL_REGISTRY_KEY_2
+            DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "UninstallString"
+            DeleteRegValue HKEY_CURRENT_USER "${UNINSTALL_REGISTRY_KEY_2}" "UninstallString"
+        !endif
+    !macroend
+
     !macro customUnInstallCheck
         ${if} $R0 != 0
             DetailPrint "The previous version could not be removed (code $R0): installing over it."
