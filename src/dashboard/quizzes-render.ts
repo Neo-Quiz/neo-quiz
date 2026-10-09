@@ -6,6 +6,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
+import { renderUnreadableCards } from "./unreadable-card";
 import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, declaredFolders, estLeSas, modulesAffiches } from "./quiz-modules";
@@ -249,6 +250,9 @@ export function renderModuleDrill(
 		if (sas) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyGeneratedHint"));
 		else if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
 	}
+	/* Notes whose quiz block does not parse: said, never silently dropped. They
+	   are not in `inModule`, so no counter or progress figure includes them. */
+	renderUnreadableCards(principal, ctx.scanner.getUnreadable().filter(u => moduleForQuiz(u.path, map).folder === openModuleFolder));
 	/* Two sections below the actions row: Learn first, then Tests (practice
 	   and exam-mode quizzes), each only when it has cards. */
 	const grid = ajouter(principal, "div", "qbd-quizzes-drill-sections");

@@ -280,6 +280,24 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	scanner.destroy();
 	r.check("destroy retire l'abonnement au watcher", abonne, null);
 
+	/* A block whose JSON5 does not read: reported as unreadable, kept out of the
+	   catalogue (counters, review keys), and gone once the file is fixed. */
+	const casse = { ...fichierHote, path: "Cours/casse.md", name: "casse.md", basename: "casse" };
+	const avant = content;
+	content = "```quiz-blocks\n[ { title: 'x', \n```\n";
+	await scanner.scanFile(casse);
+	r.check("un bloc illisible est signalé", scanner.getUnreadable().map(u => u.path), ["Cours/casse.md"]);
+	r.check("… sans entrer au catalogue", scanner.getQuiz("Cours/casse.md"), null);
+	content = "```quiz-blocks\n[]\n```\n";
+	await scanner.scanFile(casse);
+	r.check("un bloc vide n'est pas « illisible »", scanner.getUnreadable().length, 0);
+	content = "```quiz-blocks\n[ { title: 'x', \n```\n";
+	await scanner.scanFile(casse);
+	content = "```quiz-blocks\n[ { title: 'x', prompt: 'p', options: ['a','b'], correctIndex: 0 } ]\n```\n";
+	await scanner.scanFile(casse);
+	r.check("corrigé, il quitte la liste des illisibles", scanner.getUnreadable().length, 0);
+	content = avant;
+
 	r.done();
 });
 

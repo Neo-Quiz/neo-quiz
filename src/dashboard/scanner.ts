@@ -108,6 +108,14 @@ export interface QuizIndexEntry extends QuizMeta {
 	generated?: NeoQuizFrontmatter;
 }
 
+/** A note holding a quiz-blocks block whose JSON5 cannot be read. It is kept
+    OUT of the catalogue (no key, no counter, no review history): it only lets
+    the folder page say that a quiz is there but broken. */
+export interface UnreadableQuiz {
+	path: string;
+	basename: string;
+}
+
 /**
  * API du scanner de quiz, produite par createScanner(app) (dashboard.js
  * l'assigne à plugin._scanner, lu ensuite via DashboardView.scanner /
@@ -120,18 +128,23 @@ export interface Scanner {
 	scanFile(file: HostFile): Promise<void>;
 	getQuizzes(): QuizIndexEntry[];
 	getQuiz(path: string): QuizIndexEntry | null;
+	/** Notes whose quiz-blocks block does not parse (see `UnreadableQuiz`). */
+	getUnreadable(): UnreadableQuiz[];
 	getTotalQuestions(): number;
 	onChange(callback: (quizzes: QuizIndexEntry[]) => void): () => void;
 }
 
+const UNREADABLE = Symbol("unreadable");
+
 export function createScanner(host: Host): Scanner {
 	const cache = new Map<string, QuizIndexEntry>(); // path → entrée
+	const unreadable = new Map<string, UnreadableQuiz>();
 	const listeners: Array<(quizzes: QuizIndexEntry[]) => void> = [];
 	let desabonner: (() => void) | null = null;
 	let scanning = false;
 
 	/* ── Parse un bloc quiz-blocks pour extraire les métadonnées ── */
-	function parseQuizMeta(source: string): QuizMeta | null {
+	function parseQuizMeta(source: string): QuizMeta | null | typeof UNREADABLE {
 		try {
 			// La détection de la configuration reste partagée avec le moteur : deux
 			// filtres locaux finiraient par construire des catalogues différents.
@@ -200,7 +213,9 @@ export function createScanner(host: Host): Scanner {
 				mode: modeDuBloc(brut as unknown[])
 			};
 		} catch {
-			return null;
+			// parseQuizSource throws on JSON5 that does not read: a broken block,
+			// not an empty one.
+			return UNREADABLE;
 		}
 	}
 
@@ -214,6 +229,7 @@ export function createScanner(host: Host): Scanner {
 	async function scanVault(): Promise<void> {
 		scanning = true;
 		cache.clear();
+		unreadable.clear();
 
 		const markdownFiles = host.fs.listMarkdown();
 
@@ -224,7 +240,8 @@ export function createScanner(host: Host): Scanner {
 				if (!quizSource) continue;
 
 				const meta = parseQuizMeta(quizSource);
-				if (!meta) continue;
+				if (meta === UNREADABLE) unreadable.set(file.path, { path: file.path, basename: file.basename });
+				if (!meta || meta === UNREADABLE) continue;
 
 				cache.set(file.path, {
 					path: file.path,
@@ -254,23 +271,28 @@ export function createScanner(host: Host): Scanner {
 			   content we just read would resurrect the trashed note, and the page
 			   would keep its card. Trust the live mirror, not the stale read. */
 			if (!host.fs.getFile(file.path)) {
-				if (cache.delete(file.path)) notifyListeners();
+				const gone = cache.delete(file.path);
+				if (unreadable.delete(file.path) || gone) notifyListeners();
 				return;
 			}
 			const quizSource = extractQuizSource(content);
 
 			if (!quizSource) {
 				const removed = cache.delete(file.path);
-				if (removed) notifyListeners();
+				if (unreadable.delete(file.path) || removed) notifyListeners();
 				return;
 			}
 
 			const meta = parseQuizMeta(quizSource);
-			if (!meta) {
+			if (!meta || meta === UNREADABLE) {
 				const removed = cache.delete(file.path);
-				if (removed) notifyListeners();
+				const wasBroken = unreadable.has(file.path);
+				if (meta === UNREADABLE) unreadable.set(file.path, { path: file.path, basename: file.basename });
+				else unreadable.delete(file.path);
+				if (removed || wasBroken !== (meta === UNREADABLE)) notifyListeners();
 				return;
 			}
+			unreadable.delete(file.path);
 
 			const entry: QuizIndexEntry = {
 				path: file.path,
@@ -291,7 +313,7 @@ export function createScanner(host: Host): Scanner {
 		} catch {
 			// Fichier inaccessible, on l'enlève du cache
 			const removed = cache.delete(file.path);
-			if (removed) notifyListeners();
+			if (unreadable.delete(file.path) || removed) notifyListeners();
 		}
 	}
 
@@ -343,13 +365,14 @@ export function createScanner(host: Host): Scanner {
 				return;
 			}
 			if (ev.kind === "delete") {
-				if (cache.delete(ev.path)) notifyListeners();
+				const gone = cache.delete(ev.path);
+				if (unreadable.delete(ev.path) || gone) notifyListeners();
 				return;
 			}
 			/* rename : l'ancienne clé sort du cache, et la nouvelle est
 			   rescannée — y compris quand l'ancien chemin n'était PAS indexé,
 			   sinon un quiz créé par renommage resterait invisible. */
-			const avait = cache.delete(ev.oldPath);
+			const avait = cache.delete(ev.oldPath) || unreadable.delete(ev.oldPath);
 			if (ev.file.extension === "md") void scanFile(ev.file);
 			else if (avait) notifyListeners();
 		});
@@ -366,6 +389,7 @@ export function createScanner(host: Host): Scanner {
 		desabonner = null;
 		listeners.length = 0;
 		cache.clear();
+		unreadable.clear();
 	}
 
 	return {
@@ -375,6 +399,7 @@ export function createScanner(host: Host): Scanner {
 		scanFile,
 		getQuizzes,
 		getQuiz,
+		getUnreadable: () => Array.from(unreadable.values()),
 		getTotalQuestions,
 		onChange
 	};
