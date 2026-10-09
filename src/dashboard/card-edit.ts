@@ -56,6 +56,18 @@ export function applyQuestionEdit(source: string, qi: number, expected: Record<s
 	});
 }
 
+/** The engine's one normalisation of a question (engine.ts): an old quiz's
+    `correctIndexes` also read as `correctIndices`. Both sides of a comparison
+    go through it, so a caller holding the engine's copy of a card still
+    matches the note's. */
+function asEngine(card: Record<string, unknown>): Record<string, unknown> {
+	return card && card.correctIndices == null && Array.isArray(card.correctIndexes) ? { ...card, correctIndices: card.correctIndexes } : card;
+}
+
+function sameCard(card: Record<string, unknown>, expected: Record<string, unknown>): boolean {
+	return canon(asEngine(card)) === canon(asEngine(expected));
+}
+
 /**
  * The card at `qi` in `source` is no longer `expected`: the note changed
  * under a proposal judged on an older version of it (another proposal was
@@ -67,7 +79,7 @@ export function cardMoved(source: string, qi: number, expected: Record<string, u
 		const old = parseQuizSource(source, { logErrors: false }) as unknown as Record<string, unknown>[];
 		const config = findQuizModeConfigIndex(old);
 		const card = old[qi + (config >= 0 && config <= qi ? 1 : 0)];
-		return !!card && canon(card) !== canon(expected);
+		return !!card && !sameCard(card, expected);
 	} catch {
 		return false;
 	}
@@ -80,7 +92,7 @@ function applyFields(source: string, qi: number, expected: Record<string, unknow
 		const config = findQuizModeConfigIndex(old);
 		const at = qi + (config >= 0 && config <= qi ? 1 : 0);
 		const card = old[at];
-		if (!card || canon(card) !== canon(expected) || !accept(card)) return null;
+		if (!card || !sameCard(card, expected) || !accept(card)) return null;
 		const keys = Object.keys(fields);
 		if (keys.length === 0) return null;
 

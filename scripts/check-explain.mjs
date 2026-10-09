@@ -248,6 +248,10 @@ await withSrcModule(["src/question-edit.ts", "src/explain-prompt.ts"], ({ valida
 	r.check("whitelists of the other kinds", [questionEditFields(multi).slice(4), questionEditFields(texte).slice(4), questionEditFields(trous).slice(4), questionEditFields(classement).slice(4), questionEditFields(paires).slice(4), questionEditFields(carte).slice(4)],
 		[["options", "correctIndices"], ["answer", "acceptedAnswers"], ["cloze"], ["possibilities", "correctOrder"], ["rows", "choices", "correctMap"], ["answer"]]);
 
+	const ancien = { id: "m1", prompt: "Even?", options: ["1", "2", "4"], multiSelect: true, correctIndexes: [1] };
+	r.check("an old quiz's `correctIndexes` is the key it edits, and its answer is read from it",
+		[questionEditFields(ancien).slice(4), motif(ancien, { correctIndexes: [1, 2] }), motif(ancien, { correctIndices: [1, 2] })], [["options", "correctIndexes"], "ok", "field"]);
+
 	// ── a valid proposal
 	const ok = juge(single, { prompt: "What does `7 // 2` give in Python?" });
 	r.check("a rephrased statement is proposed, with its before/after and no change of answer",

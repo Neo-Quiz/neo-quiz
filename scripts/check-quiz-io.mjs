@@ -822,6 +822,20 @@ await withSrcModule(
 				[res.ok, premierEcart(v.contenu, note({ source: ["[", "\t{ title: 'Division', prompt: 'y?', options: ['a', 'b'], correctIndex: 0 },", "]"].join(LF) }))], [true, "identiques"]);
 		}
 
+		// g. an OLD quiz writes `correctIndexes`; the engine's copy of the card also
+		//    carries the `correctIndices` it adds. The note's card still matches,
+		//    and the write keeps the note's own key.
+		{
+			const ANCIEN = "\t{ id: 'm1', prompt: 'Even?', options: ['1', '2', '4'], multiSelect: true, correctIndexes: [1] },";
+			const v = vault(note({ source: ["[", ANCIEN, "]"].join(LF) }));
+			const commeLaNote = { id: "m1", prompt: "Even?", options: ["1", "2", "4"], multiSelect: true, correctIndexes: [1] };
+			const commeLeMoteur = { ...commeLaNote, correctIndices: [1] };
+			const res = await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, commeLeMoteur, { correctIndexes: [1, 2] });
+			r.check("16g. an old `correctIndexes` quiz, with the engine's copy as expected: written",
+				[res.ok, premierEcart(v.contenu, note({ source: ["[", "\t{ id: 'm1', prompt: 'Even?', options: ['1', '2', '4'], multiSelect: true, correctIndexes: [1,2] },", "]"].join(LF) }))], [true, "identiques"]);
+			r.check("16g. … and with the note's copy too", (await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, { ...commeLaNote, correctIndexes: [1, 2] }, { prompt: "Which are even?" })).ok, true);
+		}
+
 		// f. two proposals judged on the same question: once the first is applied,
 		//    the second (judged on the card as it WAS) is refused as stale
 		{

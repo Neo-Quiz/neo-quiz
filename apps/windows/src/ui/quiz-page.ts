@@ -44,6 +44,14 @@ import { createTestSetupPage, type TestSetupPage } from "./test-setup-host";
 import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
 import { brancherCitations, monterSources } from "../../../../src/pdf-sources-view";
 
+/** The questions of a parsed block AS THE NOTE WRITES THEM, in a copy: the
+    engine normalises the objects it is given (`correctIndexes` gains a
+    `correctIndices`, engine.ts), and the assistant chat judges and writes a
+    question against the note's own fields (`question-edit.ts`, `card-edit.ts`). */
+function commeLaNote(quiz: ReturnType<typeof parseQuizSource>): Record<string, unknown>[] {
+	return JSON.parse(JSON.stringify(extractExamOptions(quiz).questions)) as Record<string, unknown>[];
+}
+
 /** What `openQuizPage` hands back. */
 export interface QuizPageHandle {
 	/** Tears the page down. MUST be called before any other screen is mounted:
@@ -200,7 +208,7 @@ export async function openQuizPage(
 		/* `parseQuizSource` THROWS on invalid JSON5 — hence the try: a half-written
 		   block must say why, not leave an empty screen. */
 		const quiz = parseQuizSource(bloc[1]);
-		questionsJouees = extractExamOptions(quiz).questions as unknown as Record<string, unknown>[];
+		questionsJouees = commeLaNote(quiz);
 		monterSources(puces, questionsJouees, entry.path);
 		/* The app's side of "Set up your test": the modal and the settings last
 		   used for this quiz. A Learn never asks (the engine skips it). */
@@ -277,7 +285,7 @@ export async function openQuizPage(
 		const m = nouvelle.match(QUIZ_BLOCK_RE);
 		if (!m) throw new Error("no quiz block");
 		const quiz = parseQuizSource(m[1]);
-		const jouees = extractExamOptions(quiz).questions as unknown as Record<string, unknown>[];
+		const jouees = commeLaNote(quiz);
 		if (opts.garderEcran) {
 			source = nouvelle;
 			questionsJouees = jouees;
