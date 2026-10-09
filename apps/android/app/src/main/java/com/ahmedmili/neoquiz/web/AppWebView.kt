@@ -12,6 +12,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.ahmedmili.neoquiz.bridge.ChooserRules
+import com.ahmedmili.neoquiz.bridge.HtmlFrameStore
 import com.ahmedmili.neoquiz.bridge.ResourceRoute
 import com.ahmedmili.neoquiz.bridge.UrlDecision
 import com.ahmedmili.neoquiz.bridge.UrlPolicy
@@ -78,6 +79,7 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
                     return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", mapOf("Content-Security-Policy" to UrlPolicy.CSP), java.io.ByteArrayInputStream(ByteArray(0)))
                 }
                 if (ResourceRoute.isResourceUrl(request.url.toString())) return resourceResponse(request)
+                if (HtmlFrameStore.isFrameUrl(request.url.toString())) return frameResponse(request)
                 val response = assetLoader.shouldInterceptRequest(request.url) ?: return null
                 response.responseHeaders = (response.responseHeaders ?: emptyMap()) + ("Content-Security-Policy" to UrlPolicy.CSP)
                 return response
@@ -188,6 +190,13 @@ class AppWebView(private val activity: Activity) : WebView(activity) {
         } catch (_: java.io.IOException) {
             WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, java.io.ByteArrayInputStream(ByteArray(0)))
         }
+    }
+
+    /** An interactive quiz page for a sandboxed sub-frame, with its own CSP (see [HtmlFrameStore]). */
+    private fun frameResponse(request: WebResourceRequest): WebResourceResponse {
+        val r = HtmlFrameStore.respond(HtmlFrameStore.shared, request.url.toString(), request.method, request.isForMainFrame)
+        if (!r.ok) return WebResourceResponse("text/plain", "utf-8", r.status, if (r.status == 404) "Not Found" else "Forbidden", r.headers, java.io.ByteArrayInputStream(ByteArray(0)))
+        return WebResourceResponse("text/html", "utf-8", 200, "OK", r.headers, java.io.ByteArrayInputStream(r.body))
     }
 
     private fun openInBrowser(uri: android.net.Uri) {

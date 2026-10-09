@@ -288,6 +288,8 @@ const pont: Pont = {
 			return { erreur: recu.erreur ?? "illisible" };
 		},
 		surFichierRecu: (rappel) => abonner<void>("android.fichierRecu", () => rappel()),
+		/* An interactive quiz page: Kotlin keeps it and returns the same-origin path a sandboxed iframe loads it from. */
+		publierCadre: (doc) => appeler<string | null>("android.publierCadre", [doc]),
 		partagerPrompt: (texte, fichiers) => appeler<boolean>("android.partagerPrompt", [texte, fichiers.map((f) => ({ name: f.nom, base64: toBase64(f.octets) }))]),
 		lirePressePapier: () => appeler<string | null>("android.lirePressePapier"),
 		format24h: () => appeler<boolean>("android.format24h"),

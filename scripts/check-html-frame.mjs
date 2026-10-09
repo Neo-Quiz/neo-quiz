@@ -17,7 +17,7 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	const r = makeReporter("Cadre HTML isolé (noyau)");
 	const {
 		FRAME_SANDBOX, FRAME_CSP, FRAME_MAX_BYTES, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT, FRAME_DEFAULT_THEME,
-		buildSrcdoc, acceptHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture,
+		buildSrcdoc, acceptHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
 	} = m;
 	const labels = { title: "T", showCode: "Show", hideCode: "Hide", tooLarge: "Too large" };
 
@@ -91,5 +91,24 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	r.check("html of a raw block item", htmlDeLecture({ role: "read", html: "<p>x</p>" }), "<p>x</p>");
 	r.check("html of an editor draft (_extraFields)", htmlDeLecture({ _extraFields: { html: "<p>y</p>" } }), "<p>y</p>");
 	r.check("absent, blank or non-string html is no page", [htmlDeLecture({}), htmlDeLecture({ html: "  " }), htmlDeLecture({ html: 3 }), htmlDeLecture(null)], [null, null, null, null]);
+	// --- hosts that publish the page (Android: HtmlFrameRoute.kt) -------
+	const route = frameMarkup("<p>hi</p>", FRAME_DEFAULT_THEME, labels, true);
+	r.check("by route: no srcdoc and no src on the iframe (the document waits in data-nq-doc)",
+		[/ srcdoc=/.test(route), /<iframe[^>]* src=/.test(route), /<iframe[^>]* data-nq-doc="/.test(route)], [false, false, true]);
+	r.check("by route: the sandbox is still exactly allow-scripts, no forbidden token",
+		[/<iframe[^>]* sandbox="allow-scripts"[ >]/.test(route), ["allow-same-origin", "allow-top-navigation", "allow-popups", "allow-forms", "allow-modals", "allow-downloads"].filter(t => route.includes(t))], [true, []]);
+	r.check("by route: the document in data-nq-doc is the same srcdoc (CSP first), attribute-escaped",
+		[route.includes("data-nq-doc=\"" + escapeAttr(buildSrcdoc("<p>hi</p>").srcdoc) + "\""), route.includes("&lt;meta http-equiv=&quot;Content-Security-Policy&quot;")], [true, true]);
+	r.check("by route: a double quote in the page cannot end the attribute",
+		/<iframe[^>]* data-nq-doc="[^"]*" style="height:120px">[<][/]iframe>/.test(frameMarkup(String.fromCharCode(34) + " onload=" + String.fromCharCode(34) + "x", FRAME_DEFAULT_THEME, labels, true)), true);
+	r.check("by route: a too large page still shows the message, not a frame", frameMarkup("x".repeat(FRAME_MAX_BYTES + 1), FRAME_DEFAULT_THEME, labels, true).includes("<iframe"), false);
+	const GOOD = "/__frame/" + "0123456789abcdef".repeat(2);
+	r.check("a route path from the host is accepted only in its exact shape", acceptFrameUrl(GOOD), GOOD);
+	r.check("anything else is never set as an iframe src",
+		[
+			"https://evil.example/__frame/" + "a".repeat(32), "//evil.example/x", "javascript:alert(1)", "data:text/html,x", GOOD + "?x=1", GOOD + "#x",
+			"/__frame/" + "A".repeat(32), "/__frame/" + "a".repeat(31), "/__frame/" + "a".repeat(33), "/assets/web/index.html", "/__frame/../" + "a".repeat(32), "", null, undefined, 42, {},
+		].map(v => acceptFrameUrl(v)),
+		new Array(16).fill(null));
 	r.done();
 });

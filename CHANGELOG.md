@@ -23,6 +23,10 @@ release notes.
 - Generated Learn readings favour interactive pages: explorable diagrams where you change a value and see what it means, symbol tables with each symbol drawn, and annotated diagrams, mixed when that helps.
 - The plan usage block now shows a plain empty track at 0 %, sinks and rebounds on press, its popover bars fill in on opening, and the popover shows the account email of Claude Code and Codex under its title (never the plan), read at most every 10 minutes and only once the popover is opened.
 
+### Fixed
+
+- Interactive HTML pages (readings and "Explain" answers) now run on Android: the page is served from the app under its own restrictive policy instead of inheriting the app's, so clicks work and the frame height follows the content.
+
 ## [1.20.64] - 2026-10-09
 
 ### Changed

@@ -25,6 +25,7 @@ class BridgeTest {
             ShareChannel(File(base, "share"), { _, _ -> true }).handlers() +
             RelayChannel(File(base, "share"), { _, _ -> true }, { }, { null }).handlers() +
             IncomingChannel(IncomingInbox()).handlers() +
+            HtmlFrameChannel(HtmlFrameStore()).handlers() +
             settings.handlers() +
             CodeChannel(object : com.ahmedmili.neoquiz.code.CodeEngine {
                 override suspend fun run(job: Any?) = JSONObject()

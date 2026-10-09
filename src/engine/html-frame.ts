@@ -1,6 +1,7 @@
 import { t } from "../i18n";
+import { currentHost } from "../host/current";
 import {
-	FRAME_DEFAULT_THEME, acceptHeight, frameMarkup,
+	FRAME_DEFAULT_THEME, acceptFrameUrl, acceptHeight, frameMarkup,
 } from "./html-frame-core";
 import type { FrameTheme } from "./html-frame-core";
 
@@ -36,6 +37,33 @@ export function htmlFrameMarkup(source: unknown): string {
 		showCode: t("engine.htmlFrame.showCode"),
 		hideCode: t("engine.htmlFrame.hideCode"),
 		tooLarge: t("engine.htmlFrame.tooLarge"),
+	}, typeof publisher() === "function");
+}
+
+/** The host's page publisher (Android), or undefined (desktop: `srcdoc`). */
+function publisher(): ((doc: string) => Promise<string | null>) | undefined {
+	try {
+		const platform = currentHost().platform;
+		return platform.publishHtmlFrame?.bind(platform);
+	} catch {
+		return undefined;
+	}
+}
+
+/** Points the iframes that wait for a published page at their route. A refusal or a failure falls back to
+    `srcdoc` (static content, as before: the host's CSP blocks its scripts, but the page still shows). */
+function publierCadres(racine: ParentNode): void {
+	const publish = publisher();
+	racine.querySelectorAll<HTMLIFrameElement>("iframe.nq-html-frame-view[data-nq-doc]").forEach(f => {
+		const doc = f.getAttribute("data-nq-doc") ?? "";
+		f.removeAttribute("data-nq-doc");
+		const repli = (): void => { if (f.isConnected) f.srcdoc = doc; };
+		if (!publish) { repli(); return; }
+		publish(doc).then(chemin => {
+			const ok = acceptFrameUrl(chemin);
+			if (!f.isConnected) return;
+			if (ok) f.src = ok; else repli();
+		}, repli);
 	});
 }
 
@@ -74,6 +102,7 @@ function poserEcouteur(): void {
 /** Wires the frames of a subtree: the height listener (once for the window)
     and the "view the code" toggles. Idempotent. */
 export function brancherCadres(racine: ParentNode): void {
+	publierCadres(racine);
 	surveillerSilence(racine);
 	const boutons = racine.querySelectorAll<HTMLButtonElement>(".nq-html-frame-code");
 	if (!boutons.length) return;

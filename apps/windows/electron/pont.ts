@@ -552,6 +552,8 @@ export interface Pont {
 		fichierRecu(): Promise<{ nom: string; octets: Uint8Array } | { erreur: "trop-grand" | "type" | "illisible" } | null>;
 		/** A file just arrived: time to read it (`fichierRecu`). */
 		surFichierRecu(rappel: () => void): () => void;
+		/** Hands Kotlin the document of an interactive quiz page (`html-frame-core.ts`, at most ~216 KB); it answers the same-origin path (`/__frame/<id>`) a sandboxed iframe loads it from, once, or null when refused. */
+		publierCadre(doc: string): Promise<string | null>;
 		/** Shares a prompt (text, also put on the clipboard) and its documents (name + bytes, <= 10 files, .md/.txt) to the system share sheet; true when the sheet opened. */
 		partagerPrompt(texte: string, fichiers: Array<{ nom: string; octets: Uint8Array }>): Promise<boolean>;
 		/** The clipboard text, read ONLY now, on the user's tap; null when empty. Rejects over 1 000 000 characters. */

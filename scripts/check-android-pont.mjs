@@ -184,6 +184,23 @@ function main() {
 		if (!read(file).includes('"(?d).import-*"')) fail(`${who} .stignore lacks the import staging rule "(?d).import-*"`);
 	}
 
+	// Interactive quiz pages: the CSP the route serves is the renderer's FRAME_CSP plus the sandbox, the
+	// route prefix and the id shape are the same on both sides, and the document cap covers 200 KB of page.
+	const frameTs = read("src/engine/html-frame-core.ts");
+	const frameKt = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/HtmlFrameRoute.kt");
+	const tsCsp = /export const FRAME_CSP = "([^"]*)"/.exec(frameTs)?.[1];
+	const ktCsp = /const val CSP = ((?:"[^"]*"\s*\+?\s*)+)/.exec(frameKt)?.[1];
+	const ktCspText = ktCsp ? [...ktCsp.matchAll(/"([^"]*)"/g)].map((m) => m[1]).join("") : undefined;
+	if (!tsCsp || !ktCspText) fail("frame CSP not found (parser broken?)");
+	else if (ktCspText !== tsCsp + "; sandbox allow-scripts") fail(`frame CSP differs: TS ${tsCsp} + sandbox / Kotlin ${ktCspText}`);
+	const tsRoute = /FRAME_ROUTE = \/\^(.*)\$\//.exec(frameTs)?.[1]?.replace(/\\\//g, "/");
+	const ktPrefix = /const val PREFIX = "([^"]*)"/.exec(frameKt)?.[1];
+	if (!tsRoute || !ktPrefix || !tsRoute.startsWith(ktPrefix) || tsRoute.slice(ktPrefix.length) !== "[0-9a-f]{32}") fail(`frame route differs: TS ${tsRoute} / Kotlin ${ktPrefix}`);
+	if (!/val ID = Regex\("\^\[0-9a-f\]\{32\}\$"\)/.test(frameKt)) fail("Kotlin frame id shape is not 32 lower-case hex digits");
+	const ktMaxExpr = /const val MAX_BYTES = (\d+) \* 1024 \+ (\d+) \* 1024/.exec(frameKt);
+	const tsMaxPage = /FRAME_MAX_BYTES = (\d+) \* 1024/.exec(frameTs)?.[1];
+	if (!ktMaxExpr || ktMaxExpr[1] !== tsMaxPage) fail(`frame document cap does not start from the page cap: TS ${tsMaxPage} KB / Kotlin ${ktMaxExpr?.[1]} KB`);
+
 	console.log(`check:android-pont  channels sent ${sent.size}, listed ${listed.size}, Pont leaves ${pontLeaves.size}, shim leaves ${shimLeaves.size}, executable extensions ${windows.size}`);
 }
 
