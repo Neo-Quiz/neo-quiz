@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.66] - 2026-10-09
+
 ### Fixed
 
 - Opening and closing the AI chat now slides the quiz card smoothly instead of jumping to its new size.
