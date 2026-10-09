@@ -18,6 +18,9 @@ import type { TakenEntry } from "./remote-request";
 export const SETTING_KIND = "setProvider";
 /** Provider switches admitted per hour on a PC (generation requests have their own limit). */
 export const MAX_SETTINGS_PER_HOUR = 3;
+/** And per SENDER device (security review of 2026-10-08): one device alone
+    cannot use up the PC's whole hourly budget. */
+export const MAX_SETTINGS_PER_HOUR_PER_SENDER = 2;
 const KEYS = new Set(["v", "id", "kind", "from", "target", "at", "provider", "fromName"]);
 
 export interface SettingRequest { v: 1; id: string; kind: typeof SETTING_KIND; from: string; target: string; at: number; provider: "claude-code"; fromName?: string }
@@ -61,10 +64,14 @@ export function buildSetting(ctx: { device: string; target: string; id: string; 
 	return verdict.request;
 }
 
-/** Once per sender + id, and at most `MAX_SETTINGS_PER_HOUR` an hour (a corrupt time counts as recent). */
+/** Once per sender + id, at most `MAX_SETTINGS_PER_HOUR` an hour, and at most
+    `MAX_SETTINGS_PER_HOUR_PER_SENDER` of them from one device (a corrupt time counts as recent). */
 export function admitSetting(req: Pick<SettingRequest, "id" | "from">, taken: ReadonlyArray<TakenEntry>, now: number): "run" | "known" | "rate" {
 	const key = (e: { id: string; from?: string }) => (e.from ?? "").toLowerCase() + "/" + e.id;
 	if (taken.some(t => key(t) === key(req))) return "known";
 	if (!Number.isFinite(now)) return "rate";
-	return taken.filter(t => !Number.isFinite(t.at) || now - t.at < 3600 * 1000).length >= MAX_SETTINGS_PER_HOUR ? "rate" : "run";
+	const recentes = taken.filter(t => !Number.isFinite(t.at) || now - t.at < 3600 * 1000);
+	if (recentes.length >= MAX_SETTINGS_PER_HOUR) return "rate";
+	const du = (req.from ?? "").toLowerCase();
+	return recentes.filter(t => (t.from ?? "").toLowerCase() === du).length >= MAX_SETTINGS_PER_HOUR_PER_SENDER ? "rate" : "run";
 }

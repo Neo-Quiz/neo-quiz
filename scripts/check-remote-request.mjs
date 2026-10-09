@@ -158,7 +158,10 @@ await withSrcModule(["src/shared-state/remote-setting.ts", "src/shared-state/rem
 	const e = (id, at) => ({ id, from: PH, at });
 	r.check("a fresh id runs", S.admitSetting({ id: "a-b-c-d", from: PH }, [], NOW), "run");
 	r.check("the same sender and id (any case) is known", S.admitSetting({ id: "a-b-c-d", from: PH.toUpperCase() }, [e("a-b-c-d", NOW)], NOW), "known");
-	r.check("three an hour run, the fourth waits", [2, 3].map(n => S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: n }, (_, i) => e("old-" + i + "xxx", NOW - 60_000)), NOW)), ["run", "rate"]);
+	const autre = (id, at, from) => ({ id, from, at });
+	r.check("three an hour run, the fourth waits (from several devices)", [2, 3].map(n => S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: n }, (_, i) => autre("old-" + i + "xxx", NOW - 60_000, "DEV" + i)), NOW)), ["run", "rate"]);
+	r.check("one device alone gets two an hour, never the whole budget", [1, 2].map(n => S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: n }, (_, i) => e("old-" + i + "xxx", NOW - 60_000)), NOW)), ["run", "rate"]);
+	r.check("… counted per sender, any case", S.admitSetting({ id: "new-1234", from: PH }, [autre("x-1-xxxx", NOW - 60_000, PH.toLowerCase()), autre("x-2-xxxx", NOW - 60_000, PH.toUpperCase())], NOW), "rate");
 	r.check("an entry older than an hour does not count", S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: 3 }, (_, i) => e("old-" + i + "xxx", NOW - 2 * 3600e3)), NOW), "run");
 	r.check("a corrupt time counts as recent", S.admitSetting({ id: "new-1234", from: PH }, Array.from({ length: 3 }, (_, i) => e("old-" + i + "xxx", NaN)), NOW), "rate");
 	r.done();

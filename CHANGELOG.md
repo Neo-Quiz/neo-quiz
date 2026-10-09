@@ -13,6 +13,21 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A quiz that cannot be read shows a card with the file's name and a button to open it, instead of disappearing.
+
+### Changed
+
+- The delete confirmations name the quiz or folder and say where it goes and how to get it back.
+
+### Fixed
+
+- An update no longer fails with « Failed to uninstall old application files »: the new version installs over the old one.
+- On a phone, the device bubble no longer covers the text box, and the ⋯ button of an empty folder stays on the right.
+- On a tablet in portrait, Settings keeps a margin on the right.
+- A phone can ask a PC to switch to Claude Code at most twice an hour.
+
 ## [1.20.53] - 2026-10-09
 
 ### Fixed

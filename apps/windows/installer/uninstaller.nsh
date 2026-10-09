@@ -2,6 +2,29 @@
 !include "WinMessages.nsh"
 !include "nsDialogs.nsh"
 
+!ifndef BUILD_UNINSTALLER
+    /* AN UPDATE NEVER STOPS ON THE OLD VERSION'S UNINSTALLER (2026-10-09).
+       Before installing, electron-builder runs the previous version's
+       uninstaller, which MOVES every file out of the install folder one by
+       one and gives up (exit code 2, after five tries) on the first file it
+       cannot move; the default `handleUninstallResult` then shows "Failed to
+       uninstall old application files: 2" and quits, so the update never
+       lands. Seen at almost every update on two PCs. That uninstaller puts
+       every file back when it gives up, so the folder is the old version,
+       whole: the new files are simply written over it (the extraction has
+       its own retries for a file still in use). Documented hook of
+       electron-builder: defining it replaces the failure dialog. */
+    !macro customUnInstallCheck
+        ${if} $R0 != 0
+            DetailPrint "The previous version could not be removed (code $R0): installing over it."
+        ${endif}
+        ClearErrors
+    !macroend
+    !macro customUnInstallCheckCurrentUser
+        !insertmacro customUnInstallCheck
+    !macroend
+!endif
+
 !ifdef BUILD_UNINSTALLER
     /* Comme Google Play Games : Windows a déjà reçu un clic explicite sur
        « Désinstaller », donc aucun assistant, texte explicatif ou écran final.
