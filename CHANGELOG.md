@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- When several devices had a quiz in progress before syncing it, the most recent progress is kept, whichever device updated first.
+
 ## [1.20.52] - 2026-10-09
 
 ### Added

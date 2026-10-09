@@ -105,8 +105,10 @@ export interface SessionsPartagees {
 	/** A quiz or a folder (by prefix) moved: the winning entries follow it, as
 	    this device's, with tombstones at the old keys. */
 	renommer(de: string, vers: string): void;
-	/** Copies legacy snapshots (the old settings key) where no device has any
-	    entry for that quiz yet. Returns how many were placed. */
+	/** Copies legacy snapshots (the old settings key) into THIS device's
+	    file, where it holds nothing for that quiz yet; the merge then keeps
+	    the latest of every device's (the first device to migrate used to
+	    block the others' newer progress). Returns how many were placed. */
 	migrer(legacy: Record<string, SessionQuiz>): number;
 	/** Writes the own files of the roots changed since the last write. */
 	ecrire(): Promise<void>;
@@ -213,11 +215,10 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 			}
 		},
 		migrer(legacy) {
-			const g = gagnantes(tables());
 			let n = 0;
 			for (const [cle, s] of Object.entries(legacy)) {
 				const r = racineDe(cle);
-				if (!r || g[cle] || !isRecord(s) || s.v !== 1 || !isRecord(s.questions) || typeof s.ecrite !== "number" || !Number.isFinite(s.ecrite) || s.ecrite > clock() + FUTUR_MS) continue;
+				if (!r || r.own[cle] || !isRecord(s) || s.v !== 1 || !isRecord(s.questions) || typeof s.ecrite !== "number" || !Number.isFinite(s.ecrite) || s.ecrite > clock() + FUTUR_MS) continue;
 				r.own[cle] = s;
 				toucher(cle);
 				n++;

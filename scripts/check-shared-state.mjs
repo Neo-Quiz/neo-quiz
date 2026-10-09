@@ -593,7 +593,16 @@ await withSrcModule("apps/windows/src/host/shared-sessions.ts", async (ses) => {
 	r.check("legacy snapshots are migrated where no device has one",
 		[s2.migrer({ [P]: snap(5), "Efrei/a.md": snap(6), "Autre/b.md": snap(7), "Efrei/bad.md": { v: 2 } }), Object.keys(s2.toutes()).sort()],
 		[2, ["Efrei/XTI303/cours.md", "Efrei/a.md"]]);
-	r.check("… and not over an entry a device already holds", s2.migrer({ [P]: snap(1) }), 0);
+	r.check("… and not over an entry this device already holds", s2.migrer({ [P]: snap(1) }), 0);
+	// Two devices migrate the same quiz: the newer progress wins, whichever migrated first.
+	{
+		const f5 = new Map();
+		const pc = make(fsOf(f5), "pc"); await pc.load(); pc.migrer({ [P]: snap(500, "vieux") }); await pc.ecrire();
+		const tel = make(fsOf(f5), "tel"); await tel.load();
+		r.check("the second device still migrates its own progress", tel.migrer({ [P]: snap(900, "recent") }), 1);
+		await tel.ecrire(); await pc.refresh();
+		r.check("… and the newer progress wins on both", [tel.toutes()[P].courante, pc.toutes()[P].courante], ["recent", "recent"]);
+	}
 
 	// A hostile or broken file from another device.
 	const t = ses.lireTableSessions({ "Autre/x.md": snap(1), "Efrei/ok.md": snap(1), "Efrei/futur.md": snap(9e15), "Efrei/v2.md": { v: 2, questions: {}, ecrite: 1 }, "Efrei/t.md": { tombe: true, ecrite: 3 }, "Efrei/nan.md": { v: 1, questions: {}, ecrite: NaN } }, "Efrei", 1000);
