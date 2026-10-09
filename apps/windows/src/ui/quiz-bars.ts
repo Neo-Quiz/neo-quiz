@@ -68,8 +68,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		if (found && found !== panel) {
 			panel?.removeEventListener("wheel", onWheel);
 			panel = found;
-			/* The mini composer above the bar shows and hides itself: the slides' room follows. */
-			mutations.observe(panel, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+						mutations.observe(panel, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
 			resize.observe(panel);
 			panel.addEventListener("wheel", onWheel, { passive: true });
 		}
@@ -120,8 +119,7 @@ export function attachQuizBars(host: HTMLElement): () => void {
 		const contentBottom = panelRect.top + (panel.clientTop + panel.clientHeight
 			- parseFloat(getComputedStyle(panel).paddingBottom || "0")) * scale;
 		const trailing = host.getBoundingClientRect().bottom - viewportRect.bottom;
-		const room = (contentBottom - viewportRect.top - trailing) / scale - (bar.isConnected ? bar.offsetHeight : 0)
-			- (panel.querySelector<HTMLElement>(":scope > .qz-above-bar:not([hidden])")?.offsetHeight ?? 0);
+		const room = (contentBottom - viewportRect.top - trailing) / scale - (bar.isConnected ? bar.offsetHeight : 0);
 		const value = `${Math.max(0, Math.floor(room))}px`;
 		/* Skipping an unchanged value keeps the loop (height → host resized →
 		   refresh) visibly finite. */

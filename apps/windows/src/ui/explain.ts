@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════
    "EXPLAIN" ON A PLAYED QUESTION (2026-09-29)
 
-   A button in its own row under the question, above the arrows, once the
-   question is corrected: it opens a WINDOW that can be closed and opened again
+   A button under EACH answered question, inside its card, once the question
+   is corrected: it opens a WINDOW that can be closed and opened again
    without losing anything — the conversation about a question lives as long as
    the quiz page, a running answer goes on while the window is closed. The
    window is a chat like claude.ai's: the history above, below a FREE, empty
@@ -49,12 +49,6 @@ export const EXPLAIN_MAX_CHARS_DEFAUT = 1500;
 function duree(ms: number): string {
 	const s = Math.max(0, Math.floor(ms / 1000));
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** The question slide on screen, if the current slide is one. */
-function questionAffichee(hote: HTMLElement): HTMLElement | null {
-	const s = hote.querySelector<HTMLElement>('.quiz-track > .quiz-track-item[aria-hidden="false"]');
-	return s && s.dataset.slideKind === "question" && s.dataset.qi !== undefined ? s : null;
 }
 
 /** The question on that slide has been CORRECTED (a Learn card once checked, a
@@ -124,19 +118,21 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	note: string;
 }): () => void {
 	const host = currentHost();
-	/* The button sits in a row of the panel, under the question and above the
-	   bar of arrows (`ui/quiz-bars.ts` keeps the slides clear of it). It only
-	   shows once the question on screen has been corrected (Check in a Learn,
-	   the hand-in of a Test): before that, the answer is not yet known. */
-	const panneau = hote.closest<HTMLElement>(".qbd-qz");
-	if (!panneau) return () => {};
-	const rangee = ajouter(panneau, "div", "qz-above-bar qz-explain-row");
-	const barre = panneau.querySelector(":scope > .qz-bottom-bar");
-	if (barre) panneau.insertBefore(rangee, barre);
-	const bouton = ajouter(rangee, "button", "qz-explain-btn");
-	bouton.type = "button";
-	const boutonLogo = ajouter(bouton, "span", "qz-explain-btn-logo");
-	ajouter(bouton, "span", undefined, t("ai.explain.button"));
+	/* One button under EACH answered question, inside its own card (no row above
+	   the arrows any more: the card keeps all the room). It only shows once that
+	   question has been corrected (Check in a Learn, the hand-in of a Test):
+	   before that, the answer is not yet known. */
+	/* Every Explain button (the row's, and one under each answered card of a
+	   Learn step) is painted from the same provider. */
+	const boutons = new Set<{ bouton: HTMLButtonElement; logo: HTMLElement }>();
+	const creerBouton = (parent: HTMLElement): HTMLButtonElement => {
+		const bouton = ajouter(parent, "button", "qz-explain-btn");
+		bouton.type = "button";
+		const logo = ajouter(bouton, "span", "qz-explain-btn-logo");
+		ajouter(bouton, "span", undefined, t("ai.explain.button"));
+		boutons.add({ bouton, logo });
+		return bouton;
+	};
 
 	/* The providers that can HOLD a conversation: the four channels that
 	   `AiClient.chat` speaks to (the websites cannot be driven from here). */
@@ -263,15 +259,18 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	};
 
 	const peindreLogoBouton = (): void => {
-		// The colours of the button follow the provider's logo (CSS on `data-nq-fournisseur`).
-		bouton.dataset.nqFournisseur = courant;
-		boutonLogo.replaceChildren();
-		if (peutExpliquer()) {
-			const p = aiProviders.getProvider(courant);
-			const logo = ajouter(boutonLogo, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
-			aiProviders.setBrandLogo(logo, p.logo);
-		} else {
-			host.ui.setIcon(boutonLogo, "sparkles");
+		for (const b of boutons) {
+			if (!b.bouton.isConnected) { boutons.delete(b); continue; }
+			// The colours of the button follow the provider's logo (CSS on `data-nq-fournisseur`).
+			b.bouton.dataset.nqFournisseur = courant;
+			b.logo.replaceChildren();
+			if (peutExpliquer()) {
+				const p = aiProviders.getProvider(courant);
+				const logo = ajouter(b.logo, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
+				aiProviders.setBrandLogo(logo, p.logo);
+			} else {
+				host.ui.setIcon(b.logo, "sparkles");
+			}
 		}
 	};
 	peindreLogoBouton();
@@ -302,7 +301,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		await sonder();
 		const premier = LOCAUX.find(id => statuts[id] === "ok");
 		if (premier) courant = premier;
-		if (bouton.isConnected) peindreLogoBouton();
+		peindreLogoBouton();
 	};
 	void detecterDefaut();
 	const choisirFournisseur = async (id: string): Promise<void> => {
@@ -315,8 +314,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 
 	/* The quiz with the question of the clicked button marked, and the learner's
 	   answer to THAT question (read on its own slide). */
-	const contexteDe = (slide: HTMLElement): string | null => {
-		const qi = Number(slide.dataset.qi);
+	const contexteDe = (slide: HTMLElement, qi: number): string | null => {
 		if (!deps.questions[qi]) return null;
 		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
@@ -327,14 +325,36 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	let cours: Promise<Cours> | null = null;
 	let coursPret = false;
 	const coursDuQuiz = (): Promise<Cours> => (cours ??= lireCours(deps.chemin, deps.note, deps.questions)
-		.then((c) => { coursPret = true; return c; })
-		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; return { texte: "", images: [], nomsImages: [] }; }));
+		/* A course that could not be read whole is read again at the next message. */
+		.then((c) => { coursPret = true; if (c.incomplet) cours = null; return c; })
+		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; cours = null; return { texte: "", images: [], nomsImages: [], incomplet: true }; }));
 
 /* Hidden in an Exam (the engine puts its clock straight into the host) and
 	   until the question is corrected. */
 	const majVisibilite = (): void => {
-		const slide = questionAffichee(hote);
-		rangee.hidden = !!hote.querySelector(":scope > .quiz-exam-timer") || !slide || !corrigee(slide);
+		const examen = !!hote.querySelector(":scope > .quiz-exam-timer");
+		/* The units: each card of a step page of a Learn, and the single card of
+		   any other question slide. `juge` is the element whose classes say
+		   whether the question is corrected, `qi` the question it holds. */
+		const unites: Array<{ carte: HTMLElement; juge: HTMLElement; qi: number }> = [];
+		for (const slide of hote.querySelectorAll<HTMLElement>('.quiz-track > .quiz-track-item[data-slide-kind="question"]')) {
+			if (slide.classList.contains("quiz-step-page")) {
+				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]:not(.quiz-step-read)")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi) });
+			} else {
+				const carte = slide.querySelector<HTMLElement>(":scope > .quiz-card");
+				if (carte && slide.dataset.qi !== undefined) unites.push({ carte, juge: slide, qi: Number(slide.dataset.qi) });
+			}
+		}
+		for (const { carte, juge, qi } of unites) {
+			const present = carte.querySelector(":scope > .qz-explain-carte");
+			const veut = !examen && !!deps.questions[qi] && corrigee(juge);
+			if (veut && !present) {
+				const zone = ajouter(carte, "div", "qz-explain-carte");
+				const b = creerBouton(zone);
+				b.addEventListener("click", () => ouvrirDepuis(juge, qi));
+				peindreLogoBouton();
+			} else if (!veut && present) present.remove();
+		}
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
@@ -350,16 +370,14 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		return c;
 	};
 
-	bouton.addEventListener("click", () => {
-		const slide = questionAffichee(hote);
-		const qi = slide ? Number(slide.dataset.qi) : NaN;
-		if (!slide || !deps.questions[qi]) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		const contexte = contexteDe(slide);
+	/** Opens the window about ONE question: the element that holds it (its card in
+	    a step page, else its slide) and its index. */
+	function ouvrirDepuis(el: HTMLElement, qi: number): void {
+		const contexte = contexteDe(el, qi);
 		if (contexte === null) { host.ui.notice(t("ai.explain.noQuestion")); return; }
 		void coursDuQuiz();
 		ouvrirFenetre(qi, contexte);
-	});
-
+	}
 	/** The window: the history above, the composer below. Built again at each
 	    opening from the conversation, which is what survives. */
 	function ouvrirFenetre(qi: number, contexte: string): void {
@@ -593,6 +611,6 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 	return () => {
 		observateur.disconnect();
 		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
-		rangee.remove();
+		for (const z of hote.querySelectorAll(".qz-explain-carte")) z.remove();
 	};
 }

@@ -1790,10 +1790,14 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 
 	/* The chat's system prompt: in English, as every instruction to the
 	   model; the answer follows the language of the conversation. */
+	const CHAT_NO_TOOLS = "You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.";
+	/* With pictures attached (the Explain window), the ONE thing the model may
+	   open is those pictures, with the read tool the call grants for them. */
+	const CHAT_PICTURES = "You cannot open files, except the course pictures listed in the context: read the ones the question needs with the Read tool before answering, and never read anything else. Everything else you know about the course is in this conversation. If something is missing, say what you would need.";
 	const CHAT_SYSTEM = [
 		"You are a patient tutor inside Neo Quiz, a revision app. The learner is studying for an exam and asks you questions about their course, a quiz question, or anything they did not understand.",
 		"Answer in the language the learner writes in; in French, ALWAYS address the learner as « tu » (tu, ton, ta, tes), never « vous ». Be clear and concrete: start with the direct answer, then explain WHY and HOW (the reason behind a fact is what makes it stick), ground every abstract idea in a concrete example, and when a procedure is involved work one example through step by step. When you use an analogy, say where it stops holding. Do not pad: precise beats long. When it helps the learner, end with one short question that lets them check their own understanding, without giving its answer. Use Markdown (short paragraphs, lists, **bold** for the key idea, fenced code blocks naming their language for any code, $…$ for math).",
-		"You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.",
+		CHAT_NO_TOOLS,
 	].join("\n\n");
 
 	/** THE PLAN OF AN EXAM PREPARATION (2026-09-30): the model reads EVERY
@@ -1910,7 +1914,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				"LEARNER'S NEW MESSAGE:\n" + last.text.trim(),
 			].filter(Boolean).join("\n\n---\n\n");
 			const systeme = [
-				CHAT_SYSTEM,
+				(options.images?.length ? CHAT_SYSTEM.replace(CHAT_NO_TOOLS, CHAT_PICTURES) : CHAT_SYSTEM),
 				options.style === "explain" ? "The learner opened this chat from a question of the quiz below; that question is marked in it. \"This question\", \"the answer\", \"explain it to me\" and the like refer to the marked question unless the learner says otherwise. Answer what they ask, using the quiz and the course; when they ask for an explanation, assume they know nothing and build it step by step (define every term the first time, say what each wrong choice gets wrong, use a concrete everyday example)." : "",
 				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding.` : "",
 			].filter(Boolean).join("\n\n");

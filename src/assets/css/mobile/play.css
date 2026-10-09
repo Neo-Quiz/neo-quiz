@@ -11,13 +11,6 @@ html.nq-phone #neo-quiz-root > .qbd-qz .quiz-nav {
 	padding-right: 10px;
 }
 
-/* The « Expliquer » row (ui/explain.ts) cancels the panel gap with -16 px, so
-   the slide's last 12 px slid under its button: the last option of a revue was
-   half-covered. -4 px keeps the row tight under the slide without overlap. */
-html.nq-phone .qz-explain-row {
-	margin-top: -4px;
-}
-
 /* Rich content in a question or a lecture: a long word, URL or list item wraps
    in the card instead of running off the screen. */
 html.nq-phone .quiz-md-p,

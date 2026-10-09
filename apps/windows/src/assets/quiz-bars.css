@@ -162,21 +162,6 @@
 	background: color-mix(in srgb, var(--quiz-danger) 12%, transparent);
 }
 
-/* THE MINI COMPOSER of ui/explain.ts (2026-09-30): a small glass card in the
-   panel between the slides and the bar of arrows, with a one-line field, the
-   provider's logo, the model, the effort and a 3D send arrow (the arrows'
-   own blue). It only exists once the question is answered (`hidden`
-   otherwise) and in no Exam. */
-.qz-explain-row {
-	flex: none;
-	display: flex;
-	justify-content: center;
-	margin-top: -16px;
-	padding: 4px 0 6px;
-}
-.qz-explain-row[hidden] {
-	display: none;
-}
 /* The button that opens the Explain window: the 3D blue of the arrows, with the
    provider's logo. */
 /* The colours follow the provider's logo (`data-nq-fournisseur`, set by ui/explain.ts):
@@ -420,4 +405,12 @@
 .nq-explain-champ::placeholder {
 	color: color-mix(in srgb, var(--text-normal) 52%, transparent);
 	opacity: 1;
+}
+
+/* An answered card of a Learn step page: its own Explain button, under its
+   correction. */
+.qz-explain-carte {
+	display: flex;
+	justify-content: flex-start;
+	margin-top: 14px;
 }

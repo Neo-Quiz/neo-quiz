@@ -28,6 +28,8 @@ export interface Cours {
 	images: ImagePayload[];
 	/** The file names of `images`, for a provider that cannot see them. */
 	nomsImages: string[];
+	/** A document or a picture failed to read: the caller does not keep this result. */
+	incomplet: boolean;
 }
 
 function enBase64(octets: Uint8Array): string {
@@ -55,6 +57,7 @@ export async function lireCours(quizPath: string, note: string, questions: Recor
 
 	// ── The text: the notes and PDFs of the folder itself ──
 	const candidats = fichiers.filter(f => !f.path.slice(prefixe.length).includes("/") && ["md", "markdown", "txt", "pdf"].includes(f.extension.toLowerCase()));
+	let incomplet = false;
 	const lus: CourseDoc[] = [];
 	const horsBudget: string[] = [];
 	let total = 0;
@@ -63,7 +66,7 @@ export async function lireCours(quizPath: string, note: string, questions: Recor
 		try {
 			let texte = "";
 			if (f.extension.toLowerCase() === "pdf") {
-				if (!host.pdf) continue;
+				if (!host.pdf) { incomplet = true; continue; }
 				if (((await host.fs.size(f.path)) ?? 0) > PDF_MAX_OCTETS) { horsBudget.push(f.name); continue; }
 				texte = (await host.pdf.extractText(await host.fs.readBinary(f.path))).trim();
 			} else {
@@ -73,6 +76,7 @@ export async function lireCours(quizPath: string, note: string, questions: Recor
 			lus.push({ name: f.name, text: texte });
 			total += texte.length;
 		} catch (e) {
+			incomplet = true;
 			console.warn(`${LOG_PREFIX} Explain: ${f.path} unreadable:`, e);
 		}
 	}
@@ -100,8 +104,9 @@ export async function lireCours(quizPath: string, note: string, questions: Recor
 			payloads.push({ base64: enBase64(await host.fs.readBinary(f.path)), mediaType: IMAGE_MEDIA[ext] });
 			noms.push(f.name);
 		} catch (e) {
+			incomplet = true;
 			console.warn(`${LOG_PREFIX} Explain: ${f.path} unreadable:`, e);
 		}
 	}
-	return { texte: assemblerCours(lus, COURSE_MAX_CHARS, horsBudget), images: payloads, nomsImages: noms };
+	return { texte: assemblerCours(lus, COURSE_MAX_CHARS, horsBudget), images: payloads, nomsImages: noms, incomplet };
 }
