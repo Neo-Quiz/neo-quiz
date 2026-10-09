@@ -15,7 +15,7 @@
    surface flottante ou petit contrôle (menu, chip) = --qbd-glass-bg-dense,
    plus opaque pour la lisibilité. Le reflet haut (sheen) est la signature
    commune du verre ; l'ombre décolle la surface du wallpaper. */
-.qbd-root, .qbd-select-menu, .nq-usage-popover, .qb-terme-bulle {
+.qbd-root, .nq-explain-conteneur, .qbd-select-menu, .nq-usage-popover, .qb-terme-bulle {
   /* THEME-AWARE (demande Ahmed 2026-07-21) : aucune teinte figée — le verre
      dérive du thème actif. --background-secondary est la surface assombrie
      du thème (sur celui d'Ahmed, rgb(24,24,37) ≈ l'ancien rgba(16,22,40)

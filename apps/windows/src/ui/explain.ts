@@ -53,18 +53,18 @@ import type { Cours } from "./explain-cours";
 import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 
-/* THE SIDE PANEL (2026-10-09). The window is a panel on the right edge, like
-   the artifact panel of claude.ai: the modal host still gives it its life
-   cycle (Escape, the close button, focus), and the class below turns its
-   container into a column that does not cover the quiz. The quiz area shrinks
-   by the panel's width (`body.nq-explain-open`, quiz-bars.css). */
+/* THE SPLIT VIEW (2026-10-09). The Explain window is a second card, on the
+   LEFT of the quiz card, with the same glass, border and radius. The modal host
+   still gives it its life cycle (Escape, the close button, focus); the classes
+   in quiz-bars.css place it and shrink the quiz card beside it
+   (`body.nq-explain-open`). Its width is kept in localStorage. */
 const CLE_LARGEUR = "nq-explain-width";
-const LARGEUR_MIN = 420;
-const LARGEUR_MAX = 760;
+const LARGEUR_MIN = 320;
+const QUIZ_MIN = 360;
 
 function bornerLargeur(w: number): number {
-	// Never wider than the window leaves room for: 320 px at least stay for the quiz.
-	return Math.round(Math.max(LARGEUR_MIN, Math.min(LARGEUR_MAX, w, window.innerWidth - 320)));
+	// The quiz card keeps QUIZ_MIN px whatever the window width.
+	return Math.round(Math.max(LARGEUR_MIN, Math.min(w, window.innerWidth - QUIZ_MIN - 48)));
 }
 
 function largeurInitiale(): number {
@@ -72,22 +72,21 @@ function largeurInitiale(): number {
 		const v = Number(window.localStorage.getItem(CLE_LARGEUR));
 		if (Number.isFinite(v) && v > 0) return bornerLargeur(v);
 	} catch { /* storage refused: the default width */ }
-	return bornerLargeur(window.innerWidth * 0.44);
+	return bornerLargeur(window.innerWidth * 0.4);
 }
 
 function poserLargeur(w: number): void {
 	document.documentElement.style.setProperty("--nq-explain-w", w + "px");
 }
 
-/** The plain text of a question's prompt, for the panel's subtitle. */
+/** The raw prompt of a question, for the panel's subtitle (rendered like the statement). */
 function texteQuestion(q: Record<string, unknown> | undefined): string {
-	const brut = typeof q?.prompt === "string" ? q.prompt : typeof q?.title === "string" ? q.title : "";
-	return stripInlineMarkdown(brut).replace(/\s+/g, " ").trim();
+	return typeof q?.prompt === "string" ? q.prompt : typeof q?.title === "string" ? q.title : "";
 }
 
 let nettoyagePanneau: (() => void) | null = null;
 
-function monterPanneau(panneau: HTMLElement, sousTitre: string): void {
+function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 	nettoyagePanneau?.();
 	const conteneur = panneau.parentElement;
 	if (!conteneur) return;
@@ -98,11 +97,17 @@ function monterPanneau(panneau: HTMLElement, sousTitre: string): void {
 	document.body.classList.add("nq-explain-open");
 	const titre = panneau.querySelector<HTMLElement>(".modal-title");
 	if (titre) {
-		const texte = titre.querySelector<HTMLElement>(".modal-title-text");
-		if (texte) texte.classList.add("nq-explain-titre");
-		if (sousTitre) ajouter(titre, "span", "nq-explain-sous-titre", sousTitre).title = sousTitre;
+		// No title in the header: the question under it is the header.
+		titre.querySelector(".modal-title-text")?.remove();
+		if (questionBrute.trim()) {
+			// The statement's own renderer: escaped, then markdown; LaTeX through MathJax.
+			const sous = ajouter(titre, "span", "nq-explain-sous-titre");
+			sous.innerHTML = renderInlineText(questionBrute.replace(/\s+/g, " ").trim());
+			if (sous.textContent?.includes("$")) void mathifyElement(sous);
+			sous.title = stripInlineMarkdown(questionBrute).replace(/\s+/g, " ").trim();
+		}
 	}
-	// The width handle on the left edge.
+	// The width handle on the LEFT edge: the chat card sits right of the quiz.
 	const poignee = ajouter(panneau, "div", "nq-explain-poignee");
 	poignee.setAttribute("role", "separator");
 	poignee.setAttribute("aria-orientation", "vertical");
@@ -114,7 +119,7 @@ function monterPanneau(panneau: HTMLElement, sousTitre: string): void {
 	window.addEventListener("resize", surRedim);
 	const bouger = (e: PointerEvent): void => {
 		choisie = true;
-		courante = bornerLargeur(window.innerWidth - e.clientX);
+		courante = bornerLargeur(conteneur.getBoundingClientRect().right - e.clientX);
 		poserLargeur(courante);
 	};
 	const finir = (): void => {
@@ -258,8 +263,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const creerBouton = (parent: HTMLElement): HTMLButtonElement => {
 		const bouton = ajouter(parent, "button", "qz-explain-btn");
 		bouton.type = "button";
+		/* Icon only: the provider's logo. The name is the tooltip and the accessible label. */
+		bouton.title = t("ai.explain.button");
+		bouton.setAttribute("aria-label", t("ai.explain.button"));
 		const logo = ajouter(bouton, "span", "qz-explain-btn-logo");
-		ajouter(bouton, "span", undefined, t("ai.explain.button"));
 		boutons.add({ bouton, logo });
 		return bouton;
 	};
@@ -394,13 +401,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			// The colours of the button follow the provider's logo (CSS on `data-nq-fournisseur`).
 			b.bouton.dataset.nqFournisseur = courant;
 			b.logo.replaceChildren();
-			if (peutExpliquer()) {
-				const p = aiProviders.getProvider(courant);
-				const logo = ajouter(b.logo, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
-				aiProviders.setBrandLogo(logo, p.logo);
-			} else {
-				host.ui.setIcon(b.logo, "sparkles");
-			}
+			// No provider picked yet: the Claude logo, as in the composer.
+			const p = aiProviders.getProvider(courant || "claude-code");
+			const logo = ajouter(b.logo, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo);
+			aiProviders.setBrandLogo(logo, p.logo);
 		}
 	};
 	peindreLogoBouton();
@@ -466,37 +470,54 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; cours = null; return { texte: "", images: [], nomsImages: [], jointes: [], incomplet: true }; }));
 
 /* Hidden in an Exam (the engine puts its clock straight into the host) and
-	   until the question is corrected. */
-	const majVisibilite = (): void => {
-		const examen = !!hote.querySelector(":scope > .quiz-exam-timer");
-		/* The units: each card of a step page of a Learn, and the single card of
-		   any other question slide. `juge` is the element whose classes say
-		   whether the question is corrected, `qi` the question it holds. */
-		const unites: Array<{ carte: HTMLElement; juge: HTMLElement; qi: number; lecture?: boolean }> = [];
+	   until the question on screen is corrected. ONE icon button, at the top
+	   right of the quiz card, tied to the question on screen: the card or slide
+	   that overlaps the quiz card the most. */
+	type Unite = { carte: HTMLElement; juge: HTMLElement; qi: number; lecture: boolean };
+	const carteDuQuiz = (): HTMLElement => hote.closest<HTMLElement>("#neo-quiz-root > .qbd-qz") ?? hote.parentElement ?? hote;
+	const boutonQuiz = creerBouton(carteDuQuiz());
+	boutonQuiz.classList.add("qz-explain-btn-icone");
+	boutonQuiz.hidden = true;
+	peindreLogoBouton();
+	let uniteCourante: Unite | null = null;
+	boutonQuiz.addEventListener("click", () => { if (uniteCourante) ouvrirDepuis(uniteCourante.juge, uniteCourante.qi); });
+	/* The units: each card of a step page of a Learn, and the single card of
+	   any other question slide. `juge` is the element whose classes say
+	   whether the question is corrected, `qi` the question it holds. */
+	const lesUnites = (): Unite[] => {
+		const unites: Unite[] = [];
 		for (const slide of hote.querySelectorAll<HTMLElement>('.quiz-track > .quiz-track-item[data-slide-kind="question"]')) {
 			if (slide.classList.contains("quiz-step-page")) {
-				/* A reading card has nothing to correct: its button is there from the start. */
 				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi].quiz-step-read")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi), lecture: true });
-				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]:not(.quiz-step-read)")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi) });
+				for (const carte of slide.querySelectorAll<HTMLElement>(".quiz-card[data-card-qi]:not(.quiz-step-read)")) unites.push({ carte, juge: carte, qi: Number(carte.dataset.cardQi), lecture: false });
 			} else {
 				const carte = slide.querySelector<HTMLElement>(":scope > .quiz-card");
-				if (carte && slide.dataset.qi !== undefined) unites.push({ carte, juge: slide, qi: Number(slide.dataset.qi) });
+				if (carte && slide.dataset.qi !== undefined) unites.push({ carte, juge: slide, qi: Number(slide.dataset.qi), lecture: false });
 			}
 		}
-		for (const { carte, juge, qi, lecture } of unites) {
-			const present = carte.querySelector(":scope > .qz-explain-carte");
-			const q = questions[qi];
-			const veut = !examen && !!q && (lecture ? q.role === "read" : corrigee(juge));
-			if (veut && !present) {
-				const zone = ajouter(carte, "div", "qz-explain-carte");
-				const b = creerBouton(zone);
-				b.addEventListener("click", () => ouvrirDepuis(juge, qi));
-				peindreLogoBouton();
-			} else if (!veut && present) present.remove();
+		return unites;
+	};
+	/* The unit on screen: the one whose box overlaps the quiz card the most. */
+	const uniteAffichee = (): Unite | null => {
+		const cadre = carteDuQuiz().getBoundingClientRect();
+		let meilleure: Unite | null = null;
+		let surface = 0;
+		for (const u of lesUnites()) {
+			const r = u.carte.getBoundingClientRect();
+			const s = Math.max(0, Math.min(r.right, cadre.right) - Math.max(r.left, cadre.left)) * Math.max(0, Math.min(r.bottom, cadre.bottom) - Math.max(r.top, cadre.top));
+			if (s > surface) { surface = s; meilleure = u; }
 		}
+		return meilleure;
+	};
+	const majVisibilite = (): void => {
+		const examen = !!hote.querySelector(":scope > .quiz-exam-timer");
+		const u = examen ? null : uniteAffichee();
+		const q = u ? questions[u.qi] : undefined;
+		uniteCourante = u;
+		boutonQuiz.hidden = !u || !q || !(u.lecture ? q.role === "read" : corrigee(u.juge));
 	};
 	const observateur = new MutationObserver(majVisibilite);
-	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "aria-pressed", "aria-hidden"] });
+	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "aria-pressed", "aria-hidden"] });
 	majVisibilite();
 
 	const conversations = new Map<number, Conversation>();
@@ -885,6 +906,6 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 	return () => {
 		observateur.disconnect();
 		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
-		for (const z of hote.querySelectorAll(".qz-explain-carte")) z.remove();
+		boutonQuiz.remove();
 	};
 }

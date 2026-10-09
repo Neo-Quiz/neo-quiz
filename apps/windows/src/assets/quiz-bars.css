@@ -402,13 +402,6 @@
 	opacity: 1;
 }
 
-/* An answered card of a Learn step page: its own Explain button, under its
-   correction. */
-.qz-explain-carte {
-	display: flex;
-	justify-content: flex-start;
-	margin-top: 14px;
-}
 
 /* A new version of a reading card proposed by the chat: a preview, then
    "Apply to the card" (flat, as everything inside a modal). */
@@ -561,18 +554,18 @@
 	.nq-explain-composer { border-radius: 20px; padding: 10px 10px 6px 14px; }
 }
 
-/* ══ THE EXPLAIN SIDE PANEL, LIKE THE ARTIFACT PANEL OF claude.ai (2026-10-09) ══
-   The window is a column on the right edge, under the title bar, full height.
-   It does not cover the quiz: the root loses the panel's width
-   (`body.nq-explain-open`), so the engine's track is recomputed by its
-   ResizeObserver and the current card stays aligned. `ui/explain.ts` sets
-   `--nq-explain-w` (44 % of the window, 420 to 760 px, kept in localStorage)
-   and the left handle drags it. The modal host still owns Escape and the
-   close button; its container is made click-through so the quiz stays usable.
-   `html body:not(.nq-x)` raises the specificity above modal.css and mobile.css. */
-:root { --nq-explain-w: 640px; }
+/* ══ THE EXPLAIN SPLIT VIEW (2026-10-09) ══
+   Desktop: the Explain window is a card on the LEFT of the quiz card, with the
+   quiz card's own glass, border and radius (`--nq-panel-*`, shell.css). It
+   sits where the quiz card starts (same top, same bottom, same gap). The quiz
+   card gives up the card's width and keeps the gap between the two cards.
+   `ui/explain.ts` sets `--nq-explain-w` (40 % of the window, kept in
+   localStorage) and the handle on the card's right edge drags it.
+   Phone and any window under 700 px: a full-screen sheet over the quiz, no split. */
+:root { --nq-explain-w: 40vw; }
 html body:not(.nq-x) .modal-container.nq-explain-conteneur {
-	inset: var(--nq-barre-hauteur) 0 0 auto;
+	/* `--nq-panel-gap` is scoped to the quiz root, not to this container: the fallback is the same 16 px. */
+	inset: var(--nq-barre-hauteur) var(--nq-panel-gap, 16px) 0 auto;
 	width: var(--nq-explain-w);
 	padding: 0;
 	align-items: stretch;
@@ -580,24 +573,34 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur {
 	pointer-events: none;
 }
 .nq-explain-conteneur > .modal-bg { display: none; }
-.modal-container.nq-explain-conteneur > .modal.nq-explain-modal {
+html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-modal {
 	pointer-events: auto;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
 	width: 100%;
 	max-width: none;
 	min-width: 0;
 	height: 100%;
 	max-height: none;
+	margin: 0;
 	padding: 0;
-	border-width: 0 0 0 1px;
-	border-radius: 0;
-	box-shadow: -10px 0 30px -18px rgba(0, 0, 0, 0.45);
-	animation: nq-explain-glisse-in 250ms cubic-bezier(0, 0, 0, 1);
+	background: var(--nq-panel-bg);
+	backdrop-filter: var(--nq-panel-blur);
+	-webkit-backdrop-filter: var(--nq-panel-blur);
+	border: 1px solid var(--nq-panel-edge);
+	border-radius: var(--nq-panel-radius);
+	box-shadow: none;
+	overflow: hidden;
+	animation: nq-explain-glisse-in 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
 }
+.nq-explain-modal .modal-content { animation: nq-explain-fondu 300ms ease 140ms both; }
 .modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing {
 	animation: nq-explain-glisse-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
-@keyframes nq-explain-glisse-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes nq-explain-glisse-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@keyframes nq-explain-glisse-in { from { opacity: 0; transform: translateX(24px) scale(0.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
+@keyframes nq-explain-fondu { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nq-explain-glisse-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(16px); } }
 
 .nq-explain-modal .modal-title {
 	flex: none;
@@ -611,6 +614,7 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur {
 }
 .nq-explain-modal .nq-explain-titre { font-size: 15px; }
 .nq-explain-sous-titre {
+	display: block;
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -619,17 +623,29 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur {
 	font-weight: 400;
 	color: var(--text-faint);
 }
+.nq-explain-sous-titre .katex, .nq-explain-sous-titre mjx-container { font-size: 1em !important; }
 .nq-explain-modal .modal-content {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 	padding: 0 20px 10px;
-	overflow-y: hidden;
+	overflow: hidden;
 }
+.nq-explain-fil {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+.nq-explain-composer { flex: none; margin-top: auto; }
+.nq-explain-modal .qbd-ai-usage-slot { flex: none; }
 
-/* The width handle, on the panel's left edge. */
+/* The handle, on the card's left edge (between the two cards). */
 .nq-explain-poignee {
 	position: absolute;
 	top: 0;
 	bottom: 0;
-	left: -4px;
+	left: -5px;
 	width: 9px;
 	z-index: 2;
 	cursor: col-resize;
@@ -652,10 +668,16 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur {
 body.nq-explain-redimension { cursor: col-resize; user-select: none; }
 body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
 
-/* The quiz keeps the room the panel leaves. */
-#neo-quiz-root { transition: padding-right 250ms cubic-bezier(0, 0, 0, 1); }
-body.nq-explain-open #neo-quiz-root { padding-right: var(--nq-explain-w); }
-body.nq-explain-redimension #neo-quiz-root { transition: none; }
+/* The quiz card gives up the width of the Explain card and the gap between them. */
+#neo-quiz-root > .qbd-qz { position: relative; transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1), margin 380ms cubic-bezier(0.22, 1, 0.36, 1); }
+@media (min-width: 701px) {
+	body.nq-explain-open:not(.is-mobile) #neo-quiz-root > .qbd-qz {
+		width: calc(100% - var(--nq-explain-w) - 3 * var(--nq-panel-gap));
+		max-width: none;
+		margin: 0 calc(2 * var(--nq-panel-gap) + var(--nq-explain-w)) 0 var(--nq-panel-gap);
+	}
+	body.nq-explain-redimension #neo-quiz-root > .qbd-qz { transition: none; }
+}
 
 /* An interactive page takes the whole answer column. */
 .nq-explain-modal .nq-html-frame { margin: 12px 0; width: 100%; }
@@ -664,7 +686,8 @@ body.nq-explain-redimension #neo-quiz-root { transition: none; }
 @media (prefers-reduced-motion: reduce) {
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal,
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing { animation: none !important; }
-	#neo-quiz-root { transition: none; }
+	.nq-explain-modal .modal-content { animation: none !important; }
+	#neo-quiz-root > .qbd-qz { transition: none !important; }
 }
 
 /* PHONE (and any window under 700 px): a full-screen sheet over the quiz.
@@ -680,14 +703,34 @@ body.nq-explain-redimension #neo-quiz-root { transition: none; }
 	}
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal {
 		border-width: 0;
+		border-radius: 0;
 		box-shadow: none;
 		animation-name: nq-explain-monte-in;
 	}
 	.modal-container.nq-explain-conteneur > .modal.nq-explain-modal.qbd-closing { animation-name: nq-explain-monte-out; }
-	body.nq-explain-open #neo-quiz-root { padding-right: 0; }
 	.nq-explain-poignee { display: none; }
 	.nq-explain-modal .modal-content { padding: 0 12px 8px; }
 	.nq-explain-modal .modal-title { padding: 12px 48px 10px 16px; }
 }
 @keyframes nq-explain-monte-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes nq-explain-monte-out { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+/* THE ASSISTANT BUTTON: one icon (the provider's logo) at the top right of the
+   quiz card, tied to the question on screen (`ui/explain.ts`, majVisibilite). */
+.qz-explain-btn.qz-explain-btn-icone {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	z-index: 3;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	justify-content: center;
+	margin-bottom: 0;
+}
+.qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo .qbd-provider-logo,
+.qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo svg {
+	width: 20px;
+	height: 20px;
+}
+.qz-explain-btn[hidden] { display: none; }

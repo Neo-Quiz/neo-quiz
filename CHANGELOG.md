@@ -23,6 +23,7 @@ release notes.
 
 ### Changed
 
+- The assistant opens as a split view: an "Ask the AI" icon at the top right of the quiz card opens a second card on its right, with the same glass and border, the question under its header and the composer pinned to its bottom. The quiz card gives up that width (40 % by default, resizable from the handle on its left edge); closing it gives the full width back.
 - On a folder page, a quiz card shows its date next to its type pill, at the bottom; the line above keeps only the counts.
 - Generated Learn readings favour interactive pages: explorable diagrams where you change a value and see what it means, symbol tables with each symbol drawn, and annotated diagrams, mixed when that helps.
 - A finished quiz saves its results automatically, once per attempt (a "Retry saving" button appears only if the save fails). The results screen offers "Delete these results" instead, after a confirmation: the file goes to the trash and the attempt leaves the progress history. Deleting an attempt from a folder's progress also moves its results file to the trash.
