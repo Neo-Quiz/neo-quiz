@@ -122,6 +122,7 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 	const modifiees = new Set<string>();
 	let cache: Record<string, SessionQuiz> | null = null;
 	let lastAt = 0;
+	let fileEcriture: Promise<void> = Promise.resolve();
 	const nextAt = (min = 0): number => (lastAt = Math.max(clock(), lastAt + 1, min));
 
 	async function lireFichier(chemin: string, root: string): Promise<TableSessions | null> {
@@ -134,7 +135,12 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 	async function chargerRacine(root: string, garder?: Racine): Promise<void> {
 		const etat: Racine = garder ? { own: garder.own, autres: [], verrou: garder.verrou } : { own: {}, autres: [], verrou: false };
 		let noms: Set<string>;
-		try { noms = new Set((await fs.list(dossier(root))).map(baseName)); } catch { noms = new Set(); }
+		try { noms = new Set((await fs.list(dossier(root))).map(baseName)); } catch (e) {
+			/* A folder that is there but cannot be listed: our file may be in it,
+			   so this root is never written (a partial table would replace it). */
+			if (await fs.exists(dossier(root)).catch(() => true)) { racines.set(root, { own: garder?.own ?? {}, autres: [], verrou: true }); cache = null; console.warn(LOG_PREFIX, "sessions folder unreadable:", root, e); return; }
+			noms = new Set();
+		}
 		const proprio = `${deviceId}.json`;
 		/* A `.json.tmp` whose `.json` is missing is a write cut between the
 		   removal and the rename: complete (written first), it stands in. */
@@ -211,14 +217,24 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 			let n = 0;
 			for (const [cle, s] of Object.entries(legacy)) {
 				const r = racineDe(cle);
-				if (!r || g[cle] || !isRecord(s) || s.v !== 1 || typeof s.ecrite !== "number") continue;
+				if (!r || g[cle] || !isRecord(s) || s.v !== 1 || !isRecord(s.questions) || typeof s.ecrite !== "number" || !Number.isFinite(s.ecrite) || s.ecrite > clock() + FUTUR_MS) continue;
 				r.own[cle] = s;
 				toucher(cle);
 				n++;
 			}
 			return n;
 		},
-		async ecrire() {
+		/* ONE write at a time: the 400 ms timer and the flush at closing used to
+		   run together on the same `.tmp`, and the older one could win the
+		   rename, losing the last answer for the other devices. */
+		ecrire() {
+			const tour = fileEcriture.then(ecrireMaintenant, ecrireMaintenant);
+			fileEcriture = tour.catch(() => {});
+			return tour;
+		},
+	};
+
+	async function ecrireMaintenant(): Promise<void> {
 			for (const root of [...modifiees]) {
 				modifiees.delete(root);
 				const r = racines.get(root);
@@ -234,6 +250,5 @@ export function createSharedSessions(deps: { fs: SharedFs; roots: () => string[]
 					throw e;
 				}
 			}
-		},
-	};
+	}
 }

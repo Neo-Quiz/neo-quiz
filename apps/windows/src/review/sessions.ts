@@ -24,6 +24,8 @@ import { renommerCles } from "./folder-move";
 
 const CLE_SESSIONS = "quizSessions";
 const DELAI_MS = 400;
+/** Set once the mirror has been copied into the synced files. */
+const CLE_MIGREE = "quizSessionsShared";
 
 export interface SessionsApp {
 	lire(chemin: string): SessionQuiz | null;
@@ -48,8 +50,14 @@ export async function creerSessionsApp(partagees?: SessionsPartagees): Promise<S
 	if (partagees) {
 		try {
 			await partagees.load();
-			// Only what no device has yet: the synced files are newer than the mirror.
-			if (partagees.migrer(locales) > 0) await partagees.ecrire();
+			/* ONCE (`quizSessionsShared`): only what no device has yet, the synced
+			   files being newer than the mirror. Never again after: once a
+			   tombstone from another device has aged out, the mirror's old
+			   snapshot would bring a finished quiz back. */
+			if (!(await lireReglage<boolean>(CLE_MIGREE))) {
+				if (partagees.migrer(locales) > 0) await partagees.ecrire();
+				await ecrireReglage(CLE_MIGREE, true);
+			}
 		} catch (e) {
 			console.warn(LOG_PREFIX, "synced sessions not loaded:", e);
 		}

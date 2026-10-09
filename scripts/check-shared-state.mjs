@@ -572,7 +572,21 @@ await withSrcModule("apps/windows/src/host/shared-sessions.ts", async (ses) => {
 	await laptop.refresh();
 	r.check("a finished quiz stays finished on the other device", [phone.toutes()[P], laptop.toutes()[P]], [undefined, undefined]);
 
-	// The legacy settings are copied once, never over a synced entry.
+	// Two writes at once (the 400 ms timer and the flush at closing): the latest snapshot ends in the file.
+	{
+		const f4 = new Map();
+		const slow = fsOf(f4);
+		const rename = slow.rename;
+		slow.rename = async (a, b) => { await new Promise(res => setTimeout(res, 5)); return rename(a, b); };
+		const s4 = make(slow, "pc");
+		await s4.load();
+		s4.poser(P, snap(1_000_100, "q2"));
+		const premier = s4.ecrire();
+		s4.poser(P, snap(1_000_200, "q3"));
+		const second = s4.ecrire();
+		await Promise.all([premier, second]);
+		r.check("two writes at once: no failure, and the file holds the latest snapshot", JSON.parse(f4.get("Efrei/.neo-quiz/sessions/pc.json"))[P].courante, "q3");
+	}	// The legacy settings are copied once, never over a synced entry.
 	const fs2 = fsOf();
 	const s2 = make(fs2, "old");
 	await s2.load();
