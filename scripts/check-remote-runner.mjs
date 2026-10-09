@@ -194,7 +194,7 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		// The Claude call used for a remote request (no image) carries the no-tool flag.
 		const { readFileSync } = await import("node:fs");
 		const ai = readFileSync("src/dashboard/ai-client.ts", "utf8");
-		r.check("ai-client grants Claude no tool unless an image is attached", ai.includes('const tools = fichiers.length > 0 ? "Read" : "";') && ai.includes('"--tools", tools,') && ai.includes('"--strict-mcp-config"'), true);
+		r.check("ai-client grants Claude no tool unless an image is attached (confined Read) or a trusted folder", ai.includes('["--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"]') && ai.includes("? ARGS_IMAGES_CLAUDE") && ai.includes("proc.trustFolder(dossier)"), true);
 	}
 	{ // Interrupted by a restart
 		const g = rig(); g.log.list = [{ id: "lq3k2-int001", from: PH, at: NOW - 600_000 }]; g.setIncoming([file("lq3k2-int001")]);

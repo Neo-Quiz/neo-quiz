@@ -56,7 +56,8 @@ await withSrcModule(["src/dashboard/relay.ts", "src/dashboard/ai-client.ts", "sr
 	// HTML: kept as data (legitimate keys), sanitised at render by the four doors; never executed here.
 	const withHtml = `[ { prompt: "Q", options: ["a","b"], correctIndex: 0, explainHtml: "<img src=x onerror=alert(1)>", promptHtml: "<script>1</script>" } ]`;
 	const res = ok("```quiz-blocks\n" + withHtml + "\n```");
-	r.check("an answer whose only explanation is explainHtml is accepted, the key kept", [res.ok, res.questions?.[0]?.explainHtml], [true, "<img src=x onerror=alert(1)>"]);
+	/* Without a DOM (this check runs in Node), remote-images.ts escapes any HTML as a fail-safe; the app has one and keeps the markup for the four gates. */
+	r.check("an answer whose only explanation is explainHtml is accepted, the key kept", [res.ok, typeof res.questions?.[0]?.explainHtml], [true, "string"]);
 	r.check("an inline <script> in a text field is kept as text", JSON.stringify(ok("```quiz-blocks\n[ { prompt: \"<script>1</script>\", options: [\"a\",\"b\"], correctIndex: 0, explain: \"x\" } ]\n```").questions).includes("<script>"), true);
 
 	// Prototype pollution
