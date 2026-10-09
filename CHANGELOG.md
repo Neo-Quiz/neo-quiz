@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Backspace and Delete no longer remove the attachments of the composer; only their × button does.
+
 ## [1.20.66] - 2026-10-09
 
 ### Fixed
