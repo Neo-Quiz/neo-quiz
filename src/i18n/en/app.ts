@@ -199,9 +199,9 @@ export const EN_APP = {
 
 	/* ── Réglages « Général » (application seulement) ── */
 	"app.settings.general": "General",
-	"app.settings.explainPrompt": "Explain prompt",
-	"app.settings.explainPromptHint": "What the Explain button of a quiz question sends to the AI provider chosen in the Explain window. {quiz}, {question}, {options}, {answer}, {myAnswer} and {explanation} are replaced by the question's own; a line whose placeholders are all empty is left out.",
 	"app.settings.explainPromptReset": "Reset",
+	"app.settings.explainTitle": "Explain",
+	"app.settings.explainHint": "In the Explain window you write your own question. Behind the scenes, every message carries the whole quiz (the question you opened it from marked, with your answer), the text of the notes and PDFs of its folder and its pictures.",
 	"app.settings.examPrompt": "/exam prompt",
 	"app.settings.examPromptHint": "The request /exam writes for you once an exam is picked. {exam}, {module} and {date} are replaced by the exam's own; what you type in the composer is added under it.",
 	"app.settings.explainMaxChars": "Longest explanation",

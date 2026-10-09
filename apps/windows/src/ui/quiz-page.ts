@@ -89,8 +89,6 @@ export async function openQuizPage(
 	/* The AI settings, for the "Explain" button of a played question
 	   (`ui/explain.ts`). Absent: no button. */
 	aiSettings?: AiSettingsHost,
-	/* Opens the Settings on the Explain prompt (the pencil of its tile). */
-	ouvrirPromptExplication?: () => void,
 ): Promise<QuizPageHandle> {
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
@@ -257,7 +255,7 @@ export async function openQuizPage(
 	const detachBars = attachQuizBars(hote);
 	/* "Explain" in the header, right: not in an Exam (it hides with the clock). */
 	const demonterExpliquer = aiSettings && questionsJouees.length
-		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings, ouvrirPrompt: () => ouvrirPromptExplication?.() })
+		? monterBoutonExpliquer(hote, { questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source })
 		: null;
 	let fait = false;
 	return {

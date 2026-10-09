@@ -107,8 +107,8 @@ export interface AiSettings {
 	    back on each arrival at « Générer », and checked against the folders
 	    that still exist (`destinationMemorisee`). */
 	aiComposerDestination?: string;
-	/** The message "Explain" sends about a played question (2026-09-29,
-	    `explain-prompt.ts` placeholders). Empty: the translated default. */
+	/** The old Explain prompt template (2026-09-29). No longer read nor edited
+	    since 2026-10-09; a value left in a settings file is kept, ignored. */
 	aiExplainPrompt?: string;
 	/** The request "/exam" writes for the learner (2026-09-30, `exam-command.ts`,
 	    placeholders {exam}, {module}, {date}). Empty: the translated default. */

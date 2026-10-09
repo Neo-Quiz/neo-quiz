@@ -57,13 +57,8 @@ const CATEGORIES: Array<{ id: Category; icon: string; label: TransKey }> = [
    reload that `onFoldersChanged` triggers). Not persisted — a new session
    opens on General. */
 let lastCategory: Category = "general";
-/** The next opening lands on a prompt of the AI page, scrolled to it: the
-    Explain one, or the "/exam" one. */
-let viserPrompt: "explain" | "exam" | null = null;
-export function viserPromptExpliquer(): void {
-	lastCategory = "ai";
-	viserPrompt = "explain";
-}
+/** The next opening lands on the "/exam" prompt of the AI page, scrolled to it. */
+let viserPrompt: "exam" | null = null;
 export function viserPromptExam(): void {
 	lastCategory = "ai";
 	viserPrompt = "exam";
@@ -439,19 +434,9 @@ export function renderSettings(
 	/* No "Generation layout" any more (2026-09-30): the conversation is always
 	   full width, so everything Claude Code or Codex does shows. */
 
-	/* The message "Explain" sends about a played question (2026-09-29,
-	   `ui/explain.ts`): editable, with its placeholders listed; empty means
-	   the translated default, which "Reset" brings back. Saved when the
-	   field loses the focus, not on every key. */
-	const expliquer = section(aiPage, t("app.settings.explainPrompt"), t("app.settings.explainPromptHint"));
-	const zone = ajouter(expliquer, "textarea", "nq-set-prompt");
-	zone.rows = 9;
-	zone.value = deps.aiSettings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
-	zone.setAttribute("aria-label", t("app.settings.explainPrompt"));
-	zone.addEventListener("change", () => {
-		const v = zone.value.trim();
-		void deps.aiSettings.save({ aiExplainPrompt: v === t("ai.explain.defaultPrompt").trim() ? "" : v });
-	});
+	/* The "Explain" window (2026-10-09): no prompt to edit any more, the learner
+	   types freely and the quiz and its course go along behind the scenes. */
+	const expliquer = section(aiPage, t("app.settings.explainTitle"), t("app.settings.explainHint"));
 	/* The longest explanation (2026-09-29): the model is asked to stay under
 	   it. Bounded to 300..6000; an empty or invalid field keeps the default. */
 	const longueur = ajouter(card(expliquer), "div", "nq-set-ligne");
@@ -470,12 +455,6 @@ export function renderSettings(
 		const borne = Number.isFinite(n) && n > 0 ? Math.min(6000, Math.max(300, n)) : EXPLAIN_MAX_CHARS_DEFAUT;
 		champLong.value = String(borne);
 		void deps.aiSettings.save({ aiExplainMaxChars: borne });
-	});
-	const reinit = ajouter(ajouter(expliquer, "div", "nq-reglages-actions"), "button", "nq-reglages-changer", t("app.settings.explainPromptReset"));
-	reinit.type = "button";
-	reinit.addEventListener("click", () => {
-		zone.value = t("ai.explain.defaultPrompt");
-		void deps.aiSettings.save({ aiExplainPrompt: "" });
 	});
 
 	/* The request "/exam" writes for the learner once an exam is picked
@@ -513,9 +492,8 @@ export function renderSettings(
 	if (phone) montrerPrincipal();
 	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");
 	if (viserPrompt) {
-		const [bloc, champ] = viserPrompt === "exam" ? [examen, zoneExam] : [expliquer, zone];
 		viserPrompt = null;
-		requestAnimationFrame(() => { bloc.scrollIntoView({ block: "center" }); champ.focus(); });
+		requestAnimationFrame(() => { examen.scrollIntoView({ block: "center" }); zoneExam.focus(); });
 	}
 
 	/* The unmount no longer unsubscribes the updater: its section left on

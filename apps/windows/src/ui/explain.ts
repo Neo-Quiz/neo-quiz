@@ -5,11 +5,13 @@
    question is corrected: it opens a WINDOW that can be closed and opened again
    without losing anything — the conversation about a question lives as long as
    the quiz page, a running answer goes on while the window is closed. The
-   window is a chat like claude.ai's: the history above, below a composer that
-   starts with a tile holding the Explain prompt (a template the learner can
-   change in Settings › AI, filled by `explain-prompt.ts`), the provider,
-   model and effort, and the send arrow. Sent, the tile joins the history and
-   the composer goes on with follow-up questions.
+   window is a chat like claude.ai's: the history above, below a FREE, empty
+   composer (no prompt, no tile), the provider, model and effort, and the
+   send arrow. The learner types what they want; with EVERY message the AI
+   receives, behind the scenes, the whole quiz with the question of the
+   button marked and the learner's answer to it, the text of the folder's
+   notes and PDFs and its pictures (`explain-prompt.ts`, `explain-course.ts`,
+   `explain-cours.ts`). The course is read once per quiz page.
 
    Not in an Exam: the button hides as soon as the test clock shows (the
    engine adds `.quiz-exam-timer` to the host), in Learn and in a Test
@@ -24,6 +26,7 @@
 import { ajouter } from "../../../../src/dom";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
+import { LOG_PREFIX } from "../../../../src/branding";
 import { createAiClient } from "../../../../src/dashboard/ai-client";
 import type { AiClient, ChatTurn } from "../../../../src/dashboard/ai-client";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
@@ -32,9 +35,10 @@ import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../s
 import type { OpenProviderMenuOptions, ProviderBrandOption } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
-import { remplirPromptExplication } from "../../../../src/explain-prompt";
+import { contexteQuiz } from "../../../../src/explain-prompt";
+import { lireCours } from "./explain-cours";
+import type { Cours } from "./explain-cours";
 import { attacherUsage } from "./comptes";
-import { openConfirmModal } from "../../../../src/editor/modals";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -61,6 +65,12 @@ function corrigee(slide: HTMLElement): boolean {
 		|| !!slide.querySelector(".quiz-explain, .quiz-option.correct, .quiz-option.wrong, .quiz-option.missed");
 }
 
+/** Was the answer on that slide right? `null` when the slide does not say. */
+function estJuste(slide: HTMLElement): boolean | null {
+	if (slide.querySelector(".quiz-option.wrong, .quiz-option.missed")) return false;
+	return slide.querySelector(".quiz-option.correct") ? true : null;
+}
+
 /** What the learner has answered on that slide, as they see it. */
 function maReponse(slide: HTMLElement): string {
 	const options = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")];
@@ -75,18 +85,18 @@ function maReponse(slide: HTMLElement): string {
 	return saisies.join(" ; ");
 }
 
-/** One message of a conversation, as the window shows it. A user message that
-    carries the prompt shows it as a tile, like a pasted text on claude.ai. */
+/** One message of a conversation, as the window shows it. */
 interface Message {
 	role: "user" | "assistant";
 	text: string;
-	tuile?: string;
 	modele?: string;
 	/** The provider that answered: its logo stays when another is picked later. */
 	fournisseur?: string;
 	debut?: number;
 	duree?: number;
 	enCours?: boolean;
+	/** The course is being read before the question leaves. */
+	lecture?: boolean;
 	erreur?: string;
 	arrete?: boolean;
 }
@@ -99,48 +109,19 @@ interface Conversation {
 	historique: ChatTurn[];
 	client: AiClient;
 	enCours: boolean;
-	/** The prompt tile has been sent: the composer is a plain one from now on. */
-	envoye: boolean;
-	/** The learner took the prompt tile away (its cross, confirmed): the first
-	    message is what they type. */
-	sansPrompt: boolean;
+	/** The quiz with this question marked (see `contexteQuiz`), set at each opening. */
+	contexte: string;
 	/** Repaints the window; null while it is closed. */
 	repeindre: (() => void) | null;
-}
-
-/** The prompt tile: the start of the text, its name, and (in the composer)
-    a pencil that opens the Settings on the field where it is written, and a
-    round cross in its corner, shown on hover, that takes it away. */
-function creerTuile(parent: HTMLElement, texte: string, ouvrirPrompt?: () => void, retirer?: () => void): HTMLElement {
-	const tuile = ajouter(parent, "div", "qz-mini-tuile");
-	if (retirer) {
-		const croix = ajouter(tuile, "button", "qz-mini-tuile-retirer");
-		croix.type = "button";
-		croix.title = t("ai.explain.tileRemove");
-		croix.setAttribute("aria-label", t("ai.explain.tileRemove"));
-		currentHost().ui.setIcon(croix, "x");
-		croix.addEventListener("click", retirer);
-	}
-	ajouter(tuile, "div", "qz-mini-tuile-texte", texte);
-	const pied = ajouter(tuile, "div", "qz-mini-tuile-pied");
-	ajouter(pied, "span", "qz-mini-tuile-nom", t("ai.explain.tile"));
-	if (ouvrirPrompt) {
-		const crayon = ajouter(pied, "button", "qz-mini-tuile-edit");
-		crayon.type = "button";
-		crayon.title = t("ai.explain.tileEdit");
-		crayon.setAttribute("aria-label", t("ai.explain.tileEdit"));
-		currentHost().ui.setIcon(crayon, "pencil");
-		crayon.addEventListener("click", ouvrirPrompt);
-	}
-	return tuile;
 }
 
 export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	questions: Record<string, unknown>[];
 	titre: string;
 	settings: AiSettingsHost;
-	/** Opens the Settings on the field that holds the Explain prompt. */
-	ouvrirPrompt(): void;
+	/** The path of the quiz note and its text, to find its folder and what it cites. */
+	chemin: string;
+	note: string;
 }): () => void {
 	const host = currentHost();
 	/* The button sits in a row of the panel, under the question and above the
@@ -332,16 +313,24 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		peindreLogoBouton();
 	};
 
-	/* The prompt of a question, built from the template of the Settings. */
-	const messagePour = (slide: HTMLElement): string | null => {
-		const q = deps.questions[Number(slide.dataset.qi)];
-		if (!q) return null;
+	/* The quiz with the question of the clicked button marked, and the learner's
+	   answer to THAT question (read on its own slide). */
+	const contexteDe = (slide: HTMLElement): string | null => {
+		const qi = Number(slide.dataset.qi);
+		if (!deps.questions[qi]) return null;
 		const ordre = [...slide.querySelectorAll<HTMLElement>(".quiz-option[data-orig]")].map(o => Number(o.dataset.orig));
-		const modele = deps.settings.get().aiExplainPrompt?.trim() || t("ai.explain.defaultPrompt");
-		return remplirPromptExplication(modele, q, { quiz: deps.titre, myAnswer: maReponse(slide), ordre });
+		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
+		return contexteQuiz(deps.questions, { quiz: deps.titre, folder: dossier, courant: qi, ordre, myAnswer: maReponse(slide), correct: estJuste(slide) });
 	};
+	/* The course (notes, PDFs, pictures) is read ONCE per quiz page, at the
+	   first opening of the window or the first send, then reused. */
+	let cours: Promise<Cours> | null = null;
+	let coursPret = false;
+	const coursDuQuiz = (): Promise<Cours> => (cours ??= lireCours(deps.chemin, deps.note, deps.questions)
+		.then((c) => { coursPret = true; return c; })
+		.catch((e): Cours => { console.warn(`${LOG_PREFIX} Explain: course unreadable:`, e); coursPret = true; return { texte: "", images: [], nomsImages: [] }; }));
 
-	/* Hidden in an Exam (the engine puts its clock straight into the host) and
+/* Hidden in an Exam (the engine puts its clock straight into the host) and
 	   until the question is corrected. */
 	const majVisibilite = (): void => {
 		const slide = questionAffichee(hote);
@@ -355,7 +344,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const conversationDe = (qi: number): Conversation => {
 		let c = conversations.get(qi);
 		if (!c) {
-			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, envoye: false, sansPrompt: false, repeindre: null };
+			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, contexte: "", repeindre: null };
 			conversations.set(qi, c);
 		}
 		return c;
@@ -365,13 +354,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const slide = questionAffichee(hote);
 		const qi = slide ? Number(slide.dataset.qi) : NaN;
 		if (!slide || !deps.questions[qi]) { host.ui.notice(t("ai.explain.noQuestion")); return; }
-		ouvrirFenetre(qi, messagePour(slide) ?? "");
+		const contexte = contexteDe(slide);
+		if (contexte === null) { host.ui.notice(t("ai.explain.noQuestion")); return; }
+		void coursDuQuiz();
+		ouvrirFenetre(qi, contexte);
 	});
 
 	/** The window: the history above, the composer below. Built again at each
 	    opening from the conversation, which is what survives. */
-	function ouvrirFenetre(qi: number, prompt: string): void {
+	function ouvrirFenetre(qi: number, contexte: string): void {
 		const conv = conversationDe(qi);
+		conv.contexte = contexte;
 		let horloge = 0;
 		let fermerUsage: (() => void) | null = null;
 		requireHost("modals").open({
@@ -382,31 +375,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
 				const champ = ajouter(composer, "textarea", "nq-explain-champ");
 				champ.rows = 1;
-				/* The prompt tile shows until the prompt has been ANSWERED: a first
-				   message that fails or is stopped brings it back, so that it can be
-				   sent again — without it, a follow-up would leave without the
-				   question. Before that there is nothing to type: the tile IS the
-				   message. */
-				/* Taking the tile away is WARNED: without the prompt, the model
-				   does not know which question the learner means. */
-				const retirerTuile = (): void => {
-					openConfirmModal(t("ai.explain.removeTitle"), t("ai.explain.removeMessage"), t("ai.explain.removeConfirm"), t("ai.explain.removeCancel"), (ok) => {
-						if (!ok) return;
-						conv.sansPrompt = true;
-						majTuile();
-						majEnvoi();
-						champ.focus();
-					});
-				};
-				const avecTuile = (): boolean => !conv.envoye && !conv.sansPrompt;
-				const majTuile = (): void => {
-					const tuile = composer.querySelector(":scope > .qz-mini-tuile");
-					if (!avecTuile()) tuile?.remove();
-					else if (!tuile) composer.insertBefore(creerTuile(composer, prompt, () => deps.ouvrirPrompt(), retirerTuile), champ);
-					champ.readOnly = avecTuile();
-					champ.placeholder = t(conv.envoye ? "ai.explain.followUp" : conv.sansPrompt ? "ai.explain.ownQuestion" : "ai.explain.miniPlaceholder");
-				};
-				majTuile();
+				champ.placeholder = t("ai.explain.ownQuestion");
+				const majPlaceholder = (): void => { champ.placeholder = t(conv.messages.length ? "ai.explain.followUp" : "ai.explain.ownQuestion"); };
 				const pied = ajouter(composer, "div", "qz-mini-pied");
 				/* The consumption of the provider, where the Settings already show
 				   it: a gauge that opens its popover (Claude Code and Codex). */
@@ -453,8 +423,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					envoi.replaceChildren();
 					host.ui.setIcon(ajouter(envoi, "span"), conv.enCours ? "square" : "arrow-up");
 					envoi.setAttribute("aria-label", t(conv.enCours ? "ai.explain.stop" : "ai.explain.send"));
-					// The first message may go without a word: the prompt tile is enough.
-					envoi.disabled = !conv.enCours && !avecTuile() && !champ.value.trim();
+envoi.disabled = !conv.enCours && !champ.value.trim();
 				};
 				peindreOutils();
 				majEnvoi();
@@ -520,7 +489,6 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					for (const msg of conv.messages) {
 						if (msg.role === "user") {
 							const bloc = ajouter(fil, "div", "nq-explain-msg-user");
-							if (msg.tuile) creerTuile(bloc, msg.tuile);
 							if (msg.text) ajouter(bloc, "div", "qbd-ai-bulle nq-explain-demande", msg.text);
 							continue;
 						}
@@ -529,7 +497,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
 						aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
 						const nom = msg.modele ?? "";
-						ajouter(tete, "span", undefined, msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
+						ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse") : msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
 						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
 						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
@@ -544,7 +512,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				let image = 0;
 				conv.repeindre = () => {
 					if (image) return;
-					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); majTuile(); } });
+					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); majPlaceholder(); } });
 				};
 				peindreFil();
 				// The time an answer has been running ticks once a second.
@@ -553,28 +521,32 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const envoyer = async (): Promise<void> => {
 					if (conv.enCours) return;
 					const perso = champ.value.trim();
-					const parTuile = avecTuile();
-					if (!parTuile && !perso) return;
+					if (!perso) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
-					const premier = !conv.envoye;
-					const texte = parTuile ? prompt : perso;
 					champ.value = "";
 					champ.style.height = "auto";
 					/* The provider shown here is the one that answers: the client reads the Settings. */
 					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
 					// Ollama: the model shown here (a default chosen by the window) is the one that answers.
 					else if (courant === "ollama" && deps.settings.get().aiModel !== modeleCourant()) await deps.settings.save({ aiModel: modeleCourant() });
-					conv.envoye = true;
-					conv.historique.push({ role: "user", text: texte });
-					conv.messages.push({ role: "user", text: parTuile ? "" : perso, tuile: parTuile ? prompt : undefined });
-					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true };
+					conv.historique.push({ role: "user", text: perso });
+					conv.messages.push({ role: "user", text: perso });
+					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true, lecture: !coursPret };
 					conv.messages.push(rep);
 					conv.enCours = true;
-					majTuile();
 					conv.repeindre?.();
 					try {
+						const lu = await coursDuQuiz();
+						rep.lecture = false;
+						conv.repeindre?.();
+						const images = lu.nomsImages.length
+							? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + lu.nomsImages.map((n, i) => `${i + 1}. ${n}`).join("; ")
+							: "";
 						const reponse = await conv.client.chat(conv.historique, {
 							style: "explain",
+							context: conv.contexte + (lu.texte ? "\n\n=== COURSE ===\n" + lu.texte : "") + images,
+							images: lu.images,
+							imageNames: lu.nomsImages,
 							maxChars: deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT,
 							onTranscript: (ev) => {
 								if (ev.kind !== "text") return;
@@ -587,12 +559,11 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					} catch (err) {
 						const e = err as Error & { aborted?: boolean };
 						conv.historique.pop();
-						// The prompt was never answered: its tile comes back (`majTuile`).
-						if (premier) conv.envoye = false;
 						if (e?.aborted) rep.arrete = true;
 						else rep.erreur = e?.message || t("ai.error.checkSettings");
 					} finally {
 						rep.enCours = false;
+						rep.lecture = false;
 						rep.duree = Date.now() - (rep.debut ?? Date.now());
 						conv.enCours = false;
 						conv.repeindre?.();

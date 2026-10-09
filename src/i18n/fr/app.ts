@@ -138,9 +138,9 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.comptes.usage.codexSnapshotSansDate": "Photo du dernier lancement de Codex — l'heure exacte n'est pas disponible.",
 
 	"app.settings.general": "Général",
-	"app.settings.explainPrompt": "Prompt d'explication",
-	"app.settings.explainPromptHint": "Ce que le bouton Expliquer d'une question envoie au fournisseur d'IA choisi dans la fenêtre Expliquer. {quiz}, {question}, {options}, {answer}, {myAnswer} et {explanation} sont remplacés par ceux de la question ; une ligne dont tous les champs sont vides est retirée.",
 	"app.settings.explainPromptReset": "Réinitialiser",
+	"app.settings.explainTitle": "Expliquer",
+	"app.settings.explainHint": "Dans la fenêtre Expliquer, tu écris ta propre question. En coulisses, chaque message emporte tout le quiz (la question d'où tu l'as ouverte est marquée, avec ta réponse), le texte des notes et des PDF de son dossier et ses images.",
 	"app.settings.examPrompt": "Prompt de /exam",
 	"app.settings.examPromptHint": "La demande que /exam écrit pour toi une fois l'examen choisi. {exam}, {module} et {date} sont remplacés par ceux de l'examen ; ce que tu tapes dans le composer s'ajoute dessous.",
 	"app.settings.explainMaxChars": "Longueur maximale de l'explication",

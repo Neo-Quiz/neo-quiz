@@ -211,6 +211,13 @@ export interface ChatOptions {
 	/** `explain`: the "Explain" button of a question — the model assumes the
 	    learner knows nothing of the subject (2026-09-29). */
 	style?: "explain";
+	/** Pictures that go with the conversation (the course's figures), through
+	    the same attachment path as a generation's images: Claude Code reads
+	    them, Codex gets `-i`, Ollama takes base64. Antigravity cannot receive
+	    pictures: it gets `imageNames` as text instead. */
+	images?: ImagePayload[];
+	/** The pictures' file names, for a provider that cannot see them. */
+	imageNames?: string[];
 	/** The longest answer wanted, in characters (the model is asked for it). */
 	maxChars?: number;
 }
@@ -1261,7 +1268,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
 	    prose answer for `chat` (2026-09-29). `effort`: the level passed to the
 	    CLI, the composer's by default. */
-	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort: string | null = effortClaude()): Promise<string> {
+	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort: string | null = effortClaude(), imageInstruction = "First read these images with the Read tool, then base the quiz on their content:"): Promise<string> {
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.claudeDesktopOnly"));
 		}
@@ -1286,7 +1293,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		// Instruction au MODÈLE (pas de l'UI) → anglais, comme le prompt
 		// système ; la langue du quiz reste celle de la demande.
 		const imageNote = fichiers.length > 0
-			? "\n\nFirst read these images with the Read tool, then base the quiz on their content:\n" +
+			? "\n\n" + imageInstruction + "\n" +
 				fichiers.map((_, i) => "- " + jetonFichier(marqueur, i + 1)).join("\n")
 			: "";
 
@@ -1898,25 +1905,25 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (!last || last.role !== "user") throw new Error(t("ai.chat.empty"));
 			const earlier = turns.slice(0, -1).map(h => (h.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + h.text.trim()).join("\n\n");
 			const userPrompt = [
-				options.context?.trim() ? "COURSE MATERIAL ATTACHED BY THE LEARNER:\n" + options.context.trim() : "",
+				options.context?.trim() ? "CONTEXT (quiz and course material):\n" + options.context.trim() : "",
 				earlier ? "CONVERSATION SO FAR:\n" + earlier : "",
 				"LEARNER'S NEW MESSAGE:\n" + last.text.trim(),
 			].filter(Boolean).join("\n\n---\n\n");
 			const systeme = [
 				CHAT_SYSTEM,
-				options.style === "explain" ? "The learner pressed \"Explain\" on a quiz question. Assume they know NOTHING about the subject: define every term the first time you use it, go one step at a time from the basics to the answer (a beginner cannot yet build the explanation alone, so give it complete), say what each wrong choice gets wrong, use a concrete everyday comparison with its limit, work one concrete example out step by step, and finish with one short check question whose answer you do not give." : "",
+				options.style === "explain" ? "The learner opened this chat from a question of the quiz below; that question is marked in it. \"This question\", \"the answer\", \"explain it to me\" and the like refer to the marked question unless the learner says otherwise. Answer what they ask, using the quiz and the course; when they ask for an explanation, assume they know nothing and build it step by step (define every term the first time, say what each wrong choice gets wrong, use a concrete everyday example)." : "",
 				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding.` : "",
 			].filter(Boolean).join("\n\n");
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);
-				return (await callClaudeCodeTexte(model, systeme, userPrompt)).trim();
+				return (await callClaudeCodeTexte(model, systeme, userPrompt, options.images ?? [], undefined, "The course's pictures (figures, diagrams). Read them with the Read tool when the question needs them:")).trim();
 			}
 			if (provider === "codex") {
 				model = resolveCodexModel(model);
 				const effort = resolveEffort("codex", settings.get().aiEffort, model);
 				const m = getCodexModels().find(x => x.value === model);
 				const fast = !!settings.get().aiCodexFast && !!(m && m.fast);
-				return (await callCodexTexte(model, systeme, userPrompt, [], effort, fast)).trim();
+				return (await callCodexTexte(model, systeme, userPrompt, options.images ?? [], effort, fast)).trim();
 			}
 			if (provider === "ollama") {
 				if (!model) model = resolveOllamaSelection(settings.get().aiOllamaModels, settings.get().aiOllamaCatalog)[0]?.value || "";
@@ -1924,12 +1931,14 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				const key = (settings.get().aiOllamaCloudKey || "").trim();
 				const authHeader: Record<string, string> = key ? { "Authorization": "Bearer " + key } : {};
 				const effort = resolveEffort("ollama", settings.get().aiEffort);
-				return (await callOllamaTexte(model, systeme, userPrompt, ollamaUrl, authHeader, [], effort)).trim();
+				return (await callOllamaTexte(model, systeme, userPrompt, ollamaUrl, authHeader, options.images ?? [], effort)).trim();
 			}
 			if (provider === "antigravity-cli") {
 				model = resolveAntigravityModel(model);
 				const effort = niveauAntigravity(settings.get().aiAntigravityLevels, model);
-				return (await callAntigravityTexte(antigravityModelId(model, effort), systeme, userPrompt)).trim();
+				// No picture support: the names go as text.
+				const sansImages = options.imageNames?.length ? userPrompt + "\n\nThe course also has these pictures, which you cannot see: " + options.imageNames.join(", ") : userPrompt;
+				return (await callAntigravityTexte(antigravityModelId(model, effort), systeme, sansImages)).trim();
 			}
 			throw new Error(t("ai.chat.providerUnsupported"));
 		} catch (err) {

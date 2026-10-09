@@ -230,68 +230,6 @@
 	height: 16px;
 }
 
-/* The prompt tile: the start of what will be sent, faded at the bottom, its
-   name and a pencil that opens the Settings on the prompt. */
-.qz-mini-tuile {
-	align-self: flex-start;
-	box-sizing: border-box;
-	width: 118px;
-	height: 118px;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-	padding: 9px 8px 8px;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 12%, transparent);
-	border-radius: 12px;
-	background: color-mix(in srgb, var(--text-normal) 4%, transparent);
-}
-.qz-mini-tuile-texte {
-	flex: 1;
-	min-height: 0;
-	overflow: hidden;
-	font-size: 10px;
-	line-height: 1.4;
-	color: var(--text-muted);
-	overflow-wrap: anywhere;
-	-webkit-mask-image: linear-gradient(#000 60%, transparent);
-	mask-image: linear-gradient(#000 60%, transparent);
-}
-.qz-mini-tuile-pied {
-	flex: none;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 6px;
-}
-.qz-mini-tuile-nom {
-	padding: 1px 6px;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 35%, transparent);
-	border-radius: 5px;
-	font-size: 11px;
-	font-weight: 700;
-	line-height: 1.35;
-	color: var(--text-normal);
-}
-.qz-mini-tuile-edit {
-	display: inline-grid;
-	place-items: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 14%, transparent);
-	border-radius: 7px;
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent) !important;
-	box-shadow: none !important;
-	color: var(--text-normal);
-	cursor: pointer;
-}
-.qz-mini-tuile-edit:hover {
-	background: var(--background-modifier-hover) !important;
-}
-.qz-mini-tuile-edit svg {
-	width: 13px;
-	height: 13px;
-}
 .qz-mini-pied {
 	margin-left: auto;
 	display: flex;
@@ -416,8 +354,7 @@
 	background: var(--background-secondary);
 }
 
-/* A message of the learner, on the right: the prompt tile then, under it, what
-   they typed. */
+/* A message of the learner, on the right. */
 .nq-explain-msg-user {
 	align-self: flex-end;
 	display: flex;
@@ -452,10 +389,6 @@
 	height: 15px;
 }
 
-.nq-explain-msg-user .qz-mini-tuile {
-	align-self: flex-end;
-}
-
 /* Nothing said yet: the history is empty, the composer is centred in the
    window and drops to the bottom with the first message. */
 .nq-explain-modal .modal-content.nq-explain-vide {
@@ -487,45 +420,4 @@
 .nq-explain-champ::placeholder {
 	color: color-mix(in srgb, var(--text-normal) 52%, transparent);
 	opacity: 1;
-}
-
-.nq-explain-champ[readonly] {
-	cursor: default;
-}
-
-.qz-mini-tuile {
-	position: relative;
-}
-/* The round cross in the corner, like claude.ai's pasted text: hidden at
-   rest, shown when the tile is hovered or holds the focus. */
-.qz-mini-tuile-retirer {
-	position: absolute;
-	top: -9px;
-	right: -9px;
-	display: grid;
-	place-items: center;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: 1px solid color-mix(in srgb, var(--text-normal) 30%, transparent);
-	border-radius: 50%;
-	background: var(--background-primary) !important;
-	box-shadow: none !important;
-	color: var(--text-normal);
-	cursor: pointer;
-	opacity: 0;
-	transform: scale(0.85);
-	transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.qz-mini-tuile:hover .qz-mini-tuile-retirer,
-.qz-mini-tuile-retirer:focus-visible {
-	opacity: 1;
-	transform: none;
-}
-.qz-mini-tuile-retirer:hover {
-	background: var(--background-modifier-hover) !important;
-}
-.qz-mini-tuile-retirer svg {
-	width: 12px;
-	height: 12px;
 }

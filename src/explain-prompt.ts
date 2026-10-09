@@ -1,17 +1,12 @@
 /* ══════════════════════════════════════════════════════════
-   THE "EXPLAIN" PROMPT OF A QUIZ QUESTION (2026-09-29)
+   THE CONTEXT OF THE "EXPLAIN" WINDOW (2026-10-09)
 
-   A button on the question being played sends it to Claude Code or Codex
-   ("explain this question to me"), instead of a screenshot and a typed
-   prompt. The message is a TEMPLATE the learner can change in Settings,
-   with placeholders filled from the question:
-
-     {quiz}         the quiz's title
-     {question}     the question's title and statement
-     {options}      its choices, lettered as on screen (empty otherwise)
-     {answer}       the expected answer
-     {myAnswer}     what the learner answered, if anything
-     {explanation}  the quiz's own explanation, if any
+   The learner types freely; behind the scenes, EVERY message carries the
+   whole quiz: its title, its folder and ALL its questions (statement,
+   choices lettered as the player shows them for the question on screen,
+   expected answer, explanation), the question on screen marked, with the
+   learner's own answer and whether it is right. Before this, a prompt
+   template filled with the single question was shown as a tile.
 
    PURE: no DOM, no host. `npm run check:explain` holds it.
 ══════════════════════════════════════════════════════════ */
@@ -86,46 +81,54 @@ export function reponseAttendue(q: Q, ordre?: number[]): string {
 	return acceptees[0] ?? "";
 }
 
-/** The question itself: its title, then its statement (or its cloze text). */
-function enonce(q: Q): string {
-	const titre = texte(q.title);
-	const corps = texte(q.prompt) + (typeof q.cloze === "string" ? (texte(q.prompt) ? "\n" : "") + q.cloze.trim() : "");
-	return [titre, corps].filter(Boolean).join("\n");
+/** A pre-rendered HTML field as plain text (tags dropped, block ends kept as
+    line breaks): what a reading card or an HTML-only statement says. */
+export function htmlEnTexte(html: unknown): string {
+	if (typeof html !== "string") return "";
+	return html
+		.replace(/<\/(p|li|div|h[1-6]|tr)>|<br\s*\/?>/gi, "\n")
+		.replace(/<[^>]*>/g, "")
+		.replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&amp;/g, "&")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
 }
 
-/** The quiz's own explanation of the question. */
-function explication(q: Q): string {
-	return texte(q.explain);
+/** One question of the quiz, as a block of the context. */
+function bloc(q: Q, n: number, courant: boolean, extra: { ordre?: number[]; myAnswer?: string; correct?: boolean | null }): string {
+	const lecture = q.role === "read";
+	const lignes: string[] = [`[Q${n}]${courant ? " <<< QUESTION ON SCREEN >>>" : ""}${lecture ? " (reading card, not a question)" : ""}`];
+	const titre = texte(q.title);
+	const corps = texte(q.prompt) || htmlEnTexte(q.promptHtml);
+	if (titre) lignes.push(`Title: ${titre}`);
+	const cloze = typeof q.cloze === "string" ? q.cloze.trim() : "";
+	if (corps || cloze) lignes.push(`Statement: ${[corps, cloze].filter(Boolean).join("\n")}`);
+	const passage = texte(q.passageTitle);
+	if (passage) lignes.push(`Document shown: ${passage}`);
+	const choices = choix(q, courant ? extra.ordre : undefined);
+	if (choices) lignes.push(`Choices:\n${choices}`);
+	if (!lecture) {
+		const bonne = reponseAttendue(q, courant ? extra.ordre : undefined);
+		if (bonne) lignes.push(`Expected answer: ${bonne}`);
+		const why = texte(q.explain) || htmlEnTexte(q.explainHtml);
+		if (why) lignes.push(`Explanation: ${why}`);
+	}
+	if (courant) {
+		const mine = (extra.myAnswer ?? "").trim();
+		lignes.push(`Learner's answer: ${mine || "(none)"}`);
+		if (extra.correct === true) lignes.push("The learner's answer is RIGHT.");
+		else if (extra.correct === false) lignes.push("The learner's answer is WRONG.");
+	}
+	return lignes.join("\n");
 }
 
 /**
- * The template with its placeholders filled. An empty value leaves its
- * placeholder empty; a line that held only an empty placeholder is dropped,
- * so "My answer: " does not stay dangling when nothing was answered.
+ * The quiz as the model gets it: header, then EVERY question in order, the one
+ * on screen (`courant`, an index in `questions`) marked with the learner's
+ * answer. An out-of-range `courant` marks nothing.
  */
-export function remplirPromptExplication(template: string, q: Q, extra: { quiz: string; myAnswer?: string; ordre?: number[] }): string {
-	const valeurs: Record<string, string> = {
-		quiz: extra.quiz.trim(),
-		question: enonce(q),
-		options: choix(q, extra.ordre),
-		answer: reponseAttendue(q, extra.ordre),
-		myAnswer: (extra.myAnswer ?? "").trim(),
-		explanation: explication(q),
-	};
-	const lignes = template.split("\n");
-	// A line built around placeholders that are ALL empty is dropped...
-	const garde = lignes.map(ligne => {
-		const cles = [...ligne.matchAll(/\{(\w+)\}/g)].map(m => m[1]).filter(k => k in valeurs);
-		return cles.length === 0 || cles.some(k => valeurs[k] !== "");
-	});
-	// ...and so is the label line just above it ("Choices:" with no choices).
-	lignes.forEach((ligne, i) => {
-		if (garde[i] && i + 1 < lignes.length && !garde[i + 1] && /:\s*$/.test(ligne) && !/\{\w+\}/.test(ligne)) garde[i] = false;
-	});
-	return lignes
-		.filter((_, i) => garde[i])
-		.map(ligne => ligne.replace(/\{(\w+)\}/g, (m, k: string) => (k in valeurs ? valeurs[k] : m)))
-		.join("\n")
-		.replace(/\n{3,}/g, "\n\n")
-		.trim();
+export function contexteQuiz(questions: Q[], extra: { quiz: string; folder?: string; courant: number; ordre?: number[]; myAnswer?: string; correct?: boolean | null }): string {
+	const tete = [`QUIZ: ${extra.quiz.trim()}`];
+	if (extra.folder?.trim()) tete.push(`FOLDER: ${extra.folder.trim()}`);
+	tete.push("The question marked \"QUESTION ON SCREEN\" is the one the learner is looking at; the others are the rest of the same quiz.");
+	return tete.join("\n") + "\n\n" + questions.map((q, i) => bloc(q, i + 1, i === extra.courant, extra)).join("\n\n") + "\n";
 }
