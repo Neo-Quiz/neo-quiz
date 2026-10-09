@@ -56,6 +56,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
 	r.check("Learn: a reading stays under 1800 characters, written in the prompt",
 		[learnP.includes("stays under 1800 characters"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("stays under 1800 characters")], [true, false]);
+	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram. */
+	r.check("Learn: interactive pages name the explorable, structured-course and annotated-diagram styles",
+		["EXPLORABLE", "STRUCTURED COURSE", "ANNOTATED DIAGRAM", "MIXED"].map(m => learnP.includes(m)), [true, true, true, true]);
 	/* 2026-10-09: the readings carry ALL of the course, rephrased to be easier, never copied, and may add related knowledge. */
 	r.check("Learn: readings keep every piece of the course, rephrased, never copied, related additions allowed",
 		["EVERY piece of information", "never copy the course sentence by sentence", "REPHRASE", "ADD related knowledge"].map(m => learnP.includes(m)), [true, true, true, true]);
