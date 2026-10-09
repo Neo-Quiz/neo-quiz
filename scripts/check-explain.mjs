@@ -120,6 +120,13 @@ await withSrcModule(["src/explain-edit.ts", "src/explain-prompt.ts", "src/lectur
 	r.check("a prototype key is a forbidden field", motif(original, '{"__proto__":{"title":"x"}}'), "field");
 	r.check("another question: its id or its own keys are refused", [motif(original, { id: "q2", title: "Other" }), motif(original, { prompt: "x", options: ["a"], correctIndex: 0 })], ["field", "field"]);
 	r.check("the card must be a reading", motif({ ...original, role: "recall" }, { title: "T" }), "notReading");
+	const sansId = { role: "read", title: "Lists", promptHtml: original.promptHtml };
+	const vSansId = juge(sansId, { title: "Lists, simply", promptHtml: original.promptHtml });
+	r.check("a card without an id keeps its title (its question id comes from the title's slug)",
+		[vSansId.ok, "title" in (vSansId.fields ?? {}), juge(original, { title: "Lists, simply" }).fields?.title], [true, false, "Lists, simply"]);
+	const vRetenir = juge(original, { retenir: { forme: "cartes", items: [{ recto: "a", verso: "b", extra: "x" }, { recto: "", verso: "" }], stray: 1 } });
+	r.check("key points are written in their normalised form: no stray key, no empty card",
+		vRetenir.fields?.retenir, { forme: "cartes", items: [{ recto: "a", verso: "b" }] });
 	r.check("`prompt` on a card that uses `promptHtml` (and the reverse) is refused",
 		[motif(original, { prompt: "text" }), motif({ id: "r2", role: "read", title: "T", prompt: x(700) }, { promptHtml: "<p>x</p>" })], ["field", "field"]);
 	r.check("wrong types: a title, a text, steps, key points", [

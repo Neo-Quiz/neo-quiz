@@ -99,7 +99,10 @@ export function validateCardEdit(original: Record<string, unknown>, raw: string,
 	const fields: CardFields = {};
 	if ("title" in given) {
 		if (typeof given.title !== "string" || !given.title.trim()) return no("type");
-		fields.title = given.title.trim();
+		/* A card without an explicit `id` takes its question id from its
+		   title's slug (`quiz-ids.ts`): renaming it would change that id and
+		   shift its suffixed namesakes. Such a card keeps its title. */
+		if (typeof original.id === "string" && original.id.trim()) fields.title = given.title.trim();
 	}
 	if ("prompt" in given) {
 		if (typeof given.prompt !== "string" || !given.prompt.trim()) return no("type");
@@ -117,8 +120,11 @@ export function validateCardEdit(original: Record<string, unknown>, raw: string,
 		fields.etapes = e;
 	}
 	if ("retenir" in given) {
-		if (!retenirDeLecture({ retenir: given.retenir })) return no("type");
-		fields.retenir = given.retenir;
+		/* Written in its normalised form: stray keys or empty cards the model
+		   sent never reach the note. */
+		const retenir = retenirDeLecture({ retenir: given.retenir });
+		if (!retenir) return no("type");
+		fields.retenir = retenir;
 	}
 
 	const before = cardTextLength(original);
