@@ -271,3 +271,41 @@ export function usageResetText(resetsAt: number | null, now: number, lang: strin
 	if (resetsAt - now >= 86400000) return formatResetMoment(resetsAt, lang, "long");
 	return formatCountdown(resetsAt, now);
 }
+
+/* ── The popover opened from the status block ── */
+
+/** Window title: "5-hour limit", "Weekly limit", "3-day limit". Claude's two
+    windows have fixed spans; a Codex window is named after its duration. */
+export function usageWindowTitle(row: UsageRow): string {
+	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
+	if (mins === 10080) return t("ai.usage.limitWeekly");
+	if (mins >= 1440) return t("ai.usage.limitDays", { n: Math.round(mins / 1440) });
+	if (mins > 0) return t("ai.usage.limitHours", { n: Math.max(1, Math.round(mins / 60)) });
+	return t("ai.usage.limitPlan");
+}
+
+/** Share left, clamped to 0..100 like the used share. */
+export function usageRemainingPercent(usedPercent: number): number {
+	const used = Number.isFinite(usedPercent) ? Math.max(0, Math.min(100, Math.round(usedPercent))) : 0;
+	return 100 - used;
+}
+
+/** "3h 38m" within a day, "4d 11h" beyond (hours dropped when zero); null when unknown or past. */
+export function usageResetIn(resetsAt: number | null, now: number): string | null {
+	if (resetsAt == null || resetsAt <= now) return null;
+	const minutes = Math.max(1, Math.floor((resetsAt - now) / 60000));
+	const days = Math.floor(minutes / 1440);
+	if (days >= 1) {
+		const hours = Math.floor((minutes - days * 1440) / 60);
+		return hours ? t("ai.usage.inDaysHours", { d: days, h: hours }) : t("ai.usage.inDays", { d: days });
+	}
+	const hours = Math.floor(minutes / 60);
+	return hours ? t("ai.usage.inHoursMinutes", { h: hours, m: minutes - hours * 60 }) : t("ai.usage.inMinutes", { m: minutes });
+}
+
+/** A wait in words: seconds under a minute ("18 s"), else whole minutes rounded up ("1 min"). */
+export function usageWaitText(ms: number): string {
+	const s = Math.max(1, Math.ceil(ms / 1000));
+	if (s < 60) return t("ai.usage.seconds", { n: s });
+	return t("ai.usage.durationMinutes", { m: Math.ceil(s / 60) });
+}

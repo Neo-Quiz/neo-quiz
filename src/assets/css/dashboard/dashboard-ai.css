@@ -4636,10 +4636,6 @@
    fixed width, so they always have the same length and position. Small and muted; accent, then orange
    from 75 % and red from 90 %. */
 .qbd-ai-usage-line {
-	display: grid;
-	grid-template-columns: max-content 140px max-content max-content;
-	align-items: center;
-	gap: 5px 10px;
 	padding: 6px 4px 0;
 	font-size: 12px;
 	line-height: 16px;
@@ -4663,11 +4659,188 @@
 
 .qbd-ai-stage > .qbd-ai-usage-slot .qbd-ai-usage-line {
 	justify-content: start;
-	padding-left: 16px;
+	/* The clickable block hugs its content; the slot keeps the composer's width. */
+	width: fit-content;
+	max-width: 100%;
+	margin-left: 8px;
+	padding: 6px 8px;
 }
 
 .qbd-ai-usage-win {
 	display: contents;
+}
+
+/* The block is one button; the grid inside keeps the column layout above. */
+.qbd-ai-usage-line {
+	display: block;
+	cursor: pointer;
+	border-radius: 8px;
+	transition: background-color 120ms ease;
+}
+
+.qbd-ai-usage-line:hover,
+.qbd-ai-usage-line[aria-expanded="true"] {
+	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+}
+
+.qbd-ai-usage-line:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
+.qbd-ai-usage-grid {
+	display: grid;
+	grid-template-columns: max-content 140px max-content max-content;
+	align-items: center;
+	gap: 5px 10px;
+}
+
+.qbd-ai-usage-updated {
+	margin-top: 5px;
+	color: var(--text-faint);
+}
+
+/* ── Popover: ONE opaque surface (no glass, no card inside a card), windows
+   separated by a hairline. Three levels: title + "% used", bar, meta. ── */
+.qbd-usage-pop {
+	position: fixed;
+	z-index: 10000;
+	box-sizing: border-box;
+	width: min(300px, calc(100vw - 16px));
+	padding: 14px 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-primary);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
+	color: var(--text-normal);
+	font-size: 12px;
+	text-transform: none;
+	font-variant-numeric: tabular-nums;
+	transform-origin: bottom left;
+	animation: qbd-usage-pop-in 150ms ease-out;
+}
+
+.qbd-usage-pop[data-side="below"] {
+	transform-origin: top left;
+}
+
+@keyframes qbd-usage-pop-in {
+	from { opacity: 0; transform: scale(0.96); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-usage-pop { animation: none; }
+}
+
+.qbd-usage-pop-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding-bottom: 12px;
+}
+
+.qbd-usage-pop-logo {
+	width: 20px;
+	height: 20px;
+}
+
+.qbd-usage-pop-logo svg,
+.qbd-usage-pop-logo img {
+	width: 20px;
+	height: 20px;
+}
+
+.qbd-usage-pop-titles {
+	flex: 1;
+	min-width: 0;
+}
+
+.qbd-usage-pop-title {
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 18px;
+}
+
+.qbd-usage-pop-sub {
+	color: var(--text-faint);
+	line-height: 16px;
+}
+
+.qbd-usage-pop-refresh {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.qbd-usage-pop-refresh:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+	color: var(--text-normal);
+}
+
+.qbd-usage-pop-refresh:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.qbd-usage-pop-refresh svg {
+	width: 14px;
+	height: 14px;
+}
+
+.qbd-usage-pop-note {
+	padding: 10px 0 2px;
+	border-top: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.qbd-usage-pop-win {
+	padding: 12px 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.qbd-usage-pop-win:last-child {
+	padding-bottom: 0;
+}
+
+.qbd-usage-pop-top {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.qbd-usage-pop-name {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.qbd-usage-pop-used {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.qbd-ai-usage-bar.qbd-usage-pop-bar {
+	height: 6px;
+}
+
+.qbd-usage-pop-meta {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	margin-top: 8px;
+	color: var(--text-faint);
 }
 
 .qbd-ai-usage-name,

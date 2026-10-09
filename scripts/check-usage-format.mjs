@@ -7,7 +7,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/usage-format.ts", ({ usageLevel, usageStatusRows, usageResetText }) => {
+await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-cadence.ts"], ({ usageLevel, usageStatusRows, usageResetText, usageWindowTitle, usageRemainingPercent, usageResetIn, usageWaitText }, { newCadence, cadenceVerdict, cadenceSuccess, cadenceRateLimited }) => {
 	const r = makeReporter("Usage line formats");
 
 	r.check("0 % : ok", usageLevel(0), "ok");
@@ -38,6 +38,57 @@ await withSrcModule("src/dashboard/usage-format.ts", ({ usageLevel, usageStatusR
 	const far = usageResetText(now + 3 * 86400000, now, "en") || "";
 	r.check("au-delà de 24 h : jour de la semaine en toutes lettres", /^[A-Z][a-z]{5,8}/.test(far), true);
 	r.check("au-delà de 24 h : heure présente", /\d{2}:\d{2}|\d{1,2}:\d{2}/.test(far), true);
+
+	r.check("title: session", usageWindowTitle(session), "5-hour limit");
+	r.check("title: weekly", usageWindowTitle(week), "Weekly limit");
+	r.check("title: codex 5 h", usageWindowTitle(w5), "5-hour limit");
+	r.check("title: codex 7 d", usageWindowTitle(w7), "Weekly limit");
+	r.check("title: codex 3 d", usageWindowTitle({ kind: "window", windowMinutes: 4320, usedPercent: 0, resetsAt: null }), "3-day limit");
+	r.check("remaining 4 -> 96", usageRemainingPercent(4), 96);
+	r.check("remaining clamps over 100", usageRemainingPercent(130), 0);
+	r.check("remaining NaN -> 100", usageRemainingPercent(Number.NaN), 100);
+	r.check("resets in 3h 38m", usageResetIn(now + (3 * 60 + 38) * 60000, now), "3h 38m");
+	r.check("resets in 4d 11h", usageResetIn(now + (4 * 24 + 11) * 3600000 + 600000, now), "4d 11h");
+	r.check("resets in exact days", usageResetIn(now + 2 * 86400000, now), "2d");
+	r.check("resets in 45m", usageResetIn(now + 45 * 60000, now), "45m");
+	r.check("resets past: null", usageResetIn(now - 1, now), null);
+
+	r.check("wait 18 s", usageWaitText(18000), "18 s");
+	r.check("wait 60 s -> 1 min", usageWaitText(60000), "1 min");
+	r.check("wait 61 s rounds up", usageWaitText(61000), "2 min");
+
+	// Read cadence, simulated clock (one shared state per provider).
+	const T = 1_000_000;
+	const c = newCadence();
+	r.check("cadence: first read allowed", cadenceVerdict(c, T).ok, true);
+	cadenceSuccess(c, T);
+	const g = cadenceVerdict(c, T + 12000);
+	r.check("cadence: 12 s after a read is refused", g.ok === false && g.reason === "gap" && g.waitMs === 18000, true);
+	r.check("cadence: 29.9 s refused", cadenceVerdict(c, T + 29900).ok, false);
+	r.check("cadence: 30 s allowed", cadenceVerdict(c, T + 30000).ok, true);
+	// Shared clock: a second holder of the SAME state sees the first one's read.
+	const shared = c;
+	r.check("cadence: shared clock refuses the other block", cadenceVerdict(shared, T + 5000).ok, false);
+	// 429 without header: 60 s, 2, 4, 8 min, cap 15 min.
+	const b = newCadence();
+	const waits = [];
+	for (let i = 0; i < 7; i++) { cadenceRateLimited(b, T, null); const v = cadenceVerdict(b, T); waits.push(v.ok ? 0 : v.waitMs / 60000); }
+	r.check("cadence: back-off 1, 2, 4, 8, 15, 15", waits.slice(0, 6), [1, 2, 4, 8, 15, 15]);
+	r.check("cadence: no read during back-off", cadenceVerdict(b, T + 14 * 60000).ok, false);
+	r.check("cadence: read after back-off", cadenceVerdict(b, T + 15 * 60000).ok, true);
+	// Retry-After wins over the back-off, and is capped.
+	const h = newCadence();
+	cadenceRateLimited(h, T, 281);
+	const hv = cadenceVerdict(h, T);
+	r.check("cadence: Retry-After 281 s used", hv.ok === false && hv.waitMs === 281000, true);
+	cadenceRateLimited(h, T, 99999);
+	const hv2 = cadenceVerdict(h, T);
+	r.check("cadence: Retry-After capped at 15 min", hv2.ok === false && hv2.waitMs === 900000, true);
+	// A success resets the back-off.
+	cadenceSuccess(b, T + 15 * 60000);
+	cadenceRateLimited(b, T + 16 * 60000, null);
+	const rv = cadenceVerdict(b, T + 16 * 60000);
+	r.check("cadence: success resets the back-off to 60 s", rv.ok === false && rv.waitMs === 60000, true);
 
 	r.done();
 });
