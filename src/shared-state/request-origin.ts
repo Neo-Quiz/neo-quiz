@@ -61,6 +61,11 @@ export function recordOrigin(q: { from: string; fromName?: string; on?: string }
 	};
 }
 
+/** Does a request need the "sent from / run on" line? Not when it was sent AND run on this window's own device: that line only tells the owner what they already see. Any other device, sender or runner, keeps it. */
+export function originLineNeeded(sender: DeviceRef, runner: DeviceRef): boolean {
+	return !(sender.self && runner.self);
+}
+
 export interface DeviceWords { phone: string; pc: string; self: string }
 
 /** "Xiaomi 13T Pro", "DESKTOP-1U89520 (this device)": the name, else a readable word for the kind. */

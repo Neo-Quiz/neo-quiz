@@ -337,6 +337,10 @@ await withSrcModule(["src/shared-state/request-origin.ts"], (O) => {
 	r.check("the recorded runner wins over the chat's origin", O.runnerOf({ from: PHONE, on: LAPTOP }, PC), LAPTOP);
 	const local = O.recordOrigin({ from: PC }, PC, ctx);
 	r.check("sent and run on the same PC: one device", [local.sender.id === local.runner.id, local.sender.role], [true, "desktop"]);
+	r.check("sent and run on this device: no origin line", O.originLineNeeded(local.sender, local.runner), false);
+	r.check("sent here, run on another device: the line stays", O.originLineNeeded(...Object.values(O.recordOrigin({ from: PC, on: LAPTOP }, PC, ctx))), true);
+	r.check("sent from another device, run here: the line stays", O.originLineNeeded(...Object.values(O.recordOrigin({ from: LAPTOP, on: PC }, PC, ctx))), true);
+	r.check("sent and run on another device: the line stays", O.originLineNeeded(...Object.values(O.recordOrigin({ from: LAPTOP, on: LAPTOP }, PC, ctx))), true);
 	r.check("seen from the laptop, the PC is not 'this device'", label(O.recordOrigin({ from: PC }, PC, { ...ctx, self: LAPTOP }).runner), "DESKTOP-1U89520");
 	r.check("on the phone itself, the sender is 'this device' under its own name", label(O.resolveDevice(PHONE, { self: PHONE, selfName: "Xiaomi 13T Pro", devices }, { sender: true, runnerId: PC })), "Xiaomi 13T Pro (this device)");
 	r.check("ids compare without case", O.resolveDevice(PC.toUpperCase(), ctx).self, true);
