@@ -496,14 +496,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	peindreLogoBouton();
 	document.body.classList.add("nq-explain-rail-on");
 	let uniteCourante: Unite | null = null;
-	boutonRail.addEventListener("click", () => {
+	/* One toggle for both AI buttons (the rail and the icon on a phone): open the
+	   window on the unit on screen, or close it when it is already open. */
+	const basculer = (): void => {
 		// Open: the window's own close button (the host's, as Escape). Closed: the unit on screen.
 		const fermer = document.querySelector<HTMLElement>(".nq-explain-modal .modal-close-button");
 		if (fermer) { fermer.click(); return; }
 		const u = uniteCourante ?? lesUnites()[0] ?? null;
 		if (u) ouvrirDepuis(u.juge, u.qi);
-	});
-	boutonQuiz.addEventListener("click", () => { if (uniteCourante) ouvrirDepuis(uniteCourante.juge, uniteCourante.qi); });
+	};
+	boutonRail.addEventListener("click", basculer);
+	boutonQuiz.addEventListener("click", basculer);
 	/* The units: each card of a step page of a Learn, and the single card of
 	   any other question slide. `juge` is the element whose classes say
 	   whether the question is corrected, `qi` the question it holds. */
@@ -574,14 +577,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			onOpen: (m) => {
 				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
 				monterPanneau(m.panelEl, texteQuestion(questions[qi]));
-				const composer = ajouter(m.contentEl, "div", "nq-explain-composer");
-				const champ = ajouter(composer, "textarea", "nq-explain-champ");
+				/* The Generate page's composer, as is (dashboard-ai.css): same frame, same bottom
+				   row, same send button. No attachments and no folder row here. */
+				const composer = ajouter(m.contentEl, "div", "qbd-ai-composer nq-explain-composer");
+				const zone = ajouter(composer, "div", "qbd-ai-composer-textzone");
+				const champ = ajouter(zone, "textarea", "qbd-ai-composer-input");
 				champ.rows = 1;
 				champ.placeholder = t("ai.explain.ownQuestion");
 				const majPlaceholder = (): void => { champ.placeholder = t(conv.messages.length ? "ai.explain.followUp" : "ai.explain.ownQuestion"); };
-				const pied = ajouter(composer, "div", "qz-mini-pied");
-				const outils = ajouter(pied, "div", "qz-mini-outils");
-				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo qz-mini-fournisseur");
+				const pied = ajouter(composer, "div", "qbd-ai-composer-bottom");
+				const outils = ajouter(pied, "div", "qbd-ai-composer-tools");
+				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo");
 				fournisseurBtn.type = "button";
 				const modeleBtn = ajouter(outils, "button", "qbd-select qbd-model-trigger qbd-composer-plain");
 				modeleBtn.type = "button";
@@ -589,7 +595,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const effortBtn = ajouter(outils, "button", "qbd-select qbd-effort-trigger qbd-composer-plain");
 				effortBtn.type = "button";
 				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
-				const envoi = ajouter(outils, "button", "qz-mini-envoi");
+				const envoi = ajouter(outils, "button", "qbd-ai-composer-send");
 				envoi.type = "button";
 
 				/* The plan status line of the Generate page, as is (`usage-line.ts`), right
@@ -631,7 +637,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				};
 				const majEnvoi = (): void => {
 					envoi.replaceChildren();
-					host.ui.setIcon(ajouter(envoi, "span"), conv.enCours ? "square" : "arrow-up");
+					envoi.classList.toggle("qbd-ai-composer-send--stop", conv.enCours);
+					host.ui.setIcon(ajouter(envoi, "span", "qbd-ai-composer-send-icon"), conv.enCours ? "square" : "arrow-up");
 					envoi.setAttribute("aria-label", t(conv.enCours ? "ai.explain.stop" : "ai.explain.send"));
 envoi.disabled = !conv.enCours && !champ.value.trim();
 				};

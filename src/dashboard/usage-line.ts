@@ -160,17 +160,25 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	    only (a redraw inside that window resumes the fill via a negative delay). */
 	let openedAt = 0;
 	const FILL_MS = 450;
+	/* Anchored by its BOTTOM edge above the block (or its top below when there is
+	   no room above): the popover grows away from the anchor when its content
+	   arrives, it never moves. Called at the opening and on resize only, never
+	   from a redraw, so a late line cannot shift it. */
 	const place = (): void => {
 		if (!pop) return;
 		const r = el.getBoundingClientRect();
-		const w = pop.offsetWidth, h = pop.offsetHeight;
-		const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
-		let top = r.top - h - 8;
-		let below = false;
-		if (top < 8) { top = r.bottom + 8; below = true; }
+		const h = pop.offsetHeight;
+		const left = Math.min(Math.max(8, r.left), window.innerWidth - pop.offsetWidth - 8);
 		pop.style.left = left + "px";
-		pop.style.top = Math.max(8, Math.min(top, window.innerHeight - h - 8)) + "px";
-		pop.dataset.side = below ? "below" : "above";
+		if (r.top - h - 8 >= 8) {
+			pop.style.top = "auto";
+			pop.style.bottom = (window.innerHeight - r.top + 8) + "px";
+			pop.dataset.side = "above";
+		} else {
+			pop.style.bottom = "auto";
+			pop.style.top = Math.max(8, r.bottom + 8) + "px";
+			pop.dataset.side = "below";
+		}
 	};
 	function drawPop(): void {
 		if (!pop) return;
@@ -188,13 +196,17 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		ajouter(titles, "div", "qbd-usage-pop-title", t(tool === "claude" ? "ai.usage.popoverTitleClaude" : "ai.usage.popoverTitleCodex"));
 		if (cur) ajouter(titles, "div", "qbd-usage-pop-sub", t("ai.usage.updated", { age: formatAge(cur.at, now) }));
 		const mail = emails.get(tool)?.email;
-		if (mail) {
+		/* On the desktop app the e-mail line is reserved from the opening, empty
+		   until the account answers: the popover does not grow under the learner. */
+		if (mail || currentHost().platform.isDesktopApp) {
 			// Middle truncation: the local part shrinks, the domain stays whole.
-			const at = mail.lastIndexOf("@");
+			const at = mail ? mail.lastIndexOf("@") : -1;
 			const line = ajouter(titles, "div", "qbd-usage-pop-email");
-			line.title = mail;
-			ajouter(line, "span", "qbd-usage-pop-email-local", at > 0 ? mail.slice(0, at) : mail);
-			if (at > 0) ajouter(line, "span", "qbd-usage-pop-email-domain", mail.slice(at));
+			if (mail) {
+				line.title = mail;
+				ajouter(line, "span", "qbd-usage-pop-email-local", at > 0 ? mail.slice(0, at) : mail);
+				if (at > 0) ajouter(line, "span", "qbd-usage-pop-email-domain", mail.slice(at));
+			}
 		}
 		const refresh = ajouter(head, "button", "qbd-usage-pop-refresh") as HTMLButtonElement;
 		refresh.type = "button";
@@ -229,7 +241,6 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(meta, "span", "", when ? t("ai.usage.resetsIn", { when }) : "");
 		}
 		drawResets(now);
-		place();
 	}
 	/** The banked resets section. Texts from the server go in as TEXT. */
 	function drawResets(now: number): void {
@@ -336,6 +347,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		window.addEventListener("resize", place);
 		openedAt = Date.now();
 		drawPop();
+		place();
 		resets.message = null;
 		loadEmail(tool, () => { if (pop) drawPop(); });
 		loadResets(tool, false, () => redraws.forEach(f => f()));

@@ -15,6 +15,7 @@ release notes.
 
 ### Added
 
+- The AI chat beside a quiz uses the Generate page's composer and usage line, and its popover no longer moves while its content loads. The AI button closes the chat when it is already open, on the desktop rail and on the phone icon.
 - Rename and Duplicate a quiz from the "⋯" menu of its card. A rename keeps the type suffix of the note, refuses a name already taken in the folder, and keeps the review history, progress and saved session; a duplicate is a fresh copy named "(copy)", without any progress. Links to the quiz from other notes are not updated.
 - A right click on a quiz card or a folder card opens its "⋯" menu.
 - Interactive pages (readings and "Explain" answers) have a "⋯" menu at their top right: "View the code" shows the page source in a window with a Copy button, "Copy as image" copies the page as it is on screen, and "Download as HTML" saves its source. On Android, the page is shared as an .html file and "Copy as image" is not offered. The "View the code" link under the page is gone.

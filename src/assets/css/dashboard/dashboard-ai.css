@@ -4653,11 +4653,11 @@
 /* Left-aligned under the composer: the slot takes the composer's width
    (732 px, see `.qbd-ai-stage .qbd-ai-composer`) and the grid starts at its
    left edge instead of being centred in the stage. */
-.qbd-ai-stage > .qbd-ai-usage-slot {
+.qbd-ai-usage-slot {
 	width: min(732px, 100%);
 }
 
-.qbd-ai-stage > .qbd-ai-usage-slot .qbd-ai-usage-line {
+.qbd-ai-usage-slot .qbd-ai-usage-line {
 	justify-content: start;
 	/* The clickable block hugs its content; the slot keeps the composer's width. */
 	width: fit-content;
@@ -4750,7 +4750,8 @@
 	position: fixed;
 	z-index: 10000;
 	box-sizing: border-box;
-	width: min(300px, calc(100vw - 16px));
+	width: 300px;
+	max-width: calc(100vw - 16px);
 	padding: 14px 16px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 12px;
@@ -4814,6 +4815,7 @@
 .qbd-usage-pop-email {
 	display: flex;
 	min-width: 0;
+	min-height: 16px;
 	color: var(--text-faint);
 	line-height: 16px;
 	white-space: nowrap;
