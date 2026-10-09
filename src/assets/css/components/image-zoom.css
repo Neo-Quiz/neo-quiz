@@ -126,6 +126,16 @@
   transition: opacity 180ms ease;
 }
 
+/* Zoomed, the bar sits OVER the picture: on a white diagram its white text
+   vanished (seen on screen, 2026-10-09). A dark pill keeps it readable. */
+.qbd-visionneuse.is-zoome .qbd-visionneuse-bas{
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgb(20 20 20 / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .qbd-visionneuse.is-saisie .qbd-visionneuse-bas{
   opacity: 0.35;
 }

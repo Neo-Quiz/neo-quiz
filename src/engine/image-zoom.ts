@@ -163,7 +163,7 @@ export function ouvrirImage(images: HTMLImageElement[], index: number): void {
 		bouton("qbd-visionneuse-outil", "zoom-out", "engine.image.zoomOut", () => zoomPar(1 / FACTEUR_BOUTON)),
 		niveau,
 		bouton("qbd-visionneuse-outil", "zoom-in", "engine.image.zoomIn", () => zoomPar(FACTEUR_BOUTON)),
-		bouton("qbd-visionneuse-outil", "scan", "engine.image.actualSize", () => poser(zoomAutour(vue, 1, vw() / 2, vh() / 2, fit()), true)),
+		bouton("qbd-visionneuse-outil", "scan", "engine.image.actualSize", () => poser(zoomAutour(vue, 1, vw() / 2, vh() / 2, Math.min(1, fit())), true)),
 	);
 	bas.append(navigation, compteur, outils);
 	voile.append(img, fermeture, bas);
@@ -271,7 +271,7 @@ export function ouvrirImage(images: HTMLImageElement[], index: number): void {
 		else if (k === "+" || k === "=") zoomPar(FACTEUR_BOUTON);
 		else if (k === "-") zoomPar(1 / FACTEUR_BOUTON);
 		else if (k === "0") poser(vueAjustee(), true);
-		else if (k === "1") poser(zoomAutour(vue, 1, vw() / 2, vh() / 2, fit()), true);
+		else if (k === "1") poser(zoomAutour(vue, 1, vw() / 2, vh() / 2, Math.min(1, fit())), true);
 		else return;
 		e.preventDefault();
 		e.stopPropagation();
