@@ -29,6 +29,11 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.lecture.flipHint": "Cliquez sur une carte, ou appuyez sur Entrée, pour la retourner.",
 	"engine.lecture.flipAria": "{front} : retourner la carte",
 	"engine.lecture.flippedAria": "{front} : {back}",
+	"engine.htmlFrame.title": "Illustration interactive",
+	"engine.htmlFrame.showCode": "Voir le code",
+	"engine.htmlFrame.hideCode": "Masquer le code",
+	"engine.htmlFrame.tooLarge": "Cette illustration est trop volumineuse pour être affichée.",
+	"engine.htmlFrame.drawing": "Dessin de l'illustration…",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Résultats",

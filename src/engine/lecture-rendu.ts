@@ -1,6 +1,8 @@
 import { t } from "../i18n";
 import { lireLecture, paragraphes } from "../lecture-style";
 import { lireCitations } from "../pdf-sources";
+import { brancherCadres, htmlFrameMarkup } from "./html-frame";
+import { htmlDeLecture } from "./html-frame-core";
 import type { LectureStylee, Retenir, TableauLecture } from "../lecture-style";
 
 /* ══════════════════════════════════════════════════════════
@@ -128,7 +130,15 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	const source = typeof cite === "string" && cite.trim()
 		? `<div class="quiz-lecture-source"${citeOuvrable(cite) ? ` data-cite="${p.attribut(cite.trim())}" role="button" tabindex="0"` : ""}>${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
 		: "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${courte ? "" : figureHtml(item, p)}${corps}${retenir}${source}</div>` };
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${courte ? "" : figureHtml(item, p)}${corps}${courte ? "" : pageInteractive(item)}${retenir}${source}</div>` };
+}
+
+/** The reading's interactive page (`html`, 2026-10-09): a complete HTML page in
+    a sandboxed iframe (html-frame-core.ts), under the text. Never in the
+    short version read above a question. */
+function pageInteractive(item: unknown): string {
+	const source = htmlDeLecture(item);
+	return source === null ? "" : htmlFrameMarkup(source);
 }
 
 /** Does this `cite` name a PDF the viewer can open? Then the line is a button. */
@@ -167,6 +177,8 @@ function figureHtml(item: unknown, p: PortesLecture): string {
  * s'annuleraient et la carte ne tournerait plus.
  */
 export function brancherCartes(racine: ParentNode): void {
+	// The interactive pages (iframes) of the same subtree share this entry point.
+	brancherCadres(racine);
 	racine.querySelectorAll<HTMLButtonElement>(".quiz-lecture-carte").forEach(btn => {
 		if (btn.dataset.branchee === "1") return;
 		btn.dataset.branchee = "1";

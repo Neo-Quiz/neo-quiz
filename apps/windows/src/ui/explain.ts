@@ -35,6 +35,8 @@ import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../s
 import type { OpenProviderMenuOptions, ProviderBrandOption } from "../../../../src/dashboard/ui-select";
 import { renderMarkdownPreview } from "../../../../src/markdown-preview";
 import { mathifyElement } from "../../../../src/engine/mathjax";
+import { brancherCadres, htmlFrameMarkup } from "../../../../src/engine/html-frame";
+import { splitHtmlBlocks } from "../../../../src/engine/html-frame-core";
 import { consigneExplication, contexteQuiz } from "../../../../src/explain-prompt";
 import { ancrerImagesCitees } from "../../../../src/explain-images";
 import type { ImageJointe } from "../../../../src/explain-images";
@@ -51,6 +53,7 @@ import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const NL = String.fromCharCode(10);
 
 /** The default longest explanation, in characters: a full explanation (error
     diagnosis, steps, every wrong option, example, check question) fits. */
@@ -674,8 +677,22 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 						const decoupe = conv.lecture ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
 						if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
 						else if (decoupe.shown) {
-							const ancre = ancrerImagesCitees(decoupe.shown, jointesCours);
-							prose.innerHTML = renderMarkdownPreview(ancre.texte);
+							/* A fenced ```html block is shown as an interactive page in a
+							   sandboxed frame (engine/html-frame-core.ts), not as code. Each
+							   block goes through the markdown renderer as a plain token, then
+							   its paragraph is replaced by the frame. A block still being
+							   written is a placeholder: a half page would reload at every chunk. */
+							const cadres: string[] = [];
+							const seul = splitHtmlBlocks(decoupe.shown).map(seg => {
+								if (seg.kind === "text") return seg.value;
+								cadres.push(seg.kind === "html" ? htmlFrameMarkup(seg.value) : `<div class="nq-html-frame nq-html-frame--pending">${t("engine.htmlFrame.drawing")}</div>`);
+								return `${NL}${NL}NQFRAME${cadres.length - 1}END${NL}${NL}`;
+							}).join("");
+							const ancre = ancrerImagesCitees(seul, jointesCours);
+							let rendu = renderMarkdownPreview(ancre.texte);
+							cadres.forEach((c, i) => { rendu = rendu.replace(new RegExp("<p>[^<]*NQFRAME" + i + "END[^<]*</p>|NQFRAME" + i + "END"), () => c); });
+							prose.innerHTML = rendu;
+							if (cadres.length) brancherCadres(prose);
 							poserImagesCitees(prose, ancre.images);
 							if (decoupe.shown.includes("$")) void mathifyElement(prose);
 						}

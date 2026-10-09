@@ -218,6 +218,11 @@ await withSrcModule(["src/dashboard/ai-client.ts"], ({ composerPrompts }) => {
 	r.check("Learn : les lectures sont des `etapes`, jamais un choix de style", [learnP.includes('"lecture" is ALWAYS "etapes"'), learnP.includes("CHOOSE for each read card")], [true, false]);
 	r.check("Practice : aucun style de lecture",
 		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
+	/* Interactive pages (2026-10-09): a reading MAY carry `html`; the rule is
+	   Learn-only and says what keeps the page safe and readable. */
+	r.check("Learn : une lecture peut porter `html` (page autonome, sans réseau, thème, 60 Ko)",
+		["a \"read\" card MAY carry \"html\"", "self-contained", "no network", "--nq-bg", "60 KB", "NEVER for plain text"].filter(p => !learnP.includes(p)), []);
+	r.check("Practice : aucune page interactive", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("INTERACTIVE PAGES"), false);
 	r.done();
 });
 

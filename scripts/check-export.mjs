@@ -573,7 +573,7 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert, exp) => {
 	const r = makeReporter("Styles de lecture (aller-retour)");
 	const tour = (brut) => JSON5.parse(exp.exportAll([convert.convertParsedToInternal(brut)], null))[0];
-	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir, methode: o.methode });
+	const champs = (o) => ({ lecture: o.lecture, etapes: o.etapes, tableau: o.tableau, retenir: o.retenir, methode: o.methode, html: o.html });
 	const lecture = (o) => ({ id: "l", title: "Lecture", prompt: "Texte.", slice: 1, role: "read", ...o });
 	const cas = {
 		"page + cartes": lecture({ lecture: "page", retenir: { forme: "cartes", items: [{ recto: "`d.get`", verso: "Renvoie **None**" }] } }),
@@ -581,6 +581,8 @@ await withSrcModule(["src/editor/convert.ts", "src/editor/export.ts"], (convert,
 		"étapes marquées méthode": lecture({ lecture: "etapes", etapes: ["Un", "Deux"], methode: true }),
 		"tableau aux lignes inégales":lecture({ lecture: "tableau", tableau: { colonnes: ["", "Python", "C"], lignes: [["Exécution", "Interprété", "Compilé"], ["Mémoire", "Auto"]] } }),
 		"valeurs inconnues ou mal formées": lecture({ lecture: "callout", etapes: "pas une liste", retenir: { forme: "glossaire", items: 3 } }),
+		/* Interactive page (2026-10-09): an unknown key for the editor, it must cross a rewrite byte for byte. */
+		"page interactive (html)": lecture({ lecture: "etapes", etapes: ["Un"], html: ["<!doctype html>", "<svg viewBox='0 0 10 10'><text>" + String.fromCharCode(34) + "$1$" + String.fromCharCode(34) + " &amp; </script></text></svg>", "<script>var a = `x${1}`; // " + String.fromCharCode(92) + "</script>"].join(String.fromCharCode(10)) }),
 		"aucun champ (quiz d'avant)": lecture({}),
 	};
 	for (const [nom, brut] of Object.entries(cas)) {

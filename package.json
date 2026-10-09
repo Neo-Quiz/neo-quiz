@@ -14,6 +14,7 @@
     "check:app": "npm --prefix apps/windows run build",
     "check:md": "node scripts/check-markdown.mjs",
     "check:code-fit": "node scripts/check-code-fit.mjs",
+    "check:html-frame": "node scripts/check-html-frame.mjs",
     "check:usage-format": "node scripts/check-usage-format.mjs",
     "check:html-markdown": "node scripts/check-html-markdown.mjs",
     "check:export": "node scripts/check-export.mjs",

@@ -474,3 +474,93 @@
 	background: #fff;
 	cursor: zoom-in;
 }
+
+/* ══ THE EXPLAIN WINDOW, LIKE claude.ai (2026-10-09) ══
+   A sober thread in one centred column: the learner's messages in rounded
+   bubbles on the right, the answers in FULL width with no bubble, a rounded
+   composer at the bottom with the plan line under it, readable type. */
+.nq-explain-modal {
+	width: min(860px, calc(100vw - 32px));
+	height: min(760px, 88vh);
+}
+.nq-explain-modal .modal-content {
+	gap: 10px;
+	padding-bottom: 6px;
+}
+.nq-explain-fil {
+	width: 100%;
+	max-width: 740px;
+	margin: 0 auto;
+	gap: 26px;
+	padding: 8px 10px 14px;
+}
+.nq-explain-msg-user {
+	max-width: 85%;
+}
+.nq-explain-demande.qbd-ai-bulle {
+	padding: 10px 16px;
+	border: 0;
+	border-radius: 18px 18px 6px 18px;
+	background: var(--background-modifier-hover);
+	font-size: 15px;
+	line-height: 1.55;
+}
+.nq-explain-modal .qbd-ai-chat-reponse {
+	gap: 8px;
+	width: 100%;
+}
+.nq-explain-modal .qbd-ai-chat-tete {
+	font-size: 12.5px;
+	color: var(--text-faint);
+}
+.nq-explain-modal .qbd-ai-chat-prose {
+	font-size: 15.5px;
+	line-height: 1.72;
+	letter-spacing: 0.005em;
+}
+.nq-explain-modal .qbd-ai-chat-prose > :first-child { margin-top: 0; }
+.nq-explain-modal .qbd-ai-chat-prose p { margin: 0 0 0.9em; }
+.nq-explain-modal .qbd-ai-chat-prose ul,
+.nq-explain-modal .qbd-ai-chat-prose ol { margin: 0 0 0.9em; padding-left: 1.4em; }
+.nq-explain-modal .qbd-ai-chat-prose li { margin: 0.25em 0; }
+.nq-explain-modal .qbd-ai-chat-prose h1,
+.nq-explain-modal .qbd-ai-chat-prose h2,
+.nq-explain-modal .qbd-ai-chat-prose h3,
+.nq-explain-modal .qbd-ai-chat-prose h4 {
+	margin: 1.3em 0 0.5em;
+	font-weight: 600;
+	line-height: 1.35;
+}
+.nq-explain-modal .qbd-ai-chat-prose h1 { font-size: 1.3em; }
+.nq-explain-modal .qbd-ai-chat-prose h2 { font-size: 1.18em; }
+.nq-explain-modal .qbd-ai-chat-prose h3,
+.nq-explain-modal .qbd-ai-chat-prose h4 { font-size: 1.05em; }
+.nq-explain-composer {
+	width: 100%;
+	max-width: 740px;
+	margin: 0 auto;
+	padding: 12px 14px 8px 18px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 24px;
+	background: var(--background-secondary);
+	box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.nq-explain-composer:focus-within {
+	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+	box-shadow: 0 2px 18px rgba(0, 0, 0, 0.24);
+}
+.nq-explain-modal .qbd-ai-usage-slot {
+	width: 100%;
+	max-width: 740px;
+	margin: 0 auto;
+	font-size: 12px;
+	color: var(--text-faint);
+}
+@media (max-width: 480px) {
+	.nq-explain-modal { width: calc(100vw - 16px); height: 92vh; }
+	.nq-explain-fil { gap: 20px; padding: 6px 4px 10px; }
+	.nq-explain-msg-user { max-width: 92%; }
+	.nq-explain-modal .qbd-ai-chat-prose { font-size: 15px; }
+	.nq-explain-composer { border-radius: 20px; padding: 10px 10px 6px 14px; }
+}

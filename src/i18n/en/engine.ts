@@ -37,6 +37,11 @@ export const EN_ENGINE = {
 	"engine.lecture.flipHint": "Click a card, or press Enter, to flip it.",
 	"engine.lecture.flipAria": "{front}: flip the card",
 	"engine.lecture.flippedAria": "{front}: {back}",
+	"engine.htmlFrame.title": "Interactive illustration",
+	"engine.htmlFrame.showCode": "View the code",
+	"engine.htmlFrame.hideCode": "Hide the code",
+	"engine.htmlFrame.tooLarge": "This illustration is too large to be shown.",
+	"engine.htmlFrame.drawing": "Drawing the illustration…",
 
 	/* ── Navigation ── */
 	"engine.nav.results": "Results",

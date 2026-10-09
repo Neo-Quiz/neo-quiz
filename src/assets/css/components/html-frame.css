@@ -1,0 +1,60 @@
+/* ── INTERACTIVE PAGE IN A SANDBOXED FRAME (2026-10-09) ──
+   The iframe itself is built by engine/html-frame-core.ts (sandbox,
+   CSP, height message). It takes the height of its content: never an inner
+   scrollbar, the page scrolls instead. */
+.nq-html-frame {
+	display: block;
+	margin: 16px 0;
+	max-width: 100%;
+}
+
+.nq-html-frame-view {
+	display: block;
+	width: 100%;
+	min-height: 40px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-secondary);
+	overflow: hidden;
+}
+
+.nq-html-frame-code {
+	appearance: none;
+	display: block;
+	margin: 6px 0 0 auto;
+	padding: 2px 6px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+.nq-html-frame-code:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.nq-html-frame-source {
+	margin: 6px 0 0;
+	max-height: 360px;
+	overflow: auto;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: var(--background-secondary);
+	font-size: 12.5px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+.nq-html-frame-source[hidden] { display: none; }
+
+.nq-html-frame--refused,
+.nq-html-frame--pending {
+	padding: 12px 14px;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 12px;
+	color: var(--text-muted);
+	font-size: 13.5px;
+}

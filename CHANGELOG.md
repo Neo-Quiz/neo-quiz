@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Interactive pages: a Learn reading can carry a full HTML page (diagrams, symbol tables, sequence diagrams, mini quizzes, simulators) and the Explain chat can answer with one, shown in a sandboxed frame with no access to the app, the network or your files. The Explain window now looks like a modern chat: your messages in bubbles, full-width answers, a rounded composer.
+
 ## [1.20.61] - 2026-10-09
 
 ### Added

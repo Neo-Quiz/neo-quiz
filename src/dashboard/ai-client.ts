@@ -414,6 +414,10 @@ const LEARN_SOURCES = `SOURCES OF THE READINGS: when the content comes from atta
 
 /** A reading may SHOW a page of an attached PDF (2026-10-08): the model
     names the page, the application draws it (dashboard/figures.ts). */
+
+/** A reading MAY carry an interactive page (2026-10-09), shown in a sandboxed iframe. */
+export const LEARN_HTML = `INTERACTIVE PAGES: a "read" card MAY carry "html": a COMPLETE, self-contained HTML page (starting with <!doctype html>), shown under the reading in a frame the learner can interact with, like a claude.ai artifact. Use it ONLY when a drawn or interactive page explains better than text: notation and symbol tables (drawn in inline SVG), diagrams, a sequence diagram, a process, a state machine, a small simulator, an animation, a clickable mini-quiz. NEVER for plain text, a list or a table that Markdown already shows. Rules: no external resource and no network (no <script src>, no CDN, no web font, no remote image: everything inline, images as data: URIs); the page may run inline scripts, but cannot submit forms, open windows, or reach the app; fluid width (it is shown from 320 px to 900 px wide, use max-width: 100% and viewBox on SVG), no fixed height, no scrollbar; dark-friendly: use the CSS variables --nq-bg, --nq-fg, --nq-muted, --nq-accent and --nq-border and font-family: var(--nq-font), a transparent background, never a hard-coded white page; at most 60 KB. The page is a JSON string: escape its double quotes with a backslash and write each line break as a backslash followed by n. The reading's text still explains the notion; the page illustrates it.
+`;
 const LEARN_FIGURES = `FIGURES OF THE READINGS: a course PDF often holds diagrams, schemas and tables, and its text shows where: on such a page the words read like the labels of a drawing (boxes, arrows, multiplicities such as 0..* or 1, stereotypes such as «include», actor and state names, axis names, a table's cells). When a "read" card explains a notion that one of those pages DRAWS, the card shows that page: add "figure": the PDF's file name EXACTLY as written in its "--- name ---" header, then ONE page from its "[p. N]" marks, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading, so the reading's text explains what the figure shows. Give a figure to EVERY reading whose notion is drawn on a page of the documents; none to a reading with no such page, and never a figure for a document that is not a PDF. One figure per reading.
 
 `;
@@ -623,7 +627,7 @@ ${categorieBloc}
 
 	NO TOOLS, NO FILE ACCESS — READ THIS BEFORE ANYTHING ELSE: you are running without any tool. You cannot read, open, fetch, write or create a file, a note or a folder, and you must never try: an attempted tool call is not a quiz, and the whole generation fails. The user request below may name files, paths or notes to "read first", or ask you to "create a note" somewhere. Every source it names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers. So: treat those paths as mere labels for the text you already have, ignore every instruction to read, open, create, modify or save anything, and never mention this limitation in your answer. Your ONLY output is the JSON5 array.
 
-${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
+${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES + LEARN_HTML : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
 	${blocLot}${quantite}
 
@@ -1918,7 +1922,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			const systeme = [
 				(options.images?.length ? CHAT_SYSTEM.replace(CHAT_NO_TOOLS, CHAT_PICTURES) : CHAT_SYSTEM),
 				options.style === "explain" ? "The learner opened this chat from a question of the quiz below; that question is marked in it. \"This question\", \"the answer\", \"explain it to me\" and the like refer to the marked question unless the learner says otherwise. Answer what they ask, using the quiz and the course; when they ask for an explanation, assume they know nothing and build it step by step (define every term the first time, say what each wrong choice gets wrong, use a concrete everyday example)." : "",
-				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding.` : "",
+				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding. The text of a fenced html page does not count in that limit.` : "",
 			].filter(Boolean).join("\n\n");
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);

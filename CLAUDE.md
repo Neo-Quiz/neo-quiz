@@ -1021,6 +1021,8 @@ par MathLive à partir de LaTeX, qui est analysé et jamais exécuté ; l'assain
 découperait les balises que MathLive vient de composer. Aucune autre exception : tout
 autre HTML de l'app repasse par les quatre portes ci-dessus.
 
+**Une sixième voie, l'ISOLATION et non l'assainissement** (2026-10-09) : le champ `html` d'une lecture et un bloc ```html d'une réponse « Expliquer » sont une page COMPLÈTE, jamais assainie, montrée par `src/engine/html-frame*.ts` dans `<iframe sandbox="allow-scripts" srcdoc>` (jamais `allow-same-origin` : origine opaque, donc ni `window.neo` ni pont Android, qui s'injectent par origine ; CSP injectée en premier ; 200 Ko ; seul message lu : `nq-height` borné). `check:html-frame` le tient. Sur Android, `srcdoc` hérite de la CSP de l'app (`script-src 'self'`) : le script de la page est bloqué, la page reste statique à hauteur fixe (suite à faire : route Kotlin servant la page avec sa propre CSP).
+
 Deux règles qui ont chacune coûté un bug :
 
 - **Le HTML d'un quiz n'est pas forcément celui de l'utilisateur** : un quiz PARTAGÉ

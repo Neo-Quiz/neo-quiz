@@ -425,6 +425,21 @@ function creerFenetre(): void {
 	// sur `will-redirect` est la ceinture, pour une ligne.
 	fenetre.webContents.on("will-redirect", refuserHorsOrigine);
 
+	/* SUB-FRAMES (2026-10-09). The only iframes of the app are the sandboxed
+	   interactive pages of `src/engine/html-frame-core.ts` (`srcdoc`,
+	   `sandbox="allow-scripts"`, opaque origin). They get no preload (the
+	   `nodeIntegrationInSubFrames` flag stays at its default, false: `window.neo`
+	   exists in the top frame only) and no popup (`setWindowOpenHandler` above
+	   denies, and the sandbox has no `allow-popups`). A page that navigates
+	   itself (`location = …`, `<meta http-equiv="refresh">`) is refused here too:
+	   a sub-frame may only be its own `about:srcdoc` document. */
+	fenetre.webContents.on("will-frame-navigate", (e) => {
+		if (e.isMainFrame) return;
+		if (e.url === "about:srcdoc" || e.url === "about:blank") return;
+		e.preventDefault();
+		console.warn(LOG_PREFIX, "navigation de sous-cadre refusée:", e.url);
+	});
+
 	/* REMISE À ZÉRO DE L'ARMEMENT — défaut laissé par la tâche 3, relevé à sa
 	   revue. `choisirDossier` recharge par `location.reload()` (une navigation
 	   de premier niveau ADMISE par `refuserHorsOrigine`, donc jamais annulée) :
