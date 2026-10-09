@@ -100,6 +100,27 @@
 	padding: 0 22px;
 	font-size: 14.5px;
 }
+/* "Resume": a thin bar along the bottom of the pill, inset so it follows the
+   rounded ends; the filled part is white on a translucent track. */
+.qbd-cta3d-progress {
+	position: absolute;
+	left: 18px;
+	right: 18px;
+	bottom: 4px;
+	z-index: 1;
+	height: 3px;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, 0.28);
+	pointer-events: none;
+}
+.qbd-cta3d-progress::after {
+	content: "";
+	display: block;
+	width: var(--progress, 0%);
+	height: 100%;
+	border-radius: inherit;
+	background: #fff;
+}
 /* Le « ⋮ » de l'en-tête d'un dossier déborde de 6 px à droite (marge
    négative, pour aligner ses points sur le bord) ; la fiche coupe ce qui
    dépasse (`overflow: hidden`), et le rond du survol était tronqué. */

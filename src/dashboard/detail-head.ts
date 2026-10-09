@@ -39,6 +39,9 @@ export interface EnteteAction {
 	/** Numeric badge after the label (term count of the glossary, task 4 of
 	    batch D) — absent or empty: no badge. */
 	badge?: string;
+	/** Thin progress bar along the bottom of the button (a quiz started and
+	    not finished: "Resume"). Absent: no bar. */
+	progress?: { done: number; total: number };
 	/** STABLE identifier set as `data-qbd-key` on the painted button, so a
 	    caller finds an already painted button (`setActionBadge`) without
 	    repainting the whole header — the "Vocabulary" action, whose badge is
@@ -169,6 +172,17 @@ export function renderEntete(page: HTMLElement, deps: EnteteDeps): Entete {
 		   raised face that sinks on click, and the SHEEN that sweeps — an SVG
 		   of its own, so that `attirer` can restart its cycle (cta3d.ts). */
 		reflet = poserBouton3d(btn);
+		const p = start.progress;
+		if (p && p.total > 0) {
+			const done = Math.max(0, Math.min(p.done, p.total));
+			const bar = ajouter(btn.querySelector(".qbd-cta3d-face") ?? btn, "span", "qbd-cta3d-progress");
+			bar.setAttribute("role", "progressbar");
+			bar.setAttribute("aria-valuemin", "0");
+			bar.setAttribute("aria-valuemax", String(p.total));
+			bar.setAttribute("aria-valuenow", String(done));
+			bar.setAttribute("aria-label", t(p.total === 1 ? "dashboard.common.questionsOfOne" : "dashboard.common.questionsOfOther", { done, total: p.total }));
+			bar.style.setProperty("--progress", `${(done / p.total) * 100}%`);
+		}
 		btn.addEventListener("click", () => start.onClick(btn));
 		if (deps.enterStarts) {
 			/* ENTER = "Start the quiz" when nothing has the focus (2026-09-26),

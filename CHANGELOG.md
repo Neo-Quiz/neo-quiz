@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A quiz you already started now shows "Resume" instead of "Start the quiz" on its page, with a thin progress bar along the bottom of the button.
+
 ### Fixed
 
 - An update no longer stalls near 80 % and restarts the app on the old version: the update window kept a file of the app open, so it could not be replaced.

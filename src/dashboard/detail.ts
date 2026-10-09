@@ -76,7 +76,7 @@ export interface QuizPageSpec {
 	onBack(): void;
 	/** Bouton principal à droite. Absent → masqué. Reçoit son propre élément :
 	    un menu flottant doit s'ancrer au bouton cliqué, pas à la page. */
-	start?: { label: string; icon: string; onClick(el: HTMLElement): void };
+	start?: { label: string; icon: string; onClick(el: HTMLElement): void; progress?: { done: number; total: number } };
 	/** Actions supplémentaires, posées avant le bouton principal. */
 	actions?: Array<{ label: string; icon: string; onClick(el: HTMLElement): void }>;
 	/** Vrai quand la page n'est plus celle qu'on regarde (vue changée) : les
@@ -194,6 +194,11 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				moduleMap ?? { byFolder: new Map(), ueOrder: [] },
 				ctx.settings.quizzesModuleOverrides || {}
 			);
+			// A started, unfinished quiz (a session snapshot exists, the same
+			// source as a folder's "Resume"): the button resumes and shows the
+			// answered share. The label is fixed per render, so the button keeps
+			// its width when the page switches to the editor.
+			const session = ctx.sessionOf?.(quiz.path) ?? null;
 			page.render(container, {
 				key: quiz.path,
 				title: quiz.title,
@@ -205,8 +210,9 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				start: {
 					// The fiche's label in every mode: the button must not
 					// change width when the page switches to the editor.
-					label: t("dashboard.quiz.welcomeStart"),
+					label: t(session ? "dashboard.home.resumeBtn" : "dashboard.quiz.welcomeStart"),
 					icon: "play",
+					progress: session ? { done: session.answered, total: session.total } : undefined,
 					// `ctx.openQuiz` et non un appel direct : c'est L'HÔTE qui
 					// décide ce que « jouer » veut dire. Dans
 					// la fenêtre il monte la page du moteur.
@@ -540,7 +546,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			onToggleEditing: () => toggleEditing(page),
 			actions,
 			editActions,
-			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick) } : undefined,
+			start: start ? { label: start.label, icon: start.icon, onClick: avant(start.onClick), progress: start.progress } : undefined,
 			enterStarts: showingWelcome(),
 			menu: menu ? (anchor) => menu(anchor, lignesEdition()) : undefined,
 			infos: spec.stats ? (p) => {
