@@ -1,8 +1,8 @@
 {
-  "versionCode": 19,
-  "versionName": "0.2.17",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.17/NeoQuiz-0.2.17.apk",
-  "sha256": "2b8c3978c85f1b1b430341ce2ce5bc6dfca3392e1a08216012d29421c3ad3403",
-  "size": 55992785,
-  "notes": "\"Picture viewer fixes.\""
+  "versionCode": 20,
+  "versionName": "0.2.18",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.18/NeoQuiz-0.2.18.apk",
+  "sha256": "f03f3766201ad5486f942f44ec25032e4168af401fe2678a25baf42aa802bfa7",
+  "size": 55994657,
+  "notes": "Explain on every answered question, Resume with progress, plan usage under the composer"
 }
