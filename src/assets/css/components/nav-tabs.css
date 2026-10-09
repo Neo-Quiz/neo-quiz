@@ -98,7 +98,8 @@
 /* LEARN, right AFTER a miss (engine/learn.ts, 2026-09-29): orange, between
    the green of right-first-time and the red of not-right-yet. amber-700
    keeps white text readable. */
-.quiz-tab.retried{
+.quiz-tab.retried,
+.quiz-tab.partial{
   --tab-face: color-mix(in srgb, #b45309 42%, var(--background-primary));
   --tab-border: color-mix(in srgb, #f59e0b 45%, transparent);
   --tab-edge: #7c3a06;
@@ -110,6 +111,7 @@
    the top right of the tab. Plain text glyphs, drawn by the font. */
 .quiz-tab.correct::before,
 .quiz-tab.retried::before,
+.quiz-tab.partial::before,
 .quiz-tab.wrong::before{
   position: absolute;
   top: -5px;
@@ -130,6 +132,18 @@
 .quiz-tab.correct::before{ content: "\2713"; }
 .quiz-tab.retried::before{ content: "\21BB"; }
 .quiz-tab.wrong::before{ content: "\2715"; }
+/* A STEP's bead (Learn, `cards.ts` tabEtat): no check or cross, the colour
+   says it; the disc shows how many of its questions are still missed. */
+.quiz-tab.step-bead::before{ content: none; }
+.quiz-tab.step-bead.miss-1::before{ content: "1"; }
+.quiz-tab.step-bead.miss-2::before{ content: "2"; }
+.quiz-tab.step-bead.miss-3::before{ content: "3"; }
+.quiz-tab.step-bead.miss-4::before{ content: "4"; }
+.quiz-tab.step-bead.miss-5::before{ content: "5"; }
+.quiz-tab.step-bead.miss-6::before{ content: "6"; }
+.quiz-tab.step-bead.miss-7::before{ content: "7"; }
+.quiz-tab.step-bead.miss-8::before{ content: "8"; }
+.quiz-tab.step-bead.miss-9::before{ content: "9+"; }
 
 /* THE HINT BADGE (engine/cards.ts withHintBadge, 2026-09-29): a question
    answered with its hint carries the Hint button's bulb (Lucide
@@ -160,7 +174,8 @@
 }
 .quiz-tab.correct.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
 .quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
-.quiz-tab.retried.active{ --tab-face: #b45309; --tab-edge: #7c3a06; }
+.quiz-tab.retried.active,
+.quiz-tab.partial.active{ --tab-face: #b45309; --tab-edge: #7c3a06; }
 /* The self-rated states too (2026-09-28): without these, a current bead
    already rated fell on the pale tints of text-only.css (a flashcard rated
    "I knew it" became an almost black green as soon as you stood on it).

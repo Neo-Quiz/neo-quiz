@@ -326,7 +326,8 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	--tab-text: #fff;
 }
 /* Learn, right after a miss (engine/learn.ts, 2026-09-29): orange. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.retried:not(.active) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.retried:not(.active),
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.partial:not(.active) {
 	--tab-face: color-mix(in srgb, #d97706 78%, #2b2a33);
 	--tab-edge: #7c3a06;
 	--tab-text: #fff;
@@ -342,6 +343,7 @@ body > .quiz-handin-overlay .quiz-submit-perle {
    a miss / not yet never rest on colour alone. */
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.correct::before,
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.retried::before,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.partial::before,
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.wrong::before {
 	top: calc(var(--taille) * -0.12);
 	right: calc(var(--taille) * -0.12);
@@ -349,6 +351,14 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	height: calc(var(--taille) * 0.46);
 	font-size: calc(var(--taille) * 0.3);
 	box-shadow: 0 0 0 1.5px var(--background-primary);
+}
+/* A step's miss count may have two characters ("9+"): the disc widens. */
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.step-bead[class*="miss-"]::before {
+	width: auto;
+	min-width: calc(var(--taille) * 0.46);
+	padding: 0 calc(var(--taille) * 0.08);
+	border-radius: 999px;
+	font-weight: 800;
 }
 
 /* The hint BULB of a bead (nav-tabs.css, `used-hint`), scaled the same way but

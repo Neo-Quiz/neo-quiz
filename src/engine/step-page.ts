@@ -77,13 +77,16 @@ export function isTapType(q: QuizQuestion): boolean {
 
 /**
  * The state class of a step's bead, from the verdicts of its graded
- * questions: all right first time = `correct`, a miss still standing =
- * `wrong`, right but only after a retry = `retried`, anything unfinished =
- * `answered` (something done) or nothing (not started).
+ * questions: all right first time = `correct`; misses still standing = `wrong`
+ * only when they are more than a third of the step, else `partial` (amber: one
+ * miss among five turned the whole step red, 2026-10-09); right but only after
+ * a retry = `retried`; anything unfinished = `answered` (something done) or
+ * nothing (not started).
  */
 export function stepBeadState(verdicts: readonly LearnVerdict[], touched: boolean): string {
 	if (verdicts.length === 0) return touched ? "answered" : "";
-	if (verdicts.includes("missed")) return "wrong";
+	const missed = verdicts.filter(v => v === "missed").length;
+	if (missed > 0) return missed * 3 > verdicts.length ? "wrong" : "partial";
 	if (verdicts.includes("none")) return touched || verdicts.some(v => v !== "none") ? "answered" : "";
 	return verdicts.every(v => v === "first") ? "correct" : "retried";
 }

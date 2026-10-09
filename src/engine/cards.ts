@@ -120,7 +120,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const key: TransKey | null = has("unanswered") ? "engine.nav.tabUnanswered"
 			: has("correct") ? "engine.nav.tabCorrect"
 			: has("retried") ? "engine.nav.tabRetried"
-			: has("wrong") ? "engine.nav.tabWrong"
+			: has("wrong") || has("partial") ? "engine.nav.tabWrong"
 			: has("answered") ? "engine.nav.tabAnswered"
 			: null;
 		const base = key ? t(key, { n }) : t("engine.nav.tab", { n });
@@ -139,7 +139,12 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			// The bead of a step: its graded questions' verdicts, as one.
 			const graded = page.questions.filter(qi => ctx.learn.isGraded(qi));
 			const touched = page.questions.some(qi => ctx.hasAnyAnswer(qi));
-			return `${active} ${stepBeadState(graded.map(qi => ctx.learn.verdictOf(qi)), touched)}`.trim();
+			const verdicts = graded.map(qi => ctx.learn.verdictOf(qi));
+			/* No check or cross on a step: the colour says it. The disc shows the
+			   NUMBER of misses still standing instead (2026-10-09). */
+			const missed = verdicts.filter(v => v === "missed").length;
+			const miss = missed > 0 ? ` miss-${Math.min(missed, 9)}` : "";
+			return `${active} step-bead ${stepBeadState(verdicts, touched)}${miss}`.trim();
 		}
 		/* THE LEARN VERDICT comes first (engine/learn.ts, 2026-09-29): green =
 		   right the first time, orange = right after a miss, red = not right
@@ -610,7 +615,6 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			<h2 class="quiz-result-title">${t("engine.learn.summaryTitle")}</h2>
 			<div class="quiz-learn-figures">
 				<div class="quiz-learn-figure"><strong>${fig.accuracy}%</strong><span>${t("engine.learn.summaryAccuracy")}</span></div>
-				<div class="quiz-learn-figure"><strong>${formatElapsed(Date.now() - startedAt)}</strong><span>${t("engine.learn.summaryTime")}</span></div>
 			</div>
 			<div class="quiz-learn-learned">
 				<p class="quiz-learn-learned-label">${t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total })}</p>

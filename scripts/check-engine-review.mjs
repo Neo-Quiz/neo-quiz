@@ -950,7 +950,8 @@ await withSrcModule(
 				{ language: "python", solution: "x" }, { title: "t", prompt: "p" }].map(isTapType), [false, false, false, false, false, false, false]);
 
 		r.check("bead: all right first time = correct", stepBeadState(["first", "first"], true), "correct");
-		r.check("bead: a miss still standing = wrong", stepBeadState(["first", "missed"], true), "wrong");
+		r.check("bead: misses over a third of the step = wrong", [stepBeadState(["first", "missed"], true), stepBeadState(["first", "first", "missed", "missed"], true)], ["wrong", "wrong"]);
+		r.check("bead: one miss among five = partial (amber), not red", [stepBeadState(["first", "first", "first", "first", "missed"], true), stepBeadState(["first", "retried", "missed"], true)], ["partial", "partial"]);
 		r.check("bead: right after a retry = retried", stepBeadState(["first", "retried"], true), "retried");
 		r.check("bead: unfinished = answered, untouched = nothing", [stepBeadState(["first", "none"], true), stepBeadState(["none", "none"], false)], ["answered", ""]);
 
