@@ -547,3 +547,22 @@
 
 .qb-type-card-name { font-size: 0.75em; font-weight: 500; }
 .qb-type-card-desc { font-size: 0.625em; color: var(--text-muted); line-height: 1.3; }
+/* "Trust this folder?" (2026-10-11): the confirm modal, compact and neutral. */
+.qb-trust-modal { width: 400px; }
+.qb-trust-folder {
+	display: inline-flex;
+	align-items: flex-start;
+	gap: 6px;
+	max-width: 100%;
+	margin: 2px 0 10px;
+	padding: 4px 10px;
+	border-radius: 8px;
+	background: var(--background-modifier-hover);
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--text-normal);
+}
+.qb-trust-folder-icon { display: inline-flex; flex: none; margin-top: 2px; color: var(--interactive-accent); }
+.qb-trust-folder-icon svg { width: 14px; height: 14px; }
+.qb-trust-folder-name { min-width: 0; overflow-wrap: anywhere; }
+.qb-trust-able { margin-top: 8px; color: var(--text-normal); }

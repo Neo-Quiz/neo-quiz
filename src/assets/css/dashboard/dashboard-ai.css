@@ -4054,7 +4054,35 @@
 .qbd-mention-menu {
 	max-height: 280px;
 	overflow-y: auto;
-	min-width: 320px;
+	/* Wide enough for a quiz name (« … — Practice.md »), never wider than
+	   the window on a phone. */
+	min-width: min(320px, 90vw);
+	max-width: min(560px, 90vw);
+}
+/* The file-type icon (VS Code's, in colour): 16 px, no shrink in its cell. */
+.qbd-mention-menu .qbd-mention-icon {
+	display: block;
+	width: 16px;
+	height: 16px;
+	flex: none;
+}
+/* The label is two pieces: the head ellipses, the tail (the extension, or
+   « — Practice.md ») never does. Same pattern as the attachment pieces. */
+.qbd-mention-menu .qbd-select-option-label {
+	display: flex;
+	min-width: 0;
+	overflow: visible;
+}
+.qbd-mention-tete {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.qbd-mention-queue {
+	flex: none;
+	white-space: nowrap;
 }
 /* Curseur clavier (flèches haut/bas). SANS cette règle, moveSelection()
    bascule bien la classe mais RIEN ne bouge à l'écran : les flèches

@@ -11,13 +11,20 @@
    an option — the project draws no emoji, and Windows shows "FR" in
    letters instead of the flag. The SVGs come from `country-flag-icons`
    and go in as an <img> data URL: an image, which runs nothing, never
-   markup set with innerHTML. A PROGRAMMING language's icon is its logo from
-   the code catalogue (`code-catalogue.ts`), the same one as its code blocks
-   (2026-10-10).
+   markup set with innerHTML. Every other subject shows a COLOUR logo
+   (2026-10-10, the owner's choice over plain glyphs): the official logo of a
+   reference tool or organisation of its field (`subject-logos.ts`, from
+   Simple Icons, Wikimedia Commons or devicon), a colour Fluent UI System icon
+   where that fits better (2026-10-11), or a Fluent UI Emoji illustration
+   where no real logo fits. A programming language's logo is the
+   same official colour logo, taken before the code catalogue's own logo
+   (`code-catalogue.ts`), which stays reserved for code blocks. A Lucide glyph
+   is only left for a subject with no logo at all.
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost } from "../host/current";
 import { codeLanguageBadgeSrc, codeLanguageOf } from "../code-catalogue";
+import { SUBJECT_LOGOS } from "../subject-logos";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -229,10 +236,28 @@ const TAG_LANGAGE: Partial<Record<CategorieQuiz, string>> = {
 	rust: "rust", go: "go", bash: "bash", sql: "sql",
 };
 
-/** Draws a subject's icon in `el`: a programming language's logo, a human
-    language's flag, otherwise its Lucide glyph. */
+/* Each subject logo's data URI, encoded once: the largest is ~40 KB, and the
+   menu draws every subject on each open. */
+const LOGO_MATIERE_SRC = new Map<CategorieQuiz, string>();
+
+/** Draws a subject's icon in `el`: its colour logo (a programming language's
+    official one first), a human language's flag, the code catalogue's logo
+    for a language with no colour logo, otherwise its Lucide glyph. */
 export function peindreIconeCategorie(el: HTMLElement, c: CategorieQuiz): void {
 	el.replaceChildren();
+	const logo = SUBJECT_LOGOS[c];
+	if (logo) {
+		let src = LOGO_MATIERE_SRC.get(c);
+		if (src === undefined) {
+			src = "data:image/svg+xml," + encodeURIComponent(logo);
+			LOGO_MATIERE_SRC.set(c, src);
+		}
+		const img = ajouter(el, "img", "qbd-categorie-logo");
+		img.src = src;
+		img.alt = "";
+		img.draggable = false;
+		return;
+	}
 	const langage = TAG_LANGAGE[c] ? codeLanguageOf(TAG_LANGAGE[c]) : null;
 	if (langage?.logo) {
 		const img = ajouter(el, "img", "qbd-categorie-logo");

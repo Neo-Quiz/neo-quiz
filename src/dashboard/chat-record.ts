@@ -52,6 +52,11 @@ export interface ChatRequest {
 	provider?: string;
 	model?: string;
 	effort?: string;
+	/** The folder the request worked in (frozen at the send, 2026-10-11): the
+	    chat's working folder, as a Claude Code session has one. Read from a
+	    synced file, so bounded (`readFolder`); the main process still judges
+	    any folder before an agent runs there. */
+	folder?: string;
 }
 
 export interface ChatRecord {
@@ -110,6 +115,14 @@ function readClarify(x: unknown): ChatClarify | null {
 	return clarify;
 }
 
+/** A stored working folder: a path of at most 400 characters, without
+    control characters and without a ".." segment; anything else is dropped. */
+export function readFolder(x: unknown): string | undefined {
+	if (!isStr(x) || x.length < 1 || x.length > 400 || /[\u0000-\u001f\u007f]/.test(x)) return undefined;
+	if (x.split(/[\\/]/).includes("..")) return undefined;
+	return x;
+}
+
 /** A stored label: a non-empty string without control characters, at most `MAX_LABEL` long; anything else is dropped. */
 export function readLabel(x: unknown): string | undefined {
 	if (!isStr(x) || x.length < 1 || x.length > MAX_LABEL || /[\u0000-\u001f\u007f]/.test(x)) return undefined;
@@ -135,6 +148,8 @@ function readRequest(x: unknown): ChatRequest | null {
 	if (provider) req.provider = provider;
 	if (model) req.model = model;
 	if (effort) req.effort = effort;
+	const folder = readFolder(x.folder);
+	if (folder) req.folder = folder;
 	return req;
 }
 

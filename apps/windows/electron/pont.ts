@@ -834,13 +834,12 @@ export interface Pont {
 		    at the end, sent to the window that asked and to no other. */
 		run(spec: RequeteCli, requeteId: number, flux?: boolean): Promise<ResultatCli>;
 		annuler(requeteId: number): Promise<void>;
-		/** ASKS the main process whether Claude Code may work in this folder
-		    (absolute path) with read-only tools (2026-10-09). The main process
-		    answers at once for a folder already trusted; otherwise it shows
-		    ITS native dialog, and only the user's click there trusts the
-		    folder. The window never answers: it only gets the verdict.
-		    `indisponible`: the folder is not a folder inside the perimeter. */
-		confiance(dossier: string): Promise<"approuve" | "refuse" | "indisponible">;
+		/** Whether Claude Code and Codex may work in this folder (absolute
+		    path): `approuve` (already trusted), `inconnu` (never asked; the
+		    page asks in its own modal, 2026-10-11) or `indisponible` (not a
+		    folder inside the perimeter). With `accorder`, after the user's
+		    "Trust" in that modal, the main process records the folder. */
+		confiance(dossier: string, accorder?: boolean): Promise<"approuve" | "inconnu" | "indisponible">;
 		/** The trusted folders, as shown in the dialog (Settings › AI). */
 		confianceListe(): Promise<string[]>;
 		/** Takes a folder off the trusted list: it only REMOVES a capability,

@@ -13,6 +13,20 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A request run on this PC just says "Stopped", "Done" or "Failed", without "on DESKTOP-… (this device)".
+- Once a chat has a message, its folder can no longer be changed from the composer: the AI keeps working in it, and another folder is a new chat.
+- Trusting a folder for the AI is asked in the app's own dark window instead of a light Windows box with its system sound.
+- A document attached to a sent message opens its preview when clicked.
+- The trust question comes as soon as a message is sent, not after the clarifying question, and the account buttons of the usage window show at once.
+
+### Changed
+
+- The @ picker starts from the quiz's folder, ranks files by how well their name matches, opens folders in place and hides the app's own folders.
+- Every subject in the subject menu now shows the colour logo of a reference tool of its field (Cisco, Linux, GeoGebra, PostgreSQL…) instead of a plain icon.
+- The @ picker shows VS Code's file icons and cuts long names in the middle, so the file type always shows.
+
 ## [1.20.82] - 2026-10-10
 
 ### Changed

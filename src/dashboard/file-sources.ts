@@ -15,6 +15,8 @@ export interface FileEntry {
 	path: string;
 	isFolder: boolean;
 	source: "vault" | "external";
+	/** Vault files only: modification time (ms), for the « @ » ranking. */
+	mtime?: number;
 }
 
 /* Formats que le composer sait réellement attacher (cf. addComposerFiles
@@ -356,7 +358,7 @@ export function searchAll(roots: string[], query: string): { entries: FileEntry[
 	   long path always has one. */
 	for (const f of files) {
 		if (!isPickable(f.name)) continue;
-		const entry: FileEntry = { name: f.name, path: f.path, isFolder: false, source: "vault" };
+		const entry: FileEntry = { name: f.name, path: f.path, isFolder: false, source: "vault", mtime: f.mtime };
 		const r = matchesName(entry, query) && fuzzy(f.path);
 		if (r) scored.push({ entry, score: r.score });
 	}

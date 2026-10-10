@@ -1538,15 +1538,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
 
 	/* ─── TRUSTED FOLDERS (2026-10-09, `confiance-ia.ts`) ───
-	   The window ASKS; the main process words the question, shows it in a
-	   native dialog, and writes the answer to a settings key the generic
-	   write refuses. A folder refused in the dialog is not asked again until
-	   the app restarts (one question per folder and session, as a terminal
-	   asks once). One dialog at a time: a second ask for the same folder
-	   waits for the first answer, an ask for another folder waits its turn. */
-	const refusesSession = new Set<string>();
-	const questionsEnCours = new Map<string, Promise<"approuve" | "refuse">>();
-	let fileDialogues: Promise<unknown> = Promise.resolve();
+	   The page asks in its own modal (since 2026-10-11, see below); the main
+	   process resolves the folder, checks the perimeter and writes the answer
+	   to a settings key the generic write refuses. */
 	const approuves = async () => lireApprouves(await reglagesOuErreur().lire(CLE_CONFIANCE_IA));
 	/** The resolved working folder of a tools run, or `undefined` when the
 	    folder it names is not a folder, not in the perimeter, or not trusted. */
@@ -1560,55 +1554,24 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		});
 		return ok && c ? path.resolve(c.real) : undefined;
 	}
-	async function poserQuestionConfiance(c: { path: string; real: string }): Promise<"approuve" | "refuse"> {
-		const options = {
-			type: "question" as const,
-			title: t("app.aiTrust.title"),
-			/* The folder SHOWN is the one RECORDED: the real path, once links
-			   and junctions are resolved. When the path asked differs (a
-			   junction, a symbolic link), both are shown, so a folder that
-			   points elsewhere is never trusted under a name it does not have. */
-			message: c.path.toLowerCase() === c.real.toLowerCase()
-				? t("app.aiTrust.message", { folder: c.real.replace(/\//g, path.sep) })
-				: t("app.aiTrust.messageLink", { folder: c.path.replace(/\//g, path.sep), real: c.real.replace(/\//g, path.sep) }),
-			detail: t("app.aiTrust.detail"),
-			buttons: [t("app.aiTrust.trust"), t("app.aiTrust.cancel")],
-			defaultId: 1,
-			cancelId: 1,
-			noLink: true,
-		};
-		const parent = deps.fenetreCourante();
-		const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
-		if (response !== 0) {
-			refusesSession.add(c.real.toLowerCase());
-			return "refuse";
-		}
+	/* THE QUESTION IS ASKED IN THE APP (2026-10-11): the native dialog (a light
+	   Windows box with its system sound) was judged unprofessional; Claude Code
+	   and MonoCode ask in their own interface. The page shows the app's modal
+	   and, on "Trust", asks the main process to record the folder; the main
+	   process still resolves it, checks the perimeter and keeps the list under
+	   the key the generic write refuses. The owner's decision for the agent
+	   modes already lets the page choose what the AI may do in a trusted folder. */
+	async function enregistrerConfiance(c: { path: string; real: string }): Promise<"approuve"> {
 		const liste = ajouterApprouve(await approuves(), { path: c.path, real: c.real, at: new Date().toISOString(), v: VERSION_CONFIANCE });
 		await reglagesOuErreur().ecrire(CLE_CONFIANCE_IA, liste);
 		console.log(LOG_PREFIX, "dossier approuvé pour l'IA:", c.real);
 		return "approuve";
 	}
-	ipcMain.handle(CANAUX.processusConfiance, async (_e, dossier: unknown): Promise<"approuve" | "refuse" | "indisponible"> => {
+	ipcMain.handle(CANAUX.processusConfiance, async (_e, dossier: unknown, accorder: unknown): Promise<"approuve" | "inconnu" | "indisponible"> => {
 		const c = await dossierCanonique(dossier);
 		if (!c || !(await perimetre.contient(c.real))) return "indisponible";
 		if (estApprouve(c.real, await approuves())) return "approuve";
-		const cle = c.real.toLowerCase();
-		if (refusesSession.has(cle)) return "refuse";
-		const enCours = questionsEnCours.get(cle);
-		if (enCours) return enCours;
-		const question = fileDialogues.then(async () => {
-			// Answered while waiting in line (another ask trusted it): no second dialog.
-			if (estApprouve(c.real, await approuves())) return "approuve" as const;
-			if (refusesSession.has(cle)) return "refuse" as const;
-			return poserQuestionConfiance(c);
-		});
-		fileDialogues = question.catch(() => undefined);
-		questionsEnCours.set(cle, question);
-		try {
-			return await question;
-		} finally {
-			questionsEnCours.delete(cle);
-		}
+		return accorder === true ? enregistrerConfiance(c) : "inconnu";
 	});
 	ipcMain.handle(CANAUX.processusConfianceListe, async (): Promise<string[]> =>
 		(await approuves()).map(a => a.path.replace(/\//g, path.sep)));

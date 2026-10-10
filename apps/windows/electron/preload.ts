@@ -139,7 +139,7 @@ const pont: Pont = {
 	processus: {
 		run: (spec, requeteId, flux) => ipcRenderer.invoke(CANAUX.processusRun, spec, requeteId, flux === true),
 		annuler: requeteId => ipcRenderer.invoke(CANAUX.processusAnnuler, requeteId),
-		confiance: dossier => ipcRenderer.invoke(CANAUX.processusConfiance, dossier),
+		confiance: (dossier, accorder) => ipcRenderer.invoke(CANAUX.processusConfiance, dossier, accorder === true),
 		confianceListe: () => ipcRenderer.invoke(CANAUX.processusConfianceListe),
 		confianceRetirer: dossier => ipcRenderer.invoke(CANAUX.processusConfianceRetirer, dossier),
 		lireCache: tool => ipcRenderer.invoke(CANAUX.processusLireCache, tool),

@@ -1,0 +1,81 @@
+Subject logos of the subject menu of the Generate page, embedded in
+src/subject-logos.ts (generated from this folder). Built 2026-10-10,
+updated 2026-10-11.
+
+Rule (owner, 2026-10-10): for each subject, the OFFICIAL colour logo of a
+well-known tool or organisation of its field. Owner, 2026-10-11: where a
+colour icon of the Fluent UI System Icons set fits better, it is used
+instead of a brand logo. Where neither fits, the Fluent UI Emoji
+illustration stays (no emoji is added, no Lucide glyph).
+The logos remain the property of their owners: trademarks are not licensed
+by the licence of the files below.
+
+Real logos, by source:
+
+- Simple Icons (npm package simple-icons; CC0 for the icon files; trademarks
+  remain with the owners). Brand colour read from its data file
+  (_data/simple-icons.json, 2026-10-11) and written as fill on the <svg>:
+    archi         Intel                      #0071C5   archi.svg
+    musique       Spotify                    #1ED760   musique.svg
+    geo           Google Maps                #4285F4   geo.svg
+    reseau        Cisco                      #1BA0D7   reseau.svg
+    os            Linux (Tux mascot not used) #FCC624  os.svg
+    cloud         Google Cloud               #4285F4   cloud.svg
+    electronique  Arduino                    #00878F   electronique.svg
+    sql           PostgreSQL                 #4169E1   sql.svg
+    web           HTML5                      #E34F26   web.svg
+    git           Git                        #F03C2E   git.svg
+    algo          LeetCode                   #FFA116   algo.svg
+    medecine      World Health Organization  #0093D5   medecine.svg
+    langues       Duolingo                   #58CC02   langues.svg
+    general       Wikipedia (black mark, drawn #e6e6e6 for the dark UI)
+                                                       general.svg
+
+- Wikimedia Commons (the file's own page gives the licence; the logo itself
+  stays the property of its owner):
+    ia       OpenAI logo 2025 (symbol), File:OpenAI logo 2025 (symbol).svg  ia.svg
+    maths    GeoGebra, File:Geogebra.svg                                    maths.svg
+    physique NASA "meatball" in colour, File:NASA_logo.svg (NASA insignia)  physique.svg
+
+- devicon 2.17.0 (npm package devicon, via jsDelivr), MIT (licence in
+  ../code-logos/LICENSE-devicon.txt), the "original" colour files of the
+  official logos:
+    genie    Visual Studio Code          vscode-original.svg    genie.svg
+    python   python-original.svg         python.svg
+    c        c-original.svg              c.svg
+    cpp      cplusplus-original.svg      cpp.svg
+    java     java-original.svg           java.svg
+    csharp   csharp-original.svg         csharp.svg
+    rust     rust-original.svg           rust.svg
+    go       go-original-wordmark.svg    go.svg
+    bash     bash-original.svg           bash.svg
+
+Fluent UI System Icons, "Color" style, MIT (LICENSE-fluentui-system-icons.txt;
+source: https://github.com/microsoft/fluentui-system-icons):
+    secu     Globe Shield  assets/Globe Shield/SVG/ic_fluent_globe_shield_24_color.svg
+Checked and not used: no colour "Shield Lock", "Gavel" or "Scale" exists in
+the set; "Cloud" (colour) is less telling than Google Cloud; "Briefcase"
+(colour) only duplicates the Fluent Emoji briefcase of gestion; "Data
+Trending" (colour) was tried for eco and rendered too thin and faint on the
+dark menu, so the Fluent Emoji chart stays.
+
+Fluent UI Emoji, "Color" style, MIT (LICENSE-fluentui-emoji.txt), kept where
+no real logo fits (source: https://github.com/microsoft/fluentui-emoji):
+    arts          Artist palette
+    eco           Chart increasing  (chart_increasing_color.svg)
+    chimie        Test tube
+    bio           Dna
+    histoire      Classical building
+    litterature   Books
+    conduite      Automobile
+    droit         Balance scale
+    gestion       Briefcase
+    philo         Thought balloon
+    psycho        Brain
+
+Not yet found, so the Fluent illustration above applies: Google Arts &
+Culture (arts), Legifrance (droit, only a JPEG on Commons), INSEE (eco, only
+GIF or regional SVGs on Commons).
+
+Optimised: comments and XML headers removed, whitespace collapsed (no svgo in
+the project). The files are only drawn as <img> data URIs.

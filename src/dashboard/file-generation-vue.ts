@@ -109,6 +109,8 @@ export function creerVueFile(opts: {
 	ouvrir: (chemin: string) => void;
 	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
+	/** Opens the preview of a document chip of a sent message (no attach). */
+	ouvrirPiece?: (n: { name: string; path?: string }) => void;
 	/** Copies a chat answer (the host's clipboard). */
 	copier?: (texte: string) => Promise<boolean>;
 	/** The chat on screen and its record (null until something is recorded). */
@@ -208,7 +210,7 @@ export function creerVueFile(opts: {
 				el.src = urlImage(img.file);
 				el.alt = img.file.name;
 			}
-			peindrePieces(pieces, notes);
+			peindrePieces(pieces, notes, opts.ouvrirPiece);
 		}
 		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
 		/* No "Learn · Opus 5.5" under the request any more (2026-09-30): the
@@ -677,9 +679,9 @@ export function creerVueFile(opts: {
 		const remote = getRemoteGenerations();
 		const items = threadItems(record, opts.file.lignes(), chatId, remote, Date.now(), getOwnRequests());
 		for (const item of items) {
-			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected())); continue; }
+			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected()), opts.ouvrirPiece); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", ouvrir: opts.ouvrir, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");
@@ -709,7 +711,7 @@ export function creerVueFile(opts: {
 			tour.setAttribute("role", "listitem");
 			tour.dataset.attente = "1";
 			const message = ajouter(tour, "div", "qbd-ai-message");
-			if (attente.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), attente.documents);
+			if (attente.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), attente.documents, opts.ouvrirPiece);
 			if (attente.text.trim()) ajouter(message, "div", "qbd-ai-bulle", attente.text.trim());
 			const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--cours");
 			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
@@ -718,7 +720,7 @@ export function creerVueFile(opts: {
 			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.clarify.deciding"));
 		}
 		const relais = opts.relais?.() ?? null;
-		if (relais) peindreRelais(zone, relais);
+		if (relais) peindreRelais(zone, relais, opts.ouvrirPiece);
 		/* A NEW item is read from the key of the last one, not from the count: a
 		   reply closed while a request goes out leaves the count unchanged. */
 		const dernier = relais ? "relais" : attente ? "waiting" : items.length ? items[items.length - 1].key : "";

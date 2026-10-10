@@ -25,6 +25,17 @@ export const labelOf = (d: DeviceRef): string => deviceLabel(d, words());
 
 /** The state of a request on the device that runs it, in one sentence. */
 export function statusText(kind: RequestStatus, runner: DeviceRef, error?: string): string {
+	/* Run on THIS device: no "on DESKTOP-1U89520 (this device)", which tells
+	   the user nothing they do not know (2026-10-11). */
+	if (runner.self) {
+		switch (kind) {
+			case "running": return t("ai.reqstatus.runningHere");
+			case "done": return t("ai.reqstatus.doneHere");
+			case "stopped": return t("ai.reqstatus.stoppedHere");
+			case "failed": return error ? t("ai.reqstatus.failedWhyHere", { reason: error }) : t("ai.reqstatus.failedHere");
+			default: break;
+		}
+	}
 	const device = labelOf(runner);
 	switch (kind) {
 		case "waiting": return t("ai.reqstatus.waiting", { device });

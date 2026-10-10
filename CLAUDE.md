@@ -999,9 +999,11 @@ de l'utilisateur, `.neo-quiz/` refusé aux outils de fichiers, le travail de l'I
 affiché OUVERT et résumé comme MonoCode (« Projet exploré · 6 outils utilisés »).
 La forme Supervisé est l'ancienne forme lecture seule ci-dessous. Hors dossier de
 confiance, le CLI est lancé **sans aucun outil**. Le dossier de confiance
-(depuis le 2026-10-09) : avant la première génération qui vise un dossier, le
-PRINCIPAL pose sa question NATIVE (« Faire confiance » / « Annuler »,
-`canaux.ts`) et garde la réponse (chemin et `realpath`) sous la clé réservée
+(depuis le 2026-10-09) : avant la première génération qui vise un dossier, la page pose
+la question dans SA modale (depuis le 2026-10-11 : la boîte native Windows, claire et
+qui sonne, a été jugée pas professionnelle ; Claude Code et MonoCode demandent dans
+leur interface) ; sur « Faire confiance », le PRINCIPAL (`canaux.ts`, `confiance(dossier, true)`)
+résout le dossier, vérifie le périmètre et garde la réponse (chemin et `realpath`) sous la clé réservée
 `aiTrustedFolders` (`confiance-ia.ts`) ; le rendu ne fait que demander. Approuvé,
 le CLI tourne avec `cwd` = ce dossier, jugé par le principal (résolu, au
 périmètre, couvert par un dossier approuvé), et la forme d'appel unique de

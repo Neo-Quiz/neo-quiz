@@ -245,7 +245,10 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		}
 		drawResets(now);
 		drawAccount(pop, tool, {
-			connected: emails.get(tool)?.connecte ?? null,
+			/* Usage shown means an account is signed in: the account buttons
+			   show at once, instead of after the CLI's (slow, first time)
+			   answer about the account (2026-10-11). */
+			connected: emails.get(tool)?.connecte ?? (cur && cur.rows.length > 0 ? true : null),
 			redraw: () => redraws.forEach(f => f()),
 			/* After a sign-in or a sign-out: the address now, the plan at the
 			   next free slot of the shared cadence (`rereadLimits`). */

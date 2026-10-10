@@ -14,7 +14,7 @@ import type { LigneGeneration } from "./file-generation-app";
 import type { ChatClarify, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
 import { absoluteInRoot } from "../shared-state/chat-merge";
 import type { RemoteRequest } from "../shared-state/remote-request";
-import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel } from "./chat-record";
+import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel, readFolder } from "./chat-record";
 
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement" || l.etat === "pause";
 export const isTerminal = (l: LigneGeneration): boolean => l.etat === "prete" || l.etat === "echouee" || l.etat === "arret";
@@ -115,6 +115,9 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	if (provider) req.provider = provider;
 	if (model) req.model = model;
 	if (effort) req.effort = effort;
+	// The working folder too (2026-10-11): it fixes the chat's folder.
+	const folder = readFolder(old?.folder ?? first.destination);
+	if (folder) req.folder = folder;
 	const error = failed?.erreur ?? old?.error;
 	if (error && state === "failed") req.error = error;
 	return req;

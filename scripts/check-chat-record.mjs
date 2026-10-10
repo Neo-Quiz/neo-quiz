@@ -75,6 +75,12 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 		C.chatTitle({ requests: [req("a", 1, { text: "", results: [q1] })] }),
 		C.chatTitle({ requests: [] }),
 	], ["CM1.pdf", "A", ""]);
+	/* 2026-10-11: a request keeps the folder it worked in, which fixes the
+	   chat's working folder. Read from a synced file: a ".." segment, a
+	   control character or an over-long value is dropped. */
+	r.check("a request's working folder: kept when sane, dropped when hostile",
+		[C.readFolder("XTI303 - Conception"), C.readFolder("C:/Cours/XTI303"), C.readFolder("a/../b"), C.readFolder("..\\x"), C.readFolder("a\u0000b"), C.readFolder("x".repeat(401)), C.readFolder(42)],
+		["XTI303 - Conception", "C:/Cours/XTI303", undefined, undefined, undefined, undefined, undefined]);
 	r.done();
 });
 

@@ -5,6 +5,9 @@ import {
 	primeExternalIndex, resolveExternalPath, revalidateExternalIndex, searchAll,
 } from "./file-sources";
 import { MentionMenuHandle, MentionMenuItem, openMentionMenu } from "./ui-select";
+import { orderListing, rankMentions } from "./mention-rank";
+import { couperNomAuMilieu } from "./file-icons";
+import { fileIconSvg, folderIconSvg } from "./file-icon-svg";
 import { t } from "../i18n";
 
 export interface MentionToken {
@@ -44,12 +47,29 @@ export interface MentionPickerOptions {
 	onTextReplaced(value: string): void;
 	/** Racines configurées, lues au rendu (le réglage peut changer). */
 	getExtraRoots(): string[];
+	/** Dossier de destination du composer, relatif au vault ("" = racine).
+	    `@` seul liste son contenu ; le classement le privilégie. Absent =
+	    la racine (le chat « Expliquer » n'a pas de destination). */
+	getCurrentFolder?(): string;
 }
 
 export interface MentionPickerHandle {
 	/** Le handler Entrée d'ai.ts s'en sert pour ne pas envoyer le prompt. */
 	isOpen(): boolean;
 	detach(): void;
+}
+
+/* A quiz name ends with " — Learn.md", " — Practice.md" or " — Exam.md"
+   (optionally followed by " (2)"): that whole suffix is the tail, because it
+   says what the file is. Otherwise the repo-wide rule applies (cut in the
+   middle, extension kept). A folder has no extension: its tail is "/". */
+const SUFFIXE_QUIZ = /( — (?:Learn|Practice|Exam)(?: \(\d+\))?\.md)$/u;
+
+function coupeLibelle(entry: FileEntry): { tete: string; queue: string } {
+	if (entry.isFolder) return { tete: entry.name, queue: "/" };
+	const quiz = SUFFIXE_QUIZ.exec(entry.name);
+	if (quiz) return { tete: entry.name.slice(0, quiz.index), queue: quiz[1] };
+	return couperNomAuMilieu(entry.name);
 }
 
 function iconFor(entry: FileEntry): string {
@@ -109,12 +129,22 @@ export function attachMentionPicker(
 	   `externe.list` traversent un pont dans l'application. `refresh` garde
 	   une génération pour qu'une réponse en retard n'écrase pas la liste d'une
 	   frappe plus récente. */
+	/* Contenu d'un dossier du vault, avec les dates de modification (le
+	   contrat `listDir` ne les porte pas ; `listFiles` oui). */
+	async function vaultChildren(dir: string): Promise<FileEntry[]> {
+		const dates = new Map(currentHost().fs.listFiles().map(f => [f.path, f.mtime]));
+		return (await listVaultFolder(dir)).map(e => e.isFolder ? e : { ...e, mtime: dates.get(e.path) });
+	}
+
 	async function entriesFor(query: string): Promise<{ entries: FileEntry[]; footer?: string }> {
 		const roots = opts.getExtraRoots();
-		// Token vide → racine du vault, puis les racines externes en fin de
-		// liste (elles ont leur icône propre).
+		const courant = opts.getCurrentFolder?.() ?? "";
+		// « @ » seul → contenu du dossier de destination (la racine sans
+		// dossier), puis les racines externes, à la racine seulement.
 		if (!query) {
-			return { entries: [...await listVaultFolder(""), ...listExternalRoots(roots)] };
+			const enfants = await vaultChildren(courant);
+			const externes = courant ? [] : listExternalRoots(roots);
+			return { entries: rankMentions([...enfants, ...externes], "", courant) };
 		}
 		// Token finissant par « / » → on liste ce dossier. `dir` est un
 		// chemin RELATIF (vault, ou racine externe préfixée de son nom —
@@ -135,7 +165,7 @@ export function attachMentionPicker(
 			// Notice l'avertit si le nom percute un dossier du vault (cf.
 			// plugin.ts, section « Dossiers hors vault »). Ici, silencieux
 			// par design, pas par oubli.
-			if (await isVaultFolder(dir)) return { entries: await listVaultFolder(dir) };
+			if (await isVaultFolder(dir)) return { entries: orderListing(await vaultChildren(dir), query) };
 			const resolved = resolveExternalPath(roots, dir);
 			if (resolved) return { entries: await listExternalFolder(resolved.absPath, resolved.root) };
 			return { entries: [] }; // ni l'un ni l'autre → liste vide
@@ -151,7 +181,7 @@ export function attachMentionPicker(
 		const footer = result.truncated.length
 			? t("ai.mention.truncated", { roots: result.truncated.join(", ") })
 			: undefined;
-		return { entries: result.entries, footer };
+		return { entries: rankMentions(result.entries, query, courant), footer };
 	}
 
 	function itemsFor(token: MentionToken, entries: FileEntry[]): MentionMenuItem[] {
@@ -170,6 +200,12 @@ export function attachMentionPicker(
 			// identique.
 			sub: entry.path.includes("/") ? entry.path.slice(0, entry.path.lastIndexOf("/")) : undefined,
 			icon: entry.source === "external" && entry.isFolder ? "corner-up-right" : iconFor(entry),
+			// Racine externe : son Lucide « sortie du vault » reste (le trait de
+			// séparation le dit déjà) ; le reste prend l'icône de fichier.
+			iconSrc: entry.source === "external" && entry.isFolder
+				? undefined
+				: entry.isFolder ? folderIconSvg() : fileIconSvg(entry.name),
+			labelParts: coupeLibelle(entry),
 			separatorBefore: i > 0 && i === firstExternal,
 			onChoose: () => {
 				if (entry.isFolder) {

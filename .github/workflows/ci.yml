@@ -341,6 +341,10 @@ jobs:
       # request's words match suggested (accents ignored, name before titles).
       - name: Folder suggestions
         run: npm run check:folder-suggest
+      # THE « @ » PICKER: the composer folder first, names matched before paths,
+      # app folders (.neo-quiz, Figures, Generated) hidden unless named.
+      - name: Mention picker ranking
+        run: npm run check:mention-rank
       # THE CHAT STORE: a full or refused storage never loses the chat on
       # screen, a deleted chat stays deleted, the legacy archive is imported
       # once, and a reload keeps the active chat.

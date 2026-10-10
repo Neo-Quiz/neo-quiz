@@ -32,8 +32,9 @@ import { recordOrigin } from "../shared-state/request-origin";
 import { originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
 
 /** The chips of the documents a request carried (thumbnail when there is one,
-    else the name cut IN THE MIDDLE so the extension always shows). */
-export function peindrePieces(parent: HTMLElement, notes: readonly { name: string; path?: string; thumb?: string }[]): void {
+    else the name cut IN THE MIDDLE so the extension always shows). With `ouvrir`,
+    a chip that has a path opens its preview when clicked (or Enter / Space). */
+export function peindrePieces(parent: HTMLElement, notes: readonly { name: string; path?: string; thumb?: string }[], ouvrir?: (n: { name: string; path?: string }) => void): void {
 	for (const n of notes) {
 		const p = ajouter(parent, "div", "qbd-ai-message-piece");
 		p.title = n.path || n.name;
@@ -42,17 +43,31 @@ export function peindrePieces(parent: HTMLElement, notes: readonly { name: strin
 			const el = ajouter(p, "img");
 			el.src = n.thumb;
 			el.alt = n.name;
-			continue;
+		} else {
+			const { tete, queue } = couperNomAuMilieu(n.name);
+			const nom = ajouter(p, "span", "qbd-ai-message-piece-nom");
+			ajouter(nom, "span", "qbd-ai-message-piece-tete", tete);
+			if (queue) ajouter(nom, "span", "qbd-ai-message-piece-queue", queue);
+			ajouter(p, "span", "qbd-ai-note-chip-badge", badgeDeFichier(n.name));
 		}
-		const { tete, queue } = couperNomAuMilieu(n.name);
-		const nom = ajouter(p, "span", "qbd-ai-message-piece-nom");
-		ajouter(nom, "span", "qbd-ai-message-piece-tete", tete);
-		if (queue) ajouter(nom, "span", "qbd-ai-message-piece-queue", queue);
-		ajouter(p, "span", "qbd-ai-note-chip-badge", badgeDeFichier(n.name));
+		if (ouvrir && n.path) rendreOuvrable(p, () => ouvrir(n));
 	}
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; ouvrir(path: string): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
+/** Makes a chip a keyboard-reachable button that runs `action` on click, Enter or Space. */
+function rendreOuvrable(p: HTMLElement, action: () => void): void {
+	p.classList.add("is-openable");
+	p.setAttribute("role", "button");
+	p.tabIndex = 0;
+	p.addEventListener("click", action);
+	p.addEventListener("keydown", e => {
+		if (e.key !== "Enter" && e.key !== " ") return;
+		e.preventDefault();
+		action();
+	});
+}
+
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -60,7 +75,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 	// A legacy chat has answers with no request text: no empty bubble.
 	if (q.documents.length || q.text.trim()) {
 		const message = ajouter(tour, "div", "qbd-ai-message");
-		if (q.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), q.documents);
+		if (q.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), q.documents, deps.ouvrirPiece);
 		if (q.text.trim()) ajouter(message, "div", "qbd-ai-bulle", q.text.trim());
 	}
 	// Who sent it and where it ran (a record always has both).
@@ -131,7 +146,7 @@ export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEn
 }
 
 /** A request the phone sent that no PC has taken yet: its message, then "Waiting for the PC" (or "Expired" past 24 h). `pcReachable` false (the PC the request was sent to is not fresh) adds the one line saying the PC does not seem on. */
-export function peindreEnAttente(parent: HTMLElement, item: { key: string; target: string; from: string; fromName?: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcReachable: boolean): void {
+export function peindreEnAttente(parent: HTMLElement, item: { key: string; target: string; from: string; fromName?: string; request: { text: string; documents: Array<{ path: string }> }; state: "waiting" | "expired" }, pcReachable: boolean, ouvrirPiece?: (n: { name: string; path?: string }) => void): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -139,7 +154,7 @@ export function peindreEnAttente(parent: HTMLElement, item: { key: string; targe
 	const message = ajouter(tour, "div", "qbd-ai-message");
 	if (item.request.documents.length) {
 		const notes = item.request.documents.map(d => ({ name: d.path.slice(d.path.lastIndexOf("/") + 1), path: d.path }));
-		peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), notes);
+		peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), notes, ouvrirPiece);
 	}
 	if (item.request.text.trim()) ajouter(message, "div", "qbd-ai-bulle", item.request.text.trim());
 	const refs = refsOf(item.from, item.fromName, item.target);
@@ -190,13 +205,13 @@ export interface RelaisVue {
 }
 
 /** A request shared to an AI app: its message, the hint, the paste (primary) and cancel (quiet) buttons, and the last refusal. */
-export function peindreRelais(parent: HTMLElement, r: RelaisVue): void {
+export function peindreRelais(parent: HTMLElement, r: RelaisVue, ouvrirPiece?: (n: { name: string; path?: string }) => void): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
 	tour.dataset.relais = "1";
 	const message = ajouter(tour, "div", "qbd-ai-message");
-	if (r.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), r.documents);
+	if (r.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), r.documents, ouvrirPiece);
 	if (r.text.trim()) ajouter(message, "div", "qbd-ai-bulle", r.text.trim());
 	const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-relais");
 	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "share-2");

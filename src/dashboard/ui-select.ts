@@ -2432,8 +2432,12 @@ export interface MentionMenuItem {
 	label: string;
 	/** Sous-titre discret : dossier parent, ou racine externe. */
 	sub?: string;
-	/** Nom d'icône Lucide (setIcon). */
+	/** Nom d'icône Lucide (setIcon). Repli quand `iconSrc` est absent. */
 	icon: string;
+	/** Icône en couleur (data URI, 16 px) : remplace `icon` quand elle est là. */
+	iconSrc?: string;
+	/** Libellé coupé en deux : la tête se tronque, la queue ne se tronque jamais. */
+	labelParts?: { tete: string; queue: string };
 	/** Trait de séparation AVANT cette entrée (vault → racines hors vault). */
 	separatorBefore?: boolean;
 	onChoose: () => void;
@@ -2474,9 +2478,24 @@ export function openMentionMenu(anchorEl: HTMLElement, onClose?: () => void): Me
 			b.setAttribute("role", "option");
 			if (i === sel) b.classList.add("is-selected");
 			const ic = ajouter(b, "span", "qbd-action-menu-icon");
-			currentHost().ui.setIcon(ic, item.icon);
+			if (item.iconSrc) {
+				const img = ajouter(ic, "img", "qbd-mention-icon");
+				img.src = item.iconSrc;
+				img.alt = "";
+				img.draggable = false;
+				img.width = 16;
+				img.height = 16;
+			} else {
+				currentHost().ui.setIcon(ic, item.icon);
+			}
 			const body = ajouter(b, "div", "qbd-action-menu-body");
-			ajouter(body, "span", "qbd-select-option-label", item.label);
+			const label = ajouter(body, "span", "qbd-select-option-label");
+			if (item.labelParts) {
+				ajouter(label, "span", "qbd-mention-tete", item.labelParts.tete);
+				ajouter(label, "span", "qbd-mention-queue", item.labelParts.queue);
+			} else {
+				label.textContent = item.label;
+			}
 			if (item.sub) ajouter(body, "span", "qbd-action-menu-sub", item.sub);
 			// mousedown, pas click : le textarea ne doit jamais perdre le focus.
 			b.addEventListener("mousedown", (e) => {

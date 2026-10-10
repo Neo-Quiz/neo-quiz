@@ -32,6 +32,25 @@
 
 import type { HostProcess } from "../../../../src/host/types";
 import { pont } from "./pont";
+import { openTrustModal } from "../../../../src/dashboard/trust-modal";
+
+/* THE TRUST QUESTION, IN THE APP (2026-10-11): asked in the app's own modal,
+   as Claude Code and MonoCode ask in their interface, instead of a light
+   native Windows box with its system sound. One question per folder at a
+   time; a folder refused is not asked again until the app restarts (a
+   terminal asks once per session). */
+const refusesSession = new Set<string>();
+const questionsEnCours = new Map<string, Promise<boolean>>();
+function demanderConfiance(abs: string): Promise<boolean> {
+	const cle = abs.toLowerCase();
+	const enCours = questionsEnCours.get(cle);
+	if (enCours) return enCours;
+	const question = new Promise<boolean>(resolve => {
+		openTrustModal(abs, resolve);
+	}).finally(() => questionsEnCours.delete(cle));
+	questionsEnCours.set(cle, question);
+	return question;
+}
 
 /** The next call id. A COUNTER, so two calls in flight never share one, and
     an id reused after a call has ended no longer names anything in the main
@@ -105,8 +124,15 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 		async trustFolder(dossier) {
 			const abs = absolu ? absolu(dossier) : null;
 			if (!abs) return "unavailable";
-			const verdict = await pont().processus.confiance(abs);
-			return verdict === "approuve" ? "trusted" : verdict === "refuse" ? "refused" : "unavailable";
+			const etat = await pont().processus.confiance(abs);
+			if (etat === "approuve") return "trusted";
+			if (etat !== "inconnu") return "unavailable";
+			if (refusesSession.has(abs.toLowerCase())) return "refused";
+			if (!(await demanderConfiance(abs))) {
+				refusesSession.add(abs.toLowerCase());
+				return "refused";
+			}
+			return (await pont().processus.confiance(abs, true)) === "approuve" ? "trusted" : "unavailable";
 		},
 		trustedFolders() {
 			return pont().processus.confianceListe();

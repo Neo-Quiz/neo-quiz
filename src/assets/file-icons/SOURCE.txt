@@ -1,0 +1,33 @@
+File-type icons of the "@" picker (dashboard/mention-picker.ts), embedded
+in src/file-icons.ts (generated from this folder). Regenerate, do not edit
+the TS module by hand.
+
+Source: Material Icon Theme for VS Code, by Material Extensions
+  https://github.com/material-extensions/vscode-material-icon-theme
+  commit a7ffd480d308a153b95cf241999dbaaa58bf4992 (main, read 2026-10-11)
+  path icons/<name>.svg, file names checked against the GitHub contents API.
+Licence: MIT, see LICENSE-material-icon-theme.txt.
+
+Files used (name in the source, then the key used by the app):
+  markdown.svg    md
+  pdf.svg         pdf
+  folder-base.svg folder (closed folder; the theme's folder-open variant
+                  does not exist under that name, so no open folder)
+  document.svg    txt, and the fallback for any other file
+  word.svg        doc, docx, odt, rtf
+  powerpoint.svg  ppt, pptx, odp
+  table.svg       xls, xlsx, ods, csv (the theme has no excel.svg)
+  image.svg       png, jpg, jpeg, gif, webp, svg, bmp
+  video.svg       mp4, webm, mkv, mov, avi
+  audio.svg       mp3, wav, m4a, ogg, flac
+  zip.svg         zip, 7z, rar, tar, gz
+  python.svg      py
+  c.svg           c, h
+  cpp.svg         cpp
+  java.svg        java
+  html.svg        html
+  json.svg        json
+  css.svg         css
+  xml.svg         xml
+  yaml.svg        yaml, yml
+  powershell.svg  ps1

@@ -421,6 +421,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 
 	const vueFile = creerVueFile({
 		file: fileGen,
+		ouvrirPiece: (n) => { void ouvrirPieceEnvoyee(n); },
 		ouvrir: (chemin) => {
 			const quiz = deps.scanner.getQuiz(chemin);
 			if (quiz) deps.navigate("detail", { quiz, entree: "generation" });
@@ -955,6 +956,32 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				void mathifyElement(corps);
 			},
 		});
+	}
+
+	/* Une pièce d'un message ENVOYÉ (le fil) s'ouvre comme une carte du composer :
+	   même aperçu, relu par les chemins du picker « @ » (relatif = vault,
+	   absolu = racine externe). Aperçu seulement : rien n'est attaché au
+	   composer. Un fichier introuvable ou illisible le dit par une Notice. */
+	async function ouvrirPieceEnvoyee(n: { name: string; path?: string }): Promise<void> {
+		if (!n.path) return;
+		const externe = /^([A-Za-z]:[\/]|[\/])/.test(n.path);
+		if (externe && !host.platform.isDesktopApp) return;
+		const ext = n.name.slice(n.name.lastIndexOf(".") + 1).toLowerCase();
+		const pdf = ext === "pdf";
+		const texte = ext === "md" || ext === "markdown" || ext === "txt";
+		if (!pdf && !texte) { host.ui.notice(t("ai.notice.noteReadFailed", { name: n.name })); return; }
+		try {
+			if (externe) {
+				if (pdf) ouvrirApercu({ name: n.name, content: "", path: n.path, source: "external", bytes: await host.fs.externe.readBinary(n.path) });
+				else ouvrirApercu({ name: n.name, content: await host.fs.externe.read(n.path), path: n.path, source: "external" });
+				return;
+			}
+			if (!host.fs.getFile(n.path)) { host.ui.notice(t("ai.notice.noteReadFailed", { name: n.name })); return; }
+			if (pdf) ouvrirApercu({ name: n.name, content: "", path: n.path, source: "vault", bytes: await host.fs.readBinary(n.path) });
+			else ouvrirApercu({ name: n.name, content: await host.fs.read(n.path), path: n.path, source: "vault" });
+		} catch {
+			host.ui.notice(t("ai.notice.noteReadFailed", { name: n.name }));
+		}
 	}
 
 	/* Les icônes des encadrés, posées APRÈS le rendu : le HTML pur ne sait pas
@@ -1731,6 +1758,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const destBtn = ajouter(destRow, "button", "qbd-ai-dest");
 		destBtn.type = "button";
 		paintDestination = (): void => {
+			/* THE CHAT'S FOLDER IS FIXED (2026-10-11), as a Claude Code or
+			   MonoCode session keeps its working directory: once the chat has a
+			   message, the agent works in that folder, so the row shows it and
+			   opens nothing; another folder is a new chat. */
+			const verrou = filDuChat().length > 0;
+			if (verrou) destination = dossierDuChat() ?? destination;
 			const options = destinationOptions();
 			const current = options.find(d => d.value === destination) ?? options[0];
 			destBtn.replaceChildren();
@@ -1742,7 +1775,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.setIcon(icon, "folder");
 			if (current.color) icon.style.color = current.color;
 			ajouter(destBtn, "span", "qbd-ai-dest-label", current.label);
-			destBtn.disabled = options.length <= 1;
+			destBtn.disabled = verrou || options.length <= 1;
+			destBtn.classList.toggle("is-locked", verrou);
+			destBtn.title = verrou ? t("ai.composer.destinationLocked") : "";
 			destBtn.setAttribute("aria-label", t("ai.composer.destination", { folder: current.label }));
 		};
 		paintDestination();
@@ -2049,6 +2084,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		mentions = attachMentionPicker(composerInput, composer, {
 			onPickVaultFile: (path) => { void attachVaultPath(path); },
 			onPickExternalFile: (path) => { void attachExternalPath(path); },
+			getCurrentFolder: () => destination,
 			onTextReplaced: (value) => {
 				composerText = value;
 				composerCaret = composerInput.selectionStart;
@@ -4021,6 +4057,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   document at all and the model answered with a question asking for the
 	   PDF, saved as a one-question quiz (2026-10-10). Those documents are read
 	   again from their paths, through the same functions as the "@" picker. */
+	/** The working folder of the chat on screen: the destination of its first
+	    line still in the queue, or the folder its record kept; `null` when no
+	    request named one (a chat older than 2026-10-11, a clarifying card). */
+	function dossierDuChat(): string | null {
+		const chatId = activeChatId();
+		const enFile = fileGen.lignes().find(l => chatOfLine(l) === chatId && !!l.demande.destination);
+		if (enFile) return enFile.demande.destination;
+		const chat = getChats().find(c => c.id === chatId);
+		return chat?.requests.find(r => !!r.folder)?.folder ?? null;
+	}
+
 	/* NOT FOR AN AGENT (2026-10-10): Claude Code and Codex run in the quiz's
 	   folder with tools and open the earlier documents themselves, from the
 	   paths the conversation context gives (`contexteConversation`);
@@ -4285,6 +4332,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   apparaître dans la ligne « envoyé » de la file. */
 			await attachPromptPaths();
 			await rattacherDocumentsHerites();
+			/* THE TRUST QUESTION AT THE SEND (2026-10-11), as Claude Code asks
+			   when it opens a folder: asked later, inside the CLI call, it came
+			   after the clarifying question and a long wait. An already trusted
+			   (or already refused) folder answers at once; any failure is "no
+			   tools", as in the call itself. */
+			if (fournisseurAgent()) {
+				try { await host.process?.trustFolder?.(destination || dossierParDefaut(settings().aiOutputFolder)); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
+			}
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
 				host.ui.notice(t(attente.ecartees === 1 ? "ai.video.notJoinedOne" : "ai.video.notJoinedOther", { count: attente.ecartees }));
