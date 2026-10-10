@@ -7,7 +7,6 @@ import type { ModuleGroup } from "./quiz-modules";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { duesDuDossier, questions } from "./folder-progress-details";
 import { moyenneDossier } from "./folder-progress";
-import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import {
 	folderTasks, homeFolders, lastPlayedOf, successOf, upcomingExams, daysUntil,
 	type HomeFolder, type HomeTask, type HomeTaskKind,
@@ -42,7 +41,7 @@ export function collectHomeFolders(
 	return homeFolders(groups.map(group => {
 		// Card order, the Learn before the Test of a course — the order of
 		// the folder's own page (quizzes-render.ts `ordre`).
-		const ordre = regrouperParCours(group.quizzes, true).flatMap(quizDeLaCarte);
+		const ordre = group.quizzes;
 		return {
 			group,
 			name: group.name,

@@ -73,11 +73,6 @@ export interface FicheDeps {
 	attirer(): void;
 }
 
-/** The OTHER modes of the same course (course-pairs.ts): the mode pill
-    becomes a selector Learn | Practice | Exam, whose other segments open
-    their quiz. */
-export type AutresModes = Array<{ mode: ModeQuiz; open(): void }>;
-
 /* L'état de la barre, gardé entre deux repeints du MÊME quiz (la page se
    repeint sur des événements extérieurs) ; remis à zéro sur un autre quiz. */
 const etat = { chemin: "", recherche: "" };
@@ -139,11 +134,11 @@ export function questionsTrouvees(questions: DraftQuestion[], lecon: boolean): n
 /** The info line of the page's header, the same in the fiche and the
     editor: the mode (or the selector Learn | Practice of the course's other
     modes), the number of questions, the origin. */
-export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null, autresModes?: AutresModes): HTMLElement {
-	return renderMeta(parent, { quiz, origine, autresModes });
+export function renderInfosQuiz(parent: HTMLElement, quiz: QuizIndexEntry, origine: FicheOrigine | null): HTMLElement {
+	return renderMeta(parent, { quiz, origine });
 }
 
-function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: FicheOrigine | null; autresModes?: AutresModes }): HTMLElement {
+function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: FicheOrigine | null }): HTMLElement {
 	const meta = ajouter(root, "div", "qbd-fiche-meta");
 	/* Les pastilles, puis l'ORIGINE (modèle et date) sur la ligne du dessous,
 	   à la place qu'occupait la recherche, partie au centre (2026-09-26) ;

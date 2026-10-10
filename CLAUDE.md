@@ -413,9 +413,7 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   la modale des questions sans réponse), l'ampoule sur la perle d'une
   question aidée, les indices qui suivent le RÉGLAGE et non l'horloge, et le
   chrono d'un test limité (h:mm:ss dès une heure, rendu à zéro qui referme la
-  modale). `check:module-edit` tient aussi le REGROUPEMENT
-  d'un cours (`course-pairs.ts`) : au plus un quiz par mode, Learn,
-  Entraînement puis Examen sur une carte. Les deux dans la CI.
+  modale). `check:module-edit` tient aussi le titre d'un quiz dont le bloc est passé en mode examen (suffixe de mode absent du titre). Chaque quiz a SA carte (le regroupement d'un cours est retiré, 2026-10-10). Dans la CI.
 - `npm run check:quiz-io` — **le CÂBLAGE de l'écriture d'un bloc**, le seul
   chemin par lequel la page réécrit une note. Entre `check:export` (la FORME du
   bloc produit) et `audit-vaults.mjs` (l'aller-retour sur de vrais vaults), il n'y

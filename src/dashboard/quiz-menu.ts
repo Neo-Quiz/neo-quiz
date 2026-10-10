@@ -16,7 +16,6 @@ import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
 import { freeNotePath } from "./folder-create";
-import { parMode, quizFreres } from "./course-pairs";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
 import { openShareChooser } from "./share-choose";
@@ -43,7 +42,7 @@ import { LOG_PREFIX } from "../branding";
    `HostModals`. Share stays an OPTIONAL ctx member (`shareQuiz?`). Rename
    was one too, absent from the app on purpose while only Obsidian could
    rewrite incoming links; since the plugin was removed (2026-10-01) the app
-   is the host, and Rename is built on the contract (`renameQuizzes`). An
+   is the host, and Rename is built on the contract (`renameQuiz`). An
    absent entry reads as a host doing something else, a greyed one as a
    failure: entries a host cannot honour are left out, never greyed.
 ══════════════════════════════════════════════════════════ */
@@ -130,12 +129,11 @@ function openConfirm(spec: ConfirmSpec, onConfirm: () => void): void {
 
 /* ── The rename modal ──
    The field holds the quiz's TITLE (without its mode suffix, put back by
-   `renameQuizzes`). The modal only ignores an empty or unchanged name and a
+   `renameQuiz`). The modal only ignores an empty or unchanged name and a
    note gone since the menu opened; the name rules, the collision test and the
-   message for each refusal belong to `renameQuizzes`. On `false` the modal
+   message for each refusal belong to `renameQuiz`. On `false` the modal
    STAYS OPEN so the user fixes the name instead of retyping it. */
-function openRenameQuizModal(ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], onDone: () => void): void {
-	const quiz = quizzes[0];
+function openRenameQuizModal(ctx: DashboardShellCtx, quiz: QuizIndexEntry, onDone: () => void): void {
 	let name = quiz.title;
 	requireHost("modals").open({
 		className: "qbd-medit-modal",
@@ -166,7 +164,7 @@ function openRenameQuizModal(ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], 
 				busy = true;
 				try {
 					// `false`: the reason is already shown; the typed name stays to be fixed.
-					if (!await renameQuizzes(ctx, quizzes, name)) return;
+					if (!await renameQuiz(ctx, quiz, name)) return;
 				} finally { busy = false; }
 				m.close();
 				currentHost().ui.notice(t("dashboard.quizzes.renamed"));
@@ -331,26 +329,6 @@ async function deleteQuizCore(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Pro
 	ctx.statsStore?.deleteRecord(quiz.path);
 	derniereSuppression.push({ path: quiz.path, avant: vu, apres: ecrit, stats });
 	return true;
-}
-
-/** Deletes every quiz of a course card (its Learn and its Test): each one
-    through the same core, one after the other; a failure is counted, never
-    thrown, so a course is never half-deleted without a word. */
-async function deleteCourseQuizzes(ctx: DashboardShellCtx, quizzes: readonly QuizIndexEntry[]): Promise<void> {
-	let failures = 0;
-	/* A fresh undo batch, as the single and folder deletes start one: without
-	   it Ctrl+Z after "Delete both" also brought back quizzes deleted earlier. */
-	derniereSuppression = [];
-	for (const q of quizzes) {
-		try {
-			if (!await deleteQuizCore(ctx, q)) failures++;
-		} catch {
-			failures++;
-		}
-	}
-	currentHost().ui.notice(failures > 0
-		? t("dashboard.quizzes.deletedPartial", { count: failures })
-		: deletedNotice());
 }
 
 /** The folder on disk that "Delete folder" may send to the trash, or `null`:
@@ -541,9 +519,8 @@ async function renameCaseOnly(from: string, to: string): Promise<void> {
    A quiz's title IS its note's name without the mode suffix (`titreSansMode`,
    scanner.ts). The field shows that TITLE, the one the card shows; the suffix
    (" — Learn", " — Practice", " — Exam") is put back automatically. Showing it
-   would let a slip in the field remove it, and a note without its suffix stops
-   pairing with the other modes of its course (`course-pairs.ts`) and loses the
-   type the file explorer reads.
+   would let a slip in the field remove it, and a note without its suffix loses
+   the type the file explorer reads.
 
    Name rules: those of a share (`share-names.ts`: NFC, forbidden and invisible
    characters, Windows device names, length). A name already in the folder, in
@@ -589,83 +566,63 @@ export function quizNoteName(quiz: QuizIndexEntry, title: string): QuizNameVerdi
 }
 
 /**
- * Renames the quizzes of a card (one quiz, or the modes of a course, which
- * keep their pairing) to `title`, each keeping its own mode suffix. Every
- * target is checked BEFORE the first rename: a refused name writes nothing.
- * `true` once renamed; `false` after showing why (the modal then stays open
- * for the name to be fixed).
+ * Renames a quiz to `title`, keeping its mode suffix. The target is checked
+ * BEFORE the rename: a refused name writes nothing. `true` once renamed;
+ * `false` after showing why (the modal then stays open for the name to be fixed).
  */
-export async function renameQuizzes(ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], title: string): Promise<boolean> {
+export async function renameQuiz(ctx: DashboardShellCtx, quiz: QuizIndexEntry, title: string): Promise<boolean> {
 	const host = currentHost();
-	const targets: Array<{ quiz: QuizIndexEntry; to: string }> = [];
-	for (const quiz of quizzes) {
-		const v = quizNoteName(quiz, title);
-		if (!v.ok) { host.ui.notice(t(v.key)); return false; }
-		const folder = parentFolder(quiz.path);
-		const to = inFolder(folder, `${v.basename}.md`);
-		if (to === quiz.path) continue;
-		if (!sameFileName(quiz.path, to) && await nameTaken(folder, `${v.basename}.md`)) {
-			host.ui.notice(t("dashboard.quizzes.renameExists"));
-			return false;
-		}
-		targets.push({ quiz, to });
+	const v = quizNoteName(quiz, title);
+	if (!v.ok) { host.ui.notice(t(v.key)); return false; }
+	const folder = parentFolder(quiz.path);
+	const to = inFolder(folder, `${v.basename}.md`);
+	if (to === quiz.path) return true;
+	if (!sameFileName(quiz.path, to) && await nameTaken(folder, `${v.basename}.md`)) {
+		host.ui.notice(t("dashboard.quizzes.renameExists"));
+		return false;
 	}
-	for (const { quiz, to } of targets) {
-		if (!await relocateQuiz(ctx, quiz, to, "dashboard.quizzes.renameExists", "dashboard.quizzes.renameError")) return false;
-	}
-	return true;
+	return relocateQuiz(ctx, quiz, to, "dashboard.quizzes.renameExists", "dashboard.quizzes.renameError");
 }
 
 /** Most copies tried before giving up (" (copy 2)" ... " (copy 999)"). */
 const COPY_ATTEMPTS = 999;
 
 /**
- * Duplicates the quizzes of a card: the same note, byte for byte, in the same
- * folder, as "<title> (copy)" — then "(copy 2)", "(copy 3)"... — each keeping
- * its mode suffix, under the same rules and collision test as a rename. A
- * course is copied whole, under ONE copy number, so the copies pair together.
- * Only the note: an image cited by a relative path in the same folder stays
- * valid, and nothing keyed by the old path (history, stats, session,
- * attempts) is carried: the copy has another path, so other review keys
- * (`keyOfQuestion`), and starts as a new quiz. The new paths, or `null` after
- * showing why.
+ * Duplicates a quiz: the same note, byte for byte, in the same folder, as
+ * "<title> (copy)" — then "(copy 2)", "(copy 3)"... — keeping its mode suffix,
+ * under the same rules and collision test as a rename. Only the note: an image
+ * cited by a relative path in the same folder stays valid, and nothing keyed by
+ * the old path (history, stats, session, attempts) is carried: the copy has
+ * another path and starts as a new quiz. The new path, or `null` after showing why.
  */
-export async function duplicateQuizzes(quizzes: QuizIndexEntry[]): Promise<string[] | null> {
+export async function duplicateQuiz(quiz: QuizIndexEntry): Promise<string | null> {
 	const host = currentHost();
-	if (quizzes.length === 0) return null;
 	const word = t("dashboard.quizzes.copyWord");
 	for (let n = 1; n <= COPY_ATTEMPTS; n++) {
 		const mark = n === 1 ? ` (${word})` : ` (${word} ${n})`;
-		const targets: string[] = [];
-		let taken = false;
-		for (const quiz of quizzes) {
-			// A long title is cut so that the mark and the suffix still fit.
-			const room = NAME_MAX - mark.length - modeSuffix(quiz).length;
-			const v = quizNoteName(quiz, quiz.title.slice(0, Math.max(1, room)).trimEnd() + mark);
-			if (!v.ok) { host.ui.notice(t(v.key)); return null; }
-			const folder = parentFolder(quiz.path);
-			if (await nameTaken(folder, `${v.basename}.md`)) { taken = true; break; }
-			targets.push(inFolder(folder, `${v.basename}.md`));
-		}
-		if (taken) continue;
+		// A long title is cut so that the mark and the suffix still fit.
+		const room = NAME_MAX - mark.length - modeSuffix(quiz).length;
+		const v = quizNoteName(quiz, quiz.title.slice(0, Math.max(1, room)).trimEnd() + mark);
+		if (!v.ok) { host.ui.notice(t(v.key)); return null; }
+		const folder = parentFolder(quiz.path);
+		if (await nameTaken(folder, `${v.basename}.md`)) continue;
+		const target = inFolder(folder, `${v.basename}.md`);
 		/* Written under a hidden temporary name, then renamed: `rename` refuses
 		   an existing target atomically, so a file that appeared at the target
 		   since `nameTaken` (another window, a synced device) is never
 		   overwritten. A direct `writeBinary` replaced it. */
-		for (const [i, quiz] of quizzes.entries()) {
-			const tmp = inFolder(parentFolder(targets[i]), `.duplicating-${Math.random().toString(36).slice(2, 10)}.md`);
-			await host.fs.writeBinary(tmp, await host.fs.readBinary(quiz.path));
-			try {
-				await host.fs.rename(tmp, targets[i]);
-			} catch (e) {
-				await host.fs.remove(tmp).catch((r: unknown) => console.warn(LOG_PREFIX, "temporary copy not removed", tmp, r));
-				const message = e instanceof Error ? e.message : String(e);
-				if (!message.includes("existe déjà")) throw e;
-				host.ui.notice(t("dashboard.quizzes.renameExists"));
-				return null;
-			}
+		const tmp = inFolder(folder, `.duplicating-${Math.random().toString(36).slice(2, 10)}.md`);
+		await host.fs.writeBinary(tmp, await host.fs.readBinary(quiz.path));
+		try {
+			await host.fs.rename(tmp, target);
+		} catch (e) {
+			await host.fs.remove(tmp).catch((r: unknown) => console.warn(LOG_PREFIX, "temporary copy not removed", tmp, r));
+			const message = e instanceof Error ? e.message : String(e);
+			if (!message.includes("existe déjà")) throw e;
+			host.ui.notice(t("dashboard.quizzes.renameExists"));
+			return null;
 		}
-		return targets;
+		return target;
 	}
 	host.ui.notice(t("dashboard.quizzes.duplicateError"));
 	return null;
@@ -681,8 +638,8 @@ export async function duplicateQuizzes(quizzes: QuizIndexEntry[]): Promise<strin
     `buildModuleCardMenu`, est l'ancre où poser ce sous-menu — absent (appelant
     qui ne le fournirait pas encore), pas d'entrée « Déplacer vers » : un
     sous-menu sans rien où s'ancrer ne s'ouvrirait nulle part. */
-export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement, solo?: boolean) => ActionMenuItem[] {
-	return (quiz, anchorEl, solo) => {
+export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement) => ActionMenuItem[] {
+	return (quiz, anchorEl) => {
 		/* Capturés dans des constantes : le rétrécissement de type d'un `if`
 		   sur `ctx.shareQuiz` ne survivrait pas jusqu'au `onClick`. */
 		const { shareQuiz } = ctx;
@@ -741,16 +698,9 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 						   plusieurs UE : seule, elle ne distingue rien. */
 						section: plusieursUe && derniereUe !== ue.key ? (ue.ue ?? t("dashboard.quizzes.noUe")) : undefined,
 						onClick: () => {
-							/* A course brought together (its modes on one card,
-							   `course-pairs.ts`) moves as a whole: moving only one of
-							   its files would split the course without a word
-							   (2026-09-27). The others only move once the first has;
-							   when one fails, `moveQuizTo` says so itself. */
-							const freres = quizFreres(quiz, ctx.scanner.getQuizzes());
 							void runFileGesture(async () => {
 								const to = await moveQuizTo(ctx, quiz, g.path as string, g.name);
 								if (!to) return;
-								for (const f of freres) await moveQuizTo(ctx, f, g.path as string, g.name);
 								currentHost().ui.notice(t("dashboard.quizzes.movedQuiz", { target: g.name }));
 							}, "dashboard.quizzes.moveQuizError", rerender);
 						},
@@ -767,24 +717,21 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		// « Keep exam mode » (a Test only): checkable, written into the note.
 		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
 		if (keepExam) items.push(keepExam);
-		/* Rename and Duplicate act on the quizzes of the CARD: the modes of a
-		   course together (the copies and the new names keep them paired), a
-		   single quiz on a folder page (`solo`). Both go through the contract
-		   (`HostFs.rename`, `readBinary`/`writeBinary`), so every host has them. */
-		const deLaCarte = solo ? [quiz] : [quiz, ...quizFreres(quiz, ctx.scanner.getQuizzes())];
+		/* Rename and Duplicate act on this quiz, through the contract (`HostFs.rename`,
+		   `readBinary`/`writeBinary`), so every host has them. */
 		items.push({
 			// "text-cursor-input", not a pencil: "Edit" (pencil) already opens
 			// the question editor, two pencils would be confused.
 			icon: "text-cursor-input",
 			label: t("dashboard.quizzes.menuRename"),
-			onClick: () => { openRenameQuizModal(ctx, deLaCarte, rerender); },
+			onClick: () => { openRenameQuizModal(ctx, quiz, rerender); },
 		});
 		items.push({
 			icon: "copy-plus",
 			label: t("dashboard.quizzes.menuDuplicate"),
 			onClick: () => {
 				void runFileGesture(async () => {
-					if (await duplicateQuizzes(deLaCarte)) currentHost().ui.notice(t("dashboard.quizzes.duplicated"));
+					if (await duplicateQuiz(quiz)) currentHost().ui.notice(t("dashboard.quizzes.duplicated"));
 				}, "dashboard.quizzes.duplicateError", rerender);
 			},
 		});
@@ -805,60 +752,19 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				});
 			},
 		});
-		/* A course brought together (its quizzes on one card, `course-pairs.ts`)
-		   says WHICH quiz goes (2026-09-29): "Delete quiz" on such a card did
-		   not tell whether the Learn, the Test or both would be removed. A
-		   submenu names each quiz by its type, then offers all of them. Every
-		   path still confirms, and goes through `deleteQuizCore`. */
-		/* `solo`: the card stands for this one quiz only (the folder page
-		   shows one card per quiz), so Delete removes just it. */
-		const freres = solo ? [] : quizFreres(quiz, ctx.scanner.getQuizzes());
-		const confirmerUn = (q: QuizIndexEntry): void => {
-			openConfirm({
-				title: t("dashboard.quizzes.deleteConfirmTitle", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
-				/* With its type (2026-09-29): the Learn and the Test of a course
-				   share their title, and "Delete « CM1 »?" did not say which. */
-				body: t("dashboard.quizzes.deleteConfirmBody", { title: freres.length ? `${q.title} (${quizModeLabel(q.mode)})` : q.title }),
-				cta: t("dashboard.quizzes.deleteConfirmCta"),
-				warning: true,
-			}, () => { void runFileGesture(() => deleteQuiz(ctx, q), "dashboard.quizzes.deleteError", rerender); });
-		};
-		if (freres.length === 0) {
-			items.push({
-				icon: "trash-2",
-				label: t("dashboard.quizzes.menuDelete"),
-				danger: true,
-				onClick: () => confirmerUn(quiz),
-			});
-		} else {
-			const cours = [quiz, ...freres].sort(parMode);
-			items.push({
-				icon: "trash-2",
-				label: t("dashboard.quizzes.menuDelete"),
-				danger: true,
-				submenu: [
-					...cours.map((q): ActionMenuItem => ({
-						icon: quizModeIcon(q.mode),
-						label: t("dashboard.quizzes.menuDeleteType", { type: quizModeLabel(q.mode) }),
-						danger: true,
-						onClick: () => confirmerUn(q),
-					})),
-					{
-						icon: "trash-2",
-						label: t(cours.length === 2 ? "dashboard.quizzes.menuDeleteBoth" : "dashboard.quizzes.menuDeleteAll", { count: cours.length }),
-						danger: true,
-						onClick: () => {
-							openConfirm({
-								title: t("dashboard.quizzes.deleteCourseConfirmTitle", { count: cours.length, title: quiz.title }),
-								body: t("dashboard.quizzes.deleteCourseConfirmBody", { count: cours.length, title: quiz.title }),
-								cta: t("dashboard.quizzes.deleteConfirmCta"),
-								warning: true,
-							}, () => { void deleteCourseQuizzes(ctx, cours).then(rerender); });
-						},
-					},
-				],
-			});
-		}
+		items.push({
+			icon: "trash-2",
+			label: t("dashboard.quizzes.menuDelete"),
+			danger: true,
+			onClick: () => {
+				openConfirm({
+					title: t("dashboard.quizzes.deleteConfirmTitle", { title: quiz.title }),
+					body: t("dashboard.quizzes.deleteConfirmBody", { title: quiz.title }),
+					cta: t("dashboard.quizzes.deleteConfirmCta"),
+					warning: true,
+				}, () => { void runFileGesture(() => deleteQuiz(ctx, quiz), "dashboard.quizzes.deleteError", rerender); });
+			},
+		});
 		return items;
 	};
 }

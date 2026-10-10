@@ -432,7 +432,7 @@ await withSrcModule(
 		const start = () => disk({ [learn.path]: content, [test.path]: bytes("test"), "NeoQuiz/Cours/Autre — Learn.md": bytes("a") });
 
 		const a = start();
-		const ra = await run(a, (ctx) => qm.renameQuizzes(ctx, [learn], "Réseaux: TCP"));
+		const ra = await run(a, (ctx) => qm.renameQuiz(ctx, learn, "Réseaux: TCP"));
 		const to = "NeoQuiz/Cours/Réseaux- TCP — Learn.md";
 		r.check("12a. rename: the note is renamed in place, its suffix kept, forbidden characters replaced",
 			[ra.result, a.files.has(learn.path), a.files.get(to) === content], [true, false, true]);
@@ -440,33 +440,28 @@ await withSrcModule(
 			[ra.moved, ra.prefixes, ra.store.getRecord(to)?.bestScore, ra.store.getRecord(learn.path)], [[[learn.path, to]], [[learn.path, to]], 90, null]);
 
 		const b = start();
-		const rb = await run(b, (ctx) => qm.renameQuizzes(ctx, [learn], "autre"));
+		const rb = await run(b, (ctx) => qm.renameQuiz(ctx, learn, "autre"));
 		r.check("12b. a name taken in another case: refused with a message, nothing written",
 			[rb.result, b.writes, rb.notices, rb.moved], [false, [], ["A file with this name already exists in this folder."], []]);
 
 		const c = start();
-		const rc = await run(c, (ctx) => qm.renameQuizzes(ctx, [learn], "con"));
-		const rc2 = await run(c, (ctx) => qm.renameQuizzes(ctx, [learn], "  ..  "));
+		const rc = await run(c, (ctx) => qm.renameQuiz(ctx, learn, "con"));
+		const rc2 = await run(c, (ctx) => qm.renameQuiz(ctx, learn, "  ..  "));
 		r.check("12c. a Windows device name or an empty name: refused, nothing written",
 			[rc.result, rc.notices, rc2.result, rc2.notices, c.writes],
 			[false, ["Windows reserves this name. Choose another one."], false, ["Type a name."], []]);
 
-		const d = start();
-		const rd = await run(d, (ctx) => qm.renameQuizzes(ctx, [learn, test], "CM2"));
-		r.check("12d. a course card: both modes renamed, each with its own suffix (they stay paired)",
-			[rd.result, [...d.files.keys()].sort()], [true, ["NeoQuiz/Cours/Autre — Learn.md", "NeoQuiz/Cours/CM2 — Learn.md", "NeoQuiz/Cours/CM2 — Practice.md"]]);
-
 		const e = start();
-		const re = await run(e, (ctx) => qm.renameQuizzes(ctx, [learn], "cm1"));
+		const re = await run(e, (ctx) => qm.renameQuiz(ctx, learn, "cm1"));
 		r.check("12e. a change of case only goes through (a direct rename would collide with itself)",
 			[re.result, [...e.files.keys()].includes("NeoQuiz/Cours/cm1 — Learn.md"), e.files.has(learn.path)], [true, true, false]);
 
 		const f = start();
-		const r1 = await run(f, () => qm.duplicateQuizzes([learn]));
-		const r2 = await run(f, () => qm.duplicateQuizzes([learn]));
+		const r1 = await run(f, () => qm.duplicateQuiz(learn));
+		const r2 = await run(f, () => qm.duplicateQuiz(learn));
 		const copy1 = "NeoQuiz/Cours/CM1 (copy) — Learn.md", copy2 = "NeoQuiz/Cours/CM1 (copy 2) — Learn.md";
 		r.check("12f. duplicate: \"(copy)\" then \"(copy 2)\", suffix kept, the original untouched",
-			[r1.result, r2.result, f.files.get(learn.path) === content], [[copy1], [copy2], true]);
+			[r1.result, r2.result, f.files.get(learn.path) === content], [copy1, copy2, true]);
 		r.check("12f. duplicate: the same bytes (BOM, CRLF, embeds)",
 			[copy1, copy2].map(p => f.files.has(p) && Buffer.from(f.files.get(p)).equals(Buffer.from(content))), [true, true]);
 		r.check("12f. duplicate: no progress copied (no history, stats nor session moved or written)",
@@ -480,7 +475,7 @@ await withSrcModule(
 		const theirs = bytes("theirs");
 		const renameG = g.fs.rename;
 		g.fs.rename = async (a, b) => { if (b === copy1 && !g.files.has(copy1)) g.files.set(copy1, theirs); return renameG(a, b); };
-		const rg = await run(g, () => qm.duplicateQuizzes([learn]));
+		const rg = await run(g, () => qm.duplicateQuiz(learn));
 		r.check("12g. duplicate racing a new file: refused, the collision said",
 			[rg.result, rg.notices], [null, ["A file with this name already exists in this folder."]]);
 		r.check("12g. duplicate racing a new file: the newcomer kept, no temporary file left",
@@ -495,7 +490,7 @@ await withSrcModule(
 		const original = console.error;
 		console.error = () => {};
 		let rh;
-		try { rh = await run(h, (ctx) => qm.renameQuizzes(ctx, [learn], "cm1")); } finally { console.error = original; }
+		try { rh = await run(h, (ctx) => qm.renameQuiz(ctx, learn, "cm1")); } finally { console.error = original; }
 		const stranded = [...h.files.keys()].find(k => k.includes("/.renaming-"));
 		r.check("12h. a stranded case rename: refused, a notice names the temporary file",
 			[rh.result, !!stranded && rh.notices.some(n => n.includes(stranded))], [false, true]);

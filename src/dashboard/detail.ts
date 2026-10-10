@@ -5,7 +5,6 @@ import { t } from "../i18n";
 import { formatDateHeure } from "./format-date";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
-import { quizFreres } from "./course-pairs";
 import type { QuizStatRecord, StatsStore } from "./stats-store";
 import { getCanal, getProvider, libelleModele } from "./ai-providers";
 import { renderEntete, dossierDuQuiz, setActionBadge } from "./detail-head";
@@ -110,9 +109,6 @@ export interface QuizPageSpec {
 	/** Appelée à chaque changement de question courante, par `goToQuestion`
 	    et nulle part ailleurs — c'est le seul endroit où `activeIdx` bouge. */
 	onQuestionChange?(index: number): void;
-	/** The OTHER modes of the same course (course-pairs.ts): the page then
-	    shows a selector Learn | Practice | Exam that opens them. */
-	autresModes?: Array<{ quiz: QuizIndexEntry; open(): void }>;
 	/** The page's "⋮" menu: the quiz card's (host), with `extra` lines on
 	    top (the editor's "Vocabulary"). */
 	menu?(anchor: HTMLElement, extra?: ActionMenuItem[]): void;
@@ -225,7 +221,6 @@ export function createDetailHandlers(ctx: DashboardShellCtx): DetailHandlers {
 				initialQuestion: host.initialQuestion,
 				onQuestionChange: host.onQuestionChange,
 				ouverture: host.ouverture,
-				autresModes: quizFreres(quiz, ctx.scanner.getQuizzes()).map(f => ({ quiz: f, open: () => ctx.navigate("detail", { quiz: f }) })),
 				/* The card's menu, with a repaint that re-reads the quiz: renamed,
 				   the page picks it up; deleted or moved out of the catalogue, we go
 				   back. */
@@ -528,8 +523,6 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 		   selector there, the row lost 8 px of height and everything on it
 		   moved up at each switch; a segment opens the other mode's quiz, the
 		   pending write first. */
-		const autresModes = spec.autresModes?.filter(a => a.quiz.mode !== spec.stats?.mode)
-			.map(a => ({ mode: a.quiz.mode, open: () => { void flushSave(); a.open(); } }));
 		return renderEntete(page, {
 			title: spec.title,
 			// A catalogue quiz shows its FOLDER, not its path; the Generate
@@ -553,7 +546,7 @@ export function createQuizPage(ctx: QuizPageDeps): QuizPageHandlers {
 			enterStarts: showingWelcome(),
 			menu: menu ? (anchor) => menu(anchor, lignesEdition()) : undefined,
 			infos: spec.stats ? (p) => {
-				renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!), autresModes);
+				renderInfosQuiz(p, spec.stats!, origineDe(spec.stats!));
 			} : undefined,
 		});
 	}

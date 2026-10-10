@@ -175,41 +175,32 @@ await withSrcModule(["src/dashboard/module-icons.ts", "src/dashboard/icon-sugges
 	r.done();
 });
 
-/* ONE COURSE, ONE CARD (2026-09-24, three modes since 2026-09-29, spec
-   2026-09-29-test-practice-exam-design §5.2): the Learn, the Practice and the
-   Exam of a course — same folder, same title, at most one quiz per mode —
-   are brought together, Learn first, then Practice, then Exam. */
-await withSrcModule("src/dashboard/course-pairs.ts", async ({ regrouperParCours, quizFreres }) => {
-	const r = makeReporter("Course — its modes brought together");
+/* ONE CARD PER QUIZ (2026-10-10): the Learn, the Practice and the Exam of a
+   course are three cards, each its own quiz. The grouping that brought them
+   together (course-pairs.ts) is gone, and its cases with it. What stays is the
+   title of a note whose block was switched to exam mode: its mode suffix is
+   not in the title, and it still reads as "Practice" in the file explorer. */
+await withSrcModule("src/quiz-format.ts", ({ titreSansMode }) => {
+	const r = makeReporter("Quiz — titre sans suffixe de mode");
 	const q = (path, title, mode) => ({ path, title, mode, questions: 20 });
 	const D = "Efrei/B2/XTI301";
-	const nom = (x) => x.path.split("/").pop();
-	const liste = [
-		q(`${D}/CM1 — Exam.md`, "CM1", "exam"), q(`${D}/CM1 — Practice.md`, "CM1", "practice"), q(`${D}/CM1 — Learn.md`, "CM1", "learn"),
-		q(`${D}/CM2 — Learn.md`, "CM2", "learn"), q(`${D}/TP1 — Practice.md`, "TP1", "practice"), q(`${D}/TP1 — Exam.md`, "TP1", "exam"),
-		q(`Autre/CM2 — Practice.md`, "CM2", "practice"),
-	];
-	const cartes = regrouperParCours(liste, true);
-	r.check("a course = one card with its modes by order, in place of its first quiz",
-		cartes.map(c => [nom(c.quiz), c.freres.map(nom)]),
-		[["CM1 — Learn.md", ["CM1 — Practice.md", "CM1 — Exam.md"]], ["CM2 — Learn.md", []], ["TP1 — Practice.md", ["TP1 — Exam.md"]], ["CM2 — Practice.md", []]]);
-	r.check("the other modes of a quiz, by order", quizFreres(liste[0], liste).map(nom), ["CM1 — Learn.md", "CM1 — Practice.md"]);
-	r.check("a namesake in ANOTHER folder is not brought together", quizFreres(liste[3], liste), []);
-	r.check("two quizzes of the same mode do not form a course",
-		quizFreres(q(`${D}/X.md`, "X", "learn"), [q(`${D}/X.md`, "X", "learn"), q(`${D}/X 2.md`, "X", "learn")]), []);
-	r.check("two of one mode among three: no course either",
-		quizFreres(q(`${D}/Y.md`, "Y", "exam"), [q(`${D}/Y.md`, "Y", "exam"), q(`${D}/Y 2.md`, "Y", "exam"), q(`${D}/Y — Learn.md`, "Y", "learn")]), []);
-	r.check("setting off: one card per quiz", regrouperParCours(liste, false).map(c => c.freres.length), [0, 0, 0, 0, 0, 0, 0]);
-	/* A Test named "— Practice" whose block was switched to `mode: "exam"`
-	   ("Keep exam mode" does not rename the note): titled through the real
-	   scanner rule, it still pairs with its Learn. */
-	await withSrcModule("src/quiz-format.ts", ({ titreSansMode }) => {
-		const s = (base, mode) => q(`${D}/${base}.md`, titreSansMode(base, mode), mode);
-		const kept = [s("CM1 — Learn", "learn"), s("CM1 — Practice", "exam"), s("TP1 — Learn", "learn"), s("TP1 — Exam (2)", "practice")];
-		r.check("a Practice-named note in exam mode is titled without suffix and grouped with its Learn",
-			[kept[1].title, kept[3].title, regrouperParCours(kept, true).map(c => [nom(c.quiz), c.freres.map(nom)])],
-			["CM1", "TP1 (2)", [["CM1 — Learn.md", ["CM1 — Practice.md"]], ["TP1 — Learn.md", []], ["TP1 — Exam (2).md", []]]]);
-	});
+	const s = (base, mode) => q(`${D}/${base}.md`, titreSansMode(base, mode), mode);
+	const kept = [s("CM1 — Learn", "learn"), s("CM1 — Practice", "exam"), s("TP1 — Exam (2)", "practice")];
+	r.check("a Practice-named note in exam mode is titled without its suffix",
+		[kept[1].title, kept[2].title], ["CM1", "TP1 (2)"]);
+	r.done();
+});
+
+/* The card date (2026-10-10): the long form in the interface language, the
+   short one for a phone, the time for the bubble. Local time, so the fixture
+   is built with the Date constructor and not a UTC string. */
+await withSrcModule("src/dashboard/card-date.ts", ({ cardDate }) => {
+	const r = makeReporter("Carte — date de création");
+	const ms = new Date(2026, 9, 9, 22, 30).getTime();
+	r.check("the long date in French, then in English",
+		[cardDate(ms, "fr").long, cardDate(ms, "en").long], ["9 octobre 2026", "October 9, 2026"]);
+	r.check("the short date on a phone, the time 24-hour",
+		[cardDate(ms, "fr").short, cardDate(ms, "fr").time], ["9 oct. 2026", "22:30"]);
 	r.done();
 });
 

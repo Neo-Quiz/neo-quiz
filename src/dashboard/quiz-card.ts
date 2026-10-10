@@ -6,8 +6,7 @@ import type { QuizIndexEntry, QuizTypeTag } from "./scanner";
 import type { ModeQuiz } from "../quiz-format";
 import type { QuizStatRecord } from "./stats-store";
 import { computeQuizState } from "./quiz-mastery";
-import { parMode } from "./course-pairs";
-import { createOptionCard } from "./folder-create";
+import { cardDate } from "./card-date";
 
 /* Tag de type de quiz (calculé au scan) → clé de traduction, résolue au rendu.
    Table explicite plutôt qu'une clé construite par concaténation : `t()` n'accepte
@@ -71,26 +70,13 @@ export function quizModeIcon(mode: ModeQuiz): string {
 }
 
 
-/** When a quiz (or the earliest of a course's quizzes) was created: the
-    generation date of the app's `neo-quiz:` frontmatter when the note has one,
-    else the file's creation time, else its modification time (a host that
-    does not report `ctime`). 0 when nothing is known. */
-export function quizCreationTime(quizzes: readonly QuizIndexEntry[]): number {
-	const times = quizzes.map(q => {
-		const generated = q.generated ? Date.parse(q.generated.generatedAt) : NaN;
-		return Number.isFinite(generated) ? generated : (q.ctime || q.mtime || 0);
-	}).filter(n => n > 0);
-	return times.length > 0 ? Math.min(...times) : 0;
-}
-
-/** Short localized date: "Oct 8" / "8 oct.", with the year only when it is
-    not the current one. */
-export function formatCardDate(ms: number, now: Date = new Date()): string {
-	const d = new Date(ms);
-	return d.toLocaleDateString(currentLang(), {
-		day: "numeric", month: "short",
-		...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
-	});
+/** When a quiz was created: the generation date of the app's `neo-quiz:`
+    frontmatter when the note has one, else the file's creation time, else its
+    modification time (a host that does not report `ctime`). 0 when nothing is known. */
+export function quizCreationTime(quiz: QuizIndexEntry): number {
+	const generated = quiz.generated ? Date.parse(quiz.generated.generatedAt) : NaN;
+	const time = Number.isFinite(generated) ? generated : (quiz.ctime || quiz.mtime || 0);
+	return time > 0 ? time : 0;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -141,11 +127,6 @@ export function renderQuizCard(
 		onMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement) => void;
 		accent?: string;
 		entryIndex?: number;
-		/** The quizzes of the OTHER modes of the same course
-		    (`regrouperParCours`): the card becomes the course's, with one pill
-		    per mode; `statsFreres` in the same order. */
-		freres?: QuizIndexEntry[];
-		statsFreres?: Array<QuizStatRecord | null | undefined>;
 		/** The live session of a quiz (`DashboardShellCtx.sessionOf`): a quiz
 		    under way counts in the ring before its stats are written. */
 		sessionOf?: (path: string) => { answered: number; total: number } | null;
@@ -163,17 +144,7 @@ export function renderQuizCard(
 
 	// ── État du quiz (calcul partagé quiz-mastery.ts) ──
 	// `state` choisit la couleur de l'anneau, `pct` ce qu'il affiche.
-	/* A course brought together sums up its modes: mastered when all are, to
-	   review when one is, in progress as soon as one has started (average
-	   percentage), fresh otherwise. */
-	const freres = opts?.freres ?? [];
-	const session = (p: string) => opts?.sessionOf?.(p) ?? null;
-	const infos = [computeQuizState(quiz, stats, session(quiz.path)), ...freres.map((f, i) => computeQuizState(f, opts?.statsFreres?.[i], session(f.path)))];
-	const { state, pct } = infos.length === 1 ? infos[0]
-		: infos.every(x => x.state === "mastered") ? { state: "mastered" as const, pct: 100 }
-		: infos.some(x => x.state === "review") ? { state: "review" as const, pct: 100 }
-		: infos.every(x => x.state === "fresh") ? { state: "fresh" as const, pct: 0 }
-		: { state: "progress" as const, pct: Math.round(infos.reduce((n, x) => n + x.pct, 0) / infos.length) };
+	const { state, pct } = computeQuizState(quiz, stats, opts?.sessionOf?.(quiz.path) ?? null);
 	const body = ajouter(card, "div", "qbd-quiz-card-body");
 
 	/* ANATOMIE DU 2026-09-25 (maquette « anneau de progression », variante 2) :
@@ -185,8 +156,8 @@ export function renderQuizCard(
 	const haut = ajouter(body, "div", "qbd-quiz-card-top");
 	const texte = ajouter(haut, "div", "qbd-quiz-card-text");
 	ajouter(texte, "p", "qbd-quiz-card-title", quiz.title);
-	const totalQuestions = quiz.questions + freres.reduce((n, f) => n + f.questions, 0);
-	const totalReadings = quiz.readings + freres.reduce((n, f) => n + f.readings, 0);
+	const totalQuestions = quiz.questions;
+	const totalReadings = quiz.readings;
 	const compte = ajouter(texte, "p", "qbd-quiz-card-count");
 	ajouter(compte, "span", undefined,
 		t(totalQuestions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: totalQuestions }));
@@ -218,10 +189,8 @@ export function renderQuizCard(
 	   pas acquis. */
 	if (opts?.showRing !== false) renderProgressRing(haut, pct, state === "mastered" ? "done" : pct > 0 ? "progress" : "fresh");
 
-	/* PLAY (2026-09-29): starts the course straight from its card — its only
-	   mode at once, or a choice of mode when the card gathers several. A
-	   ghost icon of the "⋯" family, never a framed button: no tile in a
-	   tile. */
+	/* PLAY: starts this quiz straight from its card. A ghost icon of the
+	   "⋯" family, never a framed button: no tile in a tile. */
 	if (opts?.onPlay) {
 		const onPlay = opts.onPlay;
 		const play = ajouter(haut, "button", "qbd-quiz-card-play");
@@ -231,38 +200,30 @@ export function renderQuizCard(
 		currentHost().ui.setIcon(play, "play");
 		play.addEventListener("click", (e) => {
 			e.stopPropagation();
-			const modes = [quiz, ...freres].sort(parMode);
-			if (modes.length === 1) onPlay(modes[0]);
-			else openModePicker(modes, onPlay);
+			onPlay(quiz);
 		});
 	}
 
-	/* LES MODES : une pastille par mode, même couleur pour tous, jamais de
-	   coche. Plus de pourcentage (2026-09-25) : l'anneau reste le seul chiffre
-	   de la carte, et le détail par mode vit dans l'onglet « Progression » du
-	   dossier. Un clic lance le mode ; au survol, le nombre de questions du
-	   mode. Le « ⋯ » ferme la ligne, en bas à droite. */
+	/* LA MODE : une pastille, comme le mode du quiz. Un clic lance le quiz ; au
+	   survol, son nombre de questions. Le « ⋯ » ferme la ligne, en bas à droite. */
 	const bas = ajouter(body, "div", "qbd-quiz-card-modes");
-	const modes = [quiz, ...freres].sort(parMode);
-	for (const q of modes) {
-		const wrap = ajouter(bas, "span", `qbd-quiz-card-type qbd-quiz-card-mode qbd-quiz-card-mode--${q.mode}`);
-		const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
-		btn.type = "button";
-		currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), quizModeIcon(q.mode));
-		ajouter(btn, "span", undefined, quizModeLabel(q.mode));
-		ajouter(wrap, "span", "qbd-quiz-card-type-tip",
-			t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
-		btn.addEventListener("click", (e) => {
-			e.stopPropagation();
-			if (opts?.onPlay) opts.onPlay(q);
-			else if (typeof onOpen === "function") onOpen(q);
-		});
-	}
+	const wrap = ajouter(bas, "span", `qbd-quiz-card-type qbd-quiz-card-mode qbd-quiz-card-mode--${quiz.mode}`);
+	const btn = ajouter(wrap, "button", "qbd-quiz-card-mode-btn");
+	btn.type = "button";
+	currentHost().ui.setIcon(ajouter(btn, "span", "qbd-quiz-card-mode-icon"), quizModeIcon(quiz.mode));
+	ajouter(btn, "span", undefined, quizModeLabel(quiz.mode));
+	ajouter(wrap, "span", "qbd-quiz-card-type-tip",
+		t(quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: quiz.questions }));
+	btn.addEventListener("click", (e) => {
+		e.stopPropagation();
+		if (opts?.onPlay) opts.onPlay(quiz);
+		else if (typeof onOpen === "function") onOpen(quiz);
+	});
 	/* Creation date (folder pages): right of the type pills, left of the "⋯",
 	   small and faint (2026-10-09). The count line keeps only the counts. */
 	if (opts?.showDate) {
-		const created = quizCreationTime([quiz, ...freres]);
-		if (created > 0) ajouter(bas, "span", "qbd-quiz-card-date", formatCardDate(created));
+		const created = quizCreationTime(quiz);
+		if (created > 0) renderCardDate(bas, created);
 	}
 	// stopPropagation: opening the menu must NOT also open the quiz.
 	if (opts?.onMenu) {
@@ -355,22 +316,12 @@ export function renderProgressRing(parent: HTMLElement, pct: number, tone: "fres
 	return ring;
 }
 
-/** One colour per mode in the mode picker, like the options of the
-    creation modals (`createOptionCard`). */
-const MODE_ACCENT: Record<ModeQuiz, string> = { learn: "#a78bfa", practice: "#4573ff", exam: "#f5a524" };
-
-/** "Which mode?" when a course card gathers several modes: the rows of the
-    creation modals, one per mode, with its number of questions. */
-function openModePicker(modes: QuizIndexEntry[], onPlay: (quiz: QuizIndexEntry) => void): void {
-	requireHost("modals").open({
-		className: "qbd-create-modal",
-		title: t("dashboard.card.pickMode"),
-		onOpen: (m) => {
-			for (const q of modes) {
-				createOptionCard(m, m.contentEl, quizModeIcon(q.mode), MODE_ACCENT[q.mode], quizModeLabel(q.mode),
-					t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }),
-					() => onPlay(q));
-			}
-		},
-	});
+/** The creation date at the foot of a card: the long form, the short one on
+    a phone (CSS), and the full date and time in a bubble on hover. */
+function renderCardDate(parent: HTMLElement, ms: number): void {
+	const d = cardDate(ms, currentLang());
+	const el = ajouter(parent, "span", "qbd-quiz-card-date");
+	ajouter(el, "span", "qbd-quiz-card-date-long", d.long);
+	ajouter(el, "span", "qbd-quiz-card-date-short", d.short);
+	ajouter(el, "span", "qbd-quiz-card-type-tip qbd-quiz-card-date-tip", t("dashboard.card.createdOn", { date: d.long, time: d.time }));
 }

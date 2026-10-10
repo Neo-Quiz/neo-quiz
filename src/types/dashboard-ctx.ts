@@ -267,7 +267,7 @@ export interface DashboardShellCtx {
 	   liste les dossiers connus groupés par UE, tirés de la même table que
 	   `openModuleMenu`. `extra`: lines put above the card's own, a quiz's
 	   page in editing ("Vocabulary", detail.ts). */
-	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[], solo?: boolean) => void;
+	openCardMenu?: (quiz: QuizIndexEntry, anchor: HTMLElement, rerender: () => void, map: ModuleMap, extra?: ActionMenuItem[]) => void;
 	/** Même rôle qu'`openCardMenu`, pour le menu « ⋯ » d'une carte de MODULE
 	    (« Mes quiz », tâche 6) : partage, « Modifier dossier », suppression —
 	    autant de modals que l'application n'a pas encore. Absente = pas de
@@ -434,7 +434,7 @@ export interface DashboardShellCtx {
 	    quiz ni module ne se construit pas. */
 	shareQuiz?: (cible: { quiz: QuizIndexEntry } | { group: ModuleGroup } | { quizzes: QuizIndexEntry[]; name: string }) => void;
 	/* No `renameQuiz` member any more (2026-10-09): renaming a quiz is built on
-	   the contract (`renameQuizzes`, quiz-menu.ts), the same path as "Move to".
+	   the contract (`renameQuiz`, quiz-menu.ts), the same path as "Move to".
 	   It used to be an optional member, absent from the app, while only
 	   Obsidian could rewrite incoming [[links]]; the plugin is gone, and those
 	   links are no longer rewritten (the rename modal says so). */

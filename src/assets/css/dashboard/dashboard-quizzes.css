@@ -1041,12 +1041,19 @@
 /* Creation date: on the bottom row, right of the type pills and left of the
    "⋯" (which keeps `margin-left: auto`), small and muted; the row's
    `align-items: center` lines it up with the pills. */
+/* Creation date: one line, faint. The long form ("9 octobre 2026") is shown;
+   on a phone the short month ("9 oct. 2026") takes its place. The bubble
+   (`-date-tip`, shown on hover like the mode pills) gives the time too. */
 .qbd-quiz-card-date {
+	position: relative;
 	flex-shrink: 0;
 	font-size: 12px;
 	color: var(--text-faint);
 	white-space: nowrap;
 }
+.qbd-quiz-card-date-short { display: none; }
+.is-mobile .qbd-quiz-card-date-long { display: none; }
+.is-mobile .qbd-quiz-card-date-short { display: inline; }
 /* The two sections (Learn, Tests) stack with room between them. */
 .qbd-quizzes-drill-sections {
 	display: flex;

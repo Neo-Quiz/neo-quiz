@@ -587,8 +587,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   même `ctx` : le menu « ⋯ » ne demande que `DashboardShellCtx` depuis
 		   la tranche 3 (tâche 9), et c'est l'hôte qui l'OUVRE (`openActionMenu`,
 		   portalé au `<body>`) avec le `rerender` de la page qui l'affiche. */
-		openCardMenu: (quiz, anchor, rerender, map, extra, solo) => {
-			const items = buildQuizCardMenu(ctx, rerender, map)(quiz, anchor, solo);
+		openCardMenu: (quiz, anchor, rerender, map, extra) => {
+			const items = buildQuizCardMenu(ctx, rerender, map)(quiz, anchor);
 			// The page's own lines first, a rule before the card's.
 			if (extra?.length && items[0]) items[0] = { ...items[0], sepBefore: true };
 			openActionMenu(anchor, [...(extra ?? []), ...items]);
@@ -684,8 +684,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   (`electron/partage.ts`). */
 		shareQuiz: (cible) => ouvrirPartage(cible),
 		/* Rename: no host member. "Rename" and "Duplicate" of the "⋯" menu are
-		   built on the contract in shared code (`renameQuizzes`,
-		   `duplicateQuizzes`, quiz-menu.ts), so this window and Android have
+		   built on the contract in shared code (`renameQuiz`,
+		   `duplicateQuiz`, quiz-menu.ts), so this window and Android have
 		   them alike. Incoming [[links]] are not rewritten. */
 	};
 

@@ -7,7 +7,6 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
 import { renderUnreadableCards } from "./unreadable-card";
-import { quizDeLaCarte, regrouperParCours } from "./course-pairs";
 import { renderModuleCard } from "./module-card";
 import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, declaredFolders, estLeSas, modulesAffiches } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
@@ -256,17 +255,13 @@ export function renderModuleDrill(
 	/* Two sections below the actions row: Learn first, then Tests (practice
 	   and exam-mode quizzes), each only when it has cards. */
 	const grid = ajouter(principal, "div", "qbd-quizzes-drill-sections");
-	/* UN COURS, UNE CARTE : le Learn et le Practice d'un même cours sont
-	   réunis (course-pairs.ts), sauf si le réglage l'a désactivé. */
-	const cartes = regrouperParCours(inModule, false);
 	/* LE CHEMIN RÉEL, jamais la clé de module : l'écriture (« Ajouter du
 	   contenu ») veut un chemin du contrat (correctif 2026-09-17), et
 	   `renderFolderPlanning` en a besoin pour le même geste dans son propre
 	   composer (tâche 5). */
 	const dossier = cheminOuvert ?? openModuleFolder;
-	// Le Learn avant le Practice d'un même cours : ordre des cartes,
-	// consommé par l'étape suivante (ci-dessous) ET par le Planning.
-	const ordre = cartes.flatMap(quizDeLaCarte);
+	// Ordre des cartes, consommé par l'étape suivante (ci-dessous) ET par le Planning.
+	const ordre = inModule;
 	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
 	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
 	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
@@ -285,8 +280,8 @@ export function renderModuleDrill(
 		host: layout,
 		onShare: (quizzes) => shareQuiz({ quizzes, name: info?.name || openModuleFolder }),
 	}) : null;
-	const learnCards = cartes.filter(c => c.quiz.mode === "learn");
-	const testCards = cartes.filter(c => c.quiz.mode !== "learn");
+	const learnCards = inModule.filter(q => q.mode === "learn");
+	const testCards = inModule.filter(q => q.mode !== "learn");
 	let index = 0;
 	for (const [key, label, list] of [
 		["learn", t("dashboard.quizzes.sectionLearn"), learnCards],
@@ -295,11 +290,8 @@ export function renderModuleDrill(
 		if (list.length === 0) continue;
 		const clip = renderCollapsibleSection(collapse, grid, `drill:${openModuleFolder}:${key}`, label, list.length);
 		const cardsEl = ajouter(clip, "div", "qbd-home-grid qbd-quizzes-drill-grid");
-		for (const carte of list) {
-			const { quiz, freres } = carte;
+		for (const quiz of list) {
 			const cardEl = renderQuizCard(cardsEl, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {
-				freres,
-				statsFreres: freres.map(f => stats[f.path]),
 				sessionOf: ctx.sessionOf,
 				// Le dossier est le titre de la page : ne pas le répéter sur chaque carte.
 				showPath: false,
@@ -310,11 +302,11 @@ export function renderModuleDrill(
 				// carte se rend alors sans bouton « ⋯ », `onMenu?` étant opt-in —
 				// même patron que home.ts. L'hôte ouvre le menu lui-même (tour de
 				// correction 1, tâche 6).
-				onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map, undefined, true) : undefined,
+				onMenu: ctx.openCardMenu ? (q, anchor) => ctx.openCardMenu!(q, anchor, rerender, map, undefined) : undefined,
 				accent,
 				entryIndex: index++,
 			});
-			selection?.add({ id: quiz.path, el: cardEl, quizzes: quizDeLaCarte(carte) });
+			selection?.add({ id: quiz.path, el: cardEl, quizzes: [quiz] });
 		}
 	}
 	selection?.ready();
@@ -336,8 +328,8 @@ export function renderModuleDrill(
 		folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
 		color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
 	};
-	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, cartes, group });
-	const planning = sas ? null : renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, cartes, group, folder: dossier });
+	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, quizzes: inModule, group });
+	const planning = sas ? null : renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, quizzes: inModule, group, folder: dossier });
 	const vues: VuesDossier = { contenu: layout, progression, planning };
 	const disponibles: Record<OngletDossier, HTMLElement | null> = vues;
 	const montree = disponibles[onglet] ?? layout;

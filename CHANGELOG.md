@@ -13,10 +13,17 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- The plan usage popover can sign out of Claude Code or Codex, switch account, and sign in again through the browser.
+
 ### Changed
+
+- Long Claude Code generations no longer stop at 32,000 output tokens, and an answer that is not a quiz now says why or shows how it starts.
 
 - A quiz page no longer shows the Learn / Test switch; each quiz opens from its own card.
 - The plan usage block and its popover can no longer be selected like text.
+- Each quiz of a course has its own card in Folder and My quizzes, with a single Delete action; the card date shows the year, in full or short on a phone.
 
 
 ## [1.20.68] - 2026-10-09

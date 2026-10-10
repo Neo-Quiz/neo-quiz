@@ -4,7 +4,6 @@ import { currentHost } from "../host/current";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import { tentativesDe, type QuizStatRecord, type Tentative } from "./stats-store";
-import { quizDeLaCarte, type CarteCours } from "./course-pairs";
 import { computeQuizState } from "./quiz-mastery";
 import { quizModeLabel } from "./quiz-card";
 import { formatDateHeure } from "./format-date";
@@ -72,8 +71,8 @@ interface AttemptPendingUndo {
 }
 type EnAttenteAnnulation = Map<string, AttemptPendingUndo>;
 
-export function renderListeCours(parent: HTMLElement, ctx: DashboardShellCtx, cartes: CarteCours[], stats: Record<string, QuizStatRecord>): void {
-	if (cartes.length === 0) return;
+export function renderListeCours(parent: HTMLElement, ctx: DashboardShellCtx, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
+	if (quizzes.length === 0) return;
 	const tuile = ajouter(parent, "div", "qbd-folder-progress-tile qbd-folder-progress-tile--courses");
 	ajouter(tuile, "div", "qbd-folder-progress-label", t("dashboard.quizzes.progressCourses"));
 	const liste = ajouter(tuile, "div", "qbd-folder-courses");
@@ -81,27 +80,24 @@ export function renderListeCours(parent: HTMLElement, ctx: DashboardShellCtx, ca
 	// en attente d'annulation survivent au redessin d'une ligne de cours.
 	const ouvertes = new Set<string>();
 	const enAttente: EnAttenteAnnulation = new Map();
-	for (const carte of cartes) renderLigneCours(liste, ctx, carte, stats, ouvertes, enAttente);
+	for (const quiz of quizzes) renderLigneCours(liste, ctx, quiz, stats, ouvertes, enAttente);
 }
 
 /** Une ligne « cours » (titre + un ou deux modes) — redessinable seule après
     la suppression ou l'annulation d'une tentative, sans reconstruire toute
     la page (le chevron déplié et les suppressions en attente survivent,
     portés par `ouvertes`/`enAttente`, pas par ce DOM). */
-function renderLigneCours(parent: HTMLElement, ctx: DashboardShellCtx, carte: CarteCours, stats: Record<string, QuizStatRecord>, ouvertes: Set<string>, enAttente: EnAttenteAnnulation): HTMLElement {
-	const { quiz } = carte;
+function renderLigneCours(parent: HTMLElement, ctx: DashboardShellCtx, quiz: QuizIndexEntry, stats: Record<string, QuizStatRecord>, ouvertes: Set<string>, enAttente: EnAttenteAnnulation): HTMLElement {
 	const ligne = ajouter(parent, "div", "qbd-folder-course");
 	const titre = ajouter(ligne, "button", "qbd-folder-course-title", quiz.title);
 	titre.type = "button";
 	titre.addEventListener("click", () => ctx.navigate("detail", { quiz }));
 	const modes = ajouter(ligne, "div", "qbd-folder-course-modes");
 	const redessiner = (): void => {
-		const fraiche = renderLigneCours(parent, ctx, carte, ctx.statsStore.getAll(), ouvertes, enAttente);
+		const fraiche = renderLigneCours(parent, ctx, quiz, ctx.statsStore.getAll(), ouvertes, enAttente);
 		ligne.replaceWith(fraiche);
 	};
-	for (const q of quizDeLaCarte(carte)) {
-		renderModeCours(modes, ctx, q, stats[q.path], ouvertes, enAttente, redessiner);
-	}
+	renderModeCours(modes, ctx, quiz, stats[quiz.path], ouvertes, enAttente, redessiner);
 	return ligne;
 }
 

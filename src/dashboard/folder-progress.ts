@@ -9,7 +9,6 @@ import { placerIndicateur } from "./seg-indic";
 import type { OngletDossier, VuesDossier } from "./quizzes-render";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { ModuleGroup, ModuleMap } from "./quiz-modules";
-import type { CarteCours } from "./course-pairs";
 import { renderListeCours } from "./folder-progress-details";
 
 /** Ce que les tuiles du bas demandent en plus des chiffres. */
@@ -19,8 +18,8 @@ export interface DetailsProgression {
 	group: ModuleGroup;
 	map: ModuleMap;
 	rerender: () => void;
-	/** Les cartes de la grille : un cours, ses deux modes. */
-	cartes: CarteCours[];
+	/** Les quiz de la grille, une ligne par quiz. */
+	quizzes: QuizIndexEntry[];
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -78,7 +77,7 @@ export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEnt
 	tuile("progress", enCoursN, t("dashboard.quizzes.progressInProgress"));
 	tuile("fresh", freshN, t("dashboard.quizzes.progressToStart"));
 
-	renderListeCours(vue, details.ctx, details.cartes, stats);
+	renderListeCours(vue, details.ctx, details.quizzes, stats);
 	return vue;
 }
 

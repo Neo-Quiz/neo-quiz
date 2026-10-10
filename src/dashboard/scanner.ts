@@ -266,7 +266,7 @@ export function createScanner(host: Host): Scanner {
 		try {
 			const content = await host.fs.readCached(file.path);
 			/* The read is asynchronous: a `delete` event may have landed while it was
-			   in flight (a note written then trashed right away, as "Delete both" on a
+			   in flight (a note written then trashed right away, as the deletion of several quizzes on a
 			   course card does, fires a `modify` before each `delete`). Indexing the
 			   content we just read would resurrect the trashed note, and the page
 			   would keep its card. Trust the live mirror, not the stale read. */

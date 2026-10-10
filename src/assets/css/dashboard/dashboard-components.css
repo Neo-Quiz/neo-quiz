@@ -628,11 +628,26 @@
 	opacity: 1;
 	transform: translateY(0);
 }
+/* The date sits at the right edge of the card: its bubble opens leftwards. */
+.qbd-quiz-card-date-tip {
+	left: auto;
+	right: -6px;
+	white-space: nowrap;
+}
+.qbd-quiz-card-date-tip::after {
+	left: auto;
+	right: 10px;
+}
+.qbd-quiz-card-date:hover .qbd-quiz-card-date-tip {
+	opacity: 1;
+	transform: translateY(0);
+}
 /* Elle DISPARAÎT d'un coup et n'apparaît qu'en fondu (2026-09-25) : son
    fondu de sortie laissait, une fraction de seconde après que la souris a
    quitté la pastille, un « N questions » à moitié transparent flotter sur la
    carte — un fantôme sur une capture d'écran. */
-.qbd-quiz-card .qbd-quiz-card-type:not(:hover) .qbd-quiz-card-type-tip {
+.qbd-quiz-card .qbd-quiz-card-type:not(:hover) .qbd-quiz-card-type-tip,
+.qbd-quiz-card .qbd-quiz-card-date:not(:hover) .qbd-quiz-card-date-tip {
 	transition: none;
 }
 .qbd-quiz-card--folder .qbd-quiz-card-meta-item .qbd-quiz-card-type-icon svg {
