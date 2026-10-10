@@ -1,8 +1,8 @@
 {
-  "versionCode": 28,
-  "versionName": "0.2.26",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.26/NeoQuiz-0.2.26.apk",
-  "sha256": "3d93b9dc1f93b5c1fdd47ca85d9fb3eae4d3acba06f724daa50390ac8cee7db9",
-  "size": 56055365,
-  "notes": "One card per quiz, cleaner dates, unselectable interface"
+  "versionCode": 29,
+  "versionName": "0.2.27",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.27/NeoQuiz-0.2.27.apk",
+  "sha256": "007d1ec66bb9bf343fbd72d5bc244d6757193983914d152c50ec7bf4c568a8fd",
+  "size": 56054513,
+  "notes": "Updates now live in Settings only."
 }
