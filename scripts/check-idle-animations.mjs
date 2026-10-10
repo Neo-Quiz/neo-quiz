@@ -34,7 +34,7 @@ const KNOWN = {
 	"quiz-timer-pulse": "transient", // the timer of a test about to end
 	"nqm-spin": "transient", // Moodle window spinner
 	"nq-perle-reflet": "phone-off",
-	"nq-usage-pulse": "transient", "nq-maj-tourne": "transient", "nq-verifier-tour": "transient", "nq-verifier-balayage": "transient", // desktop title bar and menu
+	"nq-usage-pulse": "transient", "nq-verifier-tour": "transient", "nq-verifier-balayage": "transient", // desktop title bar and menu
 };
 // For each "phone-off" animation, the text its neutralising rule in mobile.css must contain.
 const PHONE_OFF_RULE = {

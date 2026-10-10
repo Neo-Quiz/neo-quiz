@@ -43,13 +43,8 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.moodleHost.deny": "Annuler",
 
 	/* ── Mise à jour automatique (application seulement) ── */
-	"app.update.restart": "Redémarrer pour mettre à jour",
-	"app.update.downloading": "Téléchargement de la mise à jour",
 	"app.update.size": "{done} Mo / {total} Mo",
-	"app.update.install": "Mise à jour",
 	"app.update.installing": "Installation…",
-	"app.update.download": "Télécharger",
-	"app.update.meteredAvailable": "Mise à jour disponible ({version}) — connexion limitée",
 	"app.update.android.available": "Mise à jour disponible ({version})",
 	"app.update.android.install": "Installer",
 	"app.update.android.downloading": "Téléchargement de {version}…",
@@ -70,6 +65,9 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.update.btn.downloading": "v{version} en téléchargement",
 	"app.update.btn.ready": "v{version} prête",
 	"app.update.btn.waiting": "v{version} en attente",
+	"app.update.btn.progress": "v{version} · {percent} %",
+	"app.update.btn.install": "Installer la v{version}",
+	"app.update.btn.download": "Télécharger la v{version}",
 	"app.update.btn.failed": "Vérification impossible",
 	"app.update.btn.devBuild": "Version de développement",
 	"app.update.window.title": "Mise à jour de Neo Quiz",

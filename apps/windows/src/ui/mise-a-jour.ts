@@ -1,20 +1,18 @@
 /* ══════════════════════════════════════════════════════════
    LA MISE À JOUR, VUE DU RENDU
 
-   Un seul abonnement au pont, un état courant, et UN endroit qui le montre :
-   le rail, où un bouton apparaît quand une version est prête à installer.
-   Les Réglages en montraient un second — l'état complet, « Vérifier
-   maintenant », l'interrupteur automatique — ; la section est partie le
-   2026-09-17 avec le réglage lui-même (la mise à jour est toujours active) et
-   le bouton de vérification, que le menu d'application porte déjà.
+   One bridge subscription, one current state, and ONE place on desktop that
+   shows it: the "about" row of the application menu opened by the logo
+   (2026-10-10). It checks, shows the download, and installs; the logo only
+   carries a dot. The rail's own update button is gone. Settings showed a
+   second one until 2026-09-17. On the phone: a banner and a Settings row.
 
-   Ce module n'importe rien qui tire Node : `EtatMiseAJour` est un type,
-   `pont()` lit `window.neo` à l'appel.
+   This module imports nothing that pulls in Node: `EtatMiseAJour` is a type,
+   `pont()` reads `window.neo` when called.
 ══════════════════════════════════════════════════════════ */
 
 import type { EtatMiseAJour } from "../../electron/pont";
 import { pont } from "../host/pont";
-import { currentHost } from "../../../../src/host/current";
 import { t, currentLang } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 
@@ -61,7 +59,7 @@ export type ResultatVerification =
 /**
  * "CHECK FOR UPDATES..." of the application menu: checks now and RETURNS what
  * came of it; the menu button shows it where the pointer clicked (no notice).
- * The rail only speaks while a version downloads or waits to be installed.
+ * From then on a download or a ready version is followed live by that row.
  *
  * The state is read AFTER `verifier()` resolves: the main process sends
  * electron-updater's events to the window before answering the call, so the
@@ -76,8 +74,7 @@ export async function verifierMaintenant(): Promise<ResultatVerification> {
 		if (e.phase === "erreur") return { kind: "failed", message: e.message ?? "" };
 		return { kind: "up-to-date" };
 	};
-	/* Already downloading or ready: checking again would only restart what
-	   the rail is showing. */
+	/* Already downloading or ready: the menu row already shows it live. */
 	const avant = await pont().miseAJour.etat();
 	if (avant.phase === "telechargement" || avant.phase === "prete") return lire(avant);
 	if (!await pont().miseAJour.verifier()) return { kind: "dev-build" };
@@ -99,119 +96,48 @@ function detailTaille(recus: number | null | undefined, total: number | null | u
 	return t("app.update.size", { done: mo(recus), total: mo(total) });
 }
 
+/** True while the menu has something to say on its own: a version downloads,
+    waits for a click (metered connection) or is ready to install. */
+export function majEnVue(e: EtatMiseAJour): boolean {
+	return e.phase === "telechargement" || e.phase === "prete" || (e.phase === "disponible" && e.limitee === true);
+}
+
+/** Follows the update state (one bridge subscription for the whole window). */
+export function suivreMiseAJour(rappel: (etat: EtatMiseAJour) => void): () => void {
+	return abonner(rappel);
+}
+
+/** Install a ready version, or start the download a metered connection held. */
+export function installerMiseAJour(): void {
+	void pont().miseAJour.installer();
+}
+
+/** The download's size for a screen reader, or null when it is unknown. */
+export function tailleTelechargement(e: EtatMiseAJour): string | null {
+	return detailTaille(e.octetsRecus, e.octetsTotal);
+}
+
 /**
- * LE CONTRÔLE DU RAIL — la mise à jour telle que Neo Calendar la montre
- * (`src/ui/calendar/UpdateBadge.tsx`, `.nc-update-control`), portée au rail
- * de Neo Quiz (demande d'Ahmed, 2026-09-19) : une CARTE à la couleur
- * d'accent, la forme de l'élément actif du rail, et non une pilule.
- *
- * UN SEUL ÉLÉMENT du compteur au bouton, et c'est tout l'intérêt : pendant le
- * téléchargement, la carte porte le pourcentage à la place de l'icône ; à la
- * fin, le chiffre s'efface pendant que la flèche paraît, et le libellé
- * « Mise à jour » s'ouvre SOUS elle —
- * là où le rail met tous ses libellés (Ahmed, 2026-09-19 : Neo Calendar
- * l'ouvre dans la pilule, mais son rail à lui n'a pas de libellés ; ici la
- * pilule ouverte dépassait du rail). Deux éléments qui se relaient ne
- * pouvaient rien animer : l'œil ne voyait qu'une coupure.
- *
- * Elle n'existe que pendant le téléchargement et une fois prête ; le reste du
- * temps le rail n'a rien à dire. Sans pourcentage honnête (le serveur ne dit
- * pas la taille), elle tourne (`is-tourne`) au lieu d'afficher un chiffre.
+ * THE DOT ON THE LOGO. Everything about updates happens in the application
+ * menu that the logo opens (2026-10-10; the rail had its own update button
+ * until then, apart from the menu's "Check for updates"). The logo only says
+ * that the menu has news: a dot while a version downloads, waits or is ready.
  */
-export function monterBoutonRail(navEl: HTMLElement): () => void {
-	const footer = navEl.querySelector<HTMLElement>(".qbd-nav-footer");
-	if (!footer) return () => {};
-	let bouton: HTMLButtonElement | null = null;
-	let pilule: HTMLElement | null = null;
-	let compteur: HTMLElement | null = null;
-	let libelle: HTMLElement | null = null;
-	let phasePrecedente: EtatMiseAJour["phase"] = "inactif";
-	let minuteurAnnonce: number | null = null;
-
-	const creer = (): void => {
-		bouton = document.createElement("button");
-		bouton.type = "button";
-		bouton.className = "qbd-nav-item nq-maj";
-		pilule = ajouter(bouton, "span", "nq-maj-pilule");
-		compteur = ajouter(pilule, "span", "nq-maj-compteur");
-		compteur.setAttribute("aria-hidden", "true");
-		currentHost().ui.setIcon(ajouter(pilule, "span", "nq-maj-icone"), "download");
-		libelle = ajouter(bouton, "span", "qbd-nav-label nq-maj-libelle", t("app.update.install"));
-		bouton.addEventListener("click", () => {
-			if (!bouton || bouton.disabled || bouton.classList.contains("is-telechargement")) return;
-			/* Metered connection: the click is Download, the state flips to
-			   "telechargement" by itself. */
-			if (bouton.classList.contains("is-disponible")) { void pont().miseAJour.installer(); return; }
-			/* L'appui se VOIT (Ahmed, 2026-09-19) : la pilule s'enfonce, le
-			   chiffre cède la place à un spinner et le libellé dit ce qui se
-			   passe, jusqu'à ce que le principal ferme la fenêtre pour
-			   installer. Un second clic ne relance rien. */
-			bouton.disabled = true;
-			bouton.classList.add("is-installation");
-			if (libelle) libelle.textContent = t("app.update.installing");
-			void pont().miseAJour.installer();
-		});
-		footer.prepend(bouton);
-		/* L'arrivée : la pilule pousse depuis rien, le temps d'une image, puis
-		   la classe tombe et les transitions reprennent la main. */
-		bouton.classList.add("is-arrivee");
-		window.requestAnimationFrame(() => bouton?.classList.remove("is-arrivee"));
-	};
-	const retirer = (): void => {
-		if (minuteurAnnonce !== null) { window.clearTimeout(minuteurAnnonce); minuteurAnnonce = null; }
-		bouton?.remove();
-		bouton = null; pilule = null; compteur = null; libelle = null;
-	};
-
+export function monterPointLogo(logo: HTMLElement): () => void {
+	const point = ajouter(logo, "span", "nq-rail-logo-point");
+	point.setAttribute("aria-hidden", "true");
 	const desabonner = abonner(e => {
-		/* "disponible" shows here only with `limitee` (Windows, metered connection). */
-		const attend = e.phase === "disponible" && e.limitee === true;
-		const visible = e.phase === "telechargement" || e.phase === "prete" || attend;
-		if (!visible) { retirer(); phasePrecedente = e.phase; return; }
-		if (!bouton) creer();
-		if (!bouton || !pilule || !compteur || !libelle) return;
-		const telecharge = e.phase === "telechargement";
-		const pourcent = typeof e.pourcent === "number" && e.pourcent >= 0 ? Math.min(100, Math.round(e.pourcent)) : null;
-		bouton.classList.toggle("is-telechargement", telecharge);
-		bouton.classList.toggle("is-prete", !telecharge);
-		bouton.classList.toggle("is-disponible", attend);
-		bouton.title = attend ? t("app.update.meteredAvailable", { version: e.version ?? "" }) : "";
-		pilule.classList.toggle("is-tourne", telecharge && pourcent === null);
-		/* Le dernier chiffre atteint reste en place, à l'opacité zéro, le
-		   temps du fondu : un texte vidé au moment où il devrait s'effacer ne
-		   s'efface pas, il disparaît. */
-		if (telecharge && pourcent !== null) compteur.textContent = pourcent + " %";
-		/* Not `disabled` while downloading: a disabled button takes no focus,
-		   and the size detail must show on keyboard focus too. `aria-disabled`
-		   keeps it inert for assistive tech; the click handler ignores it. */
-		const detail = telecharge ? detailTaille(e.octetsRecus, e.octetsTotal) : null;
-		bouton.toggleAttribute("aria-disabled", telecharge);
-		if (telecharge) bouton.setAttribute("aria-disabled", "true");
-		/* The label carries the size only while downloading; it opens on
-		   hover/focus (shell.css). Without a known size it stays the install label
-		   and stays closed. */
-		libelle.textContent = attend ? t("app.update.download") : detail ?? t("app.update.install");
-		bouton.classList.toggle("has-detail", detail !== null);
-		bouton.setAttribute("aria-label", attend ? t("app.update.meteredAvailable", { version: e.version ?? "" }) : telecharge
-			? t("app.update.downloading") + (pourcent === null ? "" : " " + pourcent + " %") + (detail ? ", " + detail : "")
-			: t("app.update.install") + (e.version ? " " + e.version : ""));
-		/* S'ouvrir une fois, à l'instant où la descente s'achève — pas au
-		   montage : une mise à jour déjà prête quand la fenêtre s'ouvre attend
-		   depuis un moment, elle n'a pas de nouvelle à donner. */
-		if (e.phase === "prete" && phasePrecedente === "telechargement") {
-			bouton.classList.add("is-annonce");
-			if (minuteurAnnonce !== null) window.clearTimeout(minuteurAnnonce);
-			minuteurAnnonce = window.setTimeout(() => { bouton?.classList.remove("is-annonce"); minuteurAnnonce = null; }, 4000);
-		}
-		phasePrecedente = e.phase;
+		const visible = majEnVue(e);
+		logo.classList.toggle("has-maj", visible);
+		logo.classList.toggle("is-maj-prete", e.phase === "prete");
 	});
-	return () => { desabonner(); retirer(); };
+	return () => { desabonner(); point.remove(); logo.classList.remove("has-maj", "is-maj-prete"); };
 }
 
 /* ══════════════════════════════════════════════════════════
    ANDROID: the banner and the Settings row of the in-app updater
 
-   Same channels as the rail button (`miseAJour.*`), answered in Kotlin by
+   Same channels as the desktop menu row (`miseAJour.*`), answered in Kotlin by
    `update/UpdateEngine.kt`. A check never downloads: the banner offers
    "Install", and only that tap starts the download (no data spent without
    it). `message` of an error state is a CODE the page translates.

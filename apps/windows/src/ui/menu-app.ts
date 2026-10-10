@@ -17,7 +17,8 @@ import { buildMenu } from "./menu-app-arbre";
 import type { EntreeMenu } from "./menu-app-arbre";
 import { poserIcone } from "../host/ui";
 import { t } from "../../../../src/i18n";
-import type { ResultatVerification } from "./mise-a-jour";
+import type { EtatMiseAJour } from "../../electron/pont";
+import { installerMiseAJour, majEnVue, suivreMiseAJour, tailleTelechargement, type ResultatVerification } from "./mise-a-jour";
 
 export interface ActionsMenu {
 	version: string;
@@ -67,9 +68,15 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 
 	let minuteurResultat: number | undefined;
 	let fermee = false;
+	/* The "about" row follows the update state live; set while the menu is open. */
+	let desabonnerMaj: () => void = () => undefined;
+	/* True while that row shows a download or a version to install rather than
+	   "Check for updates": the check's own outcome then gives way to it. */
+	let majEnDirect = false;
 
 	function fermer(): void {
 		fermee = true;
+		desabonnerMaj();
 		window.clearTimeout(minuteurResultat);
 		window.clearTimeout(minuteurSortie);
 		document.removeEventListener("keydown", surClavier, true);
@@ -137,9 +144,29 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 					t("app.update.btn.checking"), t("app.update.btn.upToDate"), t("app.update.btn.failed"), t("app.update.btn.devBuild"),
 					t("app.update.btn.downloading", { version: deps.version }), t("app.update.btn.ready", { version: deps.version }),
 					t("app.update.btn.waiting", { version: deps.version }),
+					t("app.update.btn.progress", { version: deps.version, percent: "100" }),
+					t("app.update.btn.install", { version: deps.version }), t("app.update.btn.download", { version: deps.version }),
+					t("app.update.installing"),
 				]) ajouter(verifierTexte, "span", "nq-menu-verifier-mesure", texte).setAttribute("aria-hidden", "true");
+				let etatMaj: EtatMiseAJour = { phase: "inactif" };
 				verifier.addEventListener("click", () => {
+					if (majEnDirect) {
+						/* Downloading: nothing to do but wait. Ready, or held by a
+						   metered connection: this click installs / downloads. */
+						if (etatMaj.phase === "telechargement" || verifier.disabled) return;
+						if (etatMaj.phase === "prete") {
+							verifier.disabled = true;
+							verifierLibelle.textContent = t("app.update.installing");
+						}
+						installerMiseAJour();
+						return;
+					}
 					void verifierMiseAJour(entree.checkLabel, verifier, verifierIcone, verifierLibelle);
+				});
+				desabonnerMaj();
+				desabonnerMaj = suivreMiseAJour(e => {
+					etatMaj = e;
+					peindreMaj(e, entree.checkLabel, verifier, verifierIcone, verifierLibelle);
 				});
 				verifier.addEventListener("mouseenter", () => {
 					allumer(niveau, verifier);
@@ -250,6 +277,54 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		}
 	}
 
+	/** The update state, LIVE in the row (2026-10-10: everything about updates
+	    happens in this menu). A download shows its percentage, a ready version
+	    an "Install" in the accent colour, a version held by a metered
+	    connection a "Download". Any other state gives the row back to "Check
+	    for updates", unless a check cycle is still showing its outcome. */
+	function peindreMaj(e: EtatMiseAJour, libelleRepos: string, bouton: HTMLButtonElement, icone: HTMLElement, libelle: HTMLElement): void {
+		if (!majEnVue(e)) {
+			if (!majEnDirect) return;
+			majEnDirect = false;
+			bouton.removeAttribute("data-maj");
+			bouton.removeAttribute("aria-disabled");
+			bouton.removeAttribute("aria-description");
+			bouton.removeAttribute("data-etat");
+			bouton.disabled = false;
+			libelle.textContent = libelleRepos;
+			icone.replaceChildren();
+			return;
+		}
+		majEnDirect = true;
+		window.clearTimeout(minuteurResultat);
+		const version = e.version ?? "";
+		const phase = e.phase === "prete" ? "prete" : e.phase === "telechargement" ? "telechargement" : "disponible";
+		if (bouton.dataset.maj !== phase || !icone.firstChild) {
+			icone.replaceChildren();
+			poserIcone(icone, phase === "prete" ? "circle-arrow-up" : "download");
+		}
+		bouton.dataset.maj = phase;
+		bouton.dataset.etat = "maj";
+		/* The pressed "Installing..." stays until the main process closes the window. */
+		if (phase === "prete" && bouton.disabled && libelle.textContent === t("app.update.installing")) return;
+		bouton.disabled = false;
+		if (phase === "telechargement") {
+			const pourcent = typeof e.pourcent === "number" && e.pourcent >= 0 ? Math.min(100, Math.round(e.pourcent)) : null;
+			libelle.textContent = pourcent === null
+				? t("app.update.btn.downloading", { version })
+				: t("app.update.btn.progress", { version, percent: String(pourcent) });
+			/* Not `disabled`: it would drop the keyboard focus; the click handler ignores it. */
+			bouton.setAttribute("aria-disabled", "true");
+			const taille = tailleTelechargement(e);
+			if (taille) bouton.setAttribute("aria-description", taille);
+			else bouton.removeAttribute("aria-description");
+		} else {
+			bouton.removeAttribute("aria-disabled");
+			bouton.removeAttribute("aria-description");
+			libelle.textContent = t(phase === "prete" ? "app.update.btn.install" : "app.update.btn.download", { version });
+		}
+	}
+
 	/** The check, shown IN the button: spinner and "Checking...", then the
 	    outcome for a few seconds, then the label comes back. The button keeps
 	    its size (hidden sizers hold the widest text) and takes no second click
@@ -271,7 +346,8 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		} catch (erreur) {
 			resultat = { kind: "failed", message: String(erreur) };
 		}
-		if (fermee || !bouton.isConnected) return;
+		/* A download or a ready version the check started is already shown live. */
+		if (fermee || !bouton.isConnected || majEnDirect) return;
 		if (resultat.kind === "up-to-date") montrer(t("app.update.btn.upToDate"), "check", "resultat");
 		else if (resultat.kind === "downloading") montrer(t("app.update.btn.downloading", { version: resultat.version }), "download", "resultat");
 		else if (resultat.kind === "ready") montrer(t("app.update.btn.ready", { version: resultat.version }), "circle-arrow-up", "resultat");
@@ -284,10 +360,10 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			montrer(t("app.update.btn.failed"), "circle-alert", "resultat");
 		}
 		minuteurResultat = window.setTimeout(() => {
-			if (fermee || !bouton.isConnected) return;
+			if (fermee || !bouton.isConnected || majEnDirect) return;
 			bouton.dataset.etat = "retour"; // fades the outcome out
 			minuteurResultat = window.setTimeout(() => {
-				if (fermee || !bouton.isConnected) return;
+				if (fermee || !bouton.isConnected || majEnDirect) return;
 				bouton.removeAttribute("aria-description");
 				montrer(libelleRepos, null, "");
 				bouton.disabled = false;

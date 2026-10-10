@@ -61,9 +61,8 @@
 	transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 	position: relative;
 }
-/* Dimmed at rest. Not the update entry (shell.css `.nq-maj`): it is an
-   announcement, in the accent colour, and must not fade into the rail. */
-.qbd-nav-item:not(.nq-maj) { opacity: var(--qbd-nav-rest); }
+/* Dimmed at rest. */
+.qbd-nav-item { opacity: var(--qbd-nav-rest); }
 
 /* The active card's shadow, on a pseudo-element so it can FADE (0.3s)
    instead of snapping on with the class. */

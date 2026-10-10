@@ -70,7 +70,7 @@ import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
-import { monterBoutonRail, monterBanniereMajAndroid } from "./mise-a-jour";
+import { monterPointLogo, monterBanniereMajAndroid } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
 import { basculerMenuApp } from "./barre-titre";
@@ -1088,7 +1088,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   tab, in bottom-bar order, by clicking that tab's button (the very path of
 	   a tap on the bar: history, highlight and view transition stay the same).
 	   Not on a quiz or folder page (sheets stacked), not under a menu. */
-	const tabButtons = () => Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item:not(.nq-maj)"))
+	const tabButtons = () => Array.from(navEl.querySelectorAll<HTMLElement>(".qbd-nav-item"))
 		.filter(b => !b.classList.contains("qbd-nav-item--placeholder"));
 	const tabKey = (b: HTMLElement) => b.dataset.nav ?? "settings";
 	const tabTarget = (dir: "next" | "prev"): HTMLElement | null => {
@@ -1159,10 +1159,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	logo.addEventListener("click", () => basculerMenuApp(logo));
 	/* The application menu belongs to the title bar, which a phone does not have. */
 	if (!currentHost().platform.isMobile) navEl.prepend(logo);
-	// Le bouton « Redémarrer pour mettre à jour » vit dans le pied du rail,
-	// posé une fois pour toute la durée de la coquille — un seul abonnement
-	// au pont pour toute la fenêtre (`mise-a-jour.ts`).
-	const demonterMajRail = monterBoutonRail(navEl);
+	/* Updates live in the application menu (2026-10-10): the logo only
+	   carries a dot while a version downloads or waits to be installed. */
+	const demonterMajRail = currentHost().platform.isMobile ? () => {} : monterPointLogo(logo);
 	// The phone has no rail: its updater speaks through a banner above the bottom bar.
 	const demonterMajBanniere = currentHost().platform.isMobile ? monterBanniereMajAndroid() : () => {};
 	const demonterMaj = (): void => { demonterMajRail(); demonterMajBanniere(); };

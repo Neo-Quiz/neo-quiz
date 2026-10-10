@@ -1187,151 +1187,6 @@ label.nq-set-ligne {
 	height: 16px;
 }
 
-/* ── La mise à jour automatique (rail + « À propos ») ── */
-/* LA MISE À JOUR DANS LE RAIL — un élément du rail comme les autres (icône,
-   libellé dessous, fond au survol), à la couleur d'ACCENT : c'est le langage
-   de ce rail, ni pilule rapportée ni carte pleine (essayées le 2026-09-19,
-   trop lourdes à côté de Réglages). Les effets sont ceux de Neo Calendar :
-   le pourcentage à la place de l'icône pendant la descente, puis le chiffre
-   s'efface pendant que la flèche paraît et que le libellé s'ouvre dessous.
-   Voir `ui/mise-a-jour.ts`. */
-.nq-maj {
-	position: relative;
-	/* Grows past the rail's 56px entries when its label opens below. */
-	height: auto;
-	min-height: 56px;
-	color: var(--text-accent) !important;
-	transition: opacity 200ms ease, transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), background 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.22s ease, filter 0.1s ease;
-}
-.nq-maj.is-arrivee { opacity: 0; transform: translateY(6px) scale(0.92); }
-.nq-maj:disabled { cursor: default; }
-.nq-maj:disabled:hover { background: transparent !important; }
-.nq-maj.is-prete:hover { color: var(--text-accent) !important; }
-.nq-maj.is-prete:active:not(:disabled) { transform: scale(0.96); }
-
-/* PENDANT LA DESCENTE : la petite pilule de Neo Calendar, telle quelle
-   (26 px de haut, 46 px de large, accent, le pourcentage en clair) — retenue
-   par Ahmed le 2026-09-19. Prête, la MÊME pilule perd son fond et se
-   resserre à 22 px : elle devient l'emplacement d'icône d'un élément du rail
-   ordinaire, le chiffre s'efface pendant que la flèche paraît. */
-.nq-maj-pilule {
-	position: relative;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 26px;
-	border-radius: 999px;
-	background: transparent;
-	color: inherit;
-	font-size: 12px;
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-	overflow: hidden;
-	transition: width 200ms ease, background 220ms ease, color 220ms ease, box-shadow 220ms ease;
-}
-/* Assez large pour « 100 % » dès le premier pour cent : une pilule qui
-   s'allonge à chaque dizaine tressaute sous les yeux. */
-.nq-maj.is-telechargement .nq-maj-pilule {
-	width: 46px;
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-	box-shadow: 0 2px 10px color-mix(in srgb, var(--interactive-accent) 35%, transparent);
-}
-
-.nq-maj-compteur {
-	position: absolute;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: opacity 120ms ease;
-}
-.nq-maj-icone {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	line-height: 0;
-	flex-shrink: 0;
-	transition: opacity 120ms ease;
-}
-.nq-maj-icone svg { width: 20px; height: 20px; }
-.nq-maj.is-telechargement .nq-maj-icone { opacity: 0; }
-.nq-maj.is-prete .nq-maj-compteur { opacity: 0; }
-
-/* Le libellé, comme dans Neo Calendar : replié, il ne s'ouvre que SOUS LE
-   CURSEUR (et au focus clavier), et une fois de lui-même à la fin du
-   téléchargement, le temps qu'on le lise (4 s, `is-annonce`), puis se
-   replie. Il s'ouvre par la hauteur et monte de 4 px, l'opacité suit avec
-   80 ms de retard pour qu'il sorte de sous la flèche au lieu d'apparaître
-   sur place ; replié, il rend sa place sans à-coup. Jamais tronqué. */
-.nq-maj .qbd-nav-label {
-	color: inherit;
-	white-space: normal; overflow: hidden; text-overflow: clip; line-height: 1.2; text-align: center;
-	max-height: 0; opacity: 0; transform: translateY(4px);
-	transition: max-height 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 160ms ease, transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-.nq-maj.is-prete:hover .qbd-nav-label,
-.nq-maj.is-prete:focus-visible .qbd-nav-label,
-.nq-maj.is-annonce .qbd-nav-label,
-.nq-maj.is-installation .qbd-nav-label {
-	max-height: 2.6em; opacity: 1; transform: none;
-	transition: max-height 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 220ms ease 80ms, transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-.nq-maj { gap: 0; }
-.nq-maj.is-prete:hover, .nq-maj.is-annonce, .nq-maj.is-installation { gap: 5px; }
-
-/* WHILE DOWNLOADING: no hover effect on the entry, only the detail. The rail
-   tints any entry under the cursor (`.qbd-sidebar .qbd-nav-item:hover`, and
-   `.qbd-nav-item:focus-visible` in dashboard-nav.css), both with !important,
-   so the override has to be !important as well and outrank them: five
-   classes here against four there. The button is not `disabled` (that would
-   block focus), so the click is ignored in JS instead. The label then shows
-   "<done> MB / <total> MB" on hover and keyboard focus, through the same
-   opening mechanism as the "ready" state; `has-detail` is absent when the
-   size is unknown, and the label stays closed. */
-.nq-maj.is-telechargement { cursor: default; }
-.qbd-sidebar .qbd-nav-item.nq-maj.is-telechargement:hover,
-.qbd-sidebar .qbd-nav-item.nq-maj.is-telechargement:focus-visible {
-	background: transparent !important;
-}
-.nq-maj.is-telechargement:active { transform: none; }
-.nq-maj.is-telechargement.has-detail:hover .qbd-nav-label,
-.nq-maj.is-telechargement.has-detail:focus-visible .qbd-nav-label {
-	max-height: 2.6em; opacity: 1; transform: none;
-	transition: max-height 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 220ms ease 80ms, transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-.nq-maj.is-telechargement.has-detail:hover,
-.nq-maj.is-telechargement.has-detail:focus-visible { gap: 5px; }
-.nq-maj { transition: gap 260ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity 200ms ease, transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), background 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), color 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.22s ease, filter 0.1s ease; }
-
-/* L'appui, puis « Installation… » : la flèche cède au spinner jusqu'à ce que
-   la fenêtre se ferme pour installer. */
-.nq-maj.is-installation { opacity: 0.85; }
-.nq-maj.is-installation .nq-maj-icone { opacity: 0; }
-.nq-maj.is-installation .nq-maj-pilule::after,
-.nq-maj-pilule.is-tourne::after {
-	content: "";
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	width: 14px;
-	height: 14px;
-	margin: -7px 0 0 -7px;
-	border: 2px solid currentColor;
-	border-right-color: transparent;
-	border-radius: 50%;
-	animation: nq-maj-tourne 700ms linear infinite;
-}
-.nq-maj-pilule.is-tourne .nq-maj-compteur { opacity: 0; }
-@keyframes nq-maj-tourne { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-	.nq-maj.is-installation .nq-maj-pilule::after, .nq-maj-pilule.is-tourne::after { animation: none; }
-	.nq-maj, .nq-maj-pilule, .nq-maj .qbd-nav-label { transition: none; }
-}
 /* Une ligne « case à cocher + libellé » des Réglages. Elle s'est appelée
    `.nq-maj-auto` tant que l'interrupteur des mises à jour automatiques
    existait ; il est parti le 2026-09-17 (l'application se met à jour, toujours)
@@ -1723,8 +1578,28 @@ label.nq-set-ligne {
 .nq-rail-logo[data-open] { opacity: 1; }
 .nq-rail-logo:active { transform: scale(0.96); }
 .nq-rail-logo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+/* THE UPDATE DOT (2026-10-10). Everything about updates happens in the menu
+   this logo opens; the logo only says the menu has news: a dot while a
+   version downloads or waits, in the accent colour once it is ready. */
+.nq-rail-logo { position: relative; }
+.nq-rail-logo-point {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	box-shadow: 0 0 0 2px var(--background-primary);
+	opacity: 0;
+	transform: scale(0.4);
+	transition: opacity 0.2s ease-out, transform 0.2s ease-out, background-color 0.2s ease-out;
+	pointer-events: none;
+}
+.nq-rail-logo.has-maj .nq-rail-logo-point { opacity: 1; transform: scale(1); }
+.nq-rail-logo.is-maj-prete .nq-rail-logo-point { background: var(--interactive-accent); }
 @media (prefers-reduced-motion: reduce) {
-	.nq-rail-logo { transition: none; }
+	.nq-rail-logo, .nq-rail-logo-point { transition: none; }
 	.nq-rail-logo:hover, .nq-rail-logo:active { transform: none; }
 }
 
@@ -1784,6 +1659,9 @@ label.nq-set-ligne {
    exactly as the menu's lines. */
 .nq-menu-apropos-verifier, .nq-menu-apropos-github { outline: none; transition: background-color 80ms ease-out, color 80ms ease-out; }
 .nq-menu-apropos-verifier[data-actif], .nq-menu-apropos-github[data-actif] { background: var(--background-modifier-hover); color: var(--text-normal); }
+/* A ready version: the row turns to "Install" in the accent colour (menu-app.ts `peindreMaj`). */
+.nq-menu-apropos-verifier[data-maj="prete"], .nq-menu-apropos-verifier[data-maj="prete"][data-actif] { color: var(--text-accent); }
+.nq-menu-apropos-verifier[data-maj="telechargement"] { cursor: default; }
 
 /* ══════════════════════════════════════════════════════════
    LES BARRES DE DÉFILEMENT DE LA FENÊTRE

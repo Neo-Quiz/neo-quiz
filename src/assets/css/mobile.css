@@ -191,8 +191,7 @@ html.nq-mobile .modal-container {
 	max-width: none;
 }
 
-/* The update button and the app mark belong to the desktop rail. */
-.is-mobile .nq-maj,
+/* The app mark belongs to the desktop rail. */
 .is-mobile .nq-rail-logo {
 	display: none;
 }
