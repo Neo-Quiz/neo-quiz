@@ -15,11 +15,13 @@ release notes.
 
 ### Fixed
 
+- An update that restarts the app on its previous version now says so in the logo menu ("Update did not finish, try again") instead of looping silently.
 - The Moodle window opens right away: the module list no longer waits for every module's assignments, which now fill the banner a moment later.
 - Opening the Moodle window from Settings keeps Settings open underneath; Escape closes only the window on top.
 
 ### Changed
 
+- An update removes the previous version before installing the new one again, so a version can no longer be left half replaced.
 - Folders and the Moodle window share one default colour per kind of module code (XTI, XCS, XMUT…), in the palette of the former Moodle plugin; a colour you chose still wins.
 - In the Moodle window, each module gets the icon its name suggests, and no icon when nothing matches.
 

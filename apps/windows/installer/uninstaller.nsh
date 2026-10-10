@@ -3,41 +3,27 @@
 !include "nsDialogs.nsh"
 
 !ifndef BUILD_UNINSTALLER
-    /* AN UPDATE NEVER STOPS ON THE OLD VERSION'S UNINSTALLER (2026-10-09).
-       Before installing, electron-builder runs the previous version's
-       uninstaller, which MOVES every file out of the install folder one by
-       one and gives up (exit code 2, after five tries) on the first file it
-       cannot move; the default `handleUninstallResult` then shows "Failed to
-       uninstall old application files: 2" and quits, so the update never
-       lands. Seen at almost every update on two PCs. That uninstaller puts
-       every file back when it gives up, so the folder is the old version,
-       whole: the new files are simply written over it (the extraction has
-       its own retries for a file still in use). Documented hook of
-       electron-builder: defining it replaces the failure dialog. */
-
-    /* THE OLD VERSION'S UNINSTALLER IS NOT RUN AT ALL (2026-10-09, the
-       hook below was not enough: the error came back on the laptop with
-       1.20.54). electron-builder runs it only when it finds its
-       `UninstallString` in the registry; removing that value here, before
-       the install section, makes `uninstallOldVersion` return at once. The
-       new files are then written over the old ones in the same folder
-       (`InstallLocation` is kept, so `$INSTDIR` is the same), and
-       `registryAddInstallInfo` writes `UninstallString` back at the end of
-       the install. A file the new version no longer ships stays behind: a
-       few kilobytes, against an update that never landed. */
+    /* BACK TO ELECTRON-BUILDER'S DEFAULT UPDATE (2026-10-10): the previous
+       version's uninstaller runs first, then the new version installs into a
+       clean folder. From 2026-10-09 the uninstall was skipped and the new
+       files were written OVER the old ones, because the uninstaller failed at
+       almost every update ("Failed to uninstall old application files: 2").
+       That in-place write turned a locked file into a SILENT half-update
+       (1.20.69 binaries around the 1.20.63 `app.asar`, 2026-10-10). The lock
+       was our own update window (fixed in 1.20.70); with it gone, the default
+       flow either lands whole or stops with its own message, the old version
+       intact, and the app's safety net (`electron/expected-update.ts`) names
+       an install that did not land. */
     !macro customInit
-        /* THE OLD UPDATE WINDOWS HELD app.asar (2026-10-09). The update
-           window of 1.20.58 and before, `neo-quiz-maj.exe`, ran from hard
-           links to the install folder and kept `resources/app.asar` open:
-           the in-place install below then could not replace it, stalled at
-           about 79 % and left the old code under the new version number.
-           Newer windows have another name and their own copy of the asar
+        /* THE OLD UPDATE WINDOWS HELD app.asar. The update window of 1.20.58
+           and before, `neo-quiz-maj.exe`, ran from hard links to the install
+           folder and kept `resources/app.asar` open; the windows of 1.20.59
+           to 1.20.69, `neo-quiz-fenetre.exe`, held it too (2026-10-10): their
+           progress probe stat'ed the installed `app.asar` with Electron's
+           `fs`, which opens an asar as an archive and never closes it. Newer
+           windows have another name and their own copy of the asar
            (`electron/fenetre-maj-liens.ts`); only the old ones are killed
-           here, the update then runs without its window.
-           The windows of 1.20.59 to 1.20.69, `neo-quiz-fenetre.exe`, held it
-           too (2026-10-10): their progress probe stat'ed the installed
-           `app.asar` with Electron's `fs`, which opens an asar as an archive
-           and never closes it. Killed the same way. */
+           here, the update then runs without its window. */
         nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM neo-quiz-maj.exe`
         Pop $0
         nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM neo-quiz-fenetre.exe`
@@ -46,22 +32,6 @@
         ${OrIf} $1 == 0
             Sleep 1500
         ${EndIf}
-        DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
-        DeleteRegValue HKEY_CURRENT_USER "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
-        !ifdef UNINSTALL_REGISTRY_KEY_2
-            DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY_2}" "UninstallString"
-            DeleteRegValue HKEY_CURRENT_USER "${UNINSTALL_REGISTRY_KEY_2}" "UninstallString"
-        !endif
-    !macroend
-
-    !macro customUnInstallCheck
-        ${if} $R0 != 0
-            DetailPrint "The previous version could not be removed (code $R0): installing over it."
-        ${endif}
-        ClearErrors
-    !macroend
-    !macro customUnInstallCheckCurrentUser
-        !insertmacro customUnInstallCheck
     !macroend
 !endif
 
