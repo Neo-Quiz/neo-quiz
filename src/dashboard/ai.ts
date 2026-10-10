@@ -3985,6 +3985,28 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		ajouter(btn, "span", "qbd-sr-only", label);
 	}
 
+	/* A FOLLOW-UP with nothing attached inherits the documents of the chat's
+	   earlier requests (`envoyerDansLaFile`), but only those the queue still
+	   holds in memory. A chat read back from its record (after a restart, an
+	   update) kept their paths alone, so "redo this quiz" left with no
+	   document at all and the model answered with a question asking for the
+	   PDF, saved as a one-question quiz (2026-10-10). Those documents are read
+	   again from their paths, through the same functions as the "@" picker. */
+	async function rattacherDocumentsHerites(): Promise<void> {
+		if (noteAttachments.length || images.length) return;
+		const chatId = activeChatId();
+		const enFile = new Set(fileGen.lignes().filter(l => chatOfLine(l) === chatId).flatMap(l => l.demande.notes).map(n => n.name));
+		const chemins = new Map<string, string>();
+		for (const item of filDuChat()) {
+			if (item.kind !== "record") continue;
+			for (const d of item.request.documents) if (d.path && !enFile.has(d.name)) chemins.set(d.name, d.path);
+		}
+		for (const chemin of chemins.values()) {
+			if (/^([A-Za-z]:[\\/]|[\\/])/.test(chemin)) await attachExternalPath(chemin);
+			else await attachVaultPath(chemin);
+		}
+	}
+
 	/* Les chemins écrits dans le prompt sont attachés AVANT l'envoi : le
 	   modèle n'a aucun accès disque, mais le plugin sait lire ces fichiers
 	   (mêmes fonctions que le picker « @ » → mêmes formats, même
@@ -4223,6 +4245,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   AVANT la capture : elles doivent partir avec la demande, et
 			   apparaître dans la ligne « envoyé » de la file. */
 			await attachPromptPaths();
+			await rattacherDocumentsHerites();
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
 				host.ui.notice(t(attente.ecartees === 1 ? "ai.video.notJoinedOne" : "ai.video.notJoinedOther", { count: attente.ecartees }));
