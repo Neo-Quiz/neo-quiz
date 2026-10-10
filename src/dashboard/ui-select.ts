@@ -138,7 +138,7 @@ export function createSelect<T extends SelectOption = SelectOption>(parent: HTML
 	}
 
 	function onKeyDown(e: KeyboardEvent): void {
-		if (e.key === "Escape") closeMenu();
+		if (e.key === "Escape") { e.stopPropagation(); closeMenu(); }
 	}
 
 	function onScroll(e: Event): void {
@@ -467,7 +467,7 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 			e.preventDefault();
 			return;
 		}
-		if (e.key === "Escape") closeMenu();
+		if (e.key === "Escape") { e.stopPropagation(); closeMenu(); }
 	}
 
 	function onScroll(e: Event): void {
@@ -962,6 +962,8 @@ export function openModelMenu(anchorEl: HTMLElement, opts: OpenModelMenuOptions)
 
 	function onKeyDown(e: KeyboardEvent): void {
 		if (e.key !== "Escape") return;
+		/* The menu takes its Escape: a modal under it (the Explain panel) must not close too. */
+		e.stopPropagation();
 		if (effortFlyout) closeEffortFlyout();
 		else if (moreFlyout) closeMoreFlyout();
 		else if (levelFlyout) closeLevelFlyout();
@@ -1379,6 +1381,8 @@ export function openProviderMenu(anchorEl: HTMLElement, opts: OpenProviderMenuOp
 
 	function onKeyDown(e: KeyboardEvent): void {
 		if (e.key !== "Escape") return;
+		/* The menu takes its Escape: a modal under it (the Explain panel) must not close too. */
+		e.stopPropagation();
 		if (flyout) closeFlyout();
 		else closeMenu();
 	}
@@ -1778,7 +1782,7 @@ export function openEffortSlider(anchorEl: HTMLElement, opts: OpenEffortSliderOp
 	}
 
 	function onKeyDown(e: KeyboardEvent): void {
-		if (e.key === "Escape") closeMenu();
+		if (e.key === "Escape") { e.stopPropagation(); closeMenu(); }
 	}
 
 	function onScroll(e: Event): void {
@@ -2252,6 +2256,8 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 
 	function onKeyDown(e: KeyboardEvent): void {
 		if (e.key !== "Escape") return;
+		/* The menu takes its Escape: a modal under it (the Explain panel) must not close too. */
+		e.stopPropagation();
 		// Escape closes the second flyout first, then the flyout, then the menu.
 		if (sousFly) { const row = sousRow; fermerSous(); row?.focus(); }
 		else if (fly) { const row = flyRow; fermerFly(); row?.focus(); } else closeMenu();
@@ -2402,7 +2408,7 @@ export function openNotePicker<F extends PickableFile>(anchorEl: HTMLElement, op
 	}
 
 	function onKeyDown(e: KeyboardEvent): void {
-		if (e.key === "Escape") closeMenu();
+		if (e.key === "Escape") { e.stopPropagation(); closeMenu(); }
 	}
 
 	function onScroll(e: Event): void {
