@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.76] - 2026-10-10
+
 ### Added
 
 - Explain panel: paste a screenshot with Ctrl+V, attach files with the + button, name a file with @.
