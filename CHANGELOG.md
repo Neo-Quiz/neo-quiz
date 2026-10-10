@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A generated Learn no longer turns one lecture into dozens of steps: it holds at most 10 steps, with two questions and one flashcard each.
+- The readings of a generated Learn take the style that fits each notion again (explorable page, structured course, annotated diagram) instead of all coming out as the same list of steps.
+
 ## [1.20.77] - 2026-10-10
 
 ### Changed
