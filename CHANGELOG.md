@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.79] - 2026-10-10
+
 ### Fixed
 
 - A follow-up such as "redo this quiz" in a chat reopened after a restart attaches the earlier documents again, instead of leaving without them.
