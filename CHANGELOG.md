@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.80] - 2026-10-10
+
 ### Added
 
 - Claude Code and Codex now work for real in the quiz folder you trusted, as in a terminal opened there: a new chip next to the model picks Supervised (read only), Auto-accept edits, Auto or Full access (the default).
