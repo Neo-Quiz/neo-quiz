@@ -25,7 +25,7 @@ const KNOWN = {
 	"qbd-effort-rainbow": "transient", // Generate page
 	"qbd-ai-logo-travail": "transient", "qbd-ai-reflet": "transient", "qbd-ai-plan-tourne": "transient", "qbd-ai-plan-respire": "transient",
 	"qbd-ai-nudge-float": "transient", "qbd-install-spin": "transient", "qbd-video-install-balayage": "transient",
-	"qbd-web-sonar": "transient", "qbd-glide": "transient", "qbd-usage-spin": "transient", "qbd-cli-maj-tourne": "transient", // Generate page and its installers
+	"qbd-web-sonar": "transient", "qbd-glide": "transient", "qbd-usage-spin": "transient", // Generate page and its installers
 	"qbd-btn-shine": "transient", // `.qbd-btn--shine`: no element carries it today
 	"qbd-cta3d-reflet": "phone-off",
 	"qbd-folder-spin": "transient", "qbd-folder-sweep": "transient", // a folder row while its file opens

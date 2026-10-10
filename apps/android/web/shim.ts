@@ -240,6 +240,8 @@ const pont: Pont = {
 		surEtat: (rappel) => abonner<EtatMiseAJour>("miseAJour.etat", rappel),
 		verifier: () => appeler("miseAJour.verifier"),
 		installer: () => appeler("miseAJour.installer"),
+		/* Only the desktop CLI updates ask; a phone has no CLI. */
+		connexionLimitee: () => Promise.resolve(false),
 	},
 
 	collage: {

@@ -37,7 +37,6 @@ import { reglerSilence, silenceActif } from "./notif-fin";
 import { mountMoodleSettings } from "./moodle-settings";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
-import { monterBandeauMaj } from "../../../../src/dashboard/cli-updates";
 import { phoneLayoutNow } from "../../../../src/phone-layout";
 
 type Category = "general" | "sync" | "ai" | "appearance" | "languages" | "moodle";
@@ -392,13 +391,6 @@ export function renderSettings(
 	   detached node so that the prompt sections below keep their handles, and
 	   the accounts (which talk to the CLIs) are not started. */
 	const aiPage = pages.get("ai") ?? document.createElement("div");
-	/* "Update available" for Claude Code and Codex, always shown here while it
-	   applies (the Generate page lets it be hidden). */
-	const demonterMaj = mobile ? () => {} : monterBandeauMaj(aiPage, () => undefined, {
-		fermable: false,
-		/* Through the bridge: `navigator.clipboard` is refused in the app window. */
-		copyText: async texte => { try { await pont().systeme.copierTexte(texte); return true; } catch { return false; } },
-	});
 	const demonterComptes = mobile ? () => {} : monterReglagesComptes(section(aiPage, t("app.settings.accounts")));
 
 	/* Paid assistants: one switch per channel that needs a subscription
@@ -543,5 +535,5 @@ export function renderSettings(
 	   (whose page then opens "Add a device" with it). */
 	const allerSync = (): void => { if (sync) show("sync"); };
 	surAjoutEnAttente.add(allerSync);
-	return () => { surAjoutEnAttente.delete(allerSync); demonterMaj(); demonterMajAndroid(); demonterComptes(); demonterFond(); demonterLangages(); demonterMoodle(); demonterSync(); root.replaceChildren(); };
+	return () => { surAjoutEnAttente.delete(allerSync); demonterMajAndroid(); demonterComptes(); demonterFond(); demonterLangages(); demonterMoodle(); demonterSync(); root.replaceChildren(); };
 }

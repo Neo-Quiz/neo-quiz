@@ -18,6 +18,8 @@ import type { EntreeMenu } from "./menu-app-arbre";
 import { poserIcone } from "../host/ui";
 import { t } from "../../../../src/i18n";
 import type { EtatMiseAJour } from "../../electron/pont";
+import { relancerMajCli, suivreMajCli, type EtatMajCli } from "../../../../src/dashboard/cli-updates";
+import { setBrandLogo } from "../../../../src/dashboard/ai-providers";
 import { installerMiseAJour, majEnVue, majInachevee, suivreMiseAJour, tailleTelechargement, type ResultatVerification } from "./mise-a-jour";
 
 export interface ActionsMenu {
@@ -73,10 +75,13 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	/* True while that row shows a download or a version to install rather than
 	   "Check for updates": the check's own outcome then gives way to it. */
 	let majEnDirect = false;
+	/* The CLI update rows (`cli-updates.ts`), followed live while the menu is open. */
+	let desabonnerCli: () => void = () => undefined;
 
 	function fermer(): void {
 		fermee = true;
 		desabonnerMaj();
+		desabonnerCli();
 		window.clearTimeout(minuteurResultat);
 		window.clearTimeout(minuteurSortie);
 		document.removeEventListener("keydown", surClavier, true);
@@ -201,6 +206,11 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				depot.addEventListener("mouseleave", () => eteindre(niveau, depot));
 				rangee.append(verifier, depot);
 				lignes.push(verifier);
+				/* Claude Code and Codex update themselves (2026-10-10): a row only
+				   while one updates, failed, or waits for a click (metered). */
+				const zoneCli = ajouter(panneau, "div", "nq-menu-cli");
+				desabonnerCli();
+				desabonnerCli = suivreMajCli(etats => peindreCli(zoneCli, etats));
 				continue;
 			}
 
@@ -348,6 +358,25 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			bouton.removeAttribute("aria-disabled");
 			bouton.removeAttribute("aria-description");
 			libelle.textContent = t(phase === "prete" ? "app.update.btn.install" : "app.update.btn.download", { version });
+		}
+	}
+
+	/** One row per CLI update to show; empty (and hidden) otherwise. */
+	function peindreCli(zone: HTMLElement, etats: EtatMajCli[]): void {
+		zone.replaceChildren();
+		zone.hidden = etats.length === 0;
+		for (const e of etats) {
+			const b = ajouter(zone, "button", "nq-menu-cli-ligne");
+			b.type = "button";
+			b.dataset.phase = e.phase;
+			setBrandLogo(ajouter(b, "span", "nq-menu-cli-logo"), e.logo);
+			ajouter(b, "span", "nq-menu-cli-texte",
+				e.phase === "en-cours" ? t("app.cliUpdate.running", { name: e.nom, version: e.derniere })
+					: e.phase === "echec" ? t("app.cliUpdate.failed", { name: e.nom })
+						: t("app.cliUpdate.metered", { name: e.nom, version: e.derniere }));
+			if (e.phase === "echec" && e.raison) b.setAttribute("aria-description", e.raison);
+			if (e.phase === "en-cours") { b.disabled = true; b.setAttribute("aria-busy", "true"); }
+			else b.addEventListener("click", () => relancerMajCli(e.outil));
 		}
 	}
 

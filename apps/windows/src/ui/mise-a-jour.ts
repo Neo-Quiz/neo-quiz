@@ -15,6 +15,7 @@ import type { EtatMiseAJour } from "../../electron/pont";
 import { pont } from "../host/pont";
 import { t, currentLang } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
+import { suivreMajCli } from "../../../../src/dashboard/cli-updates";
 
 let etat: EtatMiseAJour = { phase: "inactif" };
 const abonnes = new Set<(etat: EtatMiseAJour) => void>();
@@ -132,12 +133,17 @@ export function tailleTelechargement(e: EtatMiseAJour): string | null {
 export function monterPointLogo(logo: HTMLElement): () => void {
 	const point = ajouter(logo, "span", "nq-rail-logo-point");
 	point.setAttribute("aria-hidden", "true");
+	/* The app's own update, or a CLI update to show (`cli-updates.ts`). */
+	let app = false;
+	let cli = false;
+	const peindre = (): void => { logo.classList.toggle("has-maj", app || cli); };
 	const desabonner = abonner(e => {
-		const visible = majEnVue(e);
-		logo.classList.toggle("has-maj", visible);
+		app = majEnVue(e);
 		logo.classList.toggle("is-maj-prete", e.phase === "prete" || majInachevee(e));
+		peindre();
 	});
-	return () => { desabonner(); point.remove(); logo.classList.remove("has-maj", "is-maj-prete"); };
+	const desabonnerCli = suivreMajCli(etats => { cli = etats.length > 0; peindre(); });
+	return () => { desabonner(); desabonnerCli(); point.remove(); logo.classList.remove("has-maj", "is-maj-prete"); };
 }
 
 /* ══════════════════════════════════════════════════════════

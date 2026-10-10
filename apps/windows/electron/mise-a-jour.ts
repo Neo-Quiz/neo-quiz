@@ -67,6 +67,8 @@ export interface MiseAJour {
 	arreter(): void;
 	/** The last install did not land (`expected-update.ts`): the logo menu says so until a retry downloads. */
 	signalerInachevee(): void;
+	/** Windows says the connection is metered; false when unknown (never rejects). */
+	connexionLimitee(): Promise<boolean>;
 }
 
 export function creerMiseAJour(deps: {
@@ -202,6 +204,7 @@ export function creerMiseAJour(deps: {
 		},
 		installationArmee: () => armee,
 		signalerInachevee: () => appliquer({ type: "unfinished" }),
+		connexionLimitee: () => deps.limitee(),
 		tailles: () => tailles,
 		installerArmee() {
 			autoUpdater.quitAndInstall(true, true);

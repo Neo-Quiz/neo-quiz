@@ -1804,6 +1804,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   `main.ts` qui, tout fermé, lance `quitAndInstall`. */
 	ipcMain.handle(CANAUX.miseAJourEtatLire, () => deps.miseAJour.etat());
 	ipcMain.handle(CANAUX.miseAJourVerifier, () => deps.miseAJour.verifier());
+	/* A boolean and nothing else: no argument crosses. */
+	ipcMain.handle(CANAUX.miseAJourConnexionLimitee, () => deps.miseAJour.connexionLimitee());
 	ipcMain.handle(CANAUX.miseAJourInstaller, () => {
 		/* A version waiting on a metered connection: the click is Download. */
 		if (deps.miseAJour.etat().phase === "disponible") { void deps.miseAJour.telecharger(); return; }

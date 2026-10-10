@@ -986,6 +986,8 @@ export interface Pont {
 		/** False when no check ran (a dev build). */
 		verifier(): Promise<boolean>;
 		installer(): Promise<void>;
+		/** Windows says the connection is metered (false when unknown). Read-only; the CLI updates wait for a click then. */
+		connexionLimitee(): Promise<boolean>;
 	};
 
 	/**
@@ -1230,6 +1232,7 @@ export const CANAUX = {
 	miseAJourEtat: "neo:mise-a-jour/etat",
 	miseAJourVerifier: "neo:mise-a-jour/verifier",
 	miseAJourInstaller: "neo:mise-a-jour/installer",
+	miseAJourConnexionLimitee: "neo:mise-a-jour/connexion-limitee",
 	depotDisposer: "neo:depot/disposer",
 	depotEcrire: "neo:depot/ecrire",
 	depotPreparer: "neo:depot/preparer",

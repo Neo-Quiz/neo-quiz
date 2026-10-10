@@ -1664,6 +1664,17 @@ label.nq-set-ligne {
 .nq-menu-apropos-verifier[data-maj="telechargement"] { cursor: default; }
 /* The last install did not finish (the safety net): the row says so in the error colour. */
 .nq-menu-apropos-verifier[data-maj="inachevee"], .nq-menu-apropos-verifier[data-maj="inachevee"][data-actif] { color: var(--text-error); }
+/* Claude Code and Codex updating themselves (`cli-updates.ts`): one row each,
+   only while one updates, failed or waits for a click on a metered connection. */
+.nq-menu-cli[hidden] { display: none; }
+.nq-menu-cli { padding: 0 6px 4px 6px; }
+.nq-menu-cli-ligne { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.nq-menu-cli-ligne:hover:not(:disabled), .nq-menu-cli-ligne:focus-visible { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
+.nq-menu-cli-ligne:disabled { cursor: default; }
+.nq-menu-cli-ligne[data-phase="echec"] { color: var(--text-error); }
+.nq-menu-cli-logo { display: inline-flex; flex: none; width: 14px; height: 14px; }
+.nq-menu-cli-logo svg { width: 14px; height: 14px; }
+.nq-menu-cli-texte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ══════════════════════════════════════════════════════════
    LES BARRES DE DÉFILEMENT DE LA FENÊTRE

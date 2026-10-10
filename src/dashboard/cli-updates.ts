@@ -15,9 +15,8 @@
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost, requireHost } from "../host/current";
-import { ajouter } from "../dom";
 import { t } from "../i18n";
-import { checkClaudeCode, checkCodex, refreshCliCaches, setBrandLogo } from "./ai-providers";
+import { checkClaudeCode, checkCodex, refreshCliCaches } from "./ai-providers";
 
 export type OutilMaj = "claude" | "codex";
 
@@ -116,153 +115,81 @@ export async function mettreAJour(outil: OutilMaj): Promise<ResultatMaj> {
 	return { ok: true };
 }
 
-/** A dismissed update stays hidden until a newer one comes out (per viewer). */
-const CLE_IGNOREE = "nq-maj-cli-ignoree:";
-function ignoree(m: MajCli): boolean {
-	try { return localStorage.getItem(CLE_IGNOREE + m.outil) === m.derniere; } catch { return false; }
-}
-function ignorer(m: MajCli): void {
-	try { localStorage.setItem(CLE_IGNOREE + m.outil, m.derniere); } catch { /* storage unavailable: shown again next time */ }
+/* ══════════════════════════════════════════════════════════
+   AUTOMATIC UPDATES (2026-10-10). The banner with its Update button is gone:
+   at the app's start and every six hours, a CLI behind its latest version is
+   updated in the background with its own command, even during a generation.
+   Both CLIs install each version BESIDE the previous ones and switch a
+   pointer (`~/.local/share/claude/versions/`, Codex's `releases/` and its
+   `current` link), so a running CLI keeps its version and the next run
+   takes the new one. Two exceptions wait for a click in the logo menu: a
+   metered connection, and a failed update (no retry loop). The logo menu
+   (`apps/windows/src/ui/menu-app.ts`) shows these states, and nothing else.
+══════════════════════════════════════════════════════════ */
+
+export type PhaseMajCli = "en-cours" | "echec" | "attente";
+/** `logo`: a `BRAND_LOGOS` key (`setBrandLogo`). */
+export interface EtatMajCli { outil: OutilMaj; nom: string; logo: string; derniere: string; phase: PhaseMajCli; raison?: string }
+
+const etatsCli = new Map<OutilMaj, EtatMajCli>();
+const abonnesCli = new Set<(etats: EtatMajCli[]) => void>();
+let limiteeCli: () => Promise<boolean> = async () => false;
+let passeEnCours: Promise<void> = Promise.resolve();
+
+function publierCli(): void {
+	const liste = [...etatsCli.values()];
+	for (const a of abonnesCli) a(liste);
 }
 
-/**
- * Mounts the banner into `parent` when an update is available: one row per
- * CLI (logo, "Codex 0.159.0 → 0.160.0", Update) and a close button. Empty otherwise. `apres` runs after a successful update
- * (the page re-reads its providers and models). Returns the unmount.
- */
-export function monterBandeauMaj(parent: HTMLElement, apres: () => void, opts: { fermable?: boolean; copyText?(texte: string): Promise<boolean> } = {}): () => void {
-	const fermable = opts.fermable !== false;
-	let demonte = false;
-	const zone = ajouter(parent, "div", "qbd-cli-maj");
-	zone.hidden = true;
-	zone.setAttribute("role", "status");
+/** The CLI updates the logo menu has to show (running, failed, waiting for a click). */
+export function suivreMajCli(rappel: (etats: EtatMajCli[]) => void): () => void {
+	abonnesCli.add(rappel);
+	rappel([...etatsCli.values()]);
+	return () => { abonnesCli.delete(rappel); };
+}
 
-	function peindre(majs: MajCli[]): void {
-		if (demonte) return;
-		const visibles = fermable ? majs.filter(m => !ignoree(m)) : majs;
-		zone.replaceChildren();
-		zone.hidden = visibles.length === 0;
-		if (zone.hidden) return;
-		const tete = ajouter(zone, "div", "qbd-cli-maj-tete");
-		ajouter(tete, "span", "qbd-cli-maj-titre", t("ai.update.title"));
-		if (fermable) {
-			const fermer = ajouter(tete, "button", "qbd-cli-maj-fermer");
-			fermer.type = "button";
-			fermer.setAttribute("aria-label", t("ai.update.dismiss"));
-			currentHost().ui.setIcon(fermer, "x");
-			fermer.addEventListener("click", () => { for (const m of visibles) ignorer(m); zone.hidden = true; });
-		}
-		for (const m of visibles) {
-			const l = ajouter(zone, "div", "qbd-cli-maj-ligne");
-			let erreur: HTMLElement | null = null;
-			const nom = ajouter(l, "span", `qbd-cli-maj-nom is-${m.outil}`);
-			setBrandLogo(ajouter(nom, "span", "qbd-cli-maj-logo"), LOGOS[m.outil]);
-			ajouter(nom, "span", undefined, NOMS[m.outil]);
-			ajouter(l, "span", "qbd-cli-maj-versions", `${m.installee} → ${m.derniere}`);
-			const b = ajouter(l, "button", "qbd-cli-maj-bouton");
-			b.type = "button";
-			const icone = ajouter(b, "span", "qbd-cli-maj-bouton-icone");
-			currentHost().ui.setIcon(icone, "download");
-			const libelle = ajouter(b, "span", undefined, t("ai.update.button"));
-			b.addEventListener("click", () => {
-				b.disabled = true;
-				b.classList.add("is-loading");
-				b.setAttribute("aria-busy", "true");
-				icone.replaceChildren();
-				currentHost().ui.setIcon(icone, "loader");
-				libelle.textContent = t("ai.update.updating");
-				erreur?.remove();
-				erreur = null;
-				void mettreAJour(m.outil).then(res => {
-					if (demonte) return;
-					if (!res.ok) {
-						/* Why it failed, then what to do: the npm command to run by
-						   hand, and the package's page (2026-10-05). */
-						erreur = ajouter(zone, "div", "qbd-cli-maj-erreur");
-						l.after(erreur);
-						ajouter(erreur, "p", "qbd-cli-maj-erreur-titre", t("ai.update.failed", { name: NOMS[m.outil] }));
-						if (res.raison) ajouter(erreur, "p", "qbd-cli-maj-erreur-raison", res.raison);
-						ajouter(erreur, "p", "qbd-cli-maj-erreur-aide", t("ai.update.manual"));
-						/* The command with a Copy button, and "Open a terminal" (the
-						   same EMPTY window as the install dialog: the app runs
-						   nothing, the owner pastes). 2026-10-05. */
-						/* `npm.cmd` on Windows: plain `npm` there is `npm.ps1`, which
-						   PowerShell refuses under the default execution policy
-						   ("scripts are disabled on this system"); the .cmd is not
-						   a script it blocks. */
-						const npm = currentHost().platform.isWindows ? "npm.cmd" : "npm";
-						const commande = `${npm} install -g ${PAQUETS[m.outil]}@latest`;
-						const ligneCmd = ajouter(erreur, "div", "qbd-cli-maj-erreur-ligne");
-						ajouter(ligneCmd, "code", "qbd-cli-maj-erreur-cmd", commande);
-						const copier = ajouter(ligneCmd, "button", "qbd-cli-maj-erreur-btn");
-						copier.type = "button";
-						const copierIcone = ajouter(copier, "span", "qbd-cli-maj-bouton-icone");
-						currentHost().ui.setIcon(copierIcone, "copy");
-						const copierLbl = ajouter(copier, "span", undefined, t("ai.install.copy"));
-						copier.addEventListener("click", async () => {
-							const ok = opts.copyText
-								? await opts.copyText(commande)
-								: await navigator.clipboard.writeText(commande).then(() => true, () => false);
-							if (!ok) return;
-							copierIcone.replaceChildren();
-							currentHost().ui.setIcon(copierIcone, "check");
-							copierLbl.textContent = t("ai.install.copied");
-							window.setTimeout(() => {
-								copierIcone.replaceChildren();
-								currentHost().ui.setIcon(copierIcone, "copy");
-								copierLbl.textContent = t("ai.install.copy");
-							}, 1500);
-						});
-						const proc = currentHost().process;
-						if (proc && currentHost().platform.isWindows) {
-							const terminal = ajouter(ligneCmd, "button", "qbd-cli-maj-erreur-btn");
-							terminal.type = "button";
-							currentHost().ui.setIcon(ajouter(terminal, "span", "qbd-cli-maj-bouton-icone"), "terminal");
-							ajouter(terminal, "span", undefined, t("ai.install.openTerminal"));
-							terminal.addEventListener("click", async () => {
-								terminal.disabled = true;
-								let verdict: "lance" | "indisponible" = "indisponible";
-								try { verdict = await proc.openTerminal(); } catch { /* reported below */ }
-								terminal.disabled = false;
-								if (verdict !== "lance") currentHost().ui.notice(t("ai.install.terminalFailed"));
-							});
-						}
-						const lien = ajouter(erreur, "a", "qbd-cli-maj-erreur-lien", t("ai.update.packagePage"));
-						const url = `https://www.npmjs.com/package/${PAQUETS[m.outil]}`;
-						lien.href = url;
-						lien.addEventListener("click", ev => { ev.preventDefault(); void currentHost().shell.openUrl(url); });
-						b.disabled = false;
-						b.classList.remove("is-loading");
-						b.removeAttribute("aria-busy");
-						icone.replaceChildren();
-						currentHost().ui.setIcon(icone, "download");
-						libelle.textContent = t("ai.update.button");
-						return;
-					}
-					currentHost().ui.notice(t("ai.update.done", { name: NOMS[m.outil], version: m.derniere }));
-					apres();
-					void majsDisponibles().then(peindre).catch(() => undefined);
-				});
-			});
-		}
+async function lancerMaj(m: MajCli): Promise<void> {
+	etatsCli.set(m.outil, { outil: m.outil, nom: NOMS[m.outil], logo: LOGOS[m.outil], derniere: m.derniere, phase: "en-cours" });
+	publierCli();
+	const r = await mettreAJour(m.outil);
+	if (r.ok) etatsCli.delete(m.outil);
+	else etatsCli.set(m.outil, { outil: m.outil, nom: NOMS[m.outil], logo: LOGOS[m.outil], derniere: m.derniere, phase: "echec", raison: r.raison });
+	publierCli();
+}
+
+/** One pass: every CLI behind is updated, unless the connection is metered or
+    its last update failed; `force` is the CLI whose row was clicked. */
+async function passeMajCli(force: OutilMaj | null): Promise<void> {
+	const majs = await majsDisponibles();
+	const limitee = await limiteeCli().catch(() => false);
+	for (const outil of [...etatsCli.keys()]) {
+		if (etatsCli.get(outil)?.phase !== "en-cours" && !majs.some(m => m.outil === outil)) etatsCli.delete(outil);
 	}
+	publierCli();
+	for (const m of majs) {
+		const avant = etatsCli.get(m.outil);
+		if (avant?.phase === "en-cours") continue;
+		if (force !== m.outil && (limitee || avant?.phase === "echec")) {
+			if (limitee && avant?.phase !== "echec") { etatsCli.set(m.outil, { outil: m.outil, nom: NOMS[m.outil], logo: LOGOS[m.outil], derniere: m.derniere, phase: "attente" }); publierCli(); }
+			continue;
+		}
+		await lancerMaj(m);
+	}
+}
 
-	void majsDisponibles().then(peindre).catch(() => undefined);
-	/* Updated BY HAND in a terminal (the failure block's command): when the
-	   window gets the focus back, the installed versions are asked again and
-	   the panel follows on its own, the new models with it (2026-10-05). */
-	const reverifier = (): void => {
-		if (demonte || !zone.querySelector(".qbd-cli-maj-erreur")) return;
-		void Promise.all([checkClaudeCode(true), checkCodex(true)])
-			.then(() => refreshCliCaches().catch(() => false))
-			.then(() => majsDisponibles())
-			.then(majs => {
-				if (demonte) return;
-				peindre(majs);
-				apres();
-			})
-			.catch(() => undefined);
-	};
-	window.addEventListener("focus", reverifier);
-	return () => { demonte = true; window.removeEventListener("focus", reverifier); zone.remove(); };
+const enchainer = (force: OutilMaj | null): Promise<void> =>
+	(passeEnCours = passeEnCours.then(() => passeMajCli(force)).catch(() => undefined));
+
+/** Starts the automatic CLI updates (desktop app only); returns the stop. */
+export function demarrerMajCliAuto(deps: { limitee(): Promise<boolean> }): () => void {
+	if (!currentHost().platform.isDesktopApp) return () => {};
+	limiteeCli = deps.limitee;
+	void enchainer(null);
+	const minuteur = window.setInterval(() => { void enchainer(null); }, TTL_MS);
+	return () => window.clearInterval(minuteur);
+}
+
+/** The click on a CLI row of the logo menu: update this one now. */
+export function relancerMajCli(outil: OutilMaj): void {
+	void enchainer(outil);
 }

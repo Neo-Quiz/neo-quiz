@@ -290,6 +290,7 @@ const pont: Pont = {
 		},
 		verifier: () => ipcRenderer.invoke(CANAUX.miseAJourVerifier),
 		installer: () => ipcRenderer.invoke(CANAUX.miseAJourInstaller),
+		connexionLimitee: () => ipcRenderer.invoke(CANAUX.miseAJourConnexionLimitee),
 	},
 
 	depot: {

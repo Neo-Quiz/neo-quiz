@@ -94,6 +94,10 @@ export const EN_APP = {
 	"app.update.btn.download": "Download v{version}",
 	/* The last install restarted the app on an older version (the safety net); a click checks again. */
 	"app.update.btn.unfinished": "Update did not finish, try again",
+	/* Claude Code and Codex update themselves; the logo menu shows a row only while one updates, failed, or waits (metered). */
+	"app.cliUpdate.running": "Updating {name} to {version}…",
+	"app.cliUpdate.failed": "{name} update failed, try again",
+	"app.cliUpdate.metered": "Update {name} to {version}",
 	"app.update.btn.failed": "Check failed",
 	"app.update.btn.devBuild": "Dev build",
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée

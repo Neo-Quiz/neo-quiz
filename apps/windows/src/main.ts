@@ -33,6 +33,7 @@ import { createChatFiles } from "./host/chat-files";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
 import { createDevicePublisher } from "../../../src/dashboard/device-publisher";
+import { demarrerMajCliAuto } from "../../../src/dashboard/cli-updates";
 import { checkClaudeCode, claudeModelsOffered, getProvider } from "../../../src/dashboard/ai-providers";
 import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
@@ -666,6 +667,10 @@ async function demarrer(): Promise<void> {
 		   phone's device list showed this computer's name eight times. The
 		   installed app loads its page from inside `app.asar`. */
 		const appInstallee = location.pathname.includes("/app.asar/");
+		/* Claude Code and Codex update themselves in the background (2026-10-10,
+		   `cli-updates.ts`). The installed app only: a test instance never
+		   touches the CLIs installed for the whole account. */
+		if (!estMobile() && appInstallee) demarrerMajCliAuto({ limitee: () => pont().miseAJour.connexionLimitee() });
 		const devicePublisher = estMobile() || !appInstallee ? null : createDevicePublisher({
 			device: idAppareil,
 			info: async () => (await pont().appareil?.infos().catch(() => null)) ?? null,
