@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.73] - 2026-10-10
+
 ### Changed
 
 - Claude Code and Codex now update themselves in the background when a new version is out, even during a generation; the logo menu shows the update while it runs, and asks for a click on a metered connection or after a failure.
