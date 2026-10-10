@@ -412,8 +412,9 @@
    quiz card's own glass, border and radius (`--nq-panel-*`, shell.css). It
    sits where the quiz card starts (same top, same bottom, same gap). The quiz
    card gives up the card's width and keeps the gap between the two cards.
-   `ui/explain.ts` sets `--nq-explain-w` (40 % of the window, kept in
-   localStorage) and the handle on the card's right edge drags it.
+   `ui/explain.ts` sets `--nq-explain-w` (38 % of the window by default, the
+   dragged width kept in localStorage) and the handle in the gap left of the
+   card drags it, as wide as the quiz card's 360 px minimum allows.
    Phone and any window under 700 px: a full-screen sheet over the quiz, no split. */
 :root { --nq-explain-w: 38vw; }
 html body:not(.nq-x) .modal-container.nq-explain-conteneur {
@@ -494,33 +495,71 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-m
 .nq-explain-composer { flex: none; margin-top: auto; }
 .nq-explain-modal .qbd-ai-usage-slot { flex: none; }
 
-/* The handle, on the card's left edge (between the two cards). */
+/* The handle fills the whole gap between the two cards (2026-10-10). It hangs
+   on the container (`ui/explain.ts`): the card clips its overflow. `ew-resize`
+   is the native Windows ↔ cursor (IDC_SIZEWE); `col-resize` is a bitmap
+   Chromium draws itself. At rest a short pill sits in the middle of the gap;
+   hover brightens and lengthens it; a drag turns it accent and draws a thin
+   line down the whole gap. */
 .nq-explain-poignee {
 	position: absolute;
 	top: 0;
 	bottom: 0;
-	left: -5px;
-	width: 9px;
+	right: 100%;
+	width: var(--nq-panel-gap, 16px);
 	z-index: 2;
-	cursor: col-resize;
+	pointer-events: auto;
+	cursor: ew-resize;
 	touch-action: none;
+	outline: none;
 }
-.nq-explain-poignee::after {
+.nq-explain-poignee::before {
 	content: "";
 	position: absolute;
-	top: 0;
-	bottom: 0;
-	left: 4px;
+	top: 8px;
+	bottom: 8px;
+	left: 50%;
 	width: 2px;
-	background: transparent;
-	transition: background 0.15s ease;
+	margin-left: -1px;
+	border-radius: 1px;
+	background: var(--interactive-accent);
+	opacity: 0;
+	transition: opacity 0.18s ease;
 }
-.nq-explain-poignee:hover::after,
-.nq-explain-redimension .nq-explain-poignee::after {
+.nq-explain-poignee-grip {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 4px;
+	height: 36px;
+	border-radius: 2px;
+	background: var(--text-faint);
+	opacity: 0.35;
+	transform: translate(-50%, -50%);
+	transition: height 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
+	pointer-events: none;
+}
+.nq-explain-poignee:hover .nq-explain-poignee-grip,
+.nq-explain-poignee:focus-visible .nq-explain-poignee-grip {
+	height: 56px;
+	opacity: 0.8;
+	background: var(--text-muted);
+}
+.nq-explain-poignee:focus-visible .nq-explain-poignee-grip { background: var(--interactive-accent); }
+.nq-explain-redimension .nq-explain-poignee::before { opacity: 0.45; }
+.nq-explain-redimension .nq-explain-poignee .nq-explain-poignee-grip {
+	height: 56px;
+	opacity: 1;
 	background: var(--interactive-accent);
 }
-body.nq-explain-redimension { cursor: col-resize; user-select: none; }
+.nq-explain-conteneur.qbd-closing > .nq-explain-poignee { display: none; }
+/* During a drag the resize cursor wins over every button, field and link under the pointer. */
+body.nq-explain-redimension { user-select: none; }
+body.nq-explain-redimension, body.nq-explain-redimension * { cursor: ew-resize !important; }
 body.nq-explain-redimension .nq-html-frame-view { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+	.nq-explain-poignee::before, .nq-explain-poignee-grip { transition: none; }
+}
 
 /* The quiz card gives up the width of the Explain card and the gap between them. */
 /* No CSS transition here: the card's width moves by FLIP (ui/explain.ts), and a
@@ -611,6 +650,13 @@ body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone {
 	box-shadow: none;
 	transform: none;
 	transition: background-color 0.15s ease, color 0.15s ease;
+}
+/* The header line keeps the button's room: in a narrow quiz card (Explain
+   panel widened) the truncated title ran under the button. The card's right
+   padding is 32 px and the button's left edge sits 72 px from the card's edge:
+   48 px of padding leave 8 px before it. */
+body:not(.is-mobile) #neo-quiz-root > .qbd-qz:has(> .qz-explain-btn-icone) .qbd-qz-header {
+	padding-right: 48px;
 }
 body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:hover {
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);

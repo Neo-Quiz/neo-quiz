@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The Explain panel can be widened until the quiz is 360 px wide, with a clearer handle, the Windows resize cursor, double-click to reset and keyboard arrows.
+
 ## [1.20.76] - 2026-10-10
 
 ### Added

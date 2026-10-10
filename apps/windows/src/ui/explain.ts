@@ -67,13 +67,20 @@ import type { HostModalHandle } from "../../../../src/host/types";
    in quiz-bars.css place it and shrink the quiz card beside it
    (`body.nq-explain-open`). Its width is kept in localStorage. */
 const CLE_LARGEUR = "nq-explain-width";
-const LARGEUR_MIN = 360;
-const LARGEUR_MAX = 640;
+const LARGEUR_MIN = 320;
+// No fixed maximum (2026-10-10): a 640 px cap left empty margins in the quiz
+// card while the chat stayed narrow. The only limit is the quiz card's own minimum.
 const QUIZ_MIN = 360;
+// The three gaps around the two cards (`3 * --nq-panel-gap`, quiz-bars.css).
+const ECARTS = 48;
+const PAS_CLAVIER = 16;
+
+function largeurMax(): number {
+	return Math.max(LARGEUR_MIN, window.innerWidth - QUIZ_MIN - ECARTS);
+}
 
 function bornerLargeur(w: number): number {
-	// The quiz card keeps QUIZ_MIN px whatever the window width.
-	return Math.round(Math.max(LARGEUR_MIN, Math.min(w, LARGEUR_MAX, window.innerWidth - QUIZ_MIN - 48)));
+	return Math.round(Math.max(LARGEUR_MIN, Math.min(w, largeurMax())));
 }
 
 function largeurInitiale(): number {
@@ -177,35 +184,76 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 			sous.title = stripInlineMarkdown(questionBrute).replace(/\s+/g, " ").trim();
 		}
 	}
-	// The width handle on the LEFT edge: the chat card sits right of the quiz.
-	const poignee = ajouter(panneau, "div", "nq-explain-poignee");
+	// The width handle fills the GAP left of the chat card (the card sits right
+	// of the quiz). It hangs on the container, not on the card: the card clips
+	// its overflow, which cut the handle down to its inner 4 px.
+	const poignee = ajouter(conteneur, "div", "nq-explain-poignee");
 	poignee.setAttribute("role", "separator");
 	poignee.setAttribute("aria-orientation", "vertical");
+	poignee.setAttribute("aria-label", t("ai.explain.resize"));
+	poignee.tabIndex = 0;
+	ajouter(poignee, "span", "nq-explain-poignee-grip");
 	let courante = largeurInitiale();
-	// Until the learner drags the handle, the default follows the window (44 %).
+	// Until the learner drags the handle, the default follows the window (38 %).
 	let choisie = false;
 	try { choisie = Number(window.localStorage.getItem(CLE_LARGEUR)) > 0; } catch { /* default */ }
-	const surRedim = (): void => { courante = choisie ? bornerLargeur(courante) : largeurInitiale(); poserLargeur(courante); };
-	window.addEventListener("resize", surRedim);
-	const bouger = (e: PointerEvent): void => {
-		choisie = true;
-		courante = bornerLargeur(conteneur.getBoundingClientRect().right - e.clientX);
+	const appliquer = (w: number): void => {
+		courante = bornerLargeur(w);
 		poserLargeur(courante);
+		poignee.setAttribute("aria-valuenow", String(courante));
+		poignee.setAttribute("aria-valuemin", String(LARGEUR_MIN));
+		poignee.setAttribute("aria-valuemax", String(largeurMax()));
+	};
+	const garder = (): void => {
+		try {
+			if (choisie) window.localStorage.setItem(CLE_LARGEUR, String(courante));
+			else window.localStorage.removeItem(CLE_LARGEUR);
+		} catch { /* storage refused: not kept */ }
+	};
+	appliquer(courante);
+	const surRedim = (): void => appliquer(choisie ? courante : largeurInitiale());
+	window.addEventListener("resize", surRedim);
+	// The pointer is CAPTURED by the handle: an interactive page's iframe or a
+	// button under the pointer can no longer take the drag (or its cursor).
+	let idPointeur: number | null = null;
+	const bouger = (e: PointerEvent): void => {
+		if (e.pointerId !== idPointeur) return;
+		choisie = true;
+		appliquer(conteneur.getBoundingClientRect().right - e.clientX);
 	};
 	const finir = (): void => {
+		if (idPointeur === null) return;
+		if (poignee.hasPointerCapture(idPointeur)) poignee.releasePointerCapture(idPointeur);
+		idPointeur = null;
 		document.body.classList.remove("nq-explain-redimension");
-		window.removeEventListener("pointermove", bouger);
-		window.removeEventListener("pointerup", finir);
-		window.removeEventListener("pointercancel", finir);
-		if (!choisie) return;
-		try { window.localStorage.setItem(CLE_LARGEUR, String(courante)); } catch { /* storage refused: not kept */ }
+		garder();
 	};
 	poignee.addEventListener("pointerdown", (e) => {
+		if (e.button !== 0) return;
 		e.preventDefault();
+		idPointeur = e.pointerId;
+		poignee.setPointerCapture(e.pointerId);
 		document.body.classList.add("nq-explain-redimension");
-		window.addEventListener("pointermove", bouger);
-		window.addEventListener("pointerup", finir);
-		window.addEventListener("pointercancel", finir);
+	});
+	poignee.addEventListener("pointermove", bouger);
+	poignee.addEventListener("pointerup", finir);
+	poignee.addEventListener("pointercancel", finir);
+	poignee.addEventListener("lostpointercapture", finir);
+	// Double click: back to the default width, which follows the window again.
+	// The key goes FIRST: `largeurInitiale` reads it and would give back the dragged width.
+	poignee.addEventListener("dblclick", () => { choisie = false; garder(); appliquer(largeurInitiale()); });
+	// Keyboard: the handle sits on the chat's left edge, so ← widens the chat.
+	poignee.addEventListener("keydown", (e) => {
+		const cible = e.key === "ArrowLeft" ? courante + PAS_CLAVIER
+			: e.key === "ArrowRight" ? courante - PAS_CLAVIER
+			: e.key === "Home" ? LARGEUR_MIN
+			: e.key === "End" ? largeurMax()
+			: null;
+		if (cible === null) return;
+		e.preventDefault();
+		choisie = true;
+		appliquer(cible);
+		garder();
 	});
 	if (carte && avant) {
 		const ouverte = mesurerCarte(carte);
@@ -233,7 +281,7 @@ function monterPanneau(panneau: HTMLElement, questionBrute: string): void {
 		jouerMouvement(cadre, ouverte, fermee, ouverte.left, DUREE_FERMETURE_MS, () => document.body.classList.remove("nq-explain-open"));
 	});
 	obs.observe(conteneur, { attributes: true, attributeFilter: ["class"] });
-	nettoyagePanneau = () => { obs.disconnect(); window.removeEventListener("resize", surRedim); finir(); nettoyagePanneau = null; };
+	nettoyagePanneau = () => { obs.disconnect(); window.removeEventListener("resize", surRedim); finir(); poignee.remove(); nettoyagePanneau = null; };
 }
 
 function demonterPanneau(): void {

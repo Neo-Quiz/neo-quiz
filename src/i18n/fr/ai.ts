@@ -526,6 +526,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.explain.ownQuestion": "Écris ta question",
 	"ai.explain.readingCourse": "Lecture du cours…",
 	"ai.explain.title": "Assistant",
+	"ai.explain.resize": "Redimensionner le panneau de l'assistant",
 	"ai.explain.followUp": "Pose une autre question…",
 	"ai.explain.send": "Envoyer",
 	"ai.explain.stop": "Arrêter",

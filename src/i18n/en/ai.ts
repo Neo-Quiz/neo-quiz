@@ -571,6 +571,7 @@ export const EN_AI = {
 	"ai.explain.ownQuestion": "Write your question",
 	"ai.explain.readingCourse": "Reading the course…",
 	"ai.explain.title": "Assistant",
+	"ai.explain.resize": "Resize the assistant panel",
 	"ai.explain.followUp": "Ask a follow-up question…",
 	"ai.explain.send": "Send",
 	"ai.explain.stop": "Stop",
