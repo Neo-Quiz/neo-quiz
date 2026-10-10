@@ -65,6 +65,8 @@ export interface MiseAJour {
 	telecharger(): Promise<boolean>;
 	surFocus(): void;
 	arreter(): void;
+	/** The last install did not land (`expected-update.ts`): the logo menu says so until a retry downloads. */
+	signalerInachevee(): void;
 }
 
 export function creerMiseAJour(deps: {
@@ -199,6 +201,7 @@ export function creerMiseAJour(deps: {
 			return true;
 		},
 		installationArmee: () => armee,
+		signalerInachevee: () => appliquer({ type: "unfinished" }),
 		tailles: () => tailles,
 		installerArmee() {
 			autoUpdater.quitAndInstall(true, true);

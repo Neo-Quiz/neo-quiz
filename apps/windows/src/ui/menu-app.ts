@@ -18,7 +18,7 @@ import type { EntreeMenu } from "./menu-app-arbre";
 import { poserIcone } from "../host/ui";
 import { t } from "../../../../src/i18n";
 import type { EtatMiseAJour } from "../../electron/pont";
-import { installerMiseAJour, majEnVue, suivreMiseAJour, tailleTelechargement, type ResultatVerification } from "./mise-a-jour";
+import { installerMiseAJour, majEnVue, majInachevee, suivreMiseAJour, tailleTelechargement, type ResultatVerification } from "./mise-a-jour";
 
 export interface ActionsMenu {
 	version: string;
@@ -146,11 +146,23 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 					t("app.update.btn.waiting", { version: deps.version }),
 					t("app.update.btn.progress", { version: deps.version, percent: "100" }),
 					t("app.update.btn.install", { version: deps.version }), t("app.update.btn.download", { version: deps.version }),
-					t("app.update.installing"),
+					t("app.update.installing"), t("app.update.btn.unfinished"),
 				]) ajouter(verifierTexte, "span", "nq-menu-verifier-mesure", texte).setAttribute("aria-hidden", "true");
 				let etatMaj: EtatMiseAJour = { phase: "inactif" };
 				verifier.addEventListener("click", () => {
 					if (majEnDirect) {
+						/* The last install did not finish: this click checks again,
+						   and a found version downloads (the retry), shown live. */
+						if (majInachevee(etatMaj)) {
+							if (verifier.disabled) return;
+							verifier.disabled = true;
+							verifierLibelle.textContent = t("app.update.btn.checking");
+							void deps.verifier().catch(() => undefined).finally(() => {
+								verifier.disabled = false;
+								peindreMaj(etatMaj, entree.checkLabel, verifier, verifierIcone, verifierLibelle, true);
+							});
+							return;
+						}
 						/* Downloading: nothing to do but wait. Ready, or held by a
 						   metered connection: this click installs / downloads. */
 						if (etatMaj.phase === "telechargement" || verifier.disabled) return;
@@ -282,7 +294,21 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 	    an "Install" in the accent colour, a version held by a metered
 	    connection a "Download". Any other state gives the row back to "Check
 	    for updates", unless a check cycle is still showing its outcome. */
-	function peindreMaj(e: EtatMiseAJour, libelleRepos: string, bouton: HTMLButtonElement, icone: HTMLElement, libelle: HTMLElement): void {
+	function peindreMaj(e: EtatMiseAJour, libelleRepos: string, bouton: HTMLButtonElement, icone: HTMLElement, libelle: HTMLElement, force = false): void {
+		if (majInachevee(e)) {
+			if (bouton.disabled && !force) return; // a retry check is running: its label stays
+			majEnDirect = true;
+			window.clearTimeout(minuteurResultat);
+			if (bouton.dataset.maj !== "inachevee" || !icone.firstChild) {
+				icone.replaceChildren();
+				poserIcone(icone, "circle-alert");
+			}
+			bouton.dataset.maj = "inachevee";
+			bouton.dataset.etat = "maj";
+			bouton.removeAttribute("aria-disabled");
+			libelle.textContent = t("app.update.btn.unfinished");
+			return;
+		}
 		if (!majEnVue(e)) {
 			if (!majEnDirect) return;
 			majEnDirect = false;

@@ -60,6 +60,7 @@ import { jetonDansArguments } from "./moodle/pur";
 import { origineSite } from "./moodle/garde";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
+import { expectedUpdateOutcome } from "./expected-update";
 import type { MiseAJour } from "./mise-a-jour";
 import { creerReglages } from "./reglages";
 import type { Reglages } from "./reglages";
@@ -133,6 +134,8 @@ function etatFenetre(): EtatFenetre {
 
 let fenetre: BrowserWindow | null = null;
 let reglages: Reglages | null = null;
+/** Settings key of the version the last update install expected (the safety net, `expected-update.ts`). */
+const CLE_MAJ_ATTENDUE = "majAttendue";
 /** Le chemin absolu du dossier de quiz par défaut (tranche 9), posé une fois
     au démarrage — le canal `systeme.dossierDefaut` le sert tel quel. */
 let dossierDefaut = "";
@@ -794,6 +797,14 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);
 			},
 		});
+		/* THE SAFETY NET (2026-10-10): the version the last install expected
+		   (written in `window-all-closed` below). Still older: the update did
+		   not finish, and the logo menu says so. Reached or passed: cleared. */
+		{
+			const issue = expectedUpdateOutcome(await reglagesOuErreur().lire(CLE_MAJ_ATTENDUE).catch(() => undefined), app.getVersion());
+			if (issue === "unfinished") miseAJour.signalerInachevee();
+			else if (issue === "landed") await reglagesOuErreur().supprimer(CLE_MAJ_ATTENDUE).catch(() => undefined);
+		}
 		/* The code sandbox (task 3, `./code-sandbox.ts`): a hidden window,
 		   created here and closed with the main window (see `fenetre.on
 		   ("closed", …)` above). `dist-electron/code` carries the files
@@ -1016,7 +1027,10 @@ app.on("window-all-closed", () => {
 	   `resources/syncthing/syncthing.exe` would keep the installer from
 	   replacing the install folder. */
 	const arretSync = sync ? sync.arreter().catch(() => undefined) : Promise.resolve();
-	void Promise.all([lancerFenetreMaj(armee.etat().version ?? "", currentLang(), armee.tailles()), arretSync]).finally(() => armee.installerArmee());
+	/* The version this install must land, read back at the next start (the safety net). */
+	const attendue = armee.etat().version;
+	const note = attendue && reglages ? reglages.ecrire(CLE_MAJ_ATTENDUE, attendue).catch(() => undefined) : Promise.resolve();
+	void Promise.all([lancerFenetreMaj(attendue ?? "", currentLang(), armee.tailles()), arretSync, note]).finally(() => armee.installerArmee());
 });
 /* Any other way out: stop the embedded Syncthing first (it asks the process to
    shut down, then kills it after a few seconds), THEN quit for real. Without

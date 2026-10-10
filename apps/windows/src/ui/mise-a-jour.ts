@@ -97,9 +97,15 @@ function detailTaille(recus: number | null | undefined, total: number | null | u
 }
 
 /** True while the menu has something to say on its own: a version downloads,
-    waits for a click (metered connection) or is ready to install. */
+    waits for a click (metered connection) or is ready to install, or the last
+    install did not finish (the safety net, `electron/expected-update.ts`). */
 export function majEnVue(e: EtatMiseAJour): boolean {
-	return e.phase === "telechargement" || e.phase === "prete" || (e.phase === "disponible" && e.limitee === true);
+	return e.phase === "telechargement" || e.phase === "prete" || (e.phase === "disponible" && e.limitee === true) || majInachevee(e);
+}
+
+/** The last install restarted the app on an older version. */
+export function majInachevee(e: EtatMiseAJour): boolean {
+	return e.phase === "erreur" && e.message === "unfinished";
 }
 
 /** Follows the update state (one bridge subscription for the whole window). */
@@ -129,7 +135,7 @@ export function monterPointLogo(logo: HTMLElement): () => void {
 	const desabonner = abonner(e => {
 		const visible = majEnVue(e);
 		logo.classList.toggle("has-maj", visible);
-		logo.classList.toggle("is-maj-prete", e.phase === "prete");
+		logo.classList.toggle("is-maj-prete", e.phase === "prete" || majInachevee(e));
 	});
 	return () => { desabonner(); point.remove(); logo.classList.remove("has-maj", "is-maj-prete"); };
 }

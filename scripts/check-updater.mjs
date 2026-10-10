@@ -96,6 +96,20 @@ await withSrcModule("apps/windows/electron/mise-a-jour-etat.ts", ({ ETAT_INITIAL
 		transition({ phase: "prete", version: "2.5.2" }, { type: "error", message: "x" }),
 		{ phase: "prete", version: "2.5.2" });
 
+	/* THE SAFETY NET in the state machine (2026-10-10): "the update did not
+	   finish" stays on screen through the checks of the start (a check that
+	   finds nothing, or fails, must not erase it), and gives way only when a
+	   version starts downloading again: that download IS the retry. */
+	const inachevee = { phase: "erreur", message: "unfinished" };
+	r.check("unfinished: an error state the menu can name",
+		transition(ETAT_INITIAL, { type: "unfinished" }), inachevee);
+	r.check("unfinished survives the check of the start",
+		[transition(inachevee, { type: "checking-for-update" }), transition(inachevee, { type: "update-not-available" }), transition(inachevee, { type: "error", message: "x" })],
+		[inachevee, inachevee, inachevee]);
+	r.check("unfinished gives way to a new download (the retry)",
+		transition(inachevee, { type: "update-available", version: "2.5.3" }),
+		{ phase: "telechargement", version: "2.5.3", pourcent: 0, octetsRecus: null, octetsTotal: null });
+
 	/* Le cliquet : aucune transition ne rend un état porteur d'un drapeau
 	   `auto`, sur aucun chemin. */
 	const tous = [
@@ -109,5 +123,18 @@ await withSrcModule("apps/windows/electron/mise-a-jour-etat.ts", ({ ETAT_INITIAL
 	];
 	r.check("aucun état ne porte de drapeau « auto »", tous.some(e => "auto" in e), false);
 
+	r.done();
+});
+
+/* THE SAFETY NET (2026-10-10): an update that restarts the app on an older
+   version than the one it installed is named, never silent. */
+await withSrcModule("apps/windows/electron/expected-update.ts", ({ expectedUpdateOutcome, compareVersions }) => {
+	const r = makeReporter("Update safety net");
+	r.check("nothing expected", expectedUpdateOutcome(undefined, "1.21.0"), "none");
+	r.check("garbage expected is none", [expectedUpdateOutcome(42, "1.21.0"), expectedUpdateOutcome("x.y", "1.21.0")], ["none", "none"]);
+	r.check("running older than expected: unfinished", expectedUpdateOutcome("1.21.1", "1.21.0"), "unfinished");
+	r.check("running the expected version: landed", expectedUpdateOutcome("1.21.1", "1.21.1"), "landed");
+	r.check("running newer: landed", expectedUpdateOutcome("1.21.1", "1.22.0"), "landed");
+	r.check("numeric, not lexical", compareVersions("1.20.10", "1.20.9"), 1);
 	r.done();
 });

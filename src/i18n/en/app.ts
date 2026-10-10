@@ -92,6 +92,8 @@ export const EN_APP = {
 	"app.update.btn.progress": "v{version} · {percent} %",
 	"app.update.btn.install": "Install v{version}",
 	"app.update.btn.download": "Download v{version}",
+	/* The last install restarted the app on an older version (the safety net); a click checks again. */
+	"app.update.btn.unfinished": "Update did not finish, try again",
 	"app.update.btn.failed": "Check failed",
 	"app.update.btn.devBuild": "Dev build",
 	/* La fenêtre qui reste à l'écran pendant que NSIS travaille, lancée

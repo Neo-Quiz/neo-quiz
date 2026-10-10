@@ -49,12 +49,20 @@ export type EvenementMiseAJour =
 	| { type: "update-not-available" }
 	| { type: "download-progress"; percent: number; transferred?: number; total?: number }
 	| { type: "update-downloaded"; version: string }
-	| { type: "error"; message: string };
+	| { type: "error"; message: string }
+	/** The app restarted on an older version than the one it installed (`expected-update.ts`). */
+	| { type: "unfinished" };
 
 export const ETAT_INITIAL: EtatMiseAJour = { phase: "inactif" };
 
+/** "The update did not finish": kept through the checks of the start, until a download (the retry) begins. */
+const estInachevee = (e: EtatMiseAJour): boolean => e.phase === "erreur" && e.message === "unfinished";
+
 export function transition(etat: EtatMiseAJour, ev: EvenementMiseAJour): EtatMiseAJour {
+	if (estInachevee(etat) && (ev.type === "checking-for-update" || ev.type === "update-not-available" || ev.type === "error")) return etat;
 	switch (ev.type) {
+		case "unfinished":
+			return { phase: "erreur", message: "unfinished" };
 		case "checking-for-update":
 			return { phase: "verification" };
 		case "update-available":
