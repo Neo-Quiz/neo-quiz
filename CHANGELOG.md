@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.71] - 2026-10-10
+
 ### Changed
 
 - Updates now live in the menu of the Neo Quiz logo: it shows the download, then installs the new version; a dot on the logo says one is on the way. The update button at the bottom of the sidebar is gone.
