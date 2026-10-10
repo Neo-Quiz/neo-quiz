@@ -28,7 +28,11 @@ import { currentHost, requireHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { LOG_PREFIX } from "../../../../src/branding";
 import { createAiClient } from "../../../../src/dashboard/ai-client";
-import type { AiClient, ChatTurn } from "../../../../src/dashboard/ai-client";
+import type { AiClient, ChatTurn, ImagePayload } from "../../../../src/dashboard/ai-client";
+import { ouvrirMenuPlus } from "../../../../src/dashboard/composer-plus";
+import { attachMentionPicker } from "../../../../src/dashboard/mention-picker";
+import { creerJointesExplain } from "./explain-jointes";
+import type { JointesExplain } from "./explain-jointes";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import * as aiProviders from "../../../../src/dashboard/ai-providers";
 import { openEffortSlider, openModelMenu, openProviderMenu } from "../../../../src/dashboard/ui-select";
@@ -293,6 +297,9 @@ function maReponse(slide: HTMLElement): string {
 interface Message {
 	role: "user" | "assistant";
 	text: string;
+	/** The learner's pictures (object URLs) and documents (names) sent with this message. */
+	images?: string[];
+	documents?: string[];
 	modele?: string;
 	/** The provider that answered: its logo stays when another is picked later. */
 	fournisseur?: string;
@@ -339,6 +346,14 @@ interface Conversation {
 	lecture: boolean;
 	/** The question was changed (or put back) since the context was built. */
 	perime?: boolean;
+	/** What the learner attached and has not sent yet (the composer's cards). */
+	jointes: JointesExplain;
+	/** Repaints the composer's cards; null while the window is closed. */
+	peindrePieces: (() => void) | null;
+	/** The learner's pictures sent so far: they go with EVERY message (the CLI keeps nothing between two). */
+	imagesEleve: { payload: ImagePayload; nom: string }[];
+	/** The object URLs shown in the bubbles, revoked when the quiz page goes. */
+	urls: string[];
 }
 
 export function monterBoutonExpliquer(hote: HTMLElement, deps: {
@@ -653,7 +668,11 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const conversationDe = (qi: number): Conversation => {
 		let c = conversations.get(qi);
 		if (!c) {
-			c = { messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, contexte: "", repeindre: null, lecture: questions[qi]?.role === "read" };
+			const nouvelle: Conversation = {
+				messages: [], historique: [], client: createAiClient(deps.settings), enCours: false, contexte: "", repeindre: null, lecture: questions[qi]?.role === "read",
+				jointes: creerJointesExplain({ rendre: () => nouvelle.peindrePieces?.() }), peindrePieces: null, imagesEleve: [], urls: [],
+			};
+			c = nouvelle;
 			conversations.set(qi, c);
 		}
 		return c;
@@ -673,6 +692,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const conv = conversationDe(qi);
 		conv.contexte = contexte;
 		let horloge = 0;
+		let detacherMentions: (() => void) | null = null;
 		let ligneForfait: UsageLine | null = null;
 		const handle = requireHost("modals").open({
 			className: "nq-explain-modal",
@@ -680,15 +700,24 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			onOpen: (m) => {
 				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
 				monterPanneau(m.panelEl, texteQuestion(questions[qi]));
-				/* The Generate page's composer, as is (dashboard-ai.css): same frame, same bottom
-				   row, same send button. No attachments and no folder row here. */
+				/* The Generate page's composer, as is (dashboard-ai.css): same frame,
+				   same bottom row, same send button, same "+" and attachment cards
+				   (explain-jointes.ts). No folder row here. */
 				const composer = ajouter(m.contentEl, "div", "qbd-ai-composer nq-explain-composer");
 				const zone = ajouter(composer, "div", "qbd-ai-composer-textzone");
+				// The learner's cards (pictures, documents), above the field as on the Generate page.
+				const piecesZone = ajouter(zone, "div", "qbd-ai-composer-pieces");
 				const champ = ajouter(zone, "textarea", "qbd-ai-composer-input");
 				champ.rows = 1;
 				champ.placeholder = t("ai.explain.ownQuestion");
 				const majPlaceholder = (): void => { champ.placeholder = t(conv.messages.length ? "ai.explain.followUp" : "ai.explain.ownQuestion"); };
 				const pied = ajouter(composer, "div", "qbd-ai-composer-bottom");
+				// "+" on the left, as on the Generate page: add files, mention with "@".
+				const ajout = ajouter(pied, "button", "qbd-ai-composer-add");
+				ajout.type = "button";
+				ajout.setAttribute("aria-label", t("ai.composer.addContent"));
+				host.ui.setIcon(ajout, "plus");
+				ajout.addEventListener("click", () => ouvrirMenuPlus(ajout, { raccourci: "", ajouterFichiers: () => conv.jointes.choisirFichiers(), champ }));
 				const outils = ajouter(pied, "div", "qbd-ai-composer-tools");
 				const fournisseurBtn = ajouter(outils, "button", "qbd-select qbd-provider-trigger-logo");
 				fournisseurBtn.type = "button";
@@ -739,7 +768,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					peindreLogoBouton();
 				};
 				const majEnvoi = (): void => {
-					const contenu = !!champ.value.trim();
+					const contenu = !!champ.value.trim() || !conv.jointes.vide();
 					envoi.replaceChildren();
 					envoi.classList.toggle("qbd-ai-composer-send--stop", conv.enCours);
 					host.ui.setIcon(ajouter(envoi, "span", "qbd-ai-composer-send-icon"), conv.enCours ? "square" : "arrow-up");
@@ -747,11 +776,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					/* Hidden by default (dashboard-ai.css): shown with something to send,
 					   and as the stop square while an answer runs. */
 					envoi.classList.toggle("is-visible", conv.enCours || contenu);
-					envoi.disabled = !conv.enCours && !contenu;
+					// A PDF still being read (or unreadable) holds the message back, and says why.
+					envoi.disabled = !conv.enCours && (!contenu || !conv.jointes.pret());
 					envoi.classList.toggle("qbd-ai-composer-send--disabled", envoi.disabled);
+					envoi.title = !conv.enCours && !conv.jointes.pret() ? t("ai.attach.reading") : "";
 				};
 				peindreOutils();
 				majEnvoi();
+				conv.peindrePieces = () => { if (!composer.isConnected) return; conv.jointes.peindre(piecesZone); majEnvoi(); };
+				conv.peindrePieces();
 				void detecterDefaut().then(() => { if (fournisseurBtn.isConnected) peindreOutils(); });
 				fournisseurBtn.addEventListener("click", () => {
 					const masques = deps.settings.get().aiCanauxPayantsMasques;
@@ -926,6 +959,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				/* THE HISTORY, painted from the conversation. Only the last answer
 				   changes while it is written; every message is repainted with it,
 				   which is cheap at the length of these conversations. */
+				/* The bubbles' pictures, kept from one repaint to the next: the history is
+				   repainted at every chunk of an answer, a new <img> each time would flicker. */
+				const vignettes = new Map<string, HTMLImageElement>();
 				const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
 				const peindreFil = (): void => {
 					// No message yet: the composer sits in the middle of the window, and drops to the bottom at the first one.
@@ -935,6 +971,22 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					for (const msg of conv.messages) {
 						if (msg.role === "user") {
 							const bloc = ajouter(fil, "div", "nq-explain-msg-user");
+							if (msg.images?.length || msg.documents?.length) {
+								const pj = ajouter(bloc, "div", "nq-explain-msg-pieces");
+								for (const url of msg.images ?? []) {
+									let img = vignettes.get(url);
+									if (!img) {
+										img = document.createElement("img");
+										img.className = "nq-explain-msg-image";
+										img.alt = "";
+										img.src = url;
+										vignettes.set(url, img);
+									}
+									pj.append(img);
+								}
+								// The whole name, extension included: the type of a file always shows.
+								for (const nom of msg.documents ?? []) ajouter(pj, "span", "nq-explain-msg-doc", nom);
+							}
 							if (msg.text) ajouter(bloc, "div", "qbd-ai-bulle nq-explain-demande", msg.text);
 							continue;
 						}
@@ -998,7 +1050,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const envoyer = async (): Promise<void> => {
 					if (conv.enCours) return;
 					const perso = champ.value.trim();
-					if (!perso) return;
+					if (!perso && conv.jointes.vide()) return;
+					if (!conv.jointes.pret()) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
 					champ.value = "";
 					champ.style.height = "auto";
@@ -1006,8 +1059,16 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (deps.settings.get().aiProvider !== courant) await choisirFournisseur(courant);
 					// Ollama: the model shown here (a default chosen by the window) is the one that answers.
 					else if (courant === "ollama" && deps.settings.get().aiModel !== modeleCourant()) await deps.settings.save({ aiModel: modeleCourant() });
-					conv.historique.push({ role: "user", text: perso });
-					conv.messages.push({ role: "user", text: perso });
+					const prises = await conv.jointes.prendre(conv.imagesEleve.length);
+					prises.images.forEach((payload, i) => conv.imagesEleve.push({ payload, nom: prises.nomsImages[i] }));
+					conv.urls.push(...prises.urls);
+					/* What the model reads (never shown): the learner's text, the names of
+					   the pictures just attached, the documents' text. */
+					const pourModele = (perso || "Look at what I attached and help me understand it.")
+						+ (prises.nomsImages.length ? "\n\n(Pictures I attached: " + prises.nomsImages.join(", ") + ")" : "")
+						+ (prises.texte ? "\n\n=== DOCUMENTS I ATTACHED ===\n" + prises.texte : "");
+					conv.historique.push({ role: "user", text: pourModele });
+					conv.messages.push({ role: "user", text: perso, images: prises.urls, documents: prises.nomsDocuments });
 					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true, lecture: !coursPret };
 					conv.messages.push(rep);
 					conv.enCours = true;
@@ -1019,14 +1080,17 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						/* A rewritten card changes what the model must see: rebuilt from the current questions. */
 						if (conv.lecture) conv.contexte = contexteDe(null, qi) ?? conv.contexte;
 						else if (conv.perime) { conv.contexte = contexteDe(elementDe(qi), qi) ?? conv.contexte; conv.perime = false; }
-						const images = lu.nomsImages.length
-							? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + lu.nomsImages.map((n, i) => `${i + 1}. ${n}`).join("; ")
-							: "";
+						/* The course's pictures, then EVERY picture the learner sent in this
+						   conversation: the CLI keeps nothing between two messages. */
+						const nomsTous = [...lu.nomsImages, ...conv.imagesEleve.map(i => i.nom)];
+						const images = nomsTous.length
+						? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + nomsTous.map((n, i) => `${i + 1}. ${n}`).join("; ")
+						: "";
 						const reponse = await conv.client.chat(conv.historique, {
 							style: "explain",
 							context: conv.contexte + (lu.texte ? "\n\n=== COURSE ===\n" + lu.texte : "") + images,
-							images: lu.images,
-							imageNames: lu.nomsImages,
+							images: [...lu.images, ...conv.imagesEleve.map(i => i.payload)],
+							imageNames: nomsTous,
 							/* A reading card may come back whole in a `<card-edit>` block, on top of the explanation. */
 							maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (conv.lecture ? CARD_EDIT_MAX_CHARS + 400 : deps.recharger ? QUESTION_EDIT_ROOM : 0),
 							onTranscript: (ev) => {
@@ -1057,7 +1121,28 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					champ.style.height = Math.min(champ.scrollHeight, 160) + "px";
 					majEnvoi();
 				});
+				/* Ctrl+V of a screenshot: the pictures become cards; a text paste is left alone. */
+				champ.addEventListener("paste", (e) => {
+					const fichiers = Array.from(e.clipboardData?.files ?? []).filter(f => f.type.startsWith("image/"));
+					if (!fichiers.length) return;
+					e.preventDefault();
+					void conv.jointes.ajouterFichiers(fichiers);
+				});
+				/* "@": the Generate page's file picker (vault notes, PDFs, pictures, extra folders). */
+				const mentions = attachMentionPicker(champ, composer, {
+					onPickVaultFile: (path) => { void conv.jointes.joindreChemin(path, "vault"); },
+					onPickExternalFile: (path) => { void conv.jointes.joindreChemin(path, "external"); },
+					onTextReplaced: () => {
+						champ.style.height = "auto";
+						champ.style.height = Math.min(champ.scrollHeight, 160) + "px";
+						majEnvoi();
+					},
+					getExtraRoots: () => deps.settings.get().aiMentionExtraFolders || [],
+				});
+				detacherMentions = () => mentions.detach();
 				champ.addEventListener("keydown", (e) => {
+					// The "@" menu has the keyboard while open: its Enter picks a file, it never sends.
+					if (e.defaultPrevented || mentions.isOpen()) return;
 					if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
 					e.preventDefault();
 					void envoyer();
@@ -1069,7 +1154,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				champ.focus();
 			},
 			// Closing the window keeps the conversation; only the painting stops.
-			onClose: () => { if (fenetre === handle) fenetre = null; demonterPanneau(); window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
+			onClose: () => { if (fenetre === handle) fenetre = null; demonterPanneau(); window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; detacherMentions?.(); detacherMentions = null; conv.peindrePieces = null; },
 		});
 		fenetre = handle;
 	}
@@ -1077,7 +1162,13 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	return () => {
 		if (fenetre) fermerSansMouvement(fenetre);
 		observateur.disconnect();
-		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
+		for (const c of conversations.values()) {
+			if (c.enCours) c.client.abort();
+			c.repeindre = null;
+			c.peindrePieces = null;
+			c.jointes.liberer();
+			for (const u of c.urls) URL.revokeObjectURL(u);
+		}
 		boutonQuiz.remove();
 	};
 }

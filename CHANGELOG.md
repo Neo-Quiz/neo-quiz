@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Explain panel: paste a screenshot with Ctrl+V, attach files with the + button, name a file with @.
+
 ### Fixed
 
 - The Explain panel shows its send arrow again, and its stop button while an answer is written.

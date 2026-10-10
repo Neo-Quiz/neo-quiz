@@ -646,3 +646,25 @@ body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo s
 	-webkit-mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 48px), transparent);
 	mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 48px), transparent);
 }
+
+/* The learner's pictures and documents, above their message (explain-jointes.ts). */
+.nq-explain-msg-pieces {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 6px;
+}
+.nq-explain-msg-image {
+	width: 72px;
+	height: 72px;
+	object-fit: cover;
+	border-radius: 10px;
+	border: 1px solid var(--background-modifier-border);
+}
+.nq-explain-msg-doc {
+	padding: 4px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	font-size: 12.5px;
+	overflow-wrap: anywhere;
+}
