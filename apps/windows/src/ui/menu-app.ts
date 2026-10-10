@@ -207,7 +207,8 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 				rangee.append(verifier, depot);
 				lignes.push(verifier);
 				/* Claude Code and Codex update themselves (2026-10-10): a row only
-				   while one updates, failed, or waits for a click (metered). */
+				   when one needs the user, i.e. it failed or waits for a click
+				   (metered). A running update stays silent (asked the same day). */
 				const zoneCli = ajouter(panneau, "div", "nq-menu-cli");
 				desabonnerCli();
 				desabonnerCli = suivreMajCli(etats => peindreCli(zoneCli, etats));
@@ -361,8 +362,9 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		}
 	}
 
-	/** One row per CLI update to show; empty (and hidden) otherwise. */
-	function peindreCli(zone: HTMLElement, etats: EtatMajCli[]): void {
+	/** One row per CLI update that needs the user; empty (and hidden) otherwise. */
+	function peindreCli(zone: HTMLElement, tous: EtatMajCli[]): void {
+		const etats = tous.filter(e => e.phase !== "en-cours");
 		zone.replaceChildren();
 		zone.hidden = etats.length === 0;
 		for (const e of etats) {
@@ -370,13 +372,11 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			b.type = "button";
 			b.dataset.phase = e.phase;
 			setBrandLogo(ajouter(b, "span", "nq-menu-cli-logo"), e.logo);
-			ajouter(b, "span", "nq-menu-cli-texte",
-				e.phase === "en-cours" ? t("app.cliUpdate.running", { name: e.nom, version: e.derniere })
-					: e.phase === "echec" ? t("app.cliUpdate.failed", { name: e.nom })
-						: t("app.cliUpdate.metered", { name: e.nom, version: e.derniere }));
+			ajouter(b, "span", "nq-menu-cli-texte", e.phase === "echec"
+				? t("app.cliUpdate.failed", { name: e.nom })
+				: t("app.cliUpdate.metered", { name: e.nom, version: e.derniere }));
 			if (e.phase === "echec" && e.raison) b.setAttribute("aria-description", e.raison);
-			if (e.phase === "en-cours") { b.disabled = true; b.setAttribute("aria-busy", "true"); }
-			else b.addEventListener("click", () => relancerMajCli(e.outil));
+			b.addEventListener("click", () => relancerMajCli(e.outil));
 		}
 	}
 

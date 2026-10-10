@@ -142,7 +142,8 @@ export function monterPointLogo(logo: HTMLElement): () => void {
 		logo.classList.toggle("is-maj-prete", e.phase === "prete" || majInachevee(e));
 		peindre();
 	});
-	const desabonnerCli = suivreMajCli(etats => { cli = etats.length > 0; peindre(); });
+	/* A running CLI update is silent: the dot only for one that needs the user. */
+	const desabonnerCli = suivreMajCli(etats => { cli = etats.some(e => e.phase !== "en-cours"); peindre(); });
 	return () => { desabonner(); desabonnerCli(); point.remove(); logo.classList.remove("has-maj", "is-maj-prete"); };
 }
 

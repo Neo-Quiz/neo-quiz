@@ -69,7 +69,6 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.update.btn.install": "Installer la v{version}",
 	"app.update.btn.download": "Télécharger la v{version}",
 	"app.update.btn.unfinished": "Mise à jour inachevée, réessayer",
-	"app.cliUpdate.running": "Mise à jour de {name} vers {version}…",
 	"app.cliUpdate.failed": "Mise à jour de {name} impossible, réessayer",
 	"app.cliUpdate.metered": "Mettre à jour {name} vers {version}",
 	"app.update.btn.failed": "Vérification impossible",
