@@ -21,6 +21,7 @@ release notes.
 
 ### Changed
 
+- A quiz page no longer shows the Learn / Test switch; each quiz opens from its own card.
 - Backspace and Delete no longer remove the attachments of the composer; only their × button does.
 - A request you sent and ran on this device no longer shows a "this device" origin line.
 - An image from the web in a generated quiz now shows as a plain link and is never loaded; images from your folder still show.

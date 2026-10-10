@@ -1,5 +1,4 @@
 import { currentHost } from "../host/current";
-import { placerIndicateur, DUREE_GLISSEMENT } from "./seg-indic";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import { mathifyElement } from "../engine/mathjax";
@@ -81,7 +80,7 @@ export type AutresModes = Array<{ mode: ModeQuiz; open(): void }>;
 
 /* L'état de la barre, gardé entre deux repeints du MÊME quiz (la page se
    repeint sur des événements extérieurs) ; remis à zéro sur un autre quiz. */
-const etat = { chemin: "", recherche: "", fondu: false };
+const etat = { chemin: "", recherche: "" };
 
 function icone(parent: HTMLElement, name: string, cls = "qbd-fiche-i"): HTMLElement {
 	const el = ajouter(parent, "span", cls);
@@ -94,10 +93,6 @@ function texte(parent: HTMLElement, tag: "p" | "span", cls: string, value: strin
 	const el = ajouter(parent, tag, cls, value);
 	if (value.includes("$")) void mathifyElement(el);
 	return el;
-}
-
-function reduit(): boolean {
-	return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** Oublie la recherche : appelée par la page à
@@ -168,52 +163,9 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 		});
 		return el;
 	};
-	const autres = (deps.autresModes ?? []).filter(a => a.mode !== deps.quiz.mode);
-	if (autres.length > 0) {
-		const choix = ajouter(chips, "div", "qbd-fiche-modes");
-		choix.setAttribute("role", "group");
-		/* Le bloc qui glisse, comme dans la page « Générer » (2026-09-25) : au
-		   clic, il glisse vers l'autre mode pendant que les questions
-		   s'effacent, PUIS sa fiche s'ouvre et les siennes apparaissent. */
-		const indic = ajouter(choix, "div", "qbd-fiche-mode-indic");
-		// The course's modes, in their order (Learn, Practice, Exam).
-		const ordre: readonly ModeQuiz[] = ["learn", "practice", "exam"];
-		const presents = ordre.filter(m => m === deps.quiz.mode || autres.some(a => a.mode === m));
-		const segs = presents.map(m => {
-			const actif = m === deps.quiz.mode;
-			const seg = pastilleMode(choix, m, "qbd-fiche-mode-seg" + (actif ? " is-active" : ""), "button");
-			(seg as HTMLButtonElement).type = "button";
-			seg.setAttribute("aria-pressed", actif ? "true" : "false");
-			return { actif, seg, open: autres.find(a => a.mode === m)?.open };
-		});
-		const courant = segs.find(s => s.actif)!.seg;
-		requestAnimationFrame(() => placerIndicateur(indic, courant, false));
-		/* ONE flag for every segment: with three modes, clicking a second one
-		   during the slide would open two quizzes. */
-		let parti = false;
-		for (const { actif, seg, open } of segs) {
-			if (actif || !open) continue;
-			seg.addEventListener("click", () => {
-				if (parti) return;
-				parti = true;
-				courant.classList.remove("is-active");
-				seg.classList.add("is-active");
-				placerIndicateur(indic, seg, true);
-				const sansAnim = reduit();
-				if (!sansAnim) {
-					etat.fondu = true;
-					// The questions are in the page's body, not in this header row.
-					(root.closest(".qbd-qz") ?? document).querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
-						[{ opacity: 1 }, { opacity: 0 }],
-						{ duration: DUREE_GLISSEMENT, easing: "ease-out", fill: "forwards" },
-					));
-				}
-				window.setTimeout(() => open(), sansAnim ? 0 : DUREE_GLISSEMENT);
-			});
-		}
-	} else {
-		pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip qbd-fiche-mode", "span");
-	}
+	/* Only the quiz's own mode: the Learn / Test switch between a course's
+	   quizzes was removed (2026-10-10); each quiz opens from its own card. */
+	pastilleMode(chips, deps.quiz.mode, "qbd-fiche-chip qbd-fiche-mode", "span");
 	const count = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-count");
 	renderQuizTypeIcon(count, deps.quiz.quizType);
 	ajouter(count, "span", undefined, t(deps.quiz.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: deps.quiz.questions }));
@@ -379,12 +331,6 @@ function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): ()
 			return;
 		}
 		renderGrille(body, idx, deps, attirer);
-		if (etat.fondu) {
-			etat.fondu = false;
-			body.querySelectorAll<HTMLElement>(".qbd-fiche-q").forEach(c => c.animate(
-				[{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 60, easing: "ease-out", fill: "backwards" },
-			));
-		}
 	}
 	peindre();
 	return peindre;
