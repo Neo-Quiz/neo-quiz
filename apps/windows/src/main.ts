@@ -660,7 +660,13 @@ async function demarrer(): Promise<void> {
 		/* This PC's device file (name, kind, Claude models): written at start and
 		   only when its content changes; `check()` is a local comparison, so the
 		   60 s pass below costs no write while nothing changed. */
-		const devicePublisher = estMobile() ? null : createDevicePublisher({
+		/* Only the INSTALLED app announces itself (2026-10-10). A test instance
+		   (`electron dist-electron/main.cjs --user-data-dir=<temp>`) gets a fresh
+		   device id with every profile and published itself as one more PC: the
+		   phone's device list showed this computer's name eight times. The
+		   installed app loads its page from inside `app.asar`. */
+		const appInstallee = location.pathname.includes("/app.asar/");
+		const devicePublisher = estMobile() || !appInstallee ? null : createDevicePublisher({
 			device: idAppareil,
 			info: async () => (await pont().appareil?.infos().catch(() => null)) ?? null,
 			models: () => claudeModelsOffered(),
