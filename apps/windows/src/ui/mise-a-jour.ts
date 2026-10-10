@@ -5,7 +5,7 @@
    shows it: the "about" row of the application menu opened by the logo
    (2026-10-10). It checks, shows the download, and installs; the logo only
    carries a dot. The rail's own update button is gone. Settings showed a
-   second one until 2026-09-17. On the phone: a banner and a Settings row.
+   second one until 2026-09-17. On the phone: the Settings row only.
 
    This module imports nothing that pulls in Node: `EtatMiseAJour` is a type,
    `pont()` reads `window.neo` when called.
@@ -135,12 +135,14 @@ export function monterPointLogo(logo: HTMLElement): () => void {
 }
 
 /* ══════════════════════════════════════════════════════════
-   ANDROID: the banner and the Settings row of the in-app updater
+   ANDROID: the Settings row of the in-app updater
 
    Same channels as the desktop menu row (`miseAJour.*`), answered in Kotlin by
-   `update/UpdateEngine.kt`. A check never downloads: the banner offers
+   `update/UpdateEngine.kt`. A check never downloads: the row offers
    "Install", and only that tap starts the download (no data spent without
-   it). `message` of an error state is a CODE the page translates.
+   it). Everything about updates happens in Settings on the phone
+   (2026-10-10): the banner above the bottom bar is gone. `message` of an
+   error state is a CODE the page translates.
 ══════════════════════════════════════════════════════════ */
 
 /** The sentence under an error / permission state, or null when there is none. */
@@ -149,43 +151,6 @@ function texteEtat(e: EtatMiseAJour): string | null {
 	if (e.phase !== "erreur") return null;
 	const code = e.message === "invalid" || e.message === "mismatch" || e.message === "install" ? e.message : "network";
 	return t(`app.update.android.err.${code}` as const);
-}
-
-/**
- * The banner above the bottom bar: "Update available (x.y.z)" with Install, then
- * the progress, then the reason of a failure. Only where the app really offers
- * a version or says something about a tapped install; silent otherwise.
- */
-export function monterBanniereMajAndroid(): () => void {
-	let banniere: HTMLElement | null = null;
-	const retirer = (): void => { banniere?.remove(); banniere = null; };
-	const demonter = abonner(e => {
-		const installer = e.phase === "disponible" || e.phase === "autorisation" || (e.phase === "erreur" && !!e.version);
-		const enCours = e.phase === "telechargement" || e.phase === "prete";
-		if (!installer && !enCours) { retirer(); return; }
-		if (!banniere) {
-			banniere = document.createElement("div");
-			banniere.className = "nq-maj-banniere";
-			banniere.setAttribute("role", "status");
-			document.body.append(banniere);
-		}
-		banniere.textContent = "";
-		const version = e.version ?? "";
-		const texte = ajouter(banniere, "div", "nq-maj-banniere-texte");
-		const titre = e.phase === "telechargement"
-			? t("app.update.android.downloading", { version }) + (typeof e.pourcent === "number" ? " " + e.pourcent + " %" : "")
-			: e.phase === "prete" ? t("app.update.android.ready", { version })
-				: t("app.update.android.available", { version });
-		ajouter(texte, "span", "nq-maj-banniere-titre", titre);
-		const detail = texteEtat(e);
-		if (detail) ajouter(texte, "span", "nq-maj-banniere-detail", detail);
-		if (installer) {
-			const bouton = ajouter(banniere, "button", "nq-maj-banniere-bouton", t("app.update.android.install"));
-			bouton.type = "button";
-			bouton.addEventListener("click", () => { void pont().miseAJour.installer(); });
-		}
-	});
-	return () => { demonter(); retirer(); };
 }
 
 /**

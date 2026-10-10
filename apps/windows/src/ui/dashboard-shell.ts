@@ -70,7 +70,7 @@ import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
-import { monterPointLogo, monterBanniereMajAndroid } from "./mise-a-jour";
+import { monterPointLogo } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
 import { basculerMenuApp } from "./barre-titre";
@@ -1161,10 +1161,8 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	if (!currentHost().platform.isMobile) navEl.prepend(logo);
 	/* Updates live in the application menu (2026-10-10): the logo only
 	   carries a dot while a version downloads or waits to be installed. */
-	const demonterMajRail = currentHost().platform.isMobile ? () => {} : monterPointLogo(logo);
-	// The phone has no rail: its updater speaks through a banner above the bottom bar.
-	const demonterMajBanniere = currentHost().platform.isMobile ? monterBanniereMajAndroid() : () => {};
-	const demonterMaj = (): void => { demonterMajRail(); demonterMajBanniere(); };
+	const demonterMaj = currentHost().platform.isMobile ? () => {} : monterPointLogo(logo);
+	/* The phone shows updates in Settings only (2026-10-10): no banner. */
 	// Synchronise le rail sur la vue persistée (retour d'un quiz sur « Mes
 	// quiz », par exemple) : `createNavHandlers` démarre chaque fois avec son
 	// propre `activeNav` interne à "home".
