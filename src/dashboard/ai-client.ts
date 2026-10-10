@@ -2,7 +2,8 @@ import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
 import { jetonFichier, jetonHome, jetonPieces, jetonSortie, nouveauMarqueur } from "../host/jetons";
-import { ARGS_IMAGES_CLAUDE, ARGS_OUTILS_CLAUDE, optionInconnue } from "../host/claude-outils";
+import { ARGS_IMAGES_CLAUDE, argsAgentClaude, argsAgentCodex, lireModeAgent, optionInconnue } from "../host/claude-outils";
+import type { ModeAgent } from "../host/claude-outils";
 import {
 	resolveClaudeModel,
 	resolveCodexModel, resolveAntigravityModel, antigravityModelId, niveauAntigravity, resolveOllamaSelection,
@@ -554,20 +555,43 @@ const AVEC_OUTILS_GENERATION = `READ-ONLY TOOLS, IN THE QUIZ'S FOLDER — READ T
 /** A generic note for a system prompt that has no "no tools" sentence to replace. */
 const NOTE_OUTILS = "READ-ONLY TOOLS: you run inside the folder of the user's documents, with the tools Read, Grep and Glob. You may read and search the files of this folder and its sub-folders yourself when it helps. You have no tool to write, edit or run anything, and nothing outside this folder can be read: never try.";
 
+/** What the agent may do in the folder, per mode (2026-10-10): the model
+    is told exactly the tools the CLI gives it, so it neither gives up on a
+    tool it has nor tries one it lacks. */
+const POUVOIRS_AGENT: Record<Exclude<ModeAgent, "supervised">, string> = {
+	acceptEdits: "list, read, search and EDIT the files of this folder and its sub-folders (no shell command)",
+	auto: "list, read, search and edit the files of this folder and its sub-folders, and RUN COMMANDS (PowerShell on Windows), each one checked by an automatic reviewer",
+	full: "list, read, search and edit the files of this folder and its sub-folders, and RUN ANY COMMAND (PowerShell on Windows), as in a terminal opened in this folder",
+};
+
+/** The generation paragraph when Claude Code or Codex runs as an AGENT in
+    the quiz's folder (2026-10-10, the owner's decision). */
+function avecAgentGeneration(mode: Exclude<ModeAgent, "supervised">): string {
+	return `TOOLS, IN THE QUIZ'S FOLDER — READ THIS BEFORE ANYTHING ELSE: you are running as an agent inside the folder of this quiz. You MAY ${POUVOIRS_AGENT[mode]} whenever it helps you write a better and more faithful quiz: open a course, a note, a picture, extract the text, the tables or the figures of a PDF, compare with an earlier quiz of the folder. Every source the user request names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers: read it again only for what that text lost (a figure, the layout of a table). The APPLICATION writes the quiz: never create, modify or save the quiz note yourself, never touch the ".neo-quiz" folder, and never delete or move a file. Your ONLY final output is the JSON5 array.`;
+}
+
 /** The "no tools" sentences of the prompts, and what each says instead when
-    Claude Code runs in a trusted folder with read-only tools. */
-const REMPLACEMENTS_OUTILS: ReadonlyArray<readonly [string, string]> = [
-	[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
-	["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
-];
+    the CLI runs in a trusted folder, per mode. */
+function remplacementsOutils(mode: ModeAgent): ReadonlyArray<readonly [string, string]> {
+	if (mode === "supervised") return [
+		[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
+		["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
+	];
+	const note = `TOOLS: you run as an agent inside the folder of the user's documents. You may ${POUVOIRS_AGENT[mode]} when it helps. Never delete or move a file, and never touch the ".neo-quiz" folder.`;
+	return [
+		[SANS_OUTILS_GENERATION, avecAgentGeneration(mode)],
+		["You have no tools: the documents are in the message.", "The documents are in the message. " + note],
+	];
+}
 
 /** The system prompt as Claude Code with read-only tools must read it: its
     "no tools" sentence replaced (by `split`/`join`, never a replacement
     string that a `$` in the text could rewrite), or the note appended. */
-export function consigneAvecOutils(systemPrompt: string): string {
+export function consigneAvecOutils(systemPrompt: string, mode: ModeAgent = "supervised"): string {
 	let out = systemPrompt;
-	for (const [sans, avec] of REMPLACEMENTS_OUTILS) out = out.split(sans).join(avec);
-	return out === systemPrompt ? systemPrompt + "\n\n" + NOTE_OUTILS : out;
+	const remplacements = remplacementsOutils(mode);
+	for (const [sans, avec] of remplacements) out = out.split(sans).join(avec);
+	return out === systemPrompt ? systemPrompt + "\n\n" + remplacements[1][1].replace("The documents are in the message. ", "") : out;
 }
 
 export function composerPrompts(prompt: string, options: GenerateOptions = {}): { systemPrompt: string; userPrompt: string } {
@@ -1416,6 +1440,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   it alone: the main process judges the folder again before running
 		   anything there. Any failure to ask is "no tools", never an error. */
 		const dossier = dossierOutils;
+		const mode = lireModeAgent(settings.get().aiAgentMode);
 		let outils = false;
 		const proc = requireHost("process");
 		if (dossier && proc.trustFolder) {
@@ -1434,13 +1459,13 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		const argsOutils = [
 			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
 			...(effort ? ["--effort", effort] : []),
-			...ARGS_OUTILS_CLAUDE,
+			...argsAgentClaude(mode),
 			// The pictures live in the host's temporary folder: the only other folder readable.
 			...(fichiers.length > 0 ? ["--add-dir", jetonPieces(marqueur)] : []),
 		];
 
 		const promptDe = (avecOutils: boolean): string =>
-			(avecOutils ? consigneAvecOutils(systemPrompt) : systemPrompt) + "\n\n" + userPrompt + imageNote;
+			(avecOutils ? consigneAvecOutils(systemPrompt, mode) : systemPrompt) + "\n\n" + userPrompt + imageNote;
 
 		/** La cartographie des messages, INCHANGÉE — chaque clé était déjà là.
 		    Elle est sortie du `catch` parce qu'un échec arrive désormais par DEUX
@@ -1590,17 +1615,30 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   Le dossier personnel et le chemin du fichier de sortie sont du savoir
 		   d'HÔTE — le rendu de l'application n'a ni l'un ni l'autre : ce sont des
 		   jetons. */
+		/* AN AGENT IN THE QUIZ'S FOLDER (2026-10-10), as Claude Code: once the
+		   user trusted the folder in the host's native dialog, Codex runs IN
+		   it with the sandbox of the chosen mode; the main process judges the
+		   folder again. Otherwise the old read-only call in the home folder. */
+		const dossier = dossierOutils;
+		const mode = lireModeAgent(settings.get().aiAgentMode);
+		let agent = false;
+		const proc = requireHost("process");
+		if (dossier && proc.trustFolder) {
+			try { agent = (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); }
+		}
 		const args = [
 			"exec", "--json", "-m", model,
 			"-c", "model_reasoning_effort=" + effortVal,
 			// Fast (1.5x speed, more usage) : service tier « priority » — la
 			// valeur vient de models_cache.json (service_tiers[].id).
 			...(fast ? ["-c", "service_tier=priority"] : []),
-			"-s", "read-only", "--skip-git-repo-check", "--ignore-user-config",
-			"-C", jetonHome(marqueur),
+			...(agent
+				? [...argsAgentCodex(mode), "--skip-git-repo-check", "--ignore-user-config"]
+				: ["-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "-C", jetonHome(marqueur)]),
 			"-o", jetonSortie(marqueur),
 			...fichiers.flatMap((_, i) => ["-i", jetonFichier(marqueur, i + 1)]),
 		];
+		const promptAgent = agent ? consigneAvecOutils(systemPrompt, mode) + "\n\n" + userPrompt : fullPrompt;
 
 		/** La cartographie des messages, INCHANGÉE (voir `erreurClaude`). */
 		const erreurCodex = (e: ExecError): Error => {
@@ -1622,7 +1660,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 
 		let res: SortieCli;
 		try {
-			res = await runCli({ tool: "codex", marqueur, args, stdin: fullPrompt, fichiers, sortieFichier: CODEX_FICHIER_SORTIE });
+			res = await runCli({ tool: "codex", marqueur, args, stdin: promptAgent, fichiers, sortieFichier: CODEX_FICHIER_SORTIE, dossier: agent && dossier ? dossier : undefined });
 		} catch (err) {
 			/* Une ANNULATION n'est pas une erreur. L'hôte tue l'arbre de process
 			   et rejette `annule` — ce que la branche « killed » prendrait pour un

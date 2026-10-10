@@ -652,3 +652,29 @@
 	color: var(--qbd-ultra, #a684ff);
 	font-weight: 600;
 }
+
+/* The agent mode chip (2026-10-10), MonoCode's "Full access": an icon and a
+   word, the shield in the warning colour when the AI may run anything. */
+.qbd-agent-mode-trigger .qbd-select-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+.qbd-agent-mode-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.qbd-agent-mode-icon {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+.qbd-agent-mode-icon svg {
+	width: 14px;
+	height: 14px;
+}
+.qbd-agent-mode-trigger.is-full .qbd-agent-mode-icon {
+	color: var(--text-warning, #e0af68);
+}

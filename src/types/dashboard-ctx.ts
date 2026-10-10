@@ -64,6 +64,8 @@ export interface AiSettings {
 	aiModel?: string;
 	aiEffort?: string;
 	aiCodexFast?: boolean;
+	/** How freely Claude Code and Codex act in a trusted folder (2026-10-10): `supervised`, `acceptEdits`, `auto` or `full`, read by `lireModeAgent`. */
+	aiAgentMode?: string;
 	/** Antigravity : le niveau retenu PAR famille (`{ "gemini-3.1-pro": "low" }`),
 	    comme le sélecteur d'Antigravity garde le sien à chaque modèle. */
 	aiAntigravityLevels?: Record<string, string>;

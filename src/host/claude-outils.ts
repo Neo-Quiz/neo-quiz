@@ -41,3 +41,63 @@ export const ARGS_IMAGES_CLAUDE: readonly string[] = ["--tools", "Read", ...REST
 export function optionInconnue(stderr: string): boolean {
 	return /unknown option|unrecognized option|invalid option/i.test(String(stderr || ""));
 }
+
+/* ══════════════════════════════════════════════════════════
+   AGENT MODES (2026-10-10)
+
+   The owner's decision: Claude Code and Codex run for real in the quiz's
+   folder, "as if a PowerShell terminal had been opened in it", with the four
+   modes of MonoCode. Prompt injection by a received file was explained and
+   accepted. The folder is still one the user trusted in the native dialog,
+   and the main process still judges it (`canaux.ts`); it keeps its OWN copy
+   of these forms (`apps/windows/electron/gabarits-cli.ts`), compared by
+   `npm run check:partage`.
+
+   Measured on Claude Code 2.1.296 and Codex 0.162.1 under Windows, in a
+   throwaway folder:
+   - Claude `acceptEdits` with `--restricted`: a Write lands, a shell command
+     is not run. `auto`: the classifier approved and ran `echo > d.txt`.
+     `--dangerously-skip-permissions`: commands run.
+   - Codex `-s workspace-write` stays READ-ONLY on Windows (it refused to
+     create a file), so the two middle modes use `--approve-for-me` (an AI
+     reviewer approves; it ran the command). `--dangerously-bypass-approvals-
+     and-sandbox`: commands run.
+══════════════════════════════════════════════════════════ */
+
+export type ModeAgent = "supervised" | "acceptEdits" | "auto" | "full";
+export const MODES_AGENT: readonly ModeAgent[] = ["supervised", "acceptEdits", "auto", "full"];
+/** A stored mode, or Full access (the owner's choice) for anything else. */
+export function lireModeAgent(v: unknown): ModeAgent {
+	return MODES_AGENT.includes(v as ModeAgent) ? v as ModeAgent : "full";
+}
+
+/** No settings file, no hook, no session kept, no MCP server: the same CLI
+    whatever the user's own configuration says. */
+const SANS_CONFIG: readonly string[] = [
+	"--no-session-persistence",
+	"--setting-sources", "",
+	"--settings", "{\"disableAllHooks\":true}",
+	"--strict-mcp-config",
+	"--mcp-config", "{\"mcpServers\":{}}",
+];
+/** The app's own folder (review log, chats, other devices' requests) stays out of the file tools. */
+const NEO_QUIZ_PROTEGE = "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)";
+
+/** The tail of the Claude Code call in a trusted folder, per mode. */
+export function argsAgentClaude(mode: ModeAgent): readonly string[] {
+	switch (mode) {
+		case "supervised": return ARGS_OUTILS_CLAUDE;
+		case "acceptEdits": return ["--tools", "Read,Grep,Glob,Write,Edit,MultiEdit", "--disallowedTools", "Bash,PowerShell,Task,Agent,WebFetch,WebSearch,mcp__*," + NEO_QUIZ_PROTEGE, "--permission-mode", "acceptEdits", "--permission-prompts", "none", "--restricted", ...SANS_CONFIG];
+		case "auto": return ["--disallowedTools", NEO_QUIZ_PROTEGE, "--permission-mode", "auto", "--permission-prompts", "none", ...SANS_CONFIG];
+		case "full": return ["--disallowedTools", NEO_QUIZ_PROTEGE, "--dangerously-skip-permissions", ...SANS_CONFIG];
+	}
+}
+
+/** The sandbox options of the Codex call in a trusted folder, per mode. */
+export function argsAgentCodex(mode: ModeAgent): readonly string[] {
+	switch (mode) {
+		case "supervised": return ["-s", "read-only"];
+		case "acceptEdits": case "auto": return ["--approve-for-me"];
+		case "full": return ["--dangerously-bypass-approvals-and-sandbox"];
+	}
+}

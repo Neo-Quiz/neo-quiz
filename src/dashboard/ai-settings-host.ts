@@ -41,7 +41,7 @@ export interface AiSettingsHost {
  * muté par l'un d'eux.
  */
 export function aiSettingsDefaults(): Required<Pick<AiSettings,
-	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
+	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAgentMode" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
 	| "aiOllamaModels" | "aiOllamaCatalog" | "aiOllamaPlansAppris" | "aiOllamaPlanCompte"
 	| "aiCanauxPayantsMasques" | "aiWebAvertissementMasque" | "aiUsageLog"
 	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiComposerDestination">> & { hotkeyAddFiles: Hotkey } {
@@ -53,6 +53,8 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		// Mode Fast de Codex (service tier « priority », 1.5x speed) — l'éclair
 		// du popover effort ChatGPT. Ignoré si le modèle ne l'expose pas.
 		aiCodexFast: false,
+		// Claude Code and Codex as full agents in a trusted folder (the owner's choice, 2026-10-10).
+		aiAgentMode: "full",
 		// Rien de retenu par famille Antigravity : chacune part à son niveau par
 		// défaut (la variante que `agy models` cite en premier).
 		aiAntigravityLevels: {},

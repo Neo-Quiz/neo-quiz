@@ -133,18 +133,82 @@ function teteClaude(): Piece[] {
 }
 const effortClaude: Piece[] = ["--effort", (e: string) => EFFORT_CLAUDE.test(e)];
 
-/** True when `args` is the Claude Code call WITH read-only tools. The caller
-    must then also check the folder (`canaux.ts`): this says nothing of
-    where the CLI runs. */
+/* ── AGENT MODES, IN A TRUSTED FOLDER (2026-10-10) ──
+
+   The owner chose to run Claude Code and Codex for real in the quiz's
+   folder, as a terminal opened in it would, with MonoCode's four modes
+   (supervised, accept edits, auto, full access), knowing that a received
+   file can carry instructions the model may follow. What stays: every form
+   is still EXACT (nothing added, removed or moved), it is only accepted in a
+   folder the user trusted in the native dialog (`canaux.ts`), no settings
+   file, hook or MCP server of the user applies, and the app's `.neo-quiz/`
+   folder is denied to the file tools. The page builds the same forms in
+   `src/host/claude-outils.ts`; `npm run check:partage` compares them.
+   Measured on Claude Code 2.1.296 and Codex 0.162.1 under Windows (see the
+   page's copy): Codex `-s workspace-write` stays read-only on Windows, so
+   its middle modes use `--approve-for-me`. */
+const SANS_CONFIG: readonly string[] = [
+	"--no-session-persistence",
+	"--setting-sources", "",
+	"--settings", REGLAGES_SANS_HOOK,
+	"--strict-mcp-config",
+	"--mcp-config", MCP_VIDE,
+];
+const NEO_QUIZ_PROTEGE = "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)";
+/** The Claude tails, one per mode; the first is the read-only form above. */
+const QUEUES_AGENT_CLAUDE: readonly (readonly string[])[] = [
+	["--tools", OUTILS_LECTURE, ...RESTRICTIONS],
+	["--tools", "Read,Grep,Glob,Write,Edit,MultiEdit", "--disallowedTools", "Bash,PowerShell,Task,Agent,WebFetch,WebSearch,mcp__*," + NEO_QUIZ_PROTEGE, "--permission-mode", "acceptEdits", "--permission-prompts", "none", "--restricted", ...SANS_CONFIG],
+	["--disallowedTools", NEO_QUIZ_PROTEGE, "--permission-mode", "auto", "--permission-prompts", "none", ...SANS_CONFIG],
+	["--disallowedTools", NEO_QUIZ_PROTEGE, "--dangerously-skip-permissions", ...SANS_CONFIG],
+];
+/** The Codex sandbox options, one per mode. */
+const QUEUES_AGENT_CODEX: readonly (readonly string[])[] = [
+	["-s", "read-only"],
+	["--approve-for-me"],
+	["--dangerously-bypass-approvals-and-sandbox"],
+];
+
+function teteCodex(): Piece[] {
+	return ["exec", "--json", "-m", modele, "-c", (c: string) => c.startsWith("model_reasoning_effort=") && EFFORT.test(c.slice("model_reasoning_effort=".length))];
+}
+const RAPIDE_CODEX: readonly Piece[] = ["-c", "service_tier=priority"];
+/** The attached pictures: `-i <token of file n>`, n = 1, 2, 3… in order. */
+function imagesCodex(images: readonly string[], jeton: (nom: string) => string): boolean {
+	if (images.length % 2 !== 0) return false;
+	for (let i = 0; i < images.length; i += 2) {
+		if (images[i] !== "-i" || images[i + 1] !== jeton("fichier:" + String(i / 2 + 1))) return false;
+	}
+	return true;
+}
+
+/** True when `args` is a call that gives the model tools in a folder: a
+    Claude Code or Codex agent form. The caller must then also check the
+    folder (`canaux.ts`): this says nothing of where the CLI runs, and the
+    CLI then runs IN that folder. */
 export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unknown): boolean {
-	if (tool !== "claude" || !Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	if (!Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
 	const a = args as string[];
 	const m = typeof marqueur === "string" && MARQUEUR.test(marqueur) ? marqueur : null;
-	const pieces: Piece[] = m ? ["--add-dir", "{{nq-" + m + ":pieces}}"] : [];
-	for (const avecEffort of [false, true]) {
-		for (const avecPieces of m ? [false, true] : [false]) {
-			const forme = [...teteClaude(), ...(avecEffort ? effortClaude : []), "--tools", OUTILS_LECTURE, ...RESTRICTIONS, ...(avecPieces ? pieces : [])];
-			if (correspond(a, forme)) return true;
+	if (tool === "claude") {
+		const pieces: Piece[] = m ? ["--add-dir", "{{nq-" + m + ":pieces}}"] : [];
+		for (const queue of QUEUES_AGENT_CLAUDE) {
+			for (const avecEffort of [false, true]) {
+				for (const avecPieces of m ? [false, true] : [false]) {
+					if (correspond(a, [...teteClaude(), ...(avecEffort ? effortClaude : []), ...queue, ...(avecPieces ? pieces : [])])) return true;
+				}
+			}
+		}
+		return false;
+	}
+	if (tool === "codex" && m !== null) {
+		const jeton = (nom: string): string => "{{nq-" + m + ":" + nom + "}}";
+		for (const queue of QUEUES_AGENT_CODEX) {
+			for (const avecRapide of [false, true]) {
+				// No `-C`: the agent works in the folder the main process runs it in.
+				const base: Piece[] = [...teteCodex(), ...(avecRapide ? RAPIDE_CODEX : []), ...queue, "--skip-git-repo-check", "--ignore-user-config", "-o", jeton("sortie")];
+				if (a.length >= base.length && correspond(a.slice(0, base.length), base) && imagesCodex(a.slice(base.length), jeton)) return true;
+			}
 		}
 	}
 	return false;
@@ -219,6 +283,8 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 			}
 		case "codex": {
 			if (m === null) return false;
+			// An agent form, in a trusted folder (see above).
+			if (argumentsAvecOutils(tool, a, marqueur)) return true;
 			const tete: Piece[] = ["exec", "--json", "-m", modele, "-c", (c: string) => c.startsWith("model_reasoning_effort=") && EFFORT.test(c.slice("model_reasoning_effort=".length))];
 			const rapide: Piece[] = ["-c", "service_tier=priority"];
 			const fin: Piece[] = ["-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "-C", jeton("home"), "-o", jeton("sortie")];

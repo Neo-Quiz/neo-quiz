@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER, ARGS_COMPTE }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE }) => {
+await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER, ARGS_COMPTE }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE, MODES_AGENT, argsAgentClaude, argsAgentCodex }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 
@@ -223,6 +223,43 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 		[...outils(), "--add-dir", j("home")],
 		[...outils(), "--add-dir", j("pieces"), "--add-dir", j("pieces")],
 	].map(a => argumentsAutorises("claude", a, m)), [false, false, false, false]);
+	/* AGENT MODES (2026-10-10, the owner's decision): Claude Code and Codex
+	   run for real in a trusted folder, one exact form per mode. The page's
+	   forms (src/host/claude-outils.ts) are exactly the main process's; a
+	   bypass is accepted ONLY in its exact agent form (then judged on its
+	   folder by canaux.ts), never added to a plain form (cases above). */
+	const teteC = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku"];
+	const agentCodex = (mode, rapide = false, images = 0) => ["exec", "--json", "-m", "gpt-6.1-sol", "-c", "model_reasoning_effort=low",
+		...(rapide ? ["-c", "service_tier=priority"] : []), ...argsAgentCodex(mode), "--skip-git-repo-check", "--ignore-user-config", "-o", j("sortie"),
+		...Array.from({ length: images }, (_, i) => ["-i", j("fichier:" + (i + 1))]).flat()];
+	const autreJeton = "{{nq-" + "f".repeat(32) + ":sortie}}";
+	const MCP_HOSTILE = JSON.stringify({ mcpServers: { x: { command: "calc.exe" } } });
+	r.check("agent modes: every page form, Claude (with effort and attachments) and Codex (fast, pictures), is a tools form accepted here",
+		MODES_AGENT.flatMap(mode => [
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude(mode)], m),
+			argumentsAvecOutils("claude", [...teteC, "--effort", "high", ...argsAgentClaude(mode), "--add-dir", j("pieces")], m),
+			argumentsAutorises("claude", [...teteC, ...argsAgentClaude(mode)], m),
+			argumentsAvecOutils("codex", agentCodex(mode), m),
+			argumentsAvecOutils("codex", agentCodex(mode, true, 2), m),
+			argumentsAutorises("codex", agentCodex(mode), m),
+		]), MODES_AGENT.flatMap(() => [true, true, true, true, true, true]));
+	r.check("agent modes: Codex without this call's marker, with a -C folder, an extra option, a token of another call or an unmatched picture is refused",
+		[
+			argumentsAvecOutils("codex", agentCodex("full"), undefined),
+			argumentsAvecOutils("codex", [...agentCodex("full"), "-C", "C:/Users"], m),
+			argumentsAvecOutils("codex", [...agentCodex("full"), "--add-dir", "C:/"], m),
+			argumentsAvecOutils("codex", agentCodex("full").map(x => (x === j("sortie") ? autreJeton : x)), m),
+			argumentsAvecOutils("codex", [...agentCodex("full"), "-i", j("fichier:2")], m),
+			argumentsAvecOutils("codex", agentCodex("full").filter(x => x !== "--ignore-user-config"), m),
+		], [false, false, false, false, false, false]);
+	r.check("agent modes: a Claude agent form with an MCP server, hooks allowed, no strict MCP, an extra folder or acceptEdits without --restricted is refused",
+		[
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full").map(x => (x === "{\"mcpServers\":{}}" ? MCP_HOSTILE : x))], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full").map(x => (x === "{\"disableAllHooks\":true}" ? "{}" : x))], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("auto").filter(x => x !== "--strict-mcp-config")], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full"), "--add-dir", "C:/"], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("acceptEdits").filter(x => x !== "--restricted")], m),
+		], [false, false, false, false, false]);
 	r.check("the page's list of tools options (src/host/claude-outils.ts) is exactly the form accepted here",
 		argumentsAvecOutils("claude", ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_OUTILS_CLAUDE], m), true);
 	/* PICTURES WITHOUT A TRUSTED FOLDER (2026-10-09): Read only, with the

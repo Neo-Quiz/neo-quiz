@@ -401,6 +401,21 @@ function codexEvents(line: Rec): TranscriptEvent[] {
 		return [tool, fin];
 	}
 	if (type !== "item.completed") return [];
+	/* Files Codex changed (2026-10-10, agent modes): one step naming the
+	   files, closed at once since the item only arrives completed. */
+	if (itemType === "file_change") {
+		const changes = Array.isArray(item.changes) ? item.changes.map(rec).filter((c): c is Rec => !!c) : [];
+		const chemins = changes.map(c => str(c.path) ?? "").filter(Boolean);
+		const id = str(item.id) || "fc-" + chemins.join("|");
+		return [
+			{ kind: "tool", name: "Edit", id, input: couper(chemins.join(", "), MAX_INPUT) },
+			{ kind: "toolResult", id, status: str(item.status) === "failed" ? "error" : "ok", count: chemins.length, unit: "files" },
+		];
+	}
+	if (itemType === "web_search") {
+		const requete = str(item.query) ?? "";
+		return requete ? [{ kind: "tool", name: "WebSearch", input: couper(requete, MAX_INPUT) }] : [];
+	}
 	const text = str(item.text);
 	if (itemType === "reasoning" && text) return [{ kind: "thinking", text: text + "\n\n" }];
 	if (itemType === "agent_message" && text) return [{ kind: "text", text }];
@@ -544,4 +559,29 @@ export function tempsRestant(question: number, total: number | null | undefined,
 	const faites = question - 1;
 	const parQuestion = Math.max(0, now - writingSince) / faites;
 	return Math.round(parQuestion * (total - faites));
+}
+/** The AI's work summed up by kind, as MonoCode titles it ("Explored the
+    project · Ran 6 tools", "Ran a command · Edited SKILL.md"): what was
+    explored, run and edited, and the file when only one was edited. */
+export interface ResumeTravail { explore: number; commandes: number; modifs: number; autres: number; total: number; fichier: string | null }
+
+const OUTILS_EXPLORE = new Set(["Read", "Grep", "Glob", "LS", "WebFetch", "WebSearch", "ToolSearch"]);
+const OUTILS_COMMANDE = new Set(["Bash", "PowerShell", "Shell"]);
+const OUTILS_MODIF = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
+
+export function resumeTravail(tools: readonly ToolStep[], caches = 0): ResumeTravail {
+	const r: ResumeTravail = { explore: 0, commandes: 0, modifs: 0, autres: 0, total: tools.length + caches, fichier: null };
+	const fichiers = new Set<string>();
+	for (const s of tools) {
+		if (OUTILS_EXPLORE.has(s.name)) r.explore++;
+		else if (OUTILS_COMMANDE.has(s.name)) r.commandes++;
+		else if (OUTILS_MODIF.has(s.name)) { r.modifs++; for (const f of s.input.split(", ")) if (f) fichiers.add(f); }
+		else r.autres++;
+	}
+	if (fichiers.size === 1) {
+		const seul = [...fichiers][0];
+		r.fichier = seul.slice(Math.max(seul.lastIndexOf("/"), seul.lastIndexOf("\\")) + 1);
+	}
+	r.modifs = fichiers.size || r.modifs;
+	return r;
 }

@@ -42,6 +42,7 @@ import { currentLang, t } from "../i18n";
 import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
 import type { ToolStep, Transcript } from "./transcript";
+import { resumeTravail } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { mathifyElement } from "../engine/mathjax";
@@ -480,12 +481,21 @@ export function creerVueFile(opts: {
 				   it, `Read(path)` then `└ 120 lines`, folded by default; the
 				   refused ones in the warning colour. Text only (`textContent`
 				   through `ajouter`): a path or an error is never HTML here. */
-				const etapes = tr.tools.length + tr.toolsHidden;
+				/* The heading sums the work up by kind, as MonoCode does
+				   ("Explored the project · Ran 6 tools", "Ran a command · Edited
+				   SKILL.md"), and the steps are shown open: the owner wants to see
+				   everything the AI did without a click (2026-10-10). */
+				const r = resumeTravail(tr.tools, tr.toolsHidden);
 				const refusees = tr.tools.filter(s => s.status === "refused").length;
-				const libelle = t(etapes === 1 ? "ai.transcript.workOne" : "ai.transcript.workOther", { count: etapes })
+				const parts: string[] = [];
+				if (r.explore) parts.push(t("ai.transcript.explored"));
+				if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
+				if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
+				if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
+				const libelle = parts.join(" · ")
 					+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
 				specs.push({
-					cle: "tools", icone: "terminal", libelle, ouvertParDefaut: false,
+					cle: "tools", icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench", libelle, ouvertParDefaut: true,
 					detail: corps => peindreEtapes(corps, tr),
 				});
 			}

@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code and Codex now work for real in the quiz folder you trusted, as in a terminal opened there: a new chip next to the model picks Supervised (read only), Auto-accept edits, Auto or Full access (the default).
+
+### Changed
+
+- Everything the AI did is shown open under its message and summed up like "Explored the project · Ran 6 tools" or "Ran a command · Edited notes.md", for Codex as well as Claude Code.
+
 ## [1.20.79] - 2026-10-10
 
 ### Fixed
