@@ -112,6 +112,8 @@ class MainActivity : ComponentActivity() {
             // shows behind it, and the page itself moves its content down by that height
             // (`--nq-inset-haut`, mobile.css). The sides, the bottom bars and the keyboard stay padded.
             v.setPadding(bars.left, 0, bars.right, bars.bottom)
+            // While typing, the tab bar steps aside (`NavBarView.keyboardOpen`).
+            appWebView.navBar.keyboardOpen = insets.isVisible(WindowInsetsCompat.Type.ime())
             appWebView.setTopInset(bars.top / resources.displayMetrics.density)
             WindowInsetsCompat.CONSUMED
         }

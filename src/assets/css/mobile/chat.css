@@ -158,6 +158,26 @@
 .is-mobile .qbd-ai-stage--error::after {
 	flex: 0 0 0;
 }
+/* THE COMPOSER SITS ON THE KEYBOARD, like the Claude app's (2026-10-10): 16 px
+   between the card and the bottom of the page (the panel's own padding), not
+   56. The stage's padding, its `::after` spacer and the hidden "scroll to
+   the bottom" button (there is no thread yet) each added room under it.
+   The 16 px sit INSIDE the stage, which scrolls and so clips: the card's
+   glow keeps that room instead of being cut at its bottom edge. */
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--idle,
+.is-mobile .qbd-ai-lateral ~ .qbd-ai-stage--error {
+	padding-bottom: 16px;
+}
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-content:has(> .qbd-ai-stage--idle),
+.is-mobile #neo-quiz-root > .qbd-layout > .qbd-content:has(> .qbd-ai-stage--error) {
+	padding-bottom: 0;
+}
+.is-mobile .qbd-ai-stage--idle::after,
+.is-mobile .qbd-ai-stage--error::after,
+.is-mobile .qbd-ai-stage--idle > .qbd-ai-fil-bas,
+.is-mobile .qbd-ai-stage--error > .qbd-ai-fil-bas {
+	display: none;
+}
 /* Auto margins above and below the greeting: it takes the middle of the free
    room, and the composer lands at the bottom of the page. */
 .is-mobile .qbd-ai-stage--idle > .qbd-ai-title-row {

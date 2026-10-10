@@ -68,6 +68,23 @@ class NavBarView(context: Context) : LinearLayout(context) {
     /** The ids, labels and placeholder flags of the tabs as they were built. */
     private var tabsKey = ""
     private val tabs = ArrayList<NavTab>()
+    /** The page asks for the bar (`visible` of its state). */
+    private var pageWantsBar = false
+
+    /**
+     * The keyboard is open: the bar steps aside so the field being typed in sits right on the
+     * keyboard, as in the Claude app (2026-10-10). Set by `MainActivity` from the IME insets.
+     */
+    var keyboardOpen = false
+        set(value) {
+            if (field == value) return
+            field = value
+            syncVisibility()
+        }
+
+    private fun syncVisibility() {
+        visibility = if (pageWantsBar && !keyboardOpen) VISIBLE else GONE
+    }
     private val fastOutSlowIn: TimeInterpolator by lazy {
         AnimationUtils.loadInterpolator(context, android.R.interpolator.fast_out_slow_in)
     }
@@ -81,12 +98,10 @@ class NavBarView(context: Context) : LinearLayout(context) {
 
     /** Applies the page's state (main thread). Cheap when nothing changed. */
     fun apply(state: JSONObject) {
-        if (!state.optBoolean("visible", false)) {
-            visibility = GONE
-            return
-        }
+        pageWantsBar = state.optBoolean("visible", false)
+        syncVisibility()
+        if (!pageWantsBar) return
         val sig = state.toString()
-        visibility = VISIBLE
         if (sig == signature) return
         signature = sig
         val colors = NavColors.from(state)
