@@ -6,15 +6,18 @@
    detected", as text with the icon, no badge. Nothing is shown for
    `general`.
 
-   A language's icon is its FLAG (2026-09-29): thirty languages behind one
-   and the same Lucide glyph could not be told apart. Emoji flags are not
+   A human language's icon is its FLAG (2026-09-29): thirty languages behind
+   one and the same Lucide glyph could not be told apart. Emoji flags are not
    an option — the project draws no emoji, and Windows shows "FR" in
    letters instead of the flag. The SVGs come from `country-flag-icons`
    and go in as an <img> data URL: an image, which runs nothing, never
-   markup set with innerHTML.
+   markup set with innerHTML. A PROGRAMMING language's icon is its logo from
+   the code catalogue (`code-catalogue.ts`), the same one as its code blocks
+   (2026-10-10).
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost } from "../host/current";
+import { codeLanguageBadgeSrc, codeLanguageOf } from "../code-catalogue";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
@@ -219,10 +222,25 @@ export function libelleCategorie(c: CategorieQuiz): string {
 	return t(NOMS[c]);
 }
 
-/** Draws a subject's icon in `el`: a language's flag, otherwise its Lucide
-    glyph. */
+/* The programming subjects, by their tag in the code catalogue. Their notice
+   shows that language's logo, not a generic glyph. */
+const TAG_LANGAGE: Partial<Record<CategorieQuiz, string>> = {
+	python: "python", c: "c", cpp: "cpp", java: "java", csharp: "csharp",
+	rust: "rust", go: "go", bash: "bash", sql: "sql",
+};
+
+/** Draws a subject's icon in `el`: a programming language's logo, a human
+    language's flag, otherwise its Lucide glyph. */
 export function peindreIconeCategorie(el: HTMLElement, c: CategorieQuiz): void {
 	el.replaceChildren();
+	const langage = TAG_LANGAGE[c] ? codeLanguageOf(TAG_LANGAGE[c]) : null;
+	if (langage?.logo) {
+		const img = ajouter(el, "img", "qbd-categorie-logo");
+		img.src = codeLanguageBadgeSrc(langage);
+		img.alt = "";
+		img.draggable = false;
+		return;
+	}
 	const drapeau = estLangue(c) && c !== "langues" ? DRAPEAUX[c as LangueQuiz] : undefined;
 	if (drapeau) {
 		const img = ajouter(el, "img", "qbd-categorie-drapeau");

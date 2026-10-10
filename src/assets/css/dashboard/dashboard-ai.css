@@ -2918,6 +2918,13 @@
 /* A language's flag, in place of a Lucide glyph (menus, the subject notice,
    the folders filter): 3:2, the width of an icon, a hairline so the white
    bands of a flag keep an edge on a light theme. */
+.qbd-categorie-logo {
+	display: block;
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+}
+
 .qbd-categorie-drapeau {
 	display: block;
 	width: 18px;

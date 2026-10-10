@@ -58,6 +58,62 @@
 	user-select: none;
 }
 
+/* THE INTERFACE IS NOT A DOCUMENT. A native app does not let its labels,
+   chips and hints be highlighted in blue; only the content the user reads or
+   copies is selectable. The root is `none`, and each content zone below sets
+   `text` back on itself. Placeholders are never selected. */
+html,
+body,
+#neo-quiz-root {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]),
+pre,
+code,
+kbd,
+samp,
+.qbd-ai-composer-input,
+.qbd-ai-chat-prose,
+.qbd-ai-preview-md,
+.qbd-ai-message,
+.qbd-ai-bulle,
+.qbd-ai-reponse-corps,
+.qbd-ai-reponse-texte,
+.qbd-ai-reponse-etape,
+.qbd-ai-chat-reponse,
+.quiz-question,
+.quiz-option,
+.quiz-explain,
+.quiz-learn-content,
+.quiz-passage-content,
+.quiz-lecture-etape-texte,
+.quiz-fc-text,
+.quiz-hint-inline-body,
+.quiz-hint-modal-body,
+.quiz-textonly-explain-content,
+.quiz-textonly-expected-list,
+.quiz-textonly-correct-text,
+.quiz-textonly-written-answer,
+.quiz-textonly-answer,
+.quiz-code-block,
+.quiz-code-output,
+[class*="quiz-md-"],
+.qbd-pdf-text,
+.qbd-note-body,
+.qbd-note-content {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+::placeholder {
+	-webkit-user-select: none;
+	user-select: none;
+}
+
 html,
 body {
 	height: 100%;
