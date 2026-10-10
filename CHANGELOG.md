@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.83] - 2026-10-10
+
 ### Fixed
 
 - A request run on this PC just says "Stopped", "Done" or "Failed", without "on DESKTOP-… (this device)".
