@@ -21,6 +21,7 @@ release notes.
 
 - The Explain panel shows its send arrow again, and its stop button while an answer is written.
 - Leaving a quiz closes its Explain panel.
+- Explain answers and interactive pages draw symbols instead of typing them, and no longer put a token on a class diagram.
 
 ## [1.20.75] - 2026-10-10
 
