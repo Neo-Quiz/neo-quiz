@@ -25,7 +25,7 @@ import { openMoodleModal } from "./moodle-modal";
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
 
-export function mountMoodleSettings(page: HTMLElement, fermer: () => void): () => void {
+export function mountMoodleSettings(page: HTMLElement): () => void {
 	const api = pont().moodle;
 	if (!api) return () => undefined;
 	let detruit = false;
@@ -81,8 +81,9 @@ export function mountMoodleSettings(page: HTMLElement, fermer: () => void): () =
 			const p = ajouter(carte, "div", "nq-set-ligne");
 			const lien = ajouter(p, "button", "nq-moodle-lien", t("settings.moodle.openPage"));
 			lien.type = "button";
-			/* The settings are a modal too: it leaves first, then the Moodle window comes in. */
-			lien.addEventListener("click", () => { fermer(); setTimeout(openMoodleModal, 220); });
+			/* Opened OVER the settings, which stay open below: closing the Moodle
+			   window brings the user back where they were (host modals stack). */
+			lien.addEventListener("click", () => openMoodleModal());
 			return;
 		}
 

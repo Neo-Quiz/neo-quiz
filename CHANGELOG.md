@@ -13,6 +13,16 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Moodle window opens right away: the module list no longer waits for every module's assignments, which now fill the banner a moment later.
+- Opening the Moodle window from Settings keeps Settings open underneath; Escape closes only the window on top.
+
+### Changed
+
+- Folders and the Moodle window share one default colour per kind of module code (XTI, XCS, XMUT…), in the palette of the former Moodle plugin; a colour you chose still wins.
+- In the Moodle window, each module gets the icon its name suggests, and no icon when nothing matches.
+
 ## [1.20.71] - 2026-10-10
 
 ### Changed

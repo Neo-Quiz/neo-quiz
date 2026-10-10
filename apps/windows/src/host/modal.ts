@@ -37,6 +37,12 @@ const SORTIE_MS = 400;
     premier titre posé. */
 let compteurTitres = 0;
 
+/** The open modals, oldest first. Every modal listens to `document`, so without
+    this one Escape closed the Moodle window AND the Settings under it at once:
+    only the top one answers. A modal leaves the stack as soon as it starts
+    closing, so a second Escape reaches the one below. */
+const pile: HTMLElement[] = [];
+
 function ouvrir(spec: HostModalSpec): HostModalHandle {
 	/* Mémorisé AVANT tout attachement : une fois le panneau posé, le focus a
 	   déjà pu bouger, et on ne saurait plus à quoi le rendre. Test de canard
@@ -97,6 +103,7 @@ function ouvrir(spec: HostModalSpec): HostModalHandle {
 
 	function surTouche(e: KeyboardEvent): void {
 		if (e.key === "Escape") {
+			if (pile[pile.length - 1] !== conteneur) return;
 			e.preventDefault();
 			fermer();
 		}
@@ -105,6 +112,7 @@ function ouvrir(spec: HostModalSpec): HostModalHandle {
 	function detacher(): void {
 		if (detache) return;
 		detache = true;
+		quitterPile();
 		/* L'écouteur part AVEC le panneau : sans ça, chaque modale ouverte
 		   laisserait derrière elle un Échap qui ne ferme plus rien. */
 		document.removeEventListener("keydown", surTouche);
@@ -119,9 +127,15 @@ function ouvrir(spec: HostModalSpec): HostModalHandle {
 		corps.replaceChildren();
 	}
 
+	function quitterPile(): void {
+		const i = pile.indexOf(conteneur);
+		if (i >= 0) pile.splice(i, 1);
+	}
+
 	function fermer(): void {
 		if (ferme) return;
 		ferme = true;
+		quitterPile();
 		/* `prefers-reduced-motion` : détachement immédiat, sans animation —
 		   sinon on attendrait 240 ms un `animationend` que le CSS partagé
 		   vient justement de désactiver. */
@@ -141,6 +155,7 @@ function ouvrir(spec: HostModalSpec): HostModalHandle {
 		window.setTimeout(detacher, SORTIE_MS);
 	}
 
+	pile.push(conteneur);
 	document.addEventListener("keydown", surTouche);
 	fond.addEventListener("click", () => fermer());
 	fermeture.addEventListener("click", () => fermer());

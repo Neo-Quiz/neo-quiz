@@ -162,6 +162,24 @@ await withSrcModule("src/dashboard/module-icons.ts", async ({ moduleIcon }) => {
 	r.done();
 });
 
+/* The default colour of a module with a code is the colour of its code
+   PREFIX (2026-10-10): every XTI module shares one colour, every XCS another,
+   in the palette of the former Moodle plugin; a chosen colour still wins, and
+   a name without a code keeps the colour derived from it. */
+await withSrcModule("src/dashboard/module-color.ts", async ({ moduleAccent, codePrefix, hashAccent }) => {
+	const r = makeReporter("Module — default colour by code prefix");
+	r.check("the prefix is read at the start of the name, or of the last path segment",
+		[codePrefix("XTI303 - Conception"), codePrefix("Neo Quiz/XMUT401 - English"), codePrefix("Divers"), codePrefix("XTI303A")],
+		["XTI", "XMUT", null, null]);
+	r.check("two modules of the same prefix share one colour",
+		moduleAccent({ folder: "XTI301 - Écosystème Python" }), moduleAccent({ folder: "XTI305 - Ethical Hacking" }));
+	r.check("two prefixes have two colours",
+		moduleAccent({ folder: "XTI301 - Python" }) !== moduleAccent({ folder: "XCS320 - Outils" }), true);
+	r.check("a chosen colour wins over the prefix", moduleAccent({ folder: "XTI301 - Python", color: "#123456" }), "#123456");
+	r.check("a name without a code keeps the derived colour", moduleAccent({ folder: "Divers" }), hashAccent("Divers"));
+	r.done();
+});
+
 /* Chaque icône de la grille et des suggestions EXISTE dans le catalogue que
    l'application dessine (`lucide`) : un nom inconnu donne une pastille vide,
    sans la moindre erreur. */

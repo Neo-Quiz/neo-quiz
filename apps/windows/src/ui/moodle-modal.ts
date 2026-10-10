@@ -27,6 +27,8 @@ import { currentHourCycle, currentLang, hourOptions, t } from "../../../../src/i
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { resumeLancement, span } from "./moodle-common";
+import { codeAccent } from "../../../../src/dashboard/module-color";
+import { suggestIcons } from "../../../../src/dashboard/icon-suggest";
 
 const SONDE_MS = 2000;
 const HORLOGE_MS = 30_000;
@@ -70,11 +72,19 @@ function quand(sec: number): string {
 	});
 }
 function nomCourt(c: { name: string }): string { return c.name.replace(/^\S+\s*-\s*/, ""); }
-/** A stable colour per module code (the plugin took it from its tiles). */
+/** The colour of a module code: the one its folder card has by default, one
+    per code prefix (the plugin took it from its tiles). Empty without a code. */
 function teinte(code: string | null): string {
-	let h = 0;
-	for (const ch of code ?? "") h = (h * 31 + ch.charCodeAt(0)) % 360;
-	return `hsl(${h} 62% 64%)`;
+	return (code && codeAccent(code)) || "";
+}
+/** The row icon: the first one the module NAME suggests, the same rule as a
+    folder card; no keyword, no icon (a cap on every row said nothing). */
+function iconeLigne(parent: HTMLElement, nom: string, code: string | null): void {
+	const s = ajouter(parent, "span", "nqm-course-icon");
+	const nomIcone = suggestIcons(nom, null, 1)[0];
+	if (!nomIcone) return;
+	currentHost().ui.setIcon(s, nomIcone);
+	s.style.color = teinte(code);
 }
 function typeFichier(nom: string): string {
 	const ext = (nom.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
@@ -162,10 +172,14 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		devoirs = await api.devoirs().catch(() => [] as DevoirMoodle[]);
 		for (const d of devoirs) if (d.nouveau) nouveaux.add(d.cmid);
 	}
+	/** The state and the module list only. The hand-ins are NOT awaited here: they
+	    scan every followed module one after the other in the main process (tens of
+	    seconds for a year of ~27 modules), and the window stayed on "Loading the
+	    courses…" all that time. They arrive later, through `actualiser`. */
 	async function chargerTout(): Promise<void> {
 		etat = await api.etat().catch(() => null);
 		if (estDetruit()) return;
-		if (etat?.connected && etat.state === "connected") await Promise.all([chargerCours(), chargerDevoirs()]);
+		if (etat?.connected && etat.state === "connected") await chargerCours();
 		else { cours = []; devoirs = []; }
 	}
 	function connecte(): boolean { return !!etat && etat.connected && etat.state === "connected"; }
@@ -324,12 +338,20 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		setTimeout(() => champ?.focus(), 0);
 	}
 
+	/** The list is repainted as soon as the courses answer; the hand-ins (slow, see
+	    `chargerTout`) then fill the banner and the row chips in place. */
 	async function actualiser(rescan: boolean): Promise<void> {
 		if (rescan) dire(t("settings.moodle.checkingStart"), true);
-		await Promise.all([chargerCours(), chargerDevoirs()]);
+		const depots = chargerDevoirs().then(() => {
+			if (estDetruit() || vue !== "picker") return;
+			for (const id of badges.keys()) peindrePuceDepot(id);
+			peindreBandeau();
+		});
+		await chargerCours();
 		if (estDetruit() || vue !== "picker") return;
 		apresCours();
 		if (rescan) prescan(true);
+		await depots;
 	}
 
 	function apresCours(): void {
@@ -379,7 +401,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			for (const r of trouves) {
 				const ligne = ajouter(g, "button", "nqm-course");
 				ligne.type = "button";
-				icone(ligne, "graduation-cap", "nqm-course-icon").style.color = teinte(r.code);
+				iconeLigne(ligne, nomCourt(r), r.code);
 				ajouter(ligne, "span", "nqm-course-code", r.code).style.color = teinte(r.code);
 				ajouter(ligne, "span", "nqm-course-name", nomCourt(r));
 				ajouter(ligne, "span", "nqm-course-badge is-new", t("settings.moodle.wAddToList"));
@@ -420,7 +442,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const ligne = ajouter(g, "button", "nqm-course");
 		ligne.type = "button";
 		if (co.exclu) ligne.style.opacity = "0.55";
-		icone(ligne, "graduation-cap", "nqm-course-icon").style.color = teinte(co.code);
+		iconeLigne(ligne, nomCourt(co), co.code);
 		const code = ajouter(ligne, "span", "nqm-course-code", co.code ?? "—");
 		code.style.color = teinte(co.code);
 		if (!co.code) code.classList.add("is-orphan");

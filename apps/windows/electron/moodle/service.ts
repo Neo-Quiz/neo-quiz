@@ -668,8 +668,15 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			nouveau: !r.vus.includes(d.cmid),
 		}));
 	}
-	async function devoirsBruts(): Promise<DevoirBrut[]> {
-		if (cache && maintenant() - cache.at < DEVOIRS_TTL) return cache.liste;
+	/** One scan at a time: two callers within the scan (the window opening, a
+	    refresh, a hand-in) used to start two full serial scans of every module. */
+	let devoirsEnCours: Promise<DevoirBrut[]> | null = null;
+	function devoirsBruts(): Promise<DevoirBrut[]> {
+		if (cache && maintenant() - cache.at < DEVOIRS_TTL) return Promise.resolve(cache.liste);
+		devoirsEnCours ??= scannerDevoirs().finally(() => { devoirsEnCours = null; });
+		return devoirsEnCours;
+	}
+	async function scannerDevoirs(): Promise<DevoirBrut[]> {
 		const res = await avecClient(async (client, s) => {
 			const liste: DevoirBrut[] = [];
 			for (const c of suivis(await catalogue(client, s.j.userid))) {
