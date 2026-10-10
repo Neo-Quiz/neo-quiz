@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Explain panel shows its send arrow again, and its stop button while an answer is written.
+- Leaving a quiz closes its Explain panel.
+
 ## [1.20.75] - 2026-10-10
 
 ### Fixed

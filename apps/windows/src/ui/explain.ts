@@ -55,6 +55,7 @@ import { annoncerExplication } from "./notif-fin";
 import type { Cours } from "./explain-cours";
 import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
+import type { HostModalHandle } from "../../../../src/host/types";
 
 /* THE SPLIT VIEW (2026-10-09). The Explain window is a second card, on the
    LEFT of the quiz card, with the same glass, border and radius. The modal host
@@ -236,6 +237,15 @@ function demonterPanneau(): void {
 	// While the card is still moving back, its own motion removes the split class at the end.
 	if (!mouvementCarte) document.body.classList.remove("nq-explain-open");
 	document.querySelector(".qz-explain-btn-icone")?.classList.remove("is-active");
+}
+
+/** Leaving the quiz page: the window closes at once, without the quiz card's
+    motion (the card is about to go, and a motion on a removed card may never
+    finish, which would leave the split layout on the next page). */
+function fermerSansMouvement(fenetre: HostModalHandle): void {
+	if (mouvementCarte) { mouvementCarte.cancel(); finirMouvement(); }
+	document.body.classList.remove("nq-explain-open");
+	fenetre.close();
 }
 
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -638,6 +648,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	majVisibilite();
 
 	const conversations = new Map<number, Conversation>();
+	/* The open window, closed with the page (`fermerSansMouvement`). */
+	let fenetre: HostModalHandle | null = null;
 	const conversationDe = (qi: number): Conversation => {
 		let c = conversations.get(qi);
 		if (!c) {
@@ -662,7 +674,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		conv.contexte = contexte;
 		let horloge = 0;
 		let ligneForfait: UsageLine | null = null;
-		requireHost("modals").open({
+		const handle = requireHost("modals").open({
 			className: "nq-explain-modal",
 			title: t("ai.explain.title"),
 			onOpen: (m) => {
@@ -727,11 +739,16 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					peindreLogoBouton();
 				};
 				const majEnvoi = (): void => {
+					const contenu = !!champ.value.trim();
 					envoi.replaceChildren();
 					envoi.classList.toggle("qbd-ai-composer-send--stop", conv.enCours);
 					host.ui.setIcon(ajouter(envoi, "span", "qbd-ai-composer-send-icon"), conv.enCours ? "square" : "arrow-up");
 					envoi.setAttribute("aria-label", t(conv.enCours ? "ai.explain.stop" : "ai.explain.send"));
-envoi.disabled = !conv.enCours && !champ.value.trim();
+					/* Hidden by default (dashboard-ai.css): shown with something to send,
+					   and as the stop square while an answer runs. */
+					envoi.classList.toggle("is-visible", conv.enCours || contenu);
+					envoi.disabled = !conv.enCours && !contenu;
+					envoi.classList.toggle("qbd-ai-composer-send--disabled", envoi.disabled);
 				};
 				peindreOutils();
 				majEnvoi();
@@ -1052,11 +1069,13 @@ envoi.disabled = !conv.enCours && !champ.value.trim();
 				champ.focus();
 			},
 			// Closing the window keeps the conversation; only the painting stops.
-			onClose: () => { demonterPanneau(); window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
+			onClose: () => { if (fenetre === handle) fenetre = null; demonterPanneau(); window.clearInterval(horloge); ligneForfait?.destroy(); ligneForfait = null; conv.repeindre = null; },
 		});
+		fenetre = handle;
 	}
 
 	return () => {
+		if (fenetre) fermerSansMouvement(fenetre);
 		observateur.disconnect();
 		for (const c of conversations.values()) { if (c.enCours) c.client.abort(); c.repeindre = null; }
 		boutonQuiz.remove();
