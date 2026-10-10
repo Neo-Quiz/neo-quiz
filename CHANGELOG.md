@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.75] - 2026-10-10
+
 ### Fixed
 
 - The "Updating Neo Quiz" window can be minimised again: a click on its Minimise button dragged the window instead.
