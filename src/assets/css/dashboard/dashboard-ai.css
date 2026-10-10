@@ -4670,7 +4670,15 @@
 	display: contents;
 }
 
-/* The block is one button; the grid inside keeps the column layout above. */
+/* The block is one button; the grid inside keeps the column layout above.
+   A button's text is not selectable: a double click or a drag over it
+   painted the whole block blue. */
+.qbd-ai-usage-line,
+.qbd-usage-pop {
+	user-select: none;
+	-webkit-user-select: none;
+}
+
 .qbd-ai-usage-line {
 	display: block;
 	cursor: pointer;
@@ -5032,4 +5040,29 @@
 
 .is-mobile .qbd-ai-usage-line {
 	font-size: 11px;
+}
+
+/* The account row of the usage popover (2026-10-10): flat, like the resets. */
+.qbd-usage-pop-account {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 0 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+.qbd-usage-account-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-left: -8px;
+}
+.qbd-usage-account-actions .qbd-usage-reset-btn { color: var(--interactive-accent); }
+.qbd-usage-account-status { color: var(--text-normal); font-size: 13px; }
+.qbd-usage-account-hint { color: var(--text-muted); font-size: 12px; }
+.qbd-usage-account-command {
+	align-self: flex-start;
+	max-width: 100%;
+	overflow-wrap: anywhere;
+	font-size: 12px;
+	user-select: text;
 }
