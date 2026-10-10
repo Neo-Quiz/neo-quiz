@@ -37,6 +37,7 @@ import { copyFileSync, rmSync } from "node:fs";
 import { link, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { sansAsar } from "../installer/sondage";
 
 export type LangueFenetre = "en" | "fr";
 
@@ -56,11 +57,15 @@ export const PREFIXE_LIENS = "neo-quiz-maj-";
     could not replace it. The new installer kills every process still named
     `neo-quiz-maj.exe` (`installer/uninstaller.nsh`, `customInit`) to rescue
     the versions that launch such a window; a window under the new name holds
-    only its own copy of the asar and is never killed. */
-export const NOM_EXECUTABLE_MAJ = "neo-quiz-fenetre.exe";
+    only its own copy of the asar and is never killed.
 
-/** The name of the windows of 1.20.58 and before, killed by the installer. */
-export const ANCIEN_NOM_EXECUTABLE_MAJ = "neo-quiz-maj.exe";
+    Not `neo-quiz-fenetre.exe` either (2026-10-10): those windows (1.20.59 to
+    1.20.69) still held the installed `app.asar`, this time through their
+    progress probe (`installer/sondage.ts`), and are killed the same way. */
+export const NOM_EXECUTABLE_MAJ = "neo-quiz-progression.exe";
+
+/** The names of the windows of 1.20.69 and before, killed by the installer. */
+export const ANCIENS_NOMS_EXECUTABLE_MAJ = ["neo-quiz-maj.exe", "neo-quiz-fenetre.exe"] as const;
 
 /** Files COPIED into the mirror instead of linked. Electron keeps
     `app.asar` open for its whole life; through a hard link that is the
@@ -71,21 +76,9 @@ export const ANCIEN_NOM_EXECUTABLE_MAJ = "neo-quiz-maj.exe";
     about 35 MB in the temp folder for the length of the update. */
 const COPIES = new Set(["app.asar"]);
 
-/** Runs `f` with Electron's asar support off. Electron's patched `fs` reads
-    a `.asar` FILE as a folder: a copy of it fails, and `rm` leaves it behind
-    (every old mirror still held its `app.asar`, about 32 MB each). Only
-    synchronous calls go in here, so no other code of the main process runs
-    while the switch is on. Without Electron the property is inert. */
-function sansAsar<T>(f: () => T): T {
-	const p = process as { noAsar?: boolean };
-	const avant = p.noAsar;
-	p.noAsar = true;
-	try {
-		return f();
-	} finally {
-		p.noAsar = avant;
-	}
-}
+/* `sansAsar` (in `installer/sondage.ts`): Electron's patched `fs` reads a
+   `.asar` FILE as a folder, so a copy of it fails and `rm` leaves it behind
+   (every old mirror still held its `app.asar`, about 32 MB each). */
 
 /** Le témoin que l'APPLICATION écrit à son démarrage. C'est le signal de fin
     que la fenêtre attend : quand l'application relancée par NSIS l'a touché, la

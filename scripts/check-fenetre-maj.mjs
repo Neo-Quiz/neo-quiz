@@ -69,7 +69,7 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 	marquerDemarrage,
 	nettoyerLiensMaj,
 	NOM_EXECUTABLE_MAJ,
-	ANCIEN_NOM_EXECUTABLE_MAJ,
+	ANCIENS_NOMS_EXECUTABLE_MAJ,
 	PREFIXE_LIENS,
 	preparerReflet,
 	refleter,
@@ -109,9 +109,22 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 			[true, 1, true]);
 		const nsh = await readFile(join(process.cwd(), "apps", "windows", "installer", "uninstaller.nsh"), "utf8");
 		r.check("installer: customInit kills the old windows, which held the installed app.asar",
-			nsh.includes(`"$SYSDIR\\taskkill.exe" /F /T /IM ${ANCIEN_NOM_EXECUTABLE_MAJ}`), true);
+			ANCIENS_NOMS_EXECUTABLE_MAJ.map(nom => nsh.includes(`"$SYSDIR\\taskkill.exe" /F /T /IM ${nom}`)),
+			ANCIENS_NOMS_EXECUTABLE_MAJ.map(() => true));
 		r.check("mirror: the window's executable is never named like the old windows the installer kills",
-			[NOM_EXECUTABLE_MAJ !== ANCIEN_NOM_EXECUTABLE_MAJ, NOM_EXECUTABLE_MAJ !== "neo-quiz.exe"], [true, true]);
+			[!ANCIENS_NOMS_EXECUTABLE_MAJ.includes(NOM_EXECUTABLE_MAJ), NOM_EXECUTABLE_MAJ !== "neo-quiz.exe",
+				nsh.includes(NOM_EXECUTABLE_MAJ)], [true, true, false]);
+
+		/* The update window weighs the install folder while NSIS writes it.
+		   Under Electron one `stat` of `app.asar` opens it as an archive and
+		   keeps it open, and the install then left the old `app.asar` behind
+		   (1.20.69 binaries around 1.20.63 code, 2026-10-10). Electron is not
+		   here to show it, so the probe's source is read: every `readdir` and
+		   `stat` call must sit inside `sansAsar(() => ...)`. */
+		const sondage = await readFile(join(process.cwd(), "apps", "windows", "installer", "sondage.ts"), "utf8");
+		const appelsFs = [...sondage.matchAll(/(?<![\w.])(readdir|stat)\(/g)].map(m => sondage.slice(Math.max(0, m.index - 16), m.index));
+		r.check("probe: every readdir/stat of the install folder runs with asar support off",
+			[appelsFs.length >= 4, appelsFs.filter(avant => !avant.endsWith("sansAsar(() => ")).length], [true, 0]);
 
 		/* Une source absente ne doit pas produire un demi-reflet silencieux. */
 		r.check("reflet : une source introuvable échoue, elle ne réussit pas à vide",

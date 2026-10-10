@@ -33,10 +33,17 @@
            about 79 % and left the old code under the new version number.
            Newer windows have another name and their own copy of the asar
            (`electron/fenetre-maj-liens.ts`); only the old ones are killed
-           here, the update then runs without its window. */
+           here, the update then runs without its window.
+           The windows of 1.20.59 to 1.20.69, `neo-quiz-fenetre.exe`, held it
+           too (2026-10-10): their progress probe stat'ed the installed
+           `app.asar` with Electron's `fs`, which opens an asar as an archive
+           and never closes it. Killed the same way. */
         nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM neo-quiz-maj.exe`
         Pop $0
+        nsExec::Exec `"$SYSDIR\taskkill.exe" /F /T /IM neo-quiz-fenetre.exe`
+        Pop $1
         ${If} $0 == 0
+        ${OrIf} $1 == 0
             Sleep 1500
         ${EndIf}
         DeleteRegValue SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
