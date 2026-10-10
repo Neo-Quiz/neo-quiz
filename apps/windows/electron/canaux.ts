@@ -75,7 +75,7 @@ import { autoriserHote, fetchBorne, retirerHote } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises, argumentsAvecOutils } from "./gabarits-cli";
-import { ajouterApprouve, CLE_CONFIANCE_IA, dossierCanonique, estApprouve, jugerDossierOutils, lireApprouves, retirerApprouve } from "./confiance-ia";
+import { ajouterApprouve, CLE_CONFIANCE_IA, VERSION_CONFIANCE, dossierCanonique, estApprouve, jugerDossierOutils, lireApprouves, retirerApprouve } from "./confiance-ia";
 import { creerReprises, estCleReprise } from "./resumable-runs";
 
 /** How long a generation whose page reloaded waits to be claimed again
@@ -1583,7 +1583,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			refusesSession.add(c.real.toLowerCase());
 			return "refuse";
 		}
-		const liste = ajouterApprouve(await approuves(), { path: c.path, real: c.real, at: new Date().toISOString() });
+		const liste = ajouterApprouve(await approuves(), { path: c.path, real: c.real, at: new Date().toISOString(), v: VERSION_CONFIANCE });
 		await reglagesOuErreur().ecrire(CLE_CONFIANCE_IA, liste);
 		console.log(LOG_PREFIX, "dossier approuvé pour l'IA:", c.real);
 		return "approuve";

@@ -297,7 +297,7 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	const { mkdtempSync, mkdirSync, writeFileSync: ecrire, symlinkSync, rmSync, realpathSync } = await import("node:fs");
 	const { tmpdir } = await import("node:os");
 	const { join } = await import("node:path");
-	await withSrcModule("apps/windows/electron/confiance-ia.ts", async ({ jugerDossierOutils, dossierCanonique, lireApprouves, ajouterApprouve, retirerApprouve, estApprouve }) => {
+	await withSrcModule("apps/windows/electron/confiance-ia.ts", async ({ jugerDossierOutils, dossierCanonique, lireApprouves, ajouterApprouve, retirerApprouve, estApprouve, VERSION_CONFIANCE }) => {
 		const r = makeReporter("Run with tools: the folder (trusted, opened, resolved)");
 		const base = realpathSync(mkdtempSync(join(tmpdir(), "nq-confiance-")));
 		try {
@@ -322,7 +322,10 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 			if (jonction) r.check("a junction inside the trusted folder that points outside is judged where it leads: refused", await juger(jonction), false);
 			r.check("nothing trusted: refused", jugerDossierOutils({ reel: c.real, estDossier: true, dansPerimetre: true, approuves: [] }), false);
 			r.check("a stored list that is damaged reads as empty, entries without a real absolute path are dropped",
-				[lireApprouves("x").length, lireApprouves([{ path: "a" }, { path: "b", real: "relatif" }, null]).length, lireApprouves([{ path: c.path, real: c.real, at: "" }]).length], [0, 0, 1]);
+				[lireApprouves("x").length, lireApprouves([{ path: "a" }, { path: "b", real: "relatif" }, null]).length, lireApprouves([{ path: c.path, real: c.real, at: "", v: VERSION_CONFIANCE }]).length], [0, 0, 1]);
+			/* 2026-10-10: an approval given when the dialog promised read-only tools for Claude Code alone is not a consent to the agent modes: it is ignored and the question is asked again. */
+			r.check("an approval of an older wording (no version, version 1) is ignored",
+				[lireApprouves([{ path: c.path, real: c.real, at: "" }]).length, lireApprouves([{ path: c.path, real: c.real, at: "", v: 1 }]).length, VERSION_CONFIANCE >= 2], [0, 0, true]);
 			r.check("the same folder is not added twice, and Remove takes it off by its shown path",
 				[ajouterApprouve(approuves, approuves[0]).length, retirerApprouve(approuves, c.path.replace(/\//g, "\\")).length], [1, 0]);
 			r.check("a sibling whose name starts like the trusted one is not covered", estApprouve(c.real + "-copie", approuves), false);

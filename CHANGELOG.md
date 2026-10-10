@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The "Trust this folder?" window now says what trusting allows: Claude Code and Codex can edit files and run commands there. Folders trusted under the old read-only wording are asked again.
+
 ## [1.20.80] - 2026-10-10
 
 ### Added

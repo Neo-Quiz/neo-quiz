@@ -26,6 +26,13 @@ import { normaliser } from "./parcours";
 /** The settings key of the trusted folders. Written by the main process only. */
 export const CLE_CONFIANCE_IA = "aiTrustedFolders";
 
+/** The version of what the dialog asked (2026-10-10). Version 1 promised
+    read-only tools for Claude Code alone; since the agent modes, trusting a
+    folder lets Claude Code and Codex edit files and run commands in it. An
+    approval given under the old wording is NOT that consent: entries of an
+    older version are ignored, so the question is asked again. */
+export const VERSION_CONFIANCE = 2;
+
 /** At most this many folders are kept: a list that grows without end is a list nobody reads. */
 export const MAX_DOSSIERS_APPROUVES = 100;
 
@@ -37,6 +44,8 @@ export interface DossierApprouve {
 	real: string;
 	/** When it was trusted (ISO 8601). */
 	at: string;
+	/** The wording it was trusted under (`VERSION_CONFIANCE`). */
+	v: number;
 }
 
 /** The trusted folders a stored value holds. Tolerant on the shape (a
@@ -46,10 +55,12 @@ export function lireApprouves(valeur: unknown): DossierApprouve[] {
 	const out: DossierApprouve[] = [];
 	for (const e of valeur) {
 		if (!e || typeof e !== "object") continue;
-		const { path: p, real, at } = e as Record<string, unknown>;
+		const { path: p, real, at, v } = e as Record<string, unknown>;
 		if (typeof p !== "string" || typeof real !== "string" || !p.trim() || !real.trim()) continue;
+		// Trusted under an older wording: not a consent to what a run may do now.
+		if (v !== VERSION_CONFIANCE) continue;
 		if (!path.isAbsolute(real)) continue;
-		out.push({ path: p, real: normaliser(real), at: typeof at === "string" ? at : "" });
+		out.push({ path: p, real: normaliser(real), at: typeof at === "string" ? at : "", v: VERSION_CONFIANCE });
 		if (out.length >= MAX_DOSSIERS_APPROUVES) break;
 	}
 	return out;
