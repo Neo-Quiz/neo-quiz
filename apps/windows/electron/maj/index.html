@@ -133,14 +133,19 @@ p {
 <body>
 <div id="app">
 	<div id="decor"></div>
-	<button id="fermer" type="button" title="Close" aria-label="Close" hidden><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/></svg></button>
-	<button id="min" type="button" title="Minimize" aria-label="Minimize"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.25 10H13.75"/></svg></button>
 	<div id="contenu">
 		<h1 id="titre">Updating Neo Quiz</h1>
 		<p id="detail"></p>
 		<p id="statut"></p>
 		<div class="barre indeterminee" id="barre"><i id="rempli"></i></div>
 	</div>
+	<!-- The window controls come AFTER #contenu (2026-10-10): Chromium builds the
+	     window's drag area in page order, and #contenu, which covers the whole
+	     window, came after them and cancelled their `no-drag`. Windows then
+	     classed the Minimise button as caption (WM_NCHITTEST = HTCAPTION), so a
+	     real click dragged the window instead of pressing the button. -->
+	<button id="fermer" type="button" title="Close" aria-label="Close" hidden><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l7 7M13.5 6.5l-7 7"/></svg></button>
+	<button id="min" type="button" title="Minimize" aria-label="Minimize"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.25 10H13.75"/></svg></button>
 </div>
 </body>
 </html>

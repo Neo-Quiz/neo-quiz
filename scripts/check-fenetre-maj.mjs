@@ -115,6 +115,16 @@ await withSrcModule("apps/windows/electron/fenetre-maj-liens.ts", async ({
 			[!ANCIENS_NOMS_EXECUTABLE_MAJ.includes(NOM_EXECUTABLE_MAJ), NOM_EXECUTABLE_MAJ !== "neo-quiz.exe",
 				nsh.includes(NOM_EXECUTABLE_MAJ)], [true, true, false]);
 
+		/* The window controls must come AFTER #contenu in the page: Chromium
+		   builds the drag area in page order, and #contenu (the whole window)
+		   placed after them cancelled their no-drag, so a real click on
+		   Minimise dragged the window (WM_NCHITTEST = HTCAPTION, 2026-10-10). */
+		const page = await readFile(join(process.cwd(), "apps", "windows", "electron", "maj", "index.html"), "utf8");
+		const ouvert = (id) => page.indexOf(`<button id="${id}"`);
+		r.check("update window: Minimise and Close come after the full-window content",
+			[ouvert("min") > page.indexOf('<div id="contenu">'), ouvert("fermer") > page.indexOf('<div id="contenu">'), ouvert("min") > 0],
+			[true, true, true]);
+
 		/* The update window weighs the install folder while NSIS writes it.
 		   Under Electron one `stat` of `app.asar` opens it as an archive and
 		   keeps it open, and the install then left the old `app.asar` behind
