@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.74] - 2026-10-10
+
 ### Changed
 
 - Claude Code and Codex update silently: the logo menu only shows them when an update needs a click (metered connection or a failure).
