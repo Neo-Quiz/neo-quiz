@@ -1,8 +1,8 @@
 {
-  "versionCode": 29,
-  "versionName": "0.2.27",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.27/NeoQuiz-0.2.27.apk",
-  "sha256": "007d1ec66bb9bf343fbd72d5bc244d6757193983914d152c50ec7bf4c568a8fd",
-  "size": 56054513,
-  "notes": "Updates now live in Settings only."
+  "versionCode": 30,
+  "versionName": "0.2.28",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.28/NeoQuiz-0.2.28.apk",
+  "sha256": "36100f6d887257310d57792bb743550c4c0cb7a0375dd719f14b7a9af5ad86ef",
+  "size": 56053985,
+  "notes": "The text field now sits right on the keyboard; updates live in Settings."
 }
