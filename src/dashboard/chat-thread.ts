@@ -81,7 +81,7 @@ export function toursOfThread(items: readonly ThreadItem[]): TourPrecedent[] {
 			const q = item.request;
 			return {
 				text: q.text,
-				notes: q.documents.map(d => ({ name: d.name, content: "" })),
+				notes: q.documents.map(d => ({ name: d.name, content: "", ...(d.path ? { path: d.path } : {}) })),
 				quizzes: q.results.flatMap(x => (x.kind === "quiz" ? [{ title: x.title, questions: [], path: x.path }] : [])),
 				answers: q.results.flatMap(x => (x.kind === "text" ? [x.text] : [])),
 			};
@@ -89,7 +89,7 @@ export function toursOfThread(items: readonly ThreadItem[]): TourPrecedent[] {
 		// A planning line is no quiz of its own: its steps are the quizzes.
 		const lines = item.lines.filter(l => l.etat !== "arret");
 		const notes = new Map<string, { name: string; content: string }>();
-		for (const l of lines) for (const n of l.demande.notes) notes.set(n.name, { name: n.name, content: n.content });
+		for (const l of lines) for (const n of l.demande.notes) notes.set(n.name, { name: n.name, content: n.content, ...(n.path ? { path: n.path } : {}) });
 		const quizzes = lines.filter(l => !l.demande.planifier).flatMap(l => {
 			const p = l.demande.produit;
 			if (!p) return [];

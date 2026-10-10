@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A follow-up to Claude Code or Codex no longer sends the earlier documents again: the AI opens them itself in the folder, which saves usage. Ollama and Antigravity still get them.
+
 ## [1.20.81] - 2026-10-10
 
 ### Fixed

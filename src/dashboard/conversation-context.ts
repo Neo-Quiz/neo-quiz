@@ -7,8 +7,9 @@
 
 export interface TourPrecedent {
 	text: string;
-	/** Documents attached to that request, already read. */
-	notes: { name: string; content: string }[];
+	/** Documents attached to that request, already read; `path` where it lives
+	    (root-relative, or absolute outside the root), when known. */
+	notes: { name: string; content: string; path?: string }[];
 	/** The quizzes it produced (one entry per quiz): title and raw questions. */
 	quizzes: { title?: string; questions: unknown[]; path?: string }[];
 	/** Written answers of that request, as text. */
@@ -39,7 +40,7 @@ export function contexteConversation(tours: readonly TourPrecedent[]): string {
 	if (!tours.length) return "";
 	const blocs = tours.map((tour, i) => {
 		const lignes = ["Earlier request " + (i + 1) + ":", tour.text.trim() || "(no text)"];
-		if (tour.notes.length) lignes.push("Documents attached: " + tour.notes.map(n => n.name).join(", "));
+		if (tour.notes.length) lignes.push("Documents attached: " + tour.notes.map(n => (n.path ? n.name + " (file: " + n.path + ")" : n.name)).join(", "));
 		for (const q of tour.quizzes) {
 			const prompts = q.questions.map(promptOf).filter(Boolean);
 			// A quiz read back from a chat record: its questions are not kept, its file is.
@@ -57,5 +58,9 @@ export function contexteConversation(tours: readonly TourPrecedent[]): string {
 		}
 		return lignes.join("\n");
 	});
-	return "CONVERSATION SO FAR (the new request below continues it: \"redo it\", \"make it multiple choice\" refer to the quizzes above and their documents):\n\n" + blocs.join("\n\n");
+	/* With tools (agent modes, 2026-10-10) the documents of the earlier
+	   requests are no longer inlined again: the model opens them itself, from
+	   the file paths given here (root-relative paths start at the user's quiz
+	   root; the model may search by name from its folder). */
+	return "CONVERSATION SO FAR (the new request below continues it: \"redo it\", \"make it multiple choice\" refer to the quizzes above and their documents; when you have tools and a document or quiz is not inlined below, open its file yourself, searching by its name if the path does not resolve from your folder):\n\n" + blocs.join("\n\n");
 }

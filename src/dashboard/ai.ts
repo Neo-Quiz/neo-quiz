@@ -4021,8 +4021,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   document at all and the model answered with a question asking for the
 	   PDF, saved as a one-question quiz (2026-10-10). Those documents are read
 	   again from their paths, through the same functions as the "@" picker. */
+	/* NOT FOR AN AGENT (2026-10-10): Claude Code and Codex run in the quiz's
+	   folder with tools and open the earlier documents themselves, from the
+	   paths the conversation context gives (`contexteConversation`);
+	   inlining their text again only spent tokens. Ollama and Antigravity,
+	   which have no tools, still get them. */
+	function fournisseurAgent(): boolean {
+		const p = settings().aiProvider;
+		return (p === "claude-code" || p === "codex") && host.platform.isDesktopApp && !!host.process?.trustFolder;
+	}
+
 	async function rattacherDocumentsHerites(): Promise<void> {
-		if (noteAttachments.length || images.length) return;
+		if (noteAttachments.length || images.length || fournisseurAgent()) return;
 		const chatId = activeChatId();
 		const enFile = new Set(fileGen.lignes().filter(l => chatOfLine(l) === chatId).flatMap(l => l.demande.notes).map(n => n.name));
 		const chemins = new Map<string, string>();
@@ -4421,7 +4431,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const tours = toursOfThread(filDuChat().filter(i => i.key !== repris.requestId));
 		if (tours.length) {
 			envoi.contexte = contexteConversation(tours);
-			if (!envoi.notes.length && !envoi.images.length) {
+			if (!envoi.notes.length && !envoi.images.length && !fournisseurAgent()) {
 				const herites = documentsHeritiers(tours);
 				// Only documents the queue still holds can be attached again (their text).
 				const parNom = new Map(fileGen.lignes().filter(l => chatOfLine(l) === chatId).flatMap(l => l.demande.notes).map(n => [n.name, n] as const));
