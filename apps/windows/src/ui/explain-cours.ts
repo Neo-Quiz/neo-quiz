@@ -35,7 +35,7 @@ export interface Cours {
 	incomplet: boolean;
 }
 
-function enBase64(octets: Uint8Array): string {
+export function enBase64(octets: Uint8Array): string {
 	let s = "";
 	for (let i = 0; i < octets.length; i += 0x8000) s += String.fromCharCode(...octets.subarray(i, i + 0x8000));
 	return btoa(s);
