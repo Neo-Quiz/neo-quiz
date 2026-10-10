@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.69] - 2026-10-10
+
 ### Added
 
 - The plan usage popover can sign out of Claude Code or Codex, switch account, and sign in again through the browser.
