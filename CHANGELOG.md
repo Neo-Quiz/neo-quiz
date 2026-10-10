@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.72] - 2026-10-10
+
 ### Fixed
 
 - An update that restarts the app on its previous version now says so in the logo menu ("Update did not finish, try again") instead of looping silently.
