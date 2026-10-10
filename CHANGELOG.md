@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.78] - 2026-10-10
+
 ### Fixed
 
 - A generated Learn no longer turns one lecture into dozens of steps: it holds at most 10 steps, with two questions and one flashcard each.
