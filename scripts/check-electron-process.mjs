@@ -2012,3 +2012,104 @@ await withSrcModule(["apps/windows/electron/codex-resets.ts", "src/dashboard/cod
 	rmSync(tmp, { recursive: true, force: true });
 	r.done();
 });
+
+/* ── CLAUDE'S OUTPUT CEILING AND THE ACCOUNT COMMANDS (2026-10-10) ──
+   WHAT IT PREVENTS. (1) A long Learn ending on Claude Code's default 32,000
+   output tokens: every `claude` the app runs gets
+   `CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000`, a fixed value (`ENV_SORTIE_CLAUDE`),
+   and only `claude` gets it. (2) The sign-in and sign-out of the usage
+   popover (`comptes.ts`): the EXACT constant commands of `ARGS_COMPTE`, never
+   anything else; one account operation at a time (`occupe`); the sign-in
+   keeps `stdin` open as a terminal would; a cancelled or timed-out sign-in
+   gets its TREE killed. All on FAKE `claude` / `codex` executables first on
+   a PATH where nothing else is reachable: the real accounts are never
+   touched. */
+await withSrcModule(["apps/windows/electron/comptes.ts", "apps/windows/electron/process.ts"], async ({ annulerConnexionCompte, connecterCompte, deconnecterCompte }, { lancer, run, tuerArbre }) => {
+	const r = makeReporter("Électron — Claude's output ceiling and the account commands");
+	const racine = mkdtempSync(join(tmpdir(), "quiz-comptes-"));
+	const maison = join(racine, "maison");
+	mkdirSync(maison, { recursive: true });
+	const dossier = join(racine, "bin");
+	mkdirSync(dossier, { recursive: true });
+	const journal = join(racine, "appels.jsonl");
+	/* One fake script for both tools: it logs its name, arguments and the
+	   variable, then behaves as `FAUX_MODE` says. `attend`: waits until killed,
+	   `stdin`: exits 0 only if stdin is still open after 400 ms. */
+	const script = join(racine, "faux.js");
+	writeFileSync(script, `
+const fs = require("fs");
+const [nom, ...args] = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(journal)}, JSON.stringify({ nom, args, max: process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS ?? null, pid: process.pid }) + String.fromCharCode(10));
+const mode = process.env.FAUX_MODE || "vite";
+if (args[0] === "--version" || args.length === 0) { process.stdout.write(String(process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS ?? "absent")); process.exit(0); }
+if (mode === "attend") { setInterval(() => {}, 1000); setTimeout(() => process.exit(9), 20000); }
+else if (mode === "stdin") { let fini = false; process.stdin.on("end", () => { fini = true; }); process.stdin.resume(); setTimeout(() => process.exit(fini ? 3 : 0), 400); }
+else process.exit(0);
+`);
+	for (const nom of ["claude", "codex"]) {
+		const lanceur = join(dossier, process.platform === "win32" ? nom + ".cmd" : nom);
+		if (process.platform === "win32") writeFileSync(lanceur, '@echo off\r\n"' + process.execPath + '" "' + script + '" ' + nom + ' %*\r\n');
+		else writeFileSync(lanceur, '#!/bin/sh\nexec "' + process.execPath + '" "' + script + '" ' + nom + ' "$@"\n', { mode: 0o755 });
+	}
+	const envDe = (mode) => ({
+		PATH: dossier, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec, PATHEXT: process.env.PATHEXT,
+		TEMP: process.env.TEMP, TMP: process.env.TMP, USERPROFILE: maison, HOME: maison, FAUX_MODE: mode,
+	});
+	const appels = () => existsSync(journal) ? readFileSync(journal, "utf8").trim().split("\n").filter(Boolean).map(l => JSON.parse(l)) : [];
+	const vider = () => rmSync(journal, { force: true });
+	const dodo = (ms) => new Promise(res => setTimeout(res, ms));
+	const oui = async () => true;
+
+	try {
+		await cas(r, "the output ceiling", async () => {
+			const claude = await run({ tool: "claude", args: ["--version"], stdin: "" }, { env: envDe("vite") });
+			r.check("`claude` runs with CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000", claude.stdout, "64000");
+			const surcharge = await run({ tool: "claude", args: ["--version"], stdin: "" }, { env: Object.assign(envDe("vite"), { CLAUDE_CODE_MAX_OUTPUT_TOKENS: "999" }) });
+			r.check("… a fixed value, whatever the inherited environment says", surcharge.stdout, "64000");
+			const codex = await run({ tool: "codex", args: ["--version"], stdin: "" }, { env: envDe("vite") });
+			r.check("`codex` does not get it", codex.stdout, "absent");
+		});
+
+		await cas(r, "sign-out commands", async () => {
+			vider();
+			r.check("claude sign-out: ok", await deconnecterCompte("claude", oui, { env: envDe("vite") }), "ok");
+			r.check("codex sign-out: ok", await deconnecterCompte("codex", oui, { env: envDe("vite") }), "ok");
+			r.check("… with exactly `auth logout` and `logout`", appels().map(a => [a.nom, a.args]), [["claude", ["auth", "logout"]], ["codex", ["logout"]]]);
+			vider();
+			const ordre = [];
+			const refus = await deconnecterCompte("claude", async () => { ordre.push("box:" + appels().length); return false; }, { env: envDe("vite") });
+			r.check("the native box is asked FIRST, and a no launches nothing: `annule`", [refus, ordre, appels().length], ["annule", ["box:0"], 0]);
+			r.check("a box that throws counts as a no", [await deconnecterCompte("codex", async () => { throw new Error("x"); }, { env: envDe("vite") }), appels().length], ["annule", 0]);
+		});
+
+		await cas(r, "browser sign-in", async () => {
+			vider();
+			r.check("claude sign-in with stdin kept open: ok", await connecterCompte("claude", { env: envDe("stdin") }), "ok");
+			r.check("codex sign-in: ok", await connecterCompte("codex", { env: envDe("stdin") }), "ok");
+			r.check("… with exactly `auth login` and `login`", appels().map(a => [a.nom, a.args]), [["claude", ["auth", "login"]], ["codex", ["login"]]]);
+			r.check("a tool outside the two: `indisponible`, nothing launched", [await connecterCompte("agy", { env: envDe("vite") }), appels().length], ["indisponible", 2]);
+			r.check("no executable on the PATH: `indisponible`", await connecterCompte("claude", { env: Object.assign(envDe("vite"), { PATH: join(racine, "vide") }) }), "indisponible");
+		});
+
+		await cas(r, "one operation at a time, tree killed on cancel", async () => {
+			vider();
+			const tues = [];
+			const lancerEspion = (spec) => lancer(Object.assign({}, spec, { tuer: (pid) => { tues.push(pid); return tuerArbre(pid); } }));
+			const enCours = connecterCompte("claude", { env: envDe("attend"), lancer: lancerEspion });
+			for (let i = 0; i < 50 && appels().length === 0; i++) await dodo(100);
+			r.check("a second sign-in meanwhile: `occupe`", await connecterCompte("codex", { env: envDe("vite") }), "occupe");
+			r.check("a sign-out meanwhile: `occupe`, nothing launched", [await deconnecterCompte("claude", oui, { env: envDe("vite") }), appels().length], ["occupe", 1]);
+			annulerConnexionCompte();
+			r.check("cancelled: `annule`", await enCours, "annule");
+			r.check("… its tree was killed (`tuerArbre` on the CLI's pid)", tues.length, 1);
+			r.check("the lock is released after the cancel", await deconnecterCompte("claude", oui, { env: envDe("vite") }), "ok");
+			tues.length = 0;
+			r.check("a sign-in past its time limit: `expire`", await connecterCompte("codex", { env: envDe("attend"), lancer: lancerEspion, delaiConnexionMs: 1500 }), "expire");
+			r.check("… its tree was killed too", tues.length, 1);
+			r.check("the lock is released after the time limit", await connecterCompte("claude", { env: envDe("vite") }), "ok");
+		});
+	} finally {
+		rmSync(racine, { recursive: true, force: true });
+	}
+	r.done();
+});

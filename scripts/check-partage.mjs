@@ -102,9 +102,21 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE }) => {
+await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER, ARGS_COMPTE }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
+
+	/* THE ACCOUNT COMMANDS (2026-10-10, `comptes.ts`): constant, checked
+	   against `claude auth --help` and `codex --help`, launched by the main
+	   process only. Through `process.run` the window could sign the machine
+	   out without the native confirmation, or start a sign-in nobody asked
+	   for: none of them, nor a variant, is a form `argumentsAutorises` takes. */
+	r.check("account commands: exactly `claude auth login|logout`, `codex login|logout`",
+		ARGS_COMPTE, { claude: { connexion: ["auth", "login"], deconnexion: ["auth", "logout"] }, codex: { connexion: ["login"], deconnexion: ["logout"] } });
+	r.check("account commands are NOT forms the window can launch through process.run",
+		[["claude", ["auth", "login"]], ["claude", ["auth", "logout"]], ["codex", ["login"]], ["codex", ["logout"]], ["claude", ["auth", "login", "--console"]], ["codex", ["login", "--with-api-key"]], ["codex", ["login", "status"]], ["claude", ["auth", "status", "--json"]]]
+			.map(([o, a]) => argumentsAutorises(o, a, m) || argumentsAutorises(o, a, undefined)),
+		[false, false, false, false, false, false, false, false]);
 	const j = (nom) => `{{nq-${m}:${nom}}}`;
 	const claude = (modele, outils) => ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", modele, "--tools", outils, "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"];
 	const codex = (rapide, images) => ["exec", "--json", "-m", "gpt-5.1-codex", "-c", "model_reasoning_effort=high",

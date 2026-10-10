@@ -60,7 +60,8 @@ import type { ServiceMoodle } from "./moodle/service";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
 import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
-import { deconnecterCompte, etatComptes, usageCompte } from "./comptes";
+import { annulerConnexionCompte, connecterCompte, deconnecterCompte, etatComptes, usageCompte } from "./comptes";
+import { ecrireDiagnostic } from "./diagnostic-reponse";
 import { codexResets } from "./codex-resets";
 import type { ResetCredit } from "../../../src/dashboard/codex-resets";
 import type { AncreTerminal, EtatCompte } from "../../../src/host/types";
@@ -1404,12 +1405,53 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	};
 	ipcMain.handle(CANAUX.comptesResets, (_e, requete: unknown) => codexResets(requete, { confirmer: confirmerReset }));
 
-	ipcMain.handle(CANAUX.comptesDeconnecter, (_e, tool: unknown): Promise<"ok" | "echec" | "indisponible"> => {
+	/* SIGN-OUT IS CONFIRMED HERE, in a native box written and translated by
+	   the main process (2026-10-10): it signs the whole machine out of the
+	   tool, and a window alone must not be able to do that. `changer` only
+	   picks the wording of "Switch account" (a sign-out the page follows with
+	   a sign-in); anything but `true` is the plain sign-out. */
+	const confirmerDeconnexion = async (tool: Outil, changer: boolean): Promise<boolean> => {
+		const name = NOMS_OUTILS[tool];
+		const options = {
+			type: "question" as const,
+			title: t(changer ? "app.comptes.switchTitle" : "app.comptes.logoutTitle", { name }),
+			message: t(changer ? "app.comptes.switchMessage" : "app.comptes.logoutMessage", { name }),
+			detail: t("app.comptes.logoutDetail"),
+			buttons: [t(changer ? "app.comptes.switchConfirm" : "app.comptes.logoutConfirm"), t("app.comptes.cancel")],
+			defaultId: 1,
+			cancelId: 1,
+			noLink: true,
+		};
+		const parent = deps.fenetreCourante();
+		const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+		return response === 0;
+	};
+	ipcMain.handle(CANAUX.comptesDeconnecter, async (_e, tool: unknown, changer: unknown): Promise<"ok" | "echec" | "indisponible" | "annule" | "occupe"> => {
 		if (!estOutilAutorise(tool)) {
-			console.warn(LOG_PREFIX, "déconnexion refusée, outil hors liste:", tool);
-			throw erreurCli("refuse", "outil hors liste : " + String(tool));
+			console.warn(LOG_PREFIX, "sign-out refused, tool not listed:", tool);
+			throw erreurCli("refuse", "tool not listed: " + String(tool));
 		}
-		return deconnecterCompte(tool);
+		return deconnecterCompte(tool, () => confirmerDeconnexion(tool, changer === true));
+	});
+
+	/* ─── BROWSER SIGN-IN (2026-10-10) ───
+	   Claude Code and Codex only: the two whose CLI has a sign-in command that
+	   opens the browser by itself. The name is judged, the command is the
+	   constant of `ARGS_COMPTE`, and no confirmation is asked: a sign-in only
+	   opens the provider's page in the browser, where the user decides. */
+	ipcMain.handle(CANAUX.comptesConnecter, (_e, tool: unknown): Promise<"ok" | "echec" | "annule" | "expire" | "occupe" | "indisponible"> => {
+		if (tool !== "claude" && tool !== "codex") {
+			console.warn(LOG_PREFIX, "browser sign-in refused, tool not listed:", tool);
+			throw erreurCli("refuse", "tool not listed: " + String(tool));
+		}
+		return connecterCompte(tool);
+	});
+	ipcMain.handle(CANAUX.comptesAnnulerConnexion, (): void => { annulerConnexionCompte(); });
+
+	/* ─── RAW ANSWER DIAGNOSTIC (2026-10-10, `diagnostic-reponse.ts`) ─── */
+	ipcMain.handle(CANAUX.processusDiagnostic, async (_e, texte: unknown): Promise<void> => {
+		const chemin = await ecrireDiagnostic(app.getPath("logs"), texte);
+		if (chemin) console.warn(LOG_PREFIX, "unreadable model answer saved to", chemin);
 	});
 
 	/* ─── LE TERMINAL D'USAGE D'ANTIGRAVITY ───

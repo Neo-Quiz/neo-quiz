@@ -153,8 +153,17 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 		codexResets(requete) {
 			return pont().processus.comptesResets(requete);
 		},
-		deconnecterCli(tool) {
-			return pont().processus.comptesDeconnecter(tool);
+		deconnecterCli(tool, changer) {
+			return pont().processus.comptesDeconnecter(tool, changer === true);
+		},
+		connecterCompteNavigateur(tool) {
+			return pont().processus.comptesConnecter(tool);
+		},
+		annulerConnexionNavigateur() {
+			return pont().processus.comptesAnnulerConnexion();
+		},
+		diagnosticReponse(texte) {
+			return pont().processus.diagnosticReponse(texte);
 		},
 		terminalUsageCli(tool) {
 			return pont().processus.comptesUsageTerminal(tool);

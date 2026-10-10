@@ -8,6 +8,7 @@ import { formatAge, usageWaitText, usageLevel, usageRemainingPercent, usageReset
 import type { UsageRead } from "./usage-format";
 import { spendable } from "./codex-resets";
 import type { ResetOutcome, ResetsError, ResetsRead } from "./codex-resets";
+import { clearAccountMessage, drawAccount } from "./usage-account";
 
 /* ══════════════════════════════════════════════════════════
    THE PLAN STATUS BLOCK under the composer: one small text row per window
@@ -48,7 +49,7 @@ const enVol = new Map<UsageTool, Promise<void>>();
     minutes, started by the first popover opening only, never while the page is
     hidden. The plan is deliberately never read here. */
 const EMAIL_MS = 10 * 60000;
-const emails = new Map<UsageTool, { email: string | null; at: number }>();
+const emails = new Map<UsageTool, { email: string | null; connecte: boolean | null; at: number }>();
 const emailEnVol = new Set<UsageTool>();
 function loadEmail(tool: UsageTool, done: () => void): void {
 	const cur = emails.get(tool);
@@ -59,8 +60,8 @@ function loadEmail(tool: UsageTool, done: () => void): void {
 	emailEnVol.add(tool);
 	proc.etatComptes([tool]).then(list => {
 		const c = list.find(e => e.outil === tool);
-		emails.set(tool, { email: c && c.connecte ? c.email : null, at: Date.now() });
-	}).catch(() => { emails.set(tool, { email: null, at: Date.now() }); }).finally(() => {
+		emails.set(tool, { email: c && c.connecte ? c.email : null, connecte: c ? c.connecte : null, at: Date.now() });
+	}).catch(() => { emails.set(tool, { email: null, connecte: null, at: Date.now() }); }).finally(() => {
 		emailEnVol.delete(tool);
 		done();
 	});
@@ -218,7 +219,9 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		if (enVol.has(tool)) refresh.classList.add("is-reading");
 		refresh.addEventListener("click", () => { load(true); loadResets(tool, false, () => redraws.forEach(f => f())); drawPop(); });
 		if (!verdict.ok && verdict.reason === "backoff") ajouter(pop, "div", "qbd-usage-pop-note", t("ai.usage.rateLimited", { when: usageWaitText(verdict.waitMs) }));
-		for (const row of cur ? usageStatusRows(cur.rows) : []) {
+		// Signed out: the last numbers belong to the account that left, not shown.
+		const signedOut = emails.get(tool)?.connecte === false;
+		for (const row of cur && !signedOut ? usageStatusRows(cur.rows) : []) {
 			const pct = Math.max(0, Math.min(100, Math.round(row.usedPercent)));
 			const sec = ajouter(pop, "div", "qbd-usage-pop-win");
 			const top = ajouter(sec, "div", "qbd-usage-pop-top");
@@ -241,6 +244,18 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(meta, "span", "", when ? t("ai.usage.resetsIn", { when }) : "");
 		}
 		drawResets(now);
+		drawAccount(pop, tool, {
+			connected: emails.get(tool)?.connecte ?? null,
+			redraw: () => redraws.forEach(f => f()),
+			/* After a sign-in or a sign-out: the address now, the plan at the
+			   next free slot of the shared cadence (`rereadLimits`). */
+			changed: () => {
+				emails.delete(tool);
+				loadEmail(tool, () => redraws.forEach(f => f()));
+				if (cadenceVerdict(cadenceOf(tool), Date.now()).ok) load(true);
+				else { rereadLimits = true; startSec(); }
+			},
+		});
 	}
 	/** The banked resets section. Texts from the server go in as TEXT. */
 	function drawResets(now: number): void {
@@ -328,6 +343,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape" && pop) { closePop(); el.focus(); } };
 	function closePop(): void {
 		if (!pop) return;
+		clearAccountMessage();
 		pop.remove();
 		pop = null;
 		stopSec();

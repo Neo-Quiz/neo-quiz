@@ -1771,6 +1771,17 @@ export function dossiersCli(env: NodeJS.ProcessEnv = process.env): string[] {
  */
 export const ENV_SANS_MAJ_AGY = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" } as const;
 
+/**
+ * THE OUTPUT CEILING OF CLAUDE CODE, for every generation the app launches
+ * (2026-10-10). By default the CLI caps one answer at 32,000 output tokens;
+ * a long Learn (70+ questions) went past it after half an hour, and the run
+ * ended on "API Error: Claude's response exceeded the 32000 output token
+ * maximum" instead of a quiz. 64,000 was run with Opus 5.5 and Haiku 5.5
+ * without an error. A FIXED value set by the main process, never one that
+ * comes from the window; set for `claude` only (`run`).
+ */
+export const ENV_SORTIE_CLAUDE = { CLAUDE_CODE_MAX_OUTPUT_TOKENS: "64000" } as const;
+
 export function environnementEnfant(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
 	const courant = env.PATH || "";
 	const fusion = courant + delimiter + dossiersCli(env).filter(p => !courant.includes(p)).join(delimiter);
@@ -1990,6 +2001,13 @@ export function lancer(spec: {
 	/** The standard output as it arrives (live transcript). A throwing
 	    listener never breaks the run. */
 	surStdout?: (texte: string) => void;
+	/** Leaves `stdin` OPEN and empty instead of writing then closing it
+	    (2026-10-10, the browser sign-in of `comptes.ts`): a sign-in CLI that
+	    reads an end of input may give up before the browser answers, the way
+	    a terminal that closes would. Only the main process sets it, for a
+	    constant command; the run still ends by its exit, its timeout or its
+	    abort, which kills the tree. */
+	garderStdin?: boolean;
 }, parCmd = false): Promise<{ stdout: string; stderr: string; code: number | null }> {
 	return new Promise((resolve, reject) => {
 		const tuer = spec.tuer || tuerArbre;
@@ -2127,6 +2145,7 @@ export function lancer(spec: {
 		   entier, la fenêtre avec. Ce qui compte est déjà tenu par `close` et
 		   `error` de l'enfant ; cette erreur-là n'apporte rien de plus. */
 		enfant.stdin?.on("error", () => { /* `close` de l'enfant tranche */ });
+		if (spec.garderStdin) return;
 		try {
 			enfant.stdin?.write(spec.stdin);
 			enfant.stdin?.end();
@@ -2285,7 +2304,7 @@ export async function run(spec: {
 				stdin: resolu.stdin,
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
-				env: environnementEnfant(env),
+				env: spec.tool === "claude" ? Object.assign(environnementEnfant(env), ENV_SORTIE_CLAUDE) : environnementEnfant(env),
 				cwd: images ? resolu.pieces : spec.cwd ?? dossierPersonnel(env),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,

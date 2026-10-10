@@ -21,7 +21,6 @@ import type { CliTool, EtatCompte } from "../../../../src/host/types";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import { t, currentLang } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
-import { openConfirmModal } from "../../../../src/editor/modals";
 import { checkOllamaCompte, setBrandLogo, sondeConnexion } from "../../../../src/dashboard/ai-providers";
 import { openInstallModal } from "../../../../src/dashboard/ai-install-modal";
 import type { InstallProvider } from "../../../../src/dashboard/ai-install-modal";
@@ -633,24 +632,26 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 	    `finally` dans `surClicAction`, mais `deconnecter` a son propre
 	    chemin de retour anticipé qui, lui, ne touchait jamais `bouton`. */
 	async function deconnecter(outil: CliTool, bouton: HTMLButtonElement): Promise<void> {
-		let verdict: "ok" | "echec" | "indisponible";
+		let verdict: "ok" | "echec" | "indisponible" | "annule" | "occupe";
 		try {
 			verdict = await requireHost("process").deconnecterCli(outil);
 		} catch (e) {
-			console.warn(LOG_PREFIX, "déconnexion impossible:", e);
+			console.warn(LOG_PREFIX, "sign-out failed:", e);
 			verdict = "echec";
 		}
 		if (detruit) return;
+		// Refused in the host's native confirmation: nothing changed.
+		if (verdict === "annule") { bouton.disabled = false; return; }
 		if (verdict !== "ok") {
 			currentHost().ui.notice(t("app.comptes.logoutFailed", { name: nomOutil(outil) }));
-			// ÉCHEC OU EXCEPTION : la ligne ne se redessine pas (rien n'a changé
-			// côté compte), donc RIEN d'autre ne réactivera ce bouton — sans ce
-			// réveil explicite, il reste mort jusqu'à la fermeture des réglages.
+			// FAILURE OR EXCEPTION: the row is not redrawn (nothing changed on
+			// the account side), so NOTHING else re-enables this button; without
+			// this explicit wake-up it stays dead until Settings close.
 			bouton.disabled = false;
 			return;
 		}
-		// `"ok"` : la ligne est RE-SONDÉE, jamais supposée déconnectée — le
-		// redessin remplace `bouton` par un bouton neuf, actif.
+		// `"ok"`: the row is PROBED again, never assumed signed out; the
+		// redraw replaces `bouton` with a new, enabled one.
 		await redessiner(true);
 	}
 
@@ -759,27 +760,12 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 			// de la couche modale (90), et resterait peint par-dessus la
 			// confirmation sans ça.
 			fermerPopoversUsage();
-			// DÉSACTIVÉ AVANT D'OUVRIR LA CONFIRMATION, comme les deux autres
-			// branches : sans ça, un double-clic rapide empile deux modales de
-			// confirmation. Réactivé si l'utilisateur annule — `redessiner()`
-			// (donc un bouton refait à neuf) ne suit que la confirmation.
+			/* The confirmation is the HOST's own native box since 2026-10-10
+			   (`canaux.ts`): a window alone can no longer sign the machine
+			   out. Disabled until the verdict, so a double click cannot ask
+			   twice; `deconnecter` re-enables it on every outcome but "ok". */
 			bouton.disabled = true;
-			const name = nomOutil(outil);
-			openConfirmModal(
-				t("app.comptes.logoutTitle", { name }),
-				t("app.comptes.logoutMessage", { name }),
-				t("app.comptes.logoutConfirm"),
-				t("app.comptes.cancel"),
-				(confirme) => {
-					if (!confirme) {
-						bouton.disabled = false;
-						return;
-					}
-					void deconnecter(outil, bouton);
-				},
-				t("app.comptes.logoutDetail"),
-				"log-out",
-			);
+			void deconnecter(outil, bouton);
 			return;
 		}
 		bouton.disabled = true;

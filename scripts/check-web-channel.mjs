@@ -96,8 +96,10 @@ await withSrcModule(
 		r.check("une phrase sans quiz : erreur « pas un quiz », avec l'aperçu", typeof e1 === "string" && e1.includes("Je ne peux pas"), true);
 		let e2 = null;
 		try { client.parseReponseQuiz(`[{ title: "Q", prompt: "P", options: ["a", "b"], correctIndex: 1 `); } catch (e) { e2 = e.message; }
+		/* Since 2026-10-10 the message also shows the start of the answer, so
+		   "title" appears in it; what must not appear is the "not a quiz" wording. */
 		r.check("un quiz mal formé garde l'erreur du parseur (position), pas « pas un quiz »",
-			typeof e2 === "string" && !e2.includes("title") && /\d+:\d+|JSON5/.test(e2), true);
+			typeof e2 === "string" && !/instead of a quiz|au lieu d'un quiz/.test(e2) && /\d+:\d+|JSON5/.test(e2) && e2.includes('[{ title: "Q"'), true);
 	}
 
 	r.done();

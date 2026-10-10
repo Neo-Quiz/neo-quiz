@@ -894,8 +894,23 @@ export interface Pont {
 		    the last read); nothing else crosses. */
 		comptesResets(requete: ResetsRequest): Promise<ResetsResult>;
 		/** Déconnecte un compte, sans terminal. Le NOM est jugé par
-		    `estOutilAutorise` avant tout, comme `run` et `connecter`. */
-		comptesDeconnecter(tool: Outil): Promise<"ok" | "echec" | "indisponible">;
+		    `estOutilAutorise` avant tout, comme `run` et `connecter`. The main
+		    process asks a NATIVE confirmation first (`annule` when refused);
+		    `changer` only picks its wording ("Switch account"), it is never a
+		    text. `occupe`: another account operation is running. */
+		comptesDeconnecter(tool: Outil, changer?: boolean): Promise<"ok" | "echec" | "indisponible" | "annule" | "occupe">;
+		/** Signs in through the CLI's own browser flow (`claude auth login`,
+		    `codex login`), hidden, in the main process: only the tool's NAME
+		    crosses, never an argument, and no token ever comes back. Resolves
+		    when the CLI exits, is cancelled or times out (10 min). */
+		comptesConnecter(tool: "claude" | "codex"): Promise<"ok" | "echec" | "annule" | "expire" | "occupe" | "indisponible">;
+		/** Cancels the running browser sign-in (its process tree is killed). */
+		comptesAnnulerConnexion(): Promise<void>;
+		/** Saves the raw answer of a model that could not be read as a quiz to
+		    a diagnostic file of the app's `logs` folder (2 MB at most, the
+		    last ten kept). The main process names the file; it is never run
+		    nor opened. Resolves with nothing. */
+		diagnosticReponse(texte: string): Promise<void>;
 		/** Ouvre un terminal VISIBLE où le CLI tourne INTERACTIF, pour ce
 		    qu'aucune lecture ne sait obtenir : Antigravity ne publie son quota
 		    que dans son propre REPL (`/usage`), ni en HTTP ni sur une page web.
@@ -1207,6 +1222,9 @@ export const CANAUX = {
 	comptesUsage: "neo:comptes/usage",
 	comptesResets: "neo:comptes/resets",
 	comptesDeconnecter: "neo:comptes/deconnecter",
+	comptesConnecter: "neo:comptes/connecter",
+	comptesAnnulerConnexion: "neo:comptes/annuler-connexion",
+	processusDiagnostic: "neo:process/diagnostic",
 	comptesUsageTerminal: "neo:comptes/usage-terminal",
 	miseAJourEtatLire: "neo:mise-a-jour/etat-lire",
 	miseAJourEtat: "neo:mise-a-jour/etat",

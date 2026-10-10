@@ -134,6 +134,9 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.comptes.logoutConfirm": "Se déconnecter",
 	"app.comptes.cancel": "Annuler",
 	"app.comptes.logoutFailed": "Impossible de se déconnecter de {name}.",
+	"app.comptes.switchTitle": "Changer de compte {name} ?",
+	"app.comptes.switchMessage": "Neo Quiz déconnectera ce compte de {name}, puis ouvrira votre navigateur pour vous connecter avec un autre.",
+	"app.comptes.switchConfirm": "Changer de compte",
 
 	"app.comptes.usageOf": "Usage de {name}",
 	"app.comptes.usageOpen": "Ouvrir l'usage sur ollama.com",

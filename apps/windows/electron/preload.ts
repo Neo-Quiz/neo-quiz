@@ -171,7 +171,10 @@ const pont: Pont = {
 		comptesEtat: outils => ipcRenderer.invoke(CANAUX.comptesEtat, outils),
 		comptesUsage: tool => ipcRenderer.invoke(CANAUX.comptesUsage, tool),
 		comptesResets: requete => ipcRenderer.invoke(CANAUX.comptesResets, requete),
-		comptesDeconnecter: tool => ipcRenderer.invoke(CANAUX.comptesDeconnecter, tool),
+		comptesDeconnecter: (tool, changer) => ipcRenderer.invoke(CANAUX.comptesDeconnecter, tool, changer === true),
+		comptesConnecter: tool => ipcRenderer.invoke(CANAUX.comptesConnecter, tool),
+		comptesAnnulerConnexion: () => ipcRenderer.invoke(CANAUX.comptesAnnulerConnexion),
+		diagnosticReponse: texte => ipcRenderer.invoke(CANAUX.processusDiagnostic, texte),
 		comptesUsageTerminal: tool => ipcRenderer.invoke(CANAUX.comptesUsageTerminal, tool),
 		surNavigateurOuvert(rappel) {
 			const ecouteur = (): void => rappel();

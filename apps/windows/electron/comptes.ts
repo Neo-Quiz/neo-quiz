@@ -6,6 +6,7 @@ import type { EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageClaudeDepuisReponse, usageCodexDepuisLigne } from "./comptes-pur";
 import type { OutilCompte } from "./comptes-pur";
+import { ARGS_COMPTE } from "./gabarits-cli";
 import { dossierPersonnel, environnementEnfant, lancer, resoudreExecutable } from "./process";
 
 /* ══════════════════════════════════════════════════════════
@@ -296,28 +297,107 @@ export async function usageCompte(outil: "claude" | "codex", env: NodeJS.Process
 	return outil === "claude" ? usageClaude(env) : usageCodex(env);
 }
 
-/** Déconnecte le compte d'un CLI, sans terminal. */
-export async function deconnecterCompte(outil: OutilCompte | "ollama", env: NodeJS.ProcessEnv = process.env): Promise<"ok" | "echec" | "indisponible"> {
-	if (outil === "agy") return deconnecterAntigravity();
-	const args: Record<"claude" | "codex" | "ollama", string[]> = {
-		claude: ["auth", "logout"],
-		codex: ["logout"],
-		ollama: ["signout"],
-	};
-	const executable = resoudreExecutable(outil, env);
-	if (!executable) return "indisponible";
+/* ── ONE ACCOUNT OPERATION AT A TIME (2026-10-10) ──
+   A sign-out and a browser sign-in, of any tool, never run together: two
+   OAuth flows racing, or a sign-out landing in the middle of a sign-in,
+   would leave the account in a state nobody chose. The lock lives HERE, in
+   the main process, released on every outcome (`finally`); a second request
+   gets `occupe`, never a wait. */
+let operationEnCours: { annuler: AbortController } | null = null;
+
+/** Seams for `check:electron-process`: the launcher (a fake one sees the
+    executable and the arguments) and the sign-in's time limit. */
+export interface OptionsCompte {
+	env?: NodeJS.ProcessEnv;
+	lancer?: typeof lancer;
+	delaiConnexionMs?: number;
+}
+
+/** Signs a CLI out, without a terminal. `confirmer` is the NATIVE box of
+    `canaux.ts` (2026-10-10): it is asked FIRST, under the lock, and nothing
+    is launched unless it answers yes (`annule` otherwise). It is a parameter,
+    not an option, so no caller can forget it. */
+export async function deconnecterCompte(outil: OutilCompte | "ollama", confirmer: () => Promise<boolean>, options: OptionsCompte = {}): Promise<"ok" | "echec" | "indisponible" | "occupe" | "annule"> {
+	if (operationEnCours) return "occupe";
+	const annuler = new AbortController();
+	operationEnCours = { annuler };
 	try {
-		const { code } = await lancer({
-			executable,
-			args: args[outil],
-			stdin: "",
-			timeoutMs: DELAI_MS,
-			env: environnementEnfant(env),
-		});
-		return code === 0 ? "ok" : "echec";
-	} catch (e) {
-		return "echec";
+		let oui = false;
+		try { oui = await confirmer(); } catch (e) { oui = false; }
+		if (!oui) return "annule";
+		if (outil === "agy") return await deconnecterAntigravity();
+		const env = options.env ?? process.env;
+		const args: readonly string[] = outil === "ollama" ? ["signout"] : ARGS_COMPTE[outil].deconnexion;
+		const executable = resoudreExecutable(outil, env);
+		if (!executable) return "indisponible";
+		try {
+			const { code } = await (options.lancer ?? lancer)({
+				executable,
+				args: [...args],
+				stdin: "",
+				signal: annuler.signal,
+				timeoutMs: DELAI_MS,
+				env: environnementEnfant(env),
+				cwd: dossierPersonnel(env),
+			});
+			return code === 0 ? "ok" : "echec";
+		} catch (e) {
+			return "echec";
+		}
+	} finally {
+		operationEnCours = null;
 	}
+}
+
+/** How long the browser sign-in may take before its tree is killed. */
+export const DELAI_CONNEXION_MS = 10 * 60000;
+
+/**
+ * SIGNS IN THROUGH THE CLI'S OWN BROWSER FLOW (2026-10-10, as MonoCode does):
+ * `claude auth login` / `codex login` (`ARGS_COMPTE`), hidden, in the home
+ * folder. The CLI opens the browser, receives the answer on its own local
+ * callback and stores its own credentials: Neo Quiz never sees, reads or
+ * keeps a token, it only waits for the exit code. `stdin` stays open
+ * (`garderStdin`), as in a terminal. One operation at a time (`occupe`);
+ * `annulerConnexionCompte` or the 10-minute limit kill the WHOLE tree.
+ */
+export async function connecterCompte(outil: "claude" | "codex", options: OptionsCompte = {}): Promise<"ok" | "echec" | "annule" | "expire" | "occupe" | "indisponible"> {
+	if (outil !== "claude" && outil !== "codex") return "indisponible";
+	if (operationEnCours) return "occupe";
+	const annuler = new AbortController();
+	operationEnCours = { annuler };
+	try {
+		const env = options.env ?? process.env;
+		const executable = resoudreExecutable(outil, env);
+		if (!executable) return "indisponible";
+		try {
+			const { code } = await (options.lancer ?? lancer)({
+				executable,
+				args: [...ARGS_COMPTE[outil].connexion],
+				stdin: "",
+				garderStdin: true,
+				signal: annuler.signal,
+				timeoutMs: options.delaiConnexionMs ?? DELAI_CONNEXION_MS,
+				env: environnementEnfant(env),
+				cwd: dossierPersonnel(env),
+			});
+			return code === 0 ? "ok" : "echec";
+		} catch (e) {
+			const nom = e instanceof Error ? e.name : "";
+			if (nom === "annule") return "annule";
+			if (nom === "timeout") return "expire";
+			if (nom === "introuvable") return "indisponible";
+			console.warn(LOG_PREFIX, "browser sign-in failed:", e);
+			return "echec";
+		}
+	} finally {
+		operationEnCours = null;
+	}
+}
+
+/** Stops the running sign-in, if any: its tree is killed by `lancer`. */
+export function annulerConnexionCompte(): void {
+	operationEnCours?.annuler.abort();
 }
 
 /** Antigravity garde ses jetons au gestionnaire d'identifiants Windows, cible

@@ -25,6 +25,7 @@ import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
 import { inertRemoteImages } from "./remote-images";
 import { UsageLimitError, cliErrorText, detectUsageLimit } from "./usage-limit";
+import { detectModelLimit } from "./model-limit";
 import type { TranscriptEvent } from "./transcript";
 
 /* ══════════════════════════════════════════════════════════
@@ -189,6 +190,36 @@ export interface ReponseQuiz {
 /** How a CLI's text becomes a `ReponseQuiz`: one quiz, or (one pass over N
     documents) `lot`, one quiz per document. */
 type LireReponse = (texte: string) => ReponseQuiz & { lot?: ReponseDocument[] };
+
+/** How many characters of an unreadable answer the error shows. */
+export const APERCU_REPONSE = 160;
+
+/** The start of a model's answer, as one line of TEXT for an error message. */
+export function apercuReponse(texte: string): string {
+	return texte.trim().replace(/\s+/g, " ").slice(0, APERCU_REPONSE);
+}
+
+/**
+ * Reads a model's answer with `lire`; when it is not a quiz, the error says
+ * WHY in words the learner can act on (2026-10-10). A size limit named by the
+ * CLI (`erreurCli`: its error events, or the raw stream) or at the start of
+ * the answer becomes "the answer / the request was too long". Any other
+ * unreadable answer keeps the reader's error (which shows the first
+ * `APERCU_REPONSE` characters of the answer), and the WHOLE raw answer goes
+ * to `garder` (the host's diagnostic file) before the error is thrown. A
+ * model's explicit "no quiz" (`NoQuizAnswer`) is not a failure to read.
+ */
+export function lireOuDiagnostiquer(texte: string, lire: LireReponse, erreurCli = "", garder?: (brut: string) => void): ReponseQuiz & { lot?: ReponseDocument[] } {
+	try {
+		return lire(texte);
+	} catch (e) {
+		if (e instanceof NoQuizAnswer) throw e;
+		const limite = detectModelLimit(erreurCli, texte);
+		if (limite) throw new Error(t(limite === "output" ? "ai.err.outputLimit" : "ai.err.contextLimit"));
+		if (garder) { try { garder(texte); } catch { /* a diagnostic never replaces the error */ } }
+		throw e;
+	}
+}
 
 /** The quiz of ONE document in the answer of a one-pass generation. */
 export interface ReponseDocument {
@@ -881,7 +912,10 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		   caractère : de la prose peut commencer par « [ » (lien markdown,
 		   ponctuation échappée). */
 		const looksLikeQuiz = /["']?(prompt|title|options|correctIndex|answer)["']?\s*:/.test(cleaned);
-		if (looksLikeQuiz) throw err;
+		/* The parser's position AND the start of the answer (2026-10-10): "invalid
+		   character 'R' at 1:1" alone could not tell what the model had written
+		   on line 1. */
+		if (looksLikeQuiz) throw new Error(t("ai.err.malformedQuiz", { error: err instanceof Error ? err.message : String(err), preview: apercuReponse(content) }));
 		throw nonQuizResponseError(content);
 	}
 
@@ -980,7 +1014,7 @@ function nonQuizResponseError(content: string): Error {
 		return new Error(t("ai.err.noFileAccess"));
 	}
 	console.warn("[quiz-blocks] réponse non-quiz (" + text.length + " car.) :", text.slice(0, 2000));
-	return new Error(t("ai.err.notQuiz", { preview: text.replace(/\s+/g, " ").slice(0, 160) }));
+	return new Error(t("ai.err.notQuiz", { preview: apercuReponse(text) }));
 }
 
 export function createAiClient(settings: AiSettingsHost): AiClient {
@@ -999,6 +1033,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    a line after a reload asks the same keys in the same order. */
 	let repriseBase: string | null = null;
 	let appelsCli = 0;
+	/** The raw stream of the last Claude Code call, read only when its answer
+	    is not a quiz: a size limit may be named there and not in the answer. */
+	let derniereSortieClaude = "";
 	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
 	    Claude Code may run in it with read-only tools once it is trusted. */
 	let dossierOutils: string | null = null;
@@ -1146,9 +1183,19 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   error, never fewer quizzes). Ollama never gets `documents`: its
 		   structured answer holds a single quiz (`lectureEnUnePasse`). */
 		const documents = options.documents;
-		const lire: LireReponse = documents && documents.length >= 2
+		const lireBrut: LireReponse = documents && documents.length >= 2
 			? (texte) => ({ questions: [], lot: parseReponseLot(texte, documents) })
 			: parseReponseQuiz;
+		/* An unreadable answer: a size limit told in words, or the raw answer
+		   kept in the host's diagnostic file (`lireOuDiagnostiquer`). */
+		derniereSortieClaude = "";
+		const diag = currentHost().process?.diagnosticReponse;
+		const lire: LireReponse = (texte) => lireOuDiagnostiquer(
+			texte,
+			lireBrut,
+			cliErrorText(derniereSortieClaude) + " " + (detectModelLimit("", derniereSortieClaude) === "output" ? derniereSortieClaude : ""),
+			diag ? (brut) => { void diag.call(currentHost().process, brut).catch(() => { /* best effort */ }); } : undefined,
+		);
 
 		if (provider === "ollama") {
 			/* Le composer persiste le choix par défaut ; si la génération part
@@ -1401,6 +1448,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			   Never read in raw stdout (the MODEL's output): only its structured error events (`cliErrorText`). */
 			const limite = detectUsageLimit((e.stderr || "") + " " + cliErrorText(e.stdout || "") + " " + e.message, Date.now());
 			if (limite) return new UsageLimitError("claude", limite.resetAt, t("ai.err.claudeRateLimit"));
+			const taille = detectModelLimit((e.stderr || "") + " " + cliErrorText(e.stdout || "") + " " + e.message);
+			if (taille) return new Error(t(taille === "output" ? "ai.err.outputLimit" : "ai.err.contextLimit"));
 			if (detail.includes("login") || detail.includes("api key") || detail.includes("authentication") || detail.includes("credential")) {
 				return erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
 			}
@@ -1438,6 +1487,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 		if (res.code !== 0) throw erreurClaude(execErrorDepuisCode(res));
 		const stdout = res.stdout;
+		derniereSortieClaude = stdout;
 
 		/* `--output-format json` publie l'usage RÉEL de l'appel : tokens (dont
 		   ceux servis par le cache) et coût en dollars — Claude Code est le seul
@@ -1478,6 +1528,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			const msgLower = msg.toLowerCase();
 			const limite = detectUsageLimit(msg, Date.now());
 			if (limite) throw new UsageLimitError("claude", limite.resetAt, t("ai.err.claudeRateLimit"));
+			const taille = detectModelLimit(msg);
+			if (taille) throw new Error(t(taille === "output" ? "ai.err.outputLimit" : "ai.err.contextLimit"));
 			if (msgLower.includes("login") || msgLower.includes("api key") || msgLower.includes("credential")) {
 				throw erreurConnexion("claude", t("ai.err.claudeNotLoggedIn"));
 			}

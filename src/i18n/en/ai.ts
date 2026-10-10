@@ -124,6 +124,22 @@ export const EN_AI = {
 	"ai.usage.resetErrStale": "This reset is no longer listed. Refresh and try again.",
 	"ai.usage.resetErrDeclined": "The reset was not spent.",
 	"ai.usage.resetErrTooSoon": "A reset was spent less than 10 minutes ago. Try again later.",
+	"ai.usage.signIn": "Sign in",
+	"ai.usage.signOut": "Sign out",
+	"ai.usage.switchAccount": "Switch account",
+	"ai.usage.signingIn": "Finish signing in in your browser…",
+	"ai.usage.signingOut": "Signing out…",
+	"ai.usage.cancelSignIn": "Cancel",
+	"ai.usage.terminalHint": "Browser did not open? Run this command in a terminal:",
+	"ai.usage.openTerminal": "Open a terminal",
+	"ai.usage.copyCommand": "Copy the command",
+	"ai.usage.signedIn": "Signed in.",
+	"ai.usage.signedOut": "Signed out.",
+	"ai.usage.signInFailed": "Sign-in did not finish. Try again, or use the command in a terminal.",
+	"ai.usage.signInExpired": "Sign-in took more than 10 minutes and was stopped.",
+	"ai.usage.signOutFailed": "Could not sign out.",
+	"ai.usage.accountBusy": "Another sign-in or sign-out is already running.",
+	"ai.usage.accountUnavailable": "This is not available here.",
 
 	/* ── Options de génération ── */
 	/* Libellés des types de questions. La VALEUR envoyée au modèle reste
@@ -701,6 +717,9 @@ export const EN_AI = {
 	   l'erreur brute du parseur JSON5, incompréhensible sur de la prose. */
 	"ai.err.noFileAccess": "The quiz generator has no access to your files — it only sees what is in the composer. Paths written in your request are attached automatically when they can be found; when they cannot, attach the notes or documents with “+” or “@”, or paste their content.",
 	"ai.err.notQuiz": "The model replied with text instead of a quiz: “{preview}…”",
+	"ai.err.outputLimit": "The answer was too long for the model (output limit reached). Ask for a shorter quiz or split the course.",
+	"ai.err.contextLimit": "The request was too long for the model (context limit reached). Attach fewer or shorter documents, or split the course.",
+	"ai.err.malformedQuiz": "The quiz the model wrote could not be read ({error}). Its answer starts with: “{preview}…”",
 	"ai.err.invalidModelClaude": "Invalid Claude model name: {model}",
 	"ai.err.claudeNotInstalled": "Claude Code is not installed. Install it from claude.com/claude-code, then sign in with /login.",
 	"ai.err.claudeNotLoggedIn": "Claude account not connected. In a terminal, run \"claude\" then /login with your Pro/Max/Team/Enterprise account.",

@@ -410,11 +410,14 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	let reponse = "";
 	const appels = [];
 	const ecrits = new Map();
+	const diagnostics = [];
 	hote.installHost({
 		platform: { isDesktopApp: true },
-		process: { lireCache: async () => null, run: async (spec) => {
+		process: { lireCache: async () => null, diagnosticReponse: async (texte) => { diagnostics.push(texte); }, run: async (spec) => {
 			appels.push(spec);
-			const flux = JSON.stringify({ type: "result", is_error: false, result: reponse, usage: { input_tokens: 1, output_tokens: 1 } });
+			// "!ERR:" marks an answer the CLI itself flags as an error (`is_error`).
+			const erreur = reponse.startsWith("!ERR:");
+			const flux = JSON.stringify({ type: "result", is_error: erreur, result: erreur ? reponse.slice(5) : reponse, usage: { input_tokens: 1, output_tokens: 1 } });
 			return { stdout: flux + "\n", stderr: "", code: 0 };
 		} },
 		fs: { mkdirs: async () => {}, exists: async (p) => ecrits.has(p), write: async (p, c) => { ecrits.set(p, c); }, getFile: () => null, read: async () => "" },
@@ -465,6 +468,26 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	file.envoyer({ ...demande, parDocument: false, notes: [], fromDevice: "phone-1" });
 	await attendre();
 	r.check("a remote line on Claude does launch", appels.length - avant, 1);
+
+	/* AN UNREADABLE ANSWER, WIRED (2026-10-10): the line's error shows the
+	   start of what the model wrote, and the raw answer reaches the host's
+	   diagnostic file; a size limit is told as such, with nothing kept. */
+	file.fermer(file.lignes()[0].id);
+	const unSeul = { ...demande, parDocument: false, notes: [demande.notes[0]] };
+	const avantDiag = diagnostics.length;
+	reponse = 'Reading the course.\n[{ title: "Q", prompt: "P", options: ["a", "b"], correctIndex: 1 ';
+	file.envoyer(unSeul);
+	await attendre();
+	const l4 = file.lignes()[0];
+	r.check("a broken answer: the line fails showing the answer's start, the raw answer goes to the diagnostic file",
+		[l4.etat, (l4.erreur ?? "").includes("Reading the course."), diagnostics.slice(avantDiag)], ["echouee", true, [reponse]]);
+	file.fermer(l4.id);
+	reponse = "!ERR:API Error: Claude's response exceeded the 32000 output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.";
+	file.envoyer(unSeul);
+	await attendre();
+	const l5 = file.lignes()[0];
+	r.check("Claude Code's output limit: a clear 'too long' error, nothing more kept",
+		[l5.etat, /output limit|limite de sortie/.test(l5.erreur ?? ""), diagnostics.length - avantDiag], ["echouee", true, 1]);
 	hote.uninstallHost();
 	delete globalThis.document;
 	r.done();

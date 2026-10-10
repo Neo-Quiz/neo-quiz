@@ -47,6 +47,21 @@ const modele = (a: string): boolean => MODELE.test(a);
     `initialize`, `initialized` and one of two methods. */
 export const ARGS_CODEX_APP_SERVER: readonly string[] = ["app-server"];
 
+/** The account commands (2026-10-10, the "Sign out" and "Switch account"
+    buttons of the usage popover). CONSTANT, and launched by the MAIN process
+    only (`comptes.ts`): the window names a tool, never an argument. They are
+    deliberately NOT accepted by `argumentsAutorises`: through `process.run` a
+    compromised window could sign the user out without the native
+    confirmation, or start a sign-in flow nobody asked for. Checked against
+    `claude auth --help` (Claude Code 2.1.296) and `codex --help`. */
+export const ARGS_COMPTE: {
+	readonly claude: { readonly connexion: readonly string[]; readonly deconnexion: readonly string[] };
+	readonly codex: { readonly connexion: readonly string[]; readonly deconnexion: readonly string[] };
+} = {
+	claude: { connexion: ["auth", "login"], deconnexion: ["auth", "logout"] },
+	codex: { connexion: ["login"], deconnexion: ["logout"] },
+};
+
 /* ── CLAUDE CODE WITH READ-ONLY TOOLS, IN A TRUSTED FOLDER (2026-10-09) ──
 
    The one form where the model has tools: it reads and searches the files of

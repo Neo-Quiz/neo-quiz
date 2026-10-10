@@ -180,6 +180,9 @@ export const EN_APP = {
 	"app.comptes.logoutConfirm": "Sign out",
 	"app.comptes.cancel": "Cancel",
 	"app.comptes.logoutFailed": "Could not sign out of {name}.",
+	"app.comptes.switchTitle": "Switch {name} account?",
+	"app.comptes.switchMessage": "Neo Quiz will sign this account out of {name}, then open your browser to sign in with another one.",
+	"app.comptes.switchConfirm": "Switch account",
 
 	/* ── Popover d'usage au survol d'une ligne Claude ou Codex ──
 	   Les seuls deux outils dont le forfait est lisible (`usageCompte`, typé

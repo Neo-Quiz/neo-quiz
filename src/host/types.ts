@@ -692,8 +692,21 @@ export interface HostProcess {
 	    them, `consume` spends one. The host judges the request. */
 	codexResets?(requete: ResetsRequest): Promise<ResetsResult>;
 	/** Déconnecte le compte d'un CLI. Vaut pour TOUTE la machine : c'est le
-	    compte de l'outil, pas celui de l'application. L'appelant confirme. */
-	deconnecterCli(tool: CliTool): Promise<"ok" | "echec" | "indisponible">;
+	    compte de l'outil, pas celui de l'application. The HOST confirms, in
+	    its own native box (2026-10-10): `annule` when the user said no.
+	    `changer` only words that box as "Switch account". `occupe`: another
+	    account operation is running. */
+	deconnecterCli(tool: CliTool, changer?: boolean): Promise<"ok" | "echec" | "indisponible" | "annule" | "occupe">;
+	/** Signs in through the CLI's own browser flow, with no terminal
+	    (2026-10-10): the CLI opens the browser and stores its credentials,
+	    the host never sees a token. Resolves when the CLI is done. OPTIONAL:
+	    a host that cannot launch a CLI in the background omits it. */
+	connecterCompteNavigateur?(tool: "claude" | "codex"): Promise<"ok" | "echec" | "annule" | "expire" | "occupe" | "indisponible">;
+	/** Cancels the running `connecterCompteNavigateur`. */
+	annulerConnexionNavigateur?(): Promise<void>;
+	/** Keeps the raw answer of a model that could not be read as a quiz in
+	    a diagnostic file of the host (bounded, never opened). OPTIONAL. */
+	diagnosticReponse?(texte: string): Promise<void>;
 	/** Ouvre un terminal VISIBLE où le CLI tourne INTERACTIF, pour ce
 	    qu'aucune lecture ne sait obtenir : Antigravity ne publie son quota que
 	    dans son propre REPL (commande `/usage`), ni en HTTP ni sur une page

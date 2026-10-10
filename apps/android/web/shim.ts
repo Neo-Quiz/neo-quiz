@@ -203,6 +203,11 @@ const pont: Pont = {
 		comptesUsage: (tool) => appeler("processus.comptesUsage", [tool]),
 		comptesResets: (requete) => appeler("processus.comptesResets", [requete]),
 		comptesDeconnecter: (tool) => appeler("processus.comptesDeconnecter", [tool]),
+		/* No CLI on a phone: no browser sign-in and no model answer to keep,
+		   answered here without a channel (2026-10-10). */
+		comptesConnecter: async () => "indisponible" as const,
+		comptesAnnulerConnexion: async () => {},
+		diagnosticReponse: async () => {},
 		comptesUsageTerminal: (tool) => appeler("processus.comptesUsageTerminal", [tool]),
 	},
 

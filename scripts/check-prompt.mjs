@@ -371,3 +371,68 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 		globalThis.document = avant;
 	}
 }
+
+/* ── AN ANSWER THAT IS NOT A QUIZ, TOLD USEFULLY (2026-10-10) ──
+   WHAT IT PREVENTS. A 30-minute Learn ended on "JSON5: invalid character 'R'
+   at 1:1": no cause, no trace of the answer. Now (`lireOuDiagnostiquer`,
+   `model-limit.ts`): a size limit named by the CLI becomes "too long" in
+   words; any other unreadable answer shows its first 160 characters AS TEXT
+   and the whole raw answer is handed to the host's diagnostic file; a
+   model's explicit "no quiz" is not a failure. And the diagnostic file
+   itself (`diagnostic-reponse.ts`): 2 MB at most, ten files kept, a name the
+   main process makes, a non-string refused. */
+import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
+import { tmpdir as tmpdirDiag } from "node:os";
+import { join as joinDiag } from "node:path";
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
+	const echec = (texte, erreurCli = "") => {
+		const gardes = [];
+		try { lireOuDiagnostiquer(texte, parseReponseQuiz, erreurCli, (b) => gardes.push(b)); return { message: "(read)", gardes }; }
+		catch (e) { return { message: String(e && e.message), nom: e instanceof NoQuizAnswer ? "NoQuizAnswer" : "Error", gardes }; }
+	};
+	const SORTIE = "API Error: Claude's response exceeded the 32000 output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.";
+	const trop = /output limit|limite de sortie/;
+	const contexte = /context limit|limite de contexte/;
+
+	const a = echec(SORTIE);
+	r.check("Claude Code's output-limit sentence as the answer: 'too long', nothing kept", [trop.test(a.message), a.gardes.length], [true, 0]);
+	const b = echec('R\n[{ prompt: "x", options: ["a", "b"], correctIndex: 0 }', SORTIE);
+	r.check("… or in the CLI's error events, with a broken answer: 'too long'", trop.test(b.message), true);
+	const c = echec("Prompt is too long", "");
+	r.check("'Prompt is too long': the context limit", [contexte.test(c.message), c.gardes.length], [true, 0]);
+	r.check("Codex's context sentences are recognised",
+		["Codex ran out of room in the model's context window.", "Your input exceeds the context window of this model.", "error: context_length_exceeded"].map(e => detectModelLimit(e)),
+		["context", "context", "context"]);
+	r.check("a context sentence deep inside a quiz is not a limit, the output sentence anywhere is",
+		[detectModelLimit("", "x".repeat(2000) + " prompt is too long"), detectModelLimit("", "x".repeat(2000) + " " + SORTIE)], [null, "output"]);
+
+	const brut = 'Reading the course first.\n[{ title: "Q", prompt: "P", options: ["a", "b"], correctIndex: 1 ' + "y".repeat(500);
+	const d = echec(brut);
+	r.check("a broken quiz: the parser's position AND the start of the answer, as text",
+		[/1:1|JSON5/.test(d.message), d.message.includes(brut.replace(/\s+/g, " ").slice(0, APERCU_REPONSE)), d.message.includes(brut.replace(/\s+/g, " ").slice(0, APERCU_REPONSE + 1))],
+		[true, true, false]);
+	r.check("… and the WHOLE raw answer is kept for the diagnostic file", d.gardes, [brut]);
+	const e = echec("Je ne peux pas générer de quiz sur ce sujet.");
+	r.check("prose instead of a quiz: its start shown, raw answer kept", [e.message.includes("Je ne peux pas"), e.gardes.length], [true, 1]);
+	const f = echec("NO_QUIZ\nThe request asks for nothing to quiz.");
+	r.check("an explicit 'no quiz' is not a failure: passed through, nothing kept", [f.nom, f.gardes.length], ["NoQuizAnswer", 0]);
+	const g = (() => { try { return lireOuDiagnostiquer("[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]", parseReponseQuiz, "", () => { throw new Error("x"); }).questions.length; } catch { return -1; } })();
+	r.check("a readable answer is read, the keeper never called", g, 1);
+
+	const dossier = mkdtempDiag(joinDiag(tmpdirDiag(), "quiz-diag-"));
+	try {
+		const gros = "é".repeat(DIAGNOSTIC_MAX_OCTETS); // 2 bytes each: twice the bound
+		const chemin = await ecrireDiagnostic(dossier, gros, Date.UTC(2026, 9, 10, 8, 0, 0));
+		r.check("the diagnostic file is written in the given folder, named by the main process",
+			[chemin !== null && chemin.startsWith(dossier), /^ai-response-\d{8}-\d{6}-\d{3}\.txt$/.test(nomDiagnostic(0))], [true, true]);
+		r.check("… cut at 2 MB", statDiag(chemin).size, DIAGNOSTIC_MAX_OCTETS);
+		r.check("a non-string or empty answer writes nothing", [await ecrireDiagnostic(dossier, { x: 1 }), await ecrireDiagnostic(dossier, ""), readdirDiag(dossier).length], [null, null, 1]);
+		for (let i = 1; i <= DIAGNOSTICS_GARDES + 3; i++) await ecrireDiagnostic(dossier, "n" + i, Date.UTC(2026, 9, 10, 9, 0, i));
+		const restes = readdirDiag(dossier).sort();
+		r.check("only the last ten are kept, the newest included", [restes.length, readDiag(joinDiag(dossier, restes[restes.length - 1]), "utf8")], [DIAGNOSTICS_GARDES, "n" + (DIAGNOSTICS_GARDES + 3)]);
+	} finally {
+		rmDiag(dossier, { recursive: true, force: true });
+	}
+	r.done();
+});
