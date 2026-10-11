@@ -40,7 +40,7 @@ import { addUserMessage, answerPermission, applyLive, emptyThread } from "./live
 import type { Thread } from "./live-thread";
 import { collectLine, emptyOutcome } from "./live-turn";
 import type { TurnOutcome } from "./live-turn";
-import { readAll, readSaved, turnFromStore, writeSaved } from "./live-turn-store";
+import { forgetAllSaved, readAll, readSaved, turnFromStore, writeSaved } from "./live-turn-store";
 import type { Saved } from "./live-turn-store";
 import { addRunId, runIdsOf } from "./chat-record";
 import type { ChatRun } from "./chat-record";
@@ -275,6 +275,7 @@ export async function removeAllRuns(): Promise<void> {
 	const live = currentHost().live;
 	if (!live) return;
 	await live.removeAllRuns();
+	forgetAllSaved();
 	forgetRuns([...sessions.keys(), ...bound.values(), ...[...turns.values()].map(x => x.runId)]);
 }
 

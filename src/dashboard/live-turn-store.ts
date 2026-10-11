@@ -33,6 +33,17 @@ export function writeSaved(key: string, v: Saved): void {
 	try { sessionStorage.setItem(STORAGE + key, JSON.stringify(v)); } catch { /* the turn lasts the page */ }
 }
 
+/** Forgets every turn place of the window ("Delete all"): a line still in
+    the queue no longer points into a deleted run, nor records it again. */
+export function forgetAllSaved(): void {
+	try {
+		for (let i = sessionStorage.length - 1; i >= 0; i--) {
+			const k = sessionStorage.key(i);
+			if (k?.startsWith(STORAGE)) sessionStorage.removeItem(k);
+		}
+	} catch { /* no storage: nothing kept */ }
+}
+
 export interface StoredRun { events: RunEvent[]; live: boolean; interrupted: boolean; truncated: boolean }
 
 /** Every event of a stored run, page by page, with the last page's flags. */
