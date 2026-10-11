@@ -12,6 +12,15 @@
  * types) taken for a permission request, and a drift from the lines a real
  * Claude Code session exchanged (`scripts/fixtures/live/claude-session.jsonl`).
  *
+ * And THE LIVE CODEX SESSION PROTOCOL (`apps/windows/electron/live-codex.ts`,
+ * `codex app-server`, JSON-RPC 2.0): a request line split by a newline, a
+ * supervised mode that would not ask (or would let Codex's own reviewer
+ * answer for the user), a server message with prototype keys or a foreign
+ * `jsonrpc` taken for an approval, an approval answer of the wrong shape (a
+ * permissions request takes `permissions`, not `decision`), and a drift from
+ * the lines a real Codex session exchanged
+ * (`scripts/fixtures/live/codex-session.jsonl`).
+ *
  *     npm run check:live-protocol
  */
 import { readFileSync } from "node:fs";
@@ -163,6 +172,165 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 	r.check("real: of the CLI's lines, only the initialize answer and the request are control lines",
 		real.filter(e => e.dir === "out").map(e => parseClaudeControl(e.l)?.kind).filter(Boolean), ["controlResponse", "canUseTool"]);
 	r.check("real: the turn ends with a result", real.at(-1)?.l?.type, "result");
+
+	r.done();
+});
+
+await withSrcModule(["apps/windows/electron/live-codex.ts"], (live) => {
+	const {
+		codexRequest, codexNotification, codexInitializeParams, codexModeParams, codexThreadStartParams,
+		codexThreadResumeParams, codexTurnStartParams, codexTurnSteerParams, codexTurnInterruptParams,
+		codexApprovalAnswer, codexPermissionsAnswer, codexMethodNotFound, parseCodexMessage,
+	} = live;
+	const r = makeReporter("Live Codex session protocol");
+	const throws = (f) => { try { f(); return false; } catch { return true; } };
+	const oneLine = (s) => typeof s === "string" && s.endsWith("\n") && s.indexOf("\n") === s.length - 1;
+	// Key order is not part of JSON: lines read from the fixture are compared sorted.
+	const canon = (v) => Array.isArray(v) ? v.map(canon)
+		: v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
+
+	// The lines the app writes.
+	const init = codexRequest(1, "initialize", codexInitializeParams("1.2.3"));
+	r.check("request: initialize, exact object", JSON.parse(init),
+		{ jsonrpc: "2.0", id: 1, method: "initialize", params: { clientInfo: { name: "neo-quiz", version: "1.2.3" }, capabilities: { experimentalApi: true } } });
+	r.check("request: one line ending with a newline", oneLine(init), true);
+	const tricky = codexRequest(7, "turn/start", codexTurnStartParams("t", "a\nb \"c\"\r\n\u2028d", []));
+	r.check("request: newlines and quotes in the text stay on one line",
+		[oneLine(tricky), JSON.parse(tricky).params.input[0].text], [true, "a\nb \"c\"\r\n\u2028d"]);
+	for (const m of ["thread/start", "thread/resume", "turn/start", "turn/steer", "turn/interrupt"]) {
+		r.check(`request: ${m}`, JSON.parse(codexRequest(3, m, { a: 1 })), { jsonrpc: "2.0", id: 3, method: m, params: { a: 1 } });
+	}
+	r.check("request: a method outside the list throws", throws(() => codexRequest(1, "account/rateLimitResetCredit/consume", {})), true);
+	r.check("request: an id that is not a safe integer throws",
+		[throws(() => codexRequest(-1, "initialize", {})), throws(() => codexRequest(1.5, "initialize", {})), throws(() => codexRequest("1", "initialize", {}))],
+		[true, true, true]);
+	const initialized = codexNotification("initialized");
+	r.check("notification: initialized", [JSON.parse(initialized), oneLine(initialized)], [{ jsonrpc: "2.0", method: "initialized" }, true]);
+
+	r.check("modes: the table", ["supervised", "acceptEdits", "auto", "full"].map(codexModeParams), [
+		{ approvalPolicy: "untrusted", sandbox: "read-only", autoAcceptFileChanges: false, acceptAll: false },
+		{ approvalPolicy: "on-request", sandbox: "workspace-write", autoAcceptFileChanges: true, acceptAll: false },
+		{ approvalPolicy: "on-request", sandbox: "workspace-write", autoAcceptFileChanges: false, acceptAll: false },
+		{ approvalPolicy: "on-request", sandbox: "danger-full-access", autoAcceptFileChanges: true, acceptAll: true },
+	]);
+	r.check("modes: an unknown mode throws", [throws(() => codexModeParams("yolo")), throws(() => codexModeParams("__proto__"))], [true, true]);
+
+	r.check("thread/start: supervised, with effort", codexThreadStartParams({ cwd: "C:\\w", model: "gpt-6-luna", effort: "low", mode: "supervised" }),
+		{ cwd: "C:\\w", model: "gpt-6-luna", approvalPolicy: "untrusted", sandbox: "read-only", approvalsReviewer: "user", config: { model_reasoning_effort: "low" } });
+	r.check("thread/start: full access, no effort", codexThreadStartParams({ cwd: "C:\\w", model: "gpt-5.5", mode: "full" }),
+		{ cwd: "C:\\w", model: "gpt-5.5", approvalPolicy: "on-request", sandbox: "danger-full-access", approvalsReviewer: "user" });
+	r.check("thread/start: the reviewer of each mode (the user's config may say auto_review)",
+		["supervised", "acceptEdits", "auto", "full"].map(mode => codexThreadStartParams({ cwd: "C:\\w", model: "m", mode }).approvalsReviewer),
+		["user", "user", "auto_review", "user"]);
+	r.check("thread/start: an empty cwd, a model or an effort of the wrong shape throw", [
+		throws(() => codexThreadStartParams({ cwd: "", model: "m", mode: "full" })),
+		throws(() => codexThreadStartParams({ cwd: "C:\\w", model: "-x", mode: "full" })),
+		throws(() => codexThreadStartParams({ cwd: "C:\\w", model: "m", effort: "low high", mode: "full" })),
+		throws(() => codexThreadStartParams({ cwd: "C:\\w", model: "m", mode: "nope" })),
+	], [true, true, true, true]);
+	r.check("thread/resume: the thread id, then the start params",
+		codexThreadResumeParams("th1", { cwd: "C:\\w", model: "m", mode: "auto" }),
+		{ threadId: "th1", cwd: "C:\\w", model: "m", approvalPolicy: "on-request", sandbox: "workspace-write", approvalsReviewer: "auto_review" });
+
+	r.check("turn/start: text then pictures", codexTurnStartParams("th1", "see", [{ path: "C:\\a.png" }, { path: "C:\\b.jpg" }]),
+		{ threadId: "th1", input: [{ type: "text", text: "see" }, { type: "localImage", path: "C:\\a.png" }, { type: "localImage", path: "C:\\b.jpg" }] });
+	r.check("turn/steer: expectedTurnId", codexTurnSteerParams("th1", "tu1", "more", []),
+		{ threadId: "th1", expectedTurnId: "tu1", input: [{ type: "text", text: "more" }] });
+	r.check("turn/interrupt", codexTurnInterruptParams("th1", "tu1"), { threadId: "th1", turnId: "tu1" });
+
+	r.check("answer: accept", [JSON.parse(codexApprovalAnswer(0, true)), oneLine(codexApprovalAnswer(0, true))],
+		[{ jsonrpc: "2.0", id: 0, result: { decision: "accept" } }, true]);
+	r.check("answer: decline, string id", JSON.parse(codexApprovalAnswer("r9", false)), { jsonrpc: "2.0", id: "r9", result: { decision: "decline" } });
+	r.check("answer: permissions denied grants nothing", JSON.parse(codexPermissionsAnswer(4, null)), { jsonrpc: "2.0", id: 4, result: { permissions: {} } });
+	r.check("answer: permissions granted for the turn", JSON.parse(codexPermissionsAnswer(4, { network: { enabled: true } })),
+		{ jsonrpc: "2.0", id: 4, result: { scope: "turn", permissions: { network: { enabled: true } } } });
+	r.check("answer: method not found", JSON.parse(codexMethodNotFound(5)), { jsonrpc: "2.0", id: 5, error: { code: -32601, message: "Method not found" } });
+	r.check("answer: an id that is neither a safe integer nor a short string throws",
+		[throws(() => codexApprovalAnswer({}, true)), throws(() => codexMethodNotFound("")), throws(() => codexPermissionsAnswer(1.5, null))], [true, true, true]);
+
+	// The lines read from stdout.
+	r.check("parse: a response", parseCodexMessage({ id: 2, result: { thread: { id: "th" } } }), { kind: "response", id: 2, result: { thread: { id: "th" } } });
+	r.check("parse: a response with jsonrpc 2.0", parseCodexMessage({ jsonrpc: "2.0", id: 2, result: null }), { kind: "response", id: 2, result: null });
+	r.check("parse: an error response", parseCodexMessage({ id: 3, error: { code: -32600, message: "bad" } }),
+		{ kind: "response", id: 3, error: { code: -32600, message: "bad" } });
+	r.check("parse: an error without a numeric code", parseCodexMessage({ id: 3, error: { code: "x", message: "bad" } }), null);
+	r.check("parse: a response with neither result nor error", parseCodexMessage({ id: 3 }), null);
+	r.check("parse: a response to a string id (the app sends numbers only)", parseCodexMessage({ id: "3", result: {} }), null);
+	r.check("parse: a notification", parseCodexMessage({ method: "turn/completed", params: { threadId: "t" }, emittedAtMs: 1 }),
+		{ kind: "notification", method: "turn/completed", params: { threadId: "t" } });
+	r.check("parse: a notification without params", parseCodexMessage({ method: "x/y" }), { kind: "notification", method: "x/y", params: {} });
+	r.check("parse: a notification whose params are not an object", parseCodexMessage({ method: "x/y", params: [1] }), null);
+	for (const m of ["item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval"]) {
+		r.check(`parse: approval ${m}`, parseCodexMessage({ method: m, id: 0, params: { itemId: "i" } }), { kind: "approval", id: 0, method: m, params: { itemId: "i" } });
+	}
+	r.check("parse: an approval with a string id", parseCodexMessage({ method: "item/fileChange/requestApproval", id: "a1", params: {} })?.id, "a1");
+	r.check("parse: an approval without params", parseCodexMessage({ method: "item/fileChange/requestApproval", id: 0 }), null);
+	r.check("parse: an unknown server request", parseCodexMessage({ method: "item/tool/requestUserInput", id: 8, params: {} }),
+		{ kind: "serverRequest", id: 8, method: "item/tool/requestUserInput" });
+	r.check("parse: non-objects and arrays", [null, undefined, "x", 3, true, [], [{ id: 1, result: {} }]].map(parseCodexMessage),
+		[null, null, null, null, null, null, null]);
+	r.check("parse: jsonrpc other than 2.0", [
+		parseCodexMessage({ jsonrpc: "1.0", id: 1, result: {} }),
+		parseCodexMessage({ jsonrpc: 2, method: "item/fileChange/requestApproval", id: 0, params: {} }),
+		parseCodexMessage({ jsonrpc: null, method: "turn/completed", params: {} }),
+	], [null, null, null]);
+	r.check("parse: an object whose prototype is not Object's",
+		parseCodexMessage(Object.assign(Object.create({ evil: true }), { method: "turn/completed", params: {} })), null);
+	r.check("parse: a __proto__ key at the top",
+		parseCodexMessage(JSON.parse("{\"__proto__\":{\"x\":1},\"method\":\"item/commandExecution/requestApproval\",\"id\":0,\"params\":{}}")), null);
+	r.check("parse: a __proto__ key in the params",
+		parseCodexMessage(JSON.parse("{\"method\":\"item/commandExecution/requestApproval\",\"id\":0,\"params\":{\"__proto__\":{\"command\":\"x\"}}}")), null);
+	r.check("parse: a __proto__ key in an error",
+		parseCodexMessage(JSON.parse("{\"id\":1,\"error\":{\"__proto__\":{},\"code\":1,\"message\":\"m\"}}")), null);
+	r.check("parse: a method that is not a string, or too long", [
+		parseCodexMessage({ method: 5, params: {} }), parseCodexMessage({ method: "a".repeat(201), params: {} }),
+	], [null, null]);
+	r.check("parse: an id that is neither a safe integer nor a string",
+		[parseCodexMessage({ method: "item/fileChange/requestApproval", id: 1.5, params: {} }), parseCodexMessage({ method: "item/fileChange/requestApproval", id: {}, params: {} })],
+		[null, null]);
+
+	// The lines of a real session (codex-cli 0.162.1, see the top of live-codex.ts):
+	// a first process (start, two turns, a declined approval), `restart`, then a
+	// second process that resumes the thread and accepts one.
+	const real = readFileSync(new URL("./fixtures/live/codex-session.jsonl", import.meta.url), "utf8").trim().split("\n").map(l => JSON.parse(l));
+	const cut = real.findIndex(e => e.dir === "restart");
+	const runs = [real.slice(0, cut), real.slice(cut + 1)];
+	const opts = { cwd: "<CWD>", model: "gpt-6-luna", effort: "low", mode: "supervised" };
+	const startParams = codexThreadStartParams(opts);
+	// The first probe predates the explicit reviewer; the resume line below shows Codex takes it.
+	delete startParams.approvalsReviewer;
+	const approvalOf = (run) => run.find(e => e.dir === "out" && parseCodexMessage(e.l)?.kind === "approval")?.l;
+	r.check("real: the first process's lines are exactly the ones the builders make",
+		canon(runs[0].filter(e => e.dir === "in").map(e => e.l)), canon([
+			JSON.parse(codexRequest(1, "initialize", codexInitializeParams("1.20.83"))),
+			JSON.parse(codexNotification("initialized")),
+			JSON.parse(codexRequest(2, "thread/start", startParams)),
+			JSON.parse(codexRequest(3, "turn/start", codexTurnStartParams("<THREAD_ID>", "Run: echo hi", []))),
+			JSON.parse(codexRequest(4, "turn/start", codexTurnStartParams("<THREAD_ID>", "Run the shell command: echo hi > probe.txt (in the current folder). Do nothing else.", []))),
+			JSON.parse(codexApprovalAnswer(approvalOf(runs[0])?.id, false)),
+		]));
+	r.check("real: the second process's lines are exactly the ones the builders make",
+		canon(runs[1].filter(e => e.dir === "in").map(e => e.l)), canon([
+			JSON.parse(codexRequest(1, "initialize", codexInitializeParams("1.20.83"))),
+			JSON.parse(codexNotification("initialized")),
+			JSON.parse(codexRequest(2, "thread/resume", codexThreadResumeParams("<THREAD_ID>", opts))),
+			JSON.parse(codexRequest(3, "turn/start", codexTurnStartParams("<THREAD_ID>", "Run the shell command: Write-Output hi; Set-Content -Path probe.txt -Value hi. Do nothing else.", []))),
+			JSON.parse(codexApprovalAnswer(approvalOf(runs[1])?.id, true)),
+		]));
+	const outs = real.filter(e => e.dir === "out").map(e => parseCodexMessage(e.l));
+	r.check("real: every line Codex wrote is read", outs.filter(m => m === null).length, 0);
+	r.check("real: Codex omits jsonrpc on its own lines", real.filter(e => e.dir === "out" && "jsonrpc" in e.l).length, 0);
+	r.check("real: the only server requests are the two command approvals",
+		outs.filter(m => m.kind !== "response" && m.kind !== "notification").map(m => [m.kind, m.method]),
+		[["approval", "item/commandExecution/requestApproval"], ["approval", "item/commandExecution/requestApproval"]]);
+	r.check("real: the responses answer the app's ids", outs.filter(m => m.kind === "response").map(m => m.id), [1, 2, 3, 4, 1, 2, 3]);
+	r.check("real: thread/start answers with the thread id", outs.find(m => m.kind === "response" && m.id === 2)?.result?.thread?.id, "<THREAD_ID>");
+	r.check("real: each process ends with turn/completed",
+		runs.map(run => { const l = run.filter(e => e.dir === "out").at(-1)?.l; return [l?.method, l?.params?.turn?.status]; }),
+		[["turn/completed", "completed"], ["turn/completed", "completed"]]);
+	const done = runs[1].map(e => e.l).find(l => l.method === "item/completed" && l.params?.item?.type === "commandExecution")?.params?.item;
+	r.check("real: a finished command carries its output in item.aggregatedOutput",
+		[typeof done?.aggregatedOutput, done?.status, done?.exitCode], ["string", "failed", -1]);
 
 	r.done();
 });
