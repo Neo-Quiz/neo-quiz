@@ -187,14 +187,18 @@ function textBlock(className: string, text: string): HTMLElement {
 
 function thinkingBlock(item: ThinkingItem, live: boolean, prev: HTMLElement | undefined): HTMLElement {
 	const block = el("div", "qbd-work-item qbd-work-thinking");
-	const since = prev && SINCE.has(prev) ? (SINCE.get(prev) as number) : Date.now();
-	SINCE.set(block, since);
 	const label = el("div", "qbd-work-label");
-	label.appendChild(el("span", live ? "qbd-work-thinking-label is-live" : "qbd-work-thinking-label", t("ai.work.thinking")));
-	label.appendChild(el("span", "qbd-work-sep", " · "));
-	const elapsed = el("span", "qbd-work-elapsed", formatElapsed(Date.now() - since));
-	elapsed.setAttribute("data-since", String(since));
-	label.appendChild(elapsed);
+	if (live) {
+		const since = prev && SINCE.has(prev) ? (SINCE.get(prev) as number) : Date.now();
+		SINCE.set(block, since);
+		label.appendChild(el("span", "qbd-work-thinking-label is-live", t("ai.work.thinking")));
+		label.appendChild(el("span", "qbd-work-sep", " · "));
+		const elapsed = el("span", "qbd-work-elapsed", formatElapsed(Date.now() - since));
+		elapsed.setAttribute("data-since", String(since));
+		label.appendChild(elapsed);
+	} else {
+		label.appendChild(el("span", "qbd-work-thinking-label", thoughtLabel(item)));
+	}
 	if (item.tokens) {
 		label.appendChild(el("span", "qbd-work-sep", " · "));
 		label.appendChild(el("span", "qbd-work-tokens", t("ai.work.thinkingTokens", { n: item.tokens })));
@@ -202,6 +206,14 @@ function thinkingBlock(item: ThinkingItem, live: boolean, prev: HTMLElement | un
 	block.appendChild(label);
 	if (item.text) block.appendChild(el("div", "qbd-work-body", item.text));
 	return block;
+}
+
+/** A finished thinking row: its duration when the stream gave both ends, else "Thought". */
+function thoughtLabel(item: ThinkingItem): string {
+	if (item.started !== undefined && item.ended !== undefined && item.ended - item.started >= 1000) {
+		return t("ai.work.thoughtFor", { time: formatElapsed(item.ended - item.started) });
+	}
+	return t("ai.work.thought");
 }
 
 function formatElapsed(ms: number): string {
@@ -247,6 +259,7 @@ function groupBlock(family: Family, items: ToolItem[], deps: WorkViewDeps, prev:
 	const count = items.length;
 	const title = family === "read" ? "ai.work.groupRead" : family === "run" ? "ai.work.groupRun" : "ai.work.groupSearch";
 	const head = el("div", "qbd-work-group-head");
+	head.appendChild(statusDot(groupDotState(items)));
 	head.appendChild(el("span", "qbd-work-group-title", t(title, { count })));
 	head.appendChild(chevron());
 	const body = el("div", "qbd-work-group-body");
@@ -313,7 +326,7 @@ function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undef
 	const open = prev ? prev.classList.contains("is-open") : awaiting && isRun && item.status === "running";
 
 	const head = el("div", "qbd-work-tool-head");
-	head.appendChild(statusIcon(item));
+	head.appendChild(statusDot(toolDotState(item, awaiting)));
 	const title = el("span", "qbd-work-title");
 	appendTitle(title, item, deps);
 	head.appendChild(title);
@@ -342,19 +355,31 @@ function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undef
 	return block;
 }
 
-function statusIcon(item: ToolItem): HTMLElement {
-	const icon = el("span", "qbd-work-icon");
-	if (item.status === "running") {
-		icon.classList.add("is-running");
-		currentHost().ui.setIcon(icon, "loader");
-	} else if (item.status === "ok") {
-		// A muted dash, drawn by CSS: no glyph, no icon.
-		icon.classList.add("is-ok");
-	} else {
-		icon.classList.add("is-error");
-		currentHost().ui.setIcon(icon, "x");
-	}
-	return icon;
+type DotState = "ok" | "error" | "running" | "waiting";
+const DOT_LABELS: Record<DotState, "ai.work.dotOk" | "ai.work.dotError" | "ai.work.dotRunning" | "ai.work.dotWaiting"> = {
+	ok: "ai.work.dotOk",
+	error: "ai.work.dotError",
+	running: "ai.work.dotRunning",
+	waiting: "ai.work.dotWaiting",
+};
+
+/** The status of a row: a small dot, green, red, pulsing grey, or amber while waiting. */
+function statusDot(state: DotState): HTMLElement {
+	const dot = el("span", "qbd-work-dot is-" + state);
+	dot.setAttribute("role", "img");
+	dot.setAttribute("aria-label", t(DOT_LABELS[state]));
+	return dot;
+}
+
+function toolDotState(item: ToolItem, awaiting: boolean): DotState {
+	if (item.status === "running") return awaiting ? "waiting" : "running";
+	return item.status === "ok" ? "ok" : "error";
+}
+
+/** A group is green when all its calls succeeded, red when one failed, grey while one runs. */
+function groupDotState(items: ToolItem[]): DotState {
+	if (items.some(i => i.status === "running")) return "running";
+	return items.some(i => i.status === "error" || i.status === "refused") ? "error" : "ok";
 }
 
 const BASH_VERBS = new Set(["Bash", "PowerShell", "commandExecution"]);
@@ -702,14 +727,7 @@ function quizRow(block: string, live: boolean): HTMLElement {
 	const wrap = el("div", "qbd-work-tool qbd-work-quiz");
 	const progress = quizProgress(block);
 	const head = el("div", "qbd-work-tool-head");
-	const icon = el("span", "qbd-work-icon");
-	if (live) {
-		icon.classList.add("is-running");
-		currentHost().ui.setIcon(icon, "loader");
-	} else {
-		icon.classList.add("is-ok");
-	}
-	head.appendChild(icon);
+	head.appendChild(statusDot(live ? "running" : "ok"));
 	const title = el("span", "qbd-work-title");
 	title.appendChild(el("span", "qbd-work-tool-name", live ? t("ai.work.quizWriting") : t("ai.work.quizWritten")));
 	head.appendChild(title);

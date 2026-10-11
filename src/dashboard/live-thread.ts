@@ -36,7 +36,7 @@ export const DIFF_LINE_CAP = 2000;
     or "resumed". The view maps each to its translated string with `t()`. */
 export type ThreadItem =
 	| { kind: "user"; text: string }
-	| { kind: "thinking"; text: string; tokens?: number }
+	| { kind: "thinking"; text: string; tokens?: number; started?: number; ended?: number }
 	| { kind: "text"; text: string }
 	| { kind: "tool"; id: string; name: string; input: string; preview: string; lines: number; status: ToolStatus; diff: ToolDiff | null }
 	| { kind: "permission"; requestId: string; tool: string; input: string; state: PermissionState }
@@ -46,7 +46,7 @@ export interface Thread { items: ThreadItem[]; running: boolean }
 
 /** The shape `threadFromRun` reads: a `RunRead` from the store satisfies it. */
 export interface RunInput {
-	events: readonly { dir?: "in" | "out"; l?: unknown; meta?: unknown; end?: unknown }[];
+	events: readonly { dir?: "in" | "out"; l?: unknown; meta?: unknown; end?: unknown; t?: unknown }[];
 	interrupted: boolean;
 	truncated: boolean;
 }
@@ -70,7 +70,7 @@ export function threadFromRun(run: RunInput): Thread {
 				if (isRec(e.meta) && isRec(e.meta.spawn) && ++spawns > 1) pushNotice(t, "resumed");
 				continue;
 			}
-			if (e.dir === "in" || e.dir === "out") applyLine(t, e.dir, e.l, false);
+			if (e.dir === "in" || e.dir === "out") applyLine(t, e.dir, e.l, false, typeof e.t === "number" ? e.t : undefined);
 		} catch {
 			// One line the reader cannot take is skipped; the rest of the run is kept.
 		}
@@ -127,11 +127,11 @@ export function answerPermission(t: Thread, requestId: string, allowed: boolean)
 // --- Reading the CLI lines ----------------------------------------------------
 
 /** `in` lines are the ones the app wrote: a user message, an answer. */
-function applyLine(t: Thread, dir: "in" | "out", l: unknown, live: boolean): void {
+function applyLine(t: Thread, dir: "in" | "out", l: unknown, live: boolean, at?: number): void {
 	if (!isRec(l)) return;
 	if (dir === "in") return applyIn(t, l);
 	if (typeof l.method === "string") return applyCodex(t, l, live);
-	if (typeof l.type === "string") return applyClaude(t, l, live);
+	if (typeof l.type === "string") return applyClaude(t, l, live, at);
 }
 
 function applyIn(t: Thread, l: Rec): void {
@@ -159,12 +159,14 @@ function applyIn(t: Thread, l: Rec): void {
 	}
 }
 
-function applyClaude(t: Thread, l: Rec, live: boolean): void {
+function applyClaude(t: Thread, l: Rec, live: boolean, at?: number): void {
 	switch (l.type) {
 		case "stream_event":
-			return streamEvent(t, l.event);
+			streamEvent(t, l.event);
+			return stampThinking(t, at);
 		case "assistant":
-			return assistantMessage(t, l.message);
+			assistantMessage(t, l.message);
+			return stampThinking(t, at);
 		case "system":
 			return thinkingTokens(t, l);
 		case "user":
@@ -191,6 +193,15 @@ function thinkingTokens(t: Thread, l: Rec): void {
 			return;
 		}
 	}
+}
+
+/** Stamps the last item with the event time while it is a thinking row: the
+    first stamp is its start, the last one its end (the view shows the duration). */
+function stampThinking(t: Thread, at: number | undefined): void {
+	const last = lastItem(t);
+	if (at === undefined || !last || last.kind !== "thinking") return;
+	if (last.started === undefined) last.started = at;
+	last.ended = at;
 }
 
 /** Partial deltas: a block opens a new item, its deltas fill it. */

@@ -238,8 +238,8 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("groupe : une ligne", groupes.length, 1);
 		r.check("groupe : titre « Read 2 files »", groupes[0]?.querySelector(".qbd-work-group-title")?.textContent, "Read 2 files");
 		r.check("groupe : chevron", groupes[0]?.querySelectorAll(".qbd-work-chevron").length, 1);
-		r.check("en cours : hors groupe, visible", root.querySelectorAll(".qbd-work-icon.is-running").length, 1);
-		r.check("en erreur : hors groupe, visible", root.querySelectorAll(".qbd-work-icon.is-error").length, 1);
+		r.check("en cours (permission demandée) : hors groupe, visible", root.querySelectorAll(".qbd-work-dot.is-running, .qbd-work-dot.is-waiting").length, 1);
+		r.check("en erreur : hors groupe, visible", root.querySelectorAll(".qbd-work-dot.is-error").length, 1);
 		r.check("permission : visible", root.querySelectorAll(".qbd-work-permission").length, 1);
 		r.check("rien d'en cours ou en erreur dans le groupe", groupes[0] ? groupes[0].querySelectorAll(".is-running, .is-error").length : -1, 0);
 	}
@@ -248,7 +248,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 	{
 		const root = document.createElement("div");
 		renderThread(root, fil([{ kind: "thinking", text: "", tokens: 1240 }], false), deps);
-		r.check("réflexion : temps affiché", root.querySelector(".qbd-work-elapsed") !== null, true);
+		r.check("réflexion finie : pas de temps écoulé", root.querySelector(".qbd-work-elapsed"), null);
 		r.check("réflexion : jetons", root.querySelector(".qbd-work-tokens")?.textContent, "~1240 tokens");
 		r.check("réflexion finie : pas de reflet", root.querySelectorAll(".is-live").length, 0);
 		const vivant = document.createElement("div");
@@ -371,6 +371,44 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("outil en cours : pas de ligne « Working »", threadHasLiveRow(fil([outil], true)), true);
 		r.check("tour fini : la ligne « Working » ne reste pas", threadHasLiveRow(fil([{ ...outil, status: "ok" }], false)), false);
 		r.check("réflexion en cours : pas de ligne « Working »", threadHasLiveRow(fil([{ kind: "thinking", text: "" }], true)), true);
+	}
+
+	// 19. Status dots: green when it succeeded, red when it failed or was refused, grey and
+	//     pulsing while running, amber while waiting for a permission; the label is translated.
+	{
+		const outil = (id, status) => ({ kind: "tool", id, name: "Bash", input: "ls", preview: "", lines: 0, status, diff: null });
+		const root = document.createElement("div");
+		renderThread(root, fil([outil("d1", "ok"), outil("d2", "error"), outil("d3", "running")], true), deps);
+		const pastilles = [...root.querySelectorAll(".qbd-work-tool-head .qbd-work-dot")];
+		r.check("pastille réussie : verte", pastilles[0]?.classList.contains("is-ok"), true);
+		r.check("pastille réussie : libellé", pastilles[0]?.getAttribute("aria-label"), "Succeeded");
+		r.check("pastille en échec : rouge", pastilles[1]?.classList.contains("is-error"), true);
+		r.check("pastille en échec : libellé", pastilles[1]?.getAttribute("aria-label"), "Failed");
+		r.check("pastille en cours : pulsante", pastilles[2]?.classList.contains("is-running"), true);
+		r.check("pastille en cours : libellé", pastilles[2]?.getAttribute("aria-label"), "Running");
+		r.check("aucune icône Lucide de statut", root.querySelectorAll(".qbd-work-icon").length, 0);
+		const attente = document.createElement("div");
+		renderThread(attente, fil([
+			outil("d4", "running"),
+			{ kind: "permission", requestId: "pd", tool: "Bash", input: "rm", state: "pending" },
+		], true), deps);
+		r.check("pastille en attente : ambre", attente.querySelector(".qbd-work-tool-head .qbd-work-dot")?.classList.contains("is-waiting"), true);
+		r.check("pastille en attente : libellé", attente.querySelector(".qbd-work-tool-head .qbd-work-dot")?.getAttribute("aria-label"), "Waiting for you");
+		const groupe = document.createElement("div");
+		renderThread(groupe, fil([outil("d5", "ok"), outil("d6", "ok")], false), deps);
+		r.check("groupe réussi : pastille verte", groupe.querySelector(".qbd-work-group-head .qbd-work-dot")?.classList.contains("is-ok"), true);
+	}
+
+	// 20. A finished thinking row says how long it thought, or just "Thought"; never "0:00".
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([{ kind: "thinking", text: "", started: 0, ended: 12000 }], false), deps);
+		r.check("réflexion finie avec durée : « Thought for 0:12 »", root.querySelector(".qbd-work-thinking-label")?.textContent, "Thought for 0:12");
+		r.check("réflexion finie : pas de compteur", root.querySelector(".qbd-work-elapsed"), null);
+		const sansDuree = document.createElement("div");
+		renderThread(sansDuree, fil([{ kind: "thinking", text: "", tokens: 222 }], false), deps);
+		r.check("réflexion finie sans durée : « Thought »", sansDuree.querySelector(".qbd-work-thinking-label")?.textContent, "Thought");
+		r.check("réflexion finie : jetons gardés", sansDuree.querySelector(".qbd-work-tokens")?.textContent, "~222 tokens");
 	}
 	r.done();
 });

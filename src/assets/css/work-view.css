@@ -557,3 +557,51 @@
 		transition: none;
 	}
 }
+
+/* The status dot of a row: green, red, grey while running (pulsing), amber while
+   a permission is awaited. Its colour is the diff's own green and red. */
+.qbd-work-dot {
+	display: inline-block;
+	flex: 0 0 auto;
+	width: 7px;
+	height: 7px;
+	margin-top: 7px;
+	border-radius: 50%;
+	background: var(--text-faint);
+}
+
+.qbd-work-dot.is-ok {
+	background: var(--text-success);
+}
+
+.qbd-work-dot.is-error {
+	background: var(--text-error);
+}
+
+.qbd-work-dot.is-waiting {
+	background: var(--interactive-accent);
+}
+
+.qbd-work-dot.is-running {
+	background: var(--text-muted);
+	animation: qbd-work-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes qbd-work-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.3; }
+}
+
+.qbd-work-diff-add .qbd-work-marker {
+	color: var(--text-success);
+}
+
+.qbd-work-diff-del .qbd-work-marker {
+	color: var(--text-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-work-dot.is-running {
+		animation: none;
+	}
+}

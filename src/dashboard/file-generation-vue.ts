@@ -490,7 +490,9 @@ export function creerVueFile(opts: {
 				let marche = corps.querySelector<HTMLElement>(":scope > .qbd-work-running");
 				if (busy && !marche) {
 					marche = ajouter(corps, "div", "qbd-work-running");
-					host.ui.setIcon(ajouter(marche, "span", "qbd-work-icon is-running"), "loader");
+					const dot = ajouter(marche, "span", "qbd-work-dot is-running");
+					dot.setAttribute("role", "img");
+					dot.setAttribute("aria-label", t("ai.work.dotRunning"));
 					ajouter(marche, "span", undefined, t("ai.work.running"));
 				} else if (!busy && marche) marche.remove();
 			},
