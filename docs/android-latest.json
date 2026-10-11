@@ -1,8 +1,8 @@
 {
-  "versionCode": 32,
-  "versionName": "0.2.30",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.30/NeoQuiz-0.2.30.apk",
-  "sha256": "94bf0dd86b16f4f79ee697f58ef62f56626f947775b5685d23747e8e279d13fa",
-  "size": 56138173,
-  "notes": "New model picker, live AI sessions and fixes"
+  "versionCode": 33,
+  "versionName": "0.2.31",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.31/NeoQuiz-0.2.31.apk",
+  "sha256": "9b617a23c10101953114371ef9b92b1a69204e799fb56c6ba8aeb1f5d8fa4139",
+  "size": 56138829,
+  "notes": "Model picker fixes and each PC listed once"
 }
