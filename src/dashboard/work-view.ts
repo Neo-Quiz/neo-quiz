@@ -518,8 +518,11 @@ function summaryOf(item: ToolItem): { text: string; error: boolean; full?: strin
 	}
 	if (item.diff && item.diff.added.length + item.diff.removed.length > 0) {
 		const added = item.diff.added.length;
-		if (item.name === "Write") return { text: t("ai.work.wrote", { count: added }), error: false };
-		return { text: t("ai.work.editCounts", { added, removed: item.diff.removed.length }), error: false };
+		if (item.name === "Write") return { text: added === 1 ? t("ai.work.wroteOne") : t("ai.work.wrote", { count: added }), error: false };
+		const removed = item.diff.removed.length;
+		const addedText = added === 1 ? t("ai.work.addedOne") : t("ai.work.addedOther", { count: added });
+		const removedText = removed === 1 ? t("ai.work.removedOne") : t("ai.work.removedOther", { count: removed });
+		return { text: addedText + ", " + removedText, error: false };
 	}
 	const n = item.lines;
 	if (n === 0) return null;
@@ -570,13 +573,15 @@ function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
 	if (diff.lines) {
 		for (const l of diff.lines) {
 			const cls = l.kind === "add" ? "qbd-work-diff-add" : l.kind === "del" ? "qbd-work-diff-del" : "qbd-work-diff-ctx";
-			const marker = l.kind === "add" ? "+" : l.kind === "del" ? "−" : " ";
+			const marker = l.kind === "add" ? "+" : l.kind === "del" ? "-" : "";
 			rows.push({ cls, marker, text: l.text, num: String(l.num) });
 		}
 	} else {
-		for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "−", text: line, num: "" });
+		for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "-", text: line, num: "" });
+		// A Write is a file preview: numbered lines, no marker.
+		const write = item.name === "Write";
 		let n = 1;
-		for (const line of diff.added) rows.push({ cls: "qbd-work-diff-add", marker: "+", text: line, num: item.name === "Write" ? String(n++) : "" });
+		for (const line of diff.added) rows.push({ cls: write ? "qbd-work-diff-write" : "qbd-work-diff-add", marker: write ? "" : "+", text: line, num: write ? String(n++) : "" });
 	}
 	const box = el("div", "qbd-work-diff");
 	rows.forEach((r, i) => {
@@ -585,7 +590,8 @@ function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
 		row.appendChild(el("span", "qbd-work-gutter", r.num));
 		row.appendChild(el("span", "qbd-work-marker", r.marker));
 		const code = el("span", "qbd-work-code");
-		appendHighlighted(code, r.text, lang);
+		// A removed line is dimmed plain text, as Claude Code shows it: no syntax colours.
+		appendHighlighted(code, r.text, r.cls === "qbd-work-diff-del" ? null : lang);
 		row.appendChild(code);
 		box.appendChild(row);
 	});

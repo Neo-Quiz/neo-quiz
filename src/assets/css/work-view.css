@@ -420,6 +420,7 @@
 	min-width: 0;
 }
 
+/* Claude Code's Update view: no background, the lines sit under the summary. */
 .qbd-work-diff-row {
 	display: flex;
 	align-items: flex-start;
@@ -432,17 +433,10 @@
 	display: none;
 }
 
-.qbd-work-diff-add {
-	background: color-mix(in srgb, var(--color-green, #4caf50) 8%, transparent);
-}
-
-.qbd-work-diff-del {
-	background: color-mix(in srgb, var(--color-red, #e5484d) 11%, transparent);
-}
-
+/* The line number, right-aligned, then the marker (+ or -) in the same colour. */
 .qbd-work-gutter {
-	flex: 0 0 3.5em;
-	padding-right: 8px;
+	flex: 0 0 4ch;
+	padding-right: 1ch;
 	text-align: right;
 	color: var(--text-faint);
 	user-select: none;
@@ -450,14 +444,29 @@
 }
 
 .qbd-work-marker {
-	flex: 0 0 1.2em;
-	color: var(--text-muted);
+	flex: 0 0 2ch;
+	color: var(--text-faint);
 	user-select: none;
 }
 
 .qbd-work-code {
 	flex: 1 1 auto;
 	min-width: 0;
+}
+
+.qbd-work-diff-add .qbd-work-gutter,
+.qbd-work-diff-add .qbd-work-marker {
+	color: var(--text-success);
+}
+
+.qbd-work-diff-del .qbd-work-gutter,
+.qbd-work-diff-del .qbd-work-marker {
+	color: var(--text-error);
+}
+
+/* A removed line's code is dimmed: plain muted text. */
+.qbd-work-diff-del .qbd-work-code {
+	color: var(--text-muted);
 }
 
 .qbd-work-toggle {

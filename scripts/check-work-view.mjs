@@ -189,13 +189,13 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		root.querySelectorAll(".qbd-work-tool-head").forEach(h => click(h));
 		const resumes = root.querySelectorAll(".qbd-work-summary-text");
 		r.check("Write : « Wrote 3 lines »", resumes[0]?.textContent, "Wrote 3 lines");
-		r.check("Edit : added / removed", resumes[1]?.textContent, "Added 1 lines, removed 1 lines");
+		r.check("Edit : « Added 1 line, removed 1 line »", resumes[1]?.textContent, "Added 1 line, removed 1 line");
 		const numeros = [...root.querySelectorAll(".qbd-work-diff")[0].querySelectorAll(".qbd-work-gutter")].map(n => n.textContent);
 		r.check("Write : numéros depuis 1", numeros.join(","), "1,2,3");
 		const edition = root.querySelectorAll(".qbd-work-diff")[1];
 		r.check("Edit : pas de numéros", [...edition.querySelectorAll(".qbd-work-gutter")].every(n => n.textContent === ""), true);
 		r.check("Edit : une ligne retirée, une ajoutée", edition.querySelectorAll(".qbd-work-diff-del").length + edition.querySelectorAll(".qbd-work-diff-add").length, 2);
-		r.check("marqueurs : − puis +", [...edition.querySelectorAll(".qbd-work-marker")].map(n => n.textContent).join(""), "−+");
+		r.check("marqueurs : − puis +", [...edition.querySelectorAll(".qbd-work-marker")].map(n => n.textContent).join(""), "-+");
 		r.check("diff : aucun img/script hostile", root.querySelectorAll("img,script").length, 0);
 		r.check("diff : la ligne hostile reste du texte", root.textContent.includes(CHARGE), true);
 	}
@@ -409,6 +409,22 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		renderThread(sansDuree, fil([{ kind: "thinking", text: "", tokens: 222 }], false), deps);
 		r.check("réflexion finie sans durée : « Thought »", sansDuree.querySelector(".qbd-work-thinking-label")?.textContent, "Thought");
 		r.check("réflexion finie : jetons gardés", sansDuree.querySelector(".qbd-work-tokens")?.textContent, "~222 tokens");
+	}
+
+	// 21. Claude Code's Update view: a Write is a file preview (numbers, no marker, no add class);
+	//     a removed line is plain dimmed text (no syntax spans).
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([
+			{ kind: "tool", id: "u1", name: "Write", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["const a = 1"], removed: [] } },
+			{ kind: "tool", id: "u2", name: "Edit", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: [], removed: ["const b = 2"] } },
+		]), deps);
+		root.querySelectorAll(".qbd-work-tool-head").forEach(h => click(h));
+		const ecrit = root.querySelector(".qbd-work-diff-write");
+		r.check("Write : ligne numérotée sans marqueur", ecrit?.querySelector(".qbd-work-marker")?.textContent, "");
+		r.check("Write : aucune classe d'ajout", root.querySelectorAll(".qbd-work-diff-add").length, 0);
+		r.check("retrait : code sans coloration syntaxique", root.querySelectorAll(".qbd-work-diff-del .qbd-work-code span").length, 0);
+		r.check("retrait : marqueur « - »", root.querySelector(".qbd-work-diff-del .qbd-work-marker")?.textContent, "-");
 	}
 	r.done();
 });
