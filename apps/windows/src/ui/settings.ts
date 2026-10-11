@@ -37,6 +37,7 @@ import { reglerSilence, silenceActif } from "./notif-fin";
 import { mountMoodleSettings } from "./moodle-settings";
 import { EXPLAIN_MAX_CHARS_DEFAUT } from "./explain";
 import { monterSync } from "../../../../src/dashboard/sync-page";
+import { mountAiHistorySettings } from "./ai-history-settings";
 import { phoneLayoutNow } from "../../../../src/phone-layout";
 
 type Category = "general" | "sync" | "ai" | "appearance" | "languages" | "moodle";
@@ -461,6 +462,10 @@ export function renderSettings(
 		};
 		void peindreConfiance();
 	}
+
+	/* AI WORK HISTORY (2026-10-11): what Claude Code and Codex did in the
+	   live sessions, kept on this PC; its size and "Delete all". */
+	if (!mobile && currentHost().live) mountAiHistorySettings(card(section(aiPage, t("app.settings.aiHistory"), t("app.settings.aiHistoryHint"))), row);
 
 	/* No "Generation layout" any more (2026-09-30): the conversation is always
 	   full width, so everything Claude Code or Codex does shows. */

@@ -705,6 +705,11 @@ label.nq-set-ligne {
 	min-width: 220px;
 }
 
+/* A value next to its button (the AI work history's size, 2026-10-11). */
+.nq-set-ligne-controle .nq-set-valeur {
+	margin-right: 12px;
+}
+
 /* THE SWITCH: a native checkbox (keyboard, `change`), drawn as a switch. */
 .nq-set-interrupteur {
 	appearance: none;
