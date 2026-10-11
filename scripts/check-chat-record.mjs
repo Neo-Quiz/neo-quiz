@@ -81,6 +81,43 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	r.check("a request's working folder: kept when sane, dropped when hostile",
 		[C.readFolder("XTI303 - Conception"), C.readFolder("C:/Cours/XTI303"), C.readFolder("a/../b"), C.readFolder("..\\x"), C.readFolder("a\u0000b"), C.readFolder("x".repeat(401)), C.readFolder(42)],
 		["XTI303 - Conception", "C:/Cours/XTI303", undefined, undefined, undefined, undefined, undefined]);
+
+	/* 2026-10-11, live sessions: a chat keeps the ids of its runs (the AI work
+	   history kept on this PC). Read from a synced file: only a lowercase UUID
+	   is kept, each once, at most 500 (the newest), and a chat stored before
+	   the field existed stays valid. */
+	const uuid = (n) => "0000000" + (n % 10) + "-1111-4222-8333-" + String(n).padStart(12, "0");
+	const ids = (over) => C.readChats({ v: 1, chats: [chat("a", 1, over)] })[0];
+	r.check("run ids: round trip", ids({ runIds: [uuid(1), uuid(2)] }).runIds, [uuid(1), uuid(2)]);
+	r.check("run ids: an old chat without the field stays valid, without the field", [ids({}).id, "runIds" in ids({})], ["a", false]);
+	r.check("run ids: hostile values are dropped one by one, the chat kept",
+		ids({ runIds: [uuid(1), uuid(1).toUpperCase(), "../../x", 42, null, uuid(1), " " + uuid(2), uuid(2) + "\n", "x".repeat(5000), uuid(3)] }).runIds,
+		[uuid(1), uuid(3)]);
+	r.check("run ids: not a list is ignored, the chat kept", [ids({ runIds: "abc" }).id, "runIds" in ids({ runIds: "abc" }), "runIds" in ids({ runIds: [] })], ["a", false, false]);
+	const many = Array.from({ length: C.MAX_RUN_IDS + 10 }, (_, i) => uuid(i));
+	const bornesRuns = ids({ runIds: many }).runIds;
+	r.check("run ids: at most 500, the newest kept", [C.MAX_RUN_IDS, bornesRuns.length, bornesRuns[0], bornesRuns[bornesRuns.length - 1]], [500, 500, uuid(10), uuid(many.length - 1)]);
+	const avecRun = C.addRunId([chat("a", 1)], "a", uuid(7), "d1", 9);
+	r.check("addRunId: added to the chat, updatedAt moves", [avecRun[0].runIds, avecRun[0].updatedAt], [[uuid(7)], 9]);
+	r.check("addRunId: the same id twice is kept once, the list unchanged", C.addRunId(avecRun, "a", uuid(7), "d1", 20), avecRun);
+	r.check("addRunId: a bad id changes nothing", C.addRunId([chat("a", 1)], "a", "../x", "d1", 9), [chat("a", 1)]);
+	r.check("addRunId: an unknown chat is created, empty, with the run", C.addRunId([], "n", uuid(1), "d1", 9), [{ id: "n", origin: "d1", createdAt: 9, updatedAt: 9, requests: [], runIds: [uuid(1)] }]);
+	r.check("addRunId: never revives a deleted chat", C.addRunId([{ ...chat("a", 1), deleted: true, requests: [] }], "a", uuid(1), "d1", 9)[0].runIds, undefined);
+	r.check("addRunId: bounded to 500, the oldest dropped", C.addRunId([chat("a", 1, { runIds: many.slice(0, 500) })], "a", uuid(999), "d1", 9)[0].runIds.slice(-2), [uuid(499), uuid(999)]);
+	/* The AI work of a request (2026-10-11): where its live turns sit in their
+	   runs, so a chat reopened after a restart shows it again. Read from a
+	   synced file: a lowercase run id and two safe integers, from <= to. */
+	const reqR = (over) => ({ id: "q", at: 1, from: "d1", text: "t", mode: "learn", documents: [], results: [], state: "done", ...over });
+	const runsOf = (runs) => C.readChats({ v: 1, chats: [chat("a", 1, { requests: [reqR({ runs })] })] })[0].requests[0].runs;
+	r.check("request runs: round trip", runsOf([{ runId: uuid(1), fromSeq: 4, toSeq: 9 }]), [{ runId: uuid(1), fromSeq: 4, toSeq: 9 }]);
+	r.check("request runs: absent on an old request, and the request kept", [runsOf(undefined), C.readChats({ v: 1, chats: [chat("a", 1, { requests: [reqR({ runs: "x" })] })] })[0].requests.length], [undefined, 1]);
+	r.check("request runs: hostile turns dropped one by one (bad id, negative, reversed, not an integer, extra key not kept)",
+		runsOf([{ runId: "../x", fromSeq: 0, toSeq: 1 }, { runId: uuid(2), fromSeq: -1, toSeq: 1 }, { runId: uuid(2), fromSeq: 5, toSeq: 4 }, { runId: uuid(2), fromSeq: 1.5, toSeq: 4 }, { runId: uuid(2), fromSeq: 1, toSeq: 4, path: "C:/x" }, { runId: uuid(2), fromSeq: 1, toSeq: 9 }]),
+		[{ runId: uuid(2), fromSeq: 1, toSeq: 4 }]);
+	r.check("request runs: at most 20, the newest", (() => { const l = runsOf(Array.from({ length: 30 }, (_, i) => ({ runId: uuid(1), fromSeq: i, toSeq: i }))); return [l.length, l[0].fromSeq]; })(), [C.MAX_REQUEST_RUNS, 10]);
+	const sansRuns = C.withoutRuns([chat("a", 1, { runIds: [uuid(1)], requests: [reqR({ runs: [{ runId: uuid(1), fromSeq: 0, toSeq: 3 }] })] })]);
+	r.check("Delete all: no run id and no request run left, the rest untouched", [sansRuns[0].runIds, sansRuns[0].requests[0].runs, sansRuns[0].requests[0].text, sansRuns[0].updatedAt], [undefined, undefined, "t", 1]);
+	r.check("runIdsOf: a chat's runs, none for an unknown or deleted chat", [C.runIdsOf(avecRun, "a"), C.runIdsOf(avecRun, "zz"), C.runIdsOf([{ ...chat("a", 1), deleted: true, requests: [], runIds: [uuid(1)] }], "a")], [[uuid(7)], [], []]);
 	r.done();
 });
 

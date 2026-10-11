@@ -177,6 +177,8 @@ let gardeFermeture: NodeJS.Timeout | null = null;
 /** Arrête l'attente d'une réponse copiée (voir `canaux.ts`) ; posée par
     `enregistrerCanaux`, appelée à la fermeture de la fenêtre. */
 let arreterAttente: (() => void) | null = null;
+/** Kills the live AI sessions (`live-canaux.ts`), set with the channels. */
+let arreterLive: (() => Promise<void>) | null = null;
 /** The code sandbox (task 3, `./code-sandbox.ts`, generalised from
     Python-only to any language): created once, closed when the window
     closes, like `arreterAttente`. Only Python is wired through it for now —
@@ -966,6 +968,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			},
 		});
 		arreterAttente = canaux.arreterAttente;
+		arreterLive = canaux.arreterLive;
 		/* Moodle: at most one automatic sync an hour (the service decides), a few
 		   seconds after launch so it never competes with the window opening. */
 		setTimeout(() => {
@@ -1035,6 +1038,20 @@ app.on("window-all-closed", () => {
 /* Any other way out: stop the embedded Syncthing first (it asks the process to
    shut down, then kills it after a few seconds), THEN quit for real. Without
    it, the child would outlive the app and keep the install folder locked. */
+/* Every live AI session is killed (its whole tree) before the app quits:
+   a Claude Code or Codex process must never outlive the app. */
+let liveArrete = false;
+let liveEnCours: Promise<void> | null = null;
+app.on("before-quit", e => {
+	if (liveArrete || !arreterLive) return;
+	e.preventDefault();
+	if (liveEnCours) return;
+	const arreter = arreterLive;
+	liveEnCours = arreter().catch(err => console.warn(LOG_PREFIX, "live sessions not stopped:", err)).finally(() => {
+		liveArrete = true;
+		app.quit();
+	});
+});
 let syncArrete = false;
 app.on("before-quit", e => {
 	if (!sync || syncArrete) return;

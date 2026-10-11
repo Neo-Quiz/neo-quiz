@@ -28,6 +28,9 @@ import { inertRemoteImages } from "./remote-images";
 import { UsageLimitError, cliErrorText, detectUsageLimit } from "./usage-limit";
 import { detectModelLimit } from "./model-limit";
 import type { TranscriptEvent } from "./transcript";
+import { LiveUnavailable, runLiveTurn } from "./live-generation";
+import type { LiveTool } from "./live-generation";
+import type { TurnOutcome } from "./live-turn";
 
 /* ══════════════════════════════════════════════════════════
    AI CLIENT — Claude Code + Codex + Ollama
@@ -121,7 +124,15 @@ export interface GenerateOptions {
 	    provider: no tool at all, as before. Never set for a request that
 	    came from another device. */
 	dossier?: string;
+	/** A LIVE session (2026-10-11, `live-generation.ts`): the chat this
+	    generation belongs to and its resume key. With `dossier`, Claude Code
+	    and Codex run as a turn of the chat's live session when the host has
+	    them (`HostLive`); otherwise the one-shot call, as before. */
+	live?: LiveOptions;
 }
+
+/** See `GenerateOptions.live`. */
+export interface LiveOptions { chatId: string; key: string }
 
 /** Une réponse LUE : les questions, et le titre que le modèle a choisi
     pour le quiz (`// title:` en tête du tableau ; `title` de l'objet pour
@@ -278,7 +289,7 @@ export interface AiClient {
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
-	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string }): Promise<EtapePlan[]>;
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions }): Promise<EtapePlan[]>;
 	/** The short call that may ask clarifying questions before a vague request
 	    generates (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
 	    documents only, the lowest effort, 30 s at most. Resolves with the
@@ -1050,6 +1061,22 @@ function nonQuizResponseError(content: string): Error {
 	return new Error(t("ai.err.notQuiz", { preview: apercuReponse(text) }));
 }
 
+/** The `result` line of Claude Code: `--output-format json` (and the last
+    line of `stream-json`) publish the REAL usage of the call: tokens (those
+    served by the cache included) and cost in dollars. */
+interface ClaudeResult {
+	is_error?: boolean;
+	result?: string;
+	session_id?: string;
+	total_cost_usd?: number;
+	usage?: {
+		input_tokens?: number;
+		output_tokens?: number;
+		cache_read_input_tokens?: number;
+		cache_creation_input_tokens?: number;
+	};
+}
+
 export function createAiClient(settings: AiSettingsHost): AiClient {
 	// ── Annulation (bouton stop / Esc) ──
 	// Chaque appel CLI/HTTP enregistre sa fonction d'arrêt ici ; abort()
@@ -1072,6 +1099,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
 	    Claude Code may run in it with read-only tools once it is trusted. */
 	let dossierOutils: string | null = null;
+	/** The live session of the running generation or plan (`GenerateOptions.live`). */
+	let liveCtx: LiveOptions | null = null;
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -1139,12 +1168,42 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		});
 	}
 
+	/** One turn of the chat's live session (`live-generation.ts`), for an
+	    agent generation (a folder given, never a request from another
+	    device). `null`: no live session here, or it cannot run live (root not
+	    trusted, a form refused): the caller makes its one-shot call. Stop
+	    interrupts the turn; the session stays. */
+	async function tourVivant(tool: LiveTool, model: string, effort: string | undefined, mode: ModeAgent, texte: string, images: ImagePayload[]): Promise<TurnOutcome | null> {
+		const ctx = liveCtx;
+		if (!ctx || !dossierOutils || !currentHost().live) return null;
+		let arreter: (() => void) | null = null;
+		abortCurrent = () => { aborted = true; arreter?.(); };
+		try {
+			return await runLiveTurn({
+				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texte,
+				...(effort ? { effort } : {}),
+				images: images.map(i => ({ mediaType: i.mediaType || "image/png", base64: i.base64 })),
+				abortable: stop => { arreter = stop; if (aborted) stop(); },
+			});
+		} catch (e) {
+			if (e instanceof LiveUnavailable) return null;
+			if (aborted) throw e;
+			const nom = e instanceof Error ? e.name : "";
+			if (nom === "busy") throw userError(t("ai.live.busy"));
+			if (nom === "exited") throw userError(t("ai.live.exited"));
+			if (nom === "not-installed") throw new Error(t(tool === "claude" ? "ai.err.claudeNotInstalled" : "ai.err.codexNotInstalled"));
+			const detail = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+			throw new Error(tool === "claude" ? t("ai.err.claudeCode", { detail }) : t("ai.err.codex", { detail }));
+		}
+	}
+
 	async function generate(prompt: string, options: GenerateOptions = {}): Promise<ReponseQuiz> {
 		aborted = false;
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
 		appelsCli = 0;
 		dossierOutils = options.dossier ?? null;
+		liveCtx = options.live ?? null;
 		pendingUsage = null;
 		lastUsage = null;
 		/* L'INSTANTANÉ des fichiers de CLI, relu AVANT l'appel : `resolveCodexModel`
@@ -1183,6 +1242,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			transcriptSink = null;
 			repriseBase = null;
 			dossierOutils = null;
+			liveCtx = null;
 		}
 	}
 
@@ -1435,12 +1495,22 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				fichiers.map((_, i) => "- " + jetonFichier(marqueur, i + 1)).join("\n")
 			: "";
 
+		const mode = lireModeAgent(settings.get().aiAgentMode);
+		/* A LIVE SESSION (2026-10-11): an agent generation of the Generate
+		   page is a turn of the chat's Claude Code session, in the Neo Quiz
+		   root; the pictures go with the message itself. `null`: it cannot
+		   run live, the one-shot call below runs instead. */
+		const vivant = await tourVivant("claude", model, effort ?? undefined, mode, consigneAvecOutils(systemPrompt, mode) + "\n\n" + userPrompt, images);
+		if (vivant) {
+			derniereSortieClaude = vivant.claudeResult ? JSON.stringify(vivant.claudeResult) : "";
+			return lireResultatClaude(vivant.claudeResult as ClaudeResult | null, model);
+		}
+
 		/* READ-ONLY TOOLS IN THE QUIZ'S FOLDER (2026-10-09), only once the
 		   user trusted it in the host's native dialog. The page never decides
 		   it alone: the main process judges the folder again before running
 		   anything there. Any failure to ask is "no tools", never an error. */
 		const dossier = dossierOutils;
-		const mode = lireModeAgent(settings.get().aiAgentMode);
 		let outils = false;
 		const proc = requireHost("process");
 		if (dossier && proc.trustFolder) {
@@ -1522,23 +1592,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		if (res.code !== 0) throw erreurClaude(execErrorDepuisCode(res));
 		const stdout = res.stdout;
 		derniereSortieClaude = stdout;
+		return lireResultatClaude(claudeResultDuFlux(stdout) as ClaudeResult | null, model);
+	}
 
-		/* `--output-format json` publie l'usage RÉEL de l'appel : tokens (dont
-		   ceux servis par le cache) et coût en dollars — Claude Code est le seul
-		   des quatre à chiffrer la requête. */
-		interface ClaudeResult {
-			is_error?: boolean;
-			result?: string;
-			session_id?: string;
-			total_cost_usd?: number;
-			usage?: {
-				input_tokens?: number;
-				output_tokens?: number;
-				cache_read_input_tokens?: number;
-				cache_creation_input_tokens?: number;
-			};
-		}
-		const data = claudeResultDuFlux(stdout) as ClaudeResult | null;
+	/** The `result` line of a Claude Code run (one-shot stream or live turn):
+	    its usage, its error mapped to the user's words, or its text. */
+	function lireResultatClaude(data: ClaudeResult | null, model: string): string {
 		if (!data) throw new Error(t("ai.err.claudeUnreadable"));
 
 		const u = data.usage;
@@ -1621,6 +1680,19 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   folder again. Otherwise the old read-only call in the home folder. */
 		const dossier = dossierOutils;
 		const mode = lireModeAgent(settings.get().aiAgentMode);
+		/* A LIVE SESSION (2026-10-11), as for Claude Code: a turn of the
+		   chat's Codex session (`codex app-server`) in the Neo Quiz root; its
+		   answer is the turn's last agent message, as `-o` held it. */
+		const vivant = await tourVivant("codex", model, effortVal, mode, consigneAvecOutils(systemPrompt, mode) + "\n\n" + userPrompt, images);
+		if (vivant) {
+			if (vivant.codexError) {
+				const limite = detectUsageLimit(vivant.codexError, Date.now());
+				if (limite) throw new UsageLimitError("codex", limite.resetAt, t("ai.err.codexRateLimit"));
+				throw new Error(t("ai.err.codex", { detail: vivant.codexError.trim().slice(0, 300) }));
+			}
+			if (!vivant.codexText.trim()) throw new Error(t("ai.err.codexEmpty"));
+			return vivant.codexText;
+		}
 		let agent = false;
 		const proc = requireHost("process");
 		if (dossier && proc.trustFolder) {
@@ -2002,12 +2074,13 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    document at once, then chooses the quizzes that will cover everything
 	    that can come up — their number, their order, what each covers.
 	    `typeImpose`: the Learn | Test selector, which the plan follows. */
-	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string } = {}): Promise<EtapePlan[]> {
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions } = {}): Promise<EtapePlan[]> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
 		dossierOutils = options.dossier ?? null;
+		liveCtx = options.live ?? null;
 		appelsCli = 0;
 		await refreshCliCaches();
 		try {
@@ -2050,6 +2123,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			transcriptSink = null;
 			repriseBase = null;
 			dossierOutils = null;
+			liveCtx = null;
 		}
 	}
 
@@ -2062,6 +2136,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		transcriptSink = null;
 		// The clarify call never gets tools: request and document names only.
 		dossierOutils = null;
+		liveCtx = null;
 		repriseBase = null;
 		await refreshCliCaches();
 		const limite = window.setTimeout(() => { if (abortCurrent) abortCurrent(); }, DECIDE_TIMEOUT_MS);

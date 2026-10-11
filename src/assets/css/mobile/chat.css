@@ -379,31 +379,128 @@
 	width: 20px;
 	height: 20px;
 }
-/* "Claude Code · <model>": a compact pill like the Claude app's model chip. */
+/* The model pill: provider logo, model name, chevron (MonoCode's chip, 26 px). */
 .is-mobile .qbd-ai-model-pill {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
 	flex: 0 1 auto;
 	min-width: 0;
-	min-height: 36px;
-	padding: 0 12px;
+	height: 26px;
+	padding: 0 8px;
 	border: none;
-	border-radius: 18px;
+	border-radius: 6px;
 	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
-	font-size: 14px;
+	font-size: 12px;
 	white-space: nowrap;
 }
+.is-mobile .qbd-ai-model-pill:hover { background: color-mix(in srgb, var(--text-normal) 14%, transparent) !important; }
+.is-mobile .qbd-ai-model-pill:active { background: color-mix(in srgb, var(--text-normal) 18%, transparent) !important; }
 .is-mobile .qbd-ai-model-pill[hidden] { display: none; }
+.is-mobile .qbd-ai-model-pill-logo,
+.is-mobile .qbd-ai-model-pill-chevron {
+	display: inline-flex;
+	flex: none;
+}
+.is-mobile .qbd-ai-model-pill-logo svg,
+.is-mobile .qbd-ai-model-pill-logo img { width: 16px; height: 16px; }
+.is-mobile .qbd-ai-model-pill-chevron svg { width: 12px; height: 12px; }
 .is-mobile .qbd-ai-model-pill-texte {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.is-mobile .qbd-ai-model-pill-chevron svg {
-	width: 14px;
-	height: 14px;
+
+/* The provider/model picker (ui-select.ts openModelPicker), above the pill. */
+@keyframes qbd-model-picker-in {
+	from { opacity: 0; transform: translateY(4px); }
+	to { opacity: 1; transform: none; }
+}
+@keyframes qbd-model-picker-out {
+	from { opacity: 1; transform: none; }
+	to { opacity: 0; transform: translateY(4px); }
+}
+.is-mobile .qbd-model-picker {
+	display: flex;
+	box-sizing: border-box;
+	max-height: calc(100vh - 16px);
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--text-normal) 12%, transparent);
+	border-radius: 12px;
+	background: var(--background-primary);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+	animation: qbd-model-picker-in 150ms ease-out;
+}
+.is-mobile .qbd-model-picker.is-leaving { animation: qbd-model-picker-out 150ms ease-in forwards; }
+.is-mobile .qbd-model-picker-rail {
+	flex: 0 0 44px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 0;
+	border-right: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+.is-mobile .qbd-model-picker-rail::-webkit-scrollbar { display: none; }
+.is-mobile .qbd-model-picker-brand {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	flex: none;
+	padding: 0;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	box-shadow: none;
+}
+.is-mobile .qbd-model-picker-brand[aria-pressed="true"] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
+.is-mobile .qbd-model-picker-logo svg,
+.is-mobile .qbd-model-picker-logo img { width: 16px; height: 16px; }
+.is-mobile .qbd-model-picker-list {
+	flex: 1 1 auto;
+	min-width: 0;
+	max-height: min(55vh, 360px);
+	padding: 6px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: none;
+}
+.is-mobile .qbd-model-picker-list::-webkit-scrollbar { display: none; }
+.is-mobile .qbd-model-picker-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 36px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: 14px;
+	text-align: left;
+}
+.is-mobile .qbd-model-picker-row:hover,
+.is-mobile .qbd-model-picker-row:active { background: color-mix(in srgb, var(--text-normal) 9%, transparent); }
+.is-mobile .qbd-model-picker-row-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.is-mobile .qbd-model-picker-check { flex: none; display: inline-flex; color: var(--interactive-accent); }
+.is-mobile .qbd-model-picker-check svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) {
+	.is-mobile .qbd-model-picker,
+	.is-mobile .qbd-model-picker.is-leaving { animation: none; }
 }
 .is-mobile .qbd-ai-pc-note {
 	margin: 8px 0 0;

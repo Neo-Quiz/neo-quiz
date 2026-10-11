@@ -33,8 +33,10 @@ export function openTrustModal(folder: string, callback: (trusted: boolean) => v
 			const buttons = ajouter(c, "div", "qb-confirm-buttons");
 			ajouter(buttons, "button", "qb-btn", t("app.aiTrust.cancel")).addEventListener("click", () => { trusted = false; m.close(); });
 			const ok = ajouter(buttons, "button", "qb-btn", t("app.aiTrust.trust"));
+			/* No `ok.focus()` here, as in every other confirm modal: opened by
+			   Enter in the composer, a programmatic focus matches :focus-visible
+			   and drew the keyboard ring (a double outline) around Trust. */
 			ok.addEventListener("click", () => { trusted = true; m.close(); });
-			ok.focus();
 		},
 		onClose: () => callback(trusted),
 	});

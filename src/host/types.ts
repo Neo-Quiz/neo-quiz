@@ -19,6 +19,7 @@
 import type { UsageRead } from "../dashboard/usage-format";
 import type { ResetsRequest, ResetsResult } from "../dashboard/codex-resets";
 import type { CodeLanguage } from "../code-languages";
+import type { ModeAgent } from "./claude-outils";
 
 /** Un fichier vu par l'hôte. Volontairement plat et sérialisable. */
 export interface HostFile {
@@ -1088,6 +1089,109 @@ export interface HostDepot {
 	terminer(): Promise<void>;
 }
 
+/** First line of a run file of the live-session store (spec
+    2026-10-11-live-cli-sessions-design, section 5): one file per live Claude
+    Code / Codex run, `<userData>/runs/<runId>.jsonl`, kept on the PC only. */
+export interface RunHeader {
+	v: 1;
+	tool: "claude" | "codex";
+	model: string;
+	effort?: string;
+	mode: ModeAgent;
+	/** A UUID: the store refuses anything else before it builds a path. */
+	runId: string;
+	cwd: string;
+	chatId: string;
+	/** Epoch milliseconds. */
+	start: number;
+}
+
+/** One line after the header: a raw CLI line sent (`in`) or received
+    (`out`), a note of the app (`meta`), or the end of the run (`end`). */
+export interface RunEvent {
+	t: number;
+	/** The line's index in its run (monotonic; a dropped line leaves a gap):
+	    the same number a live `line` event carries, to merge the two. */
+	seq: number;
+	dir?: "in" | "out";
+	l?: unknown;
+	meta?: Record<string, unknown>;
+	end?: unknown;
+}
+
+/** A run as read back. `interrupted`: no end line (the app or the CLI died
+    mid-run). `truncated`: the run hit its size cap and stopped recording. */
+export interface RunRead {
+	header: RunHeader;
+	events: RunEvent[];
+	interrupted: boolean;
+	truncated: boolean;
+}
+
+/** One page of a stored run, as `HostLive.readRun` gives it: `events` are
+    the `offset`-th to the `offset + events.length`-th of `total`. A run is
+    never sent whole to the window: a page stops at 2000 events or about
+    8 MB of JSON. `live`: a process of this run is running now, so a missing
+    end line means "still running", not "interrupted". */
+export interface RunPage extends RunRead {
+	offset: number;
+	total: number;
+	live: boolean;
+}
+
+/** What the window may send to a live session (spec 2026-10-11-live-cli-
+    sessions-design, section 4.4). TYPED, never a raw line: the main process
+    validates it field by field and builds the CLI's stdin JSON itself. */
+export type LiveInput =
+	| { kind: "message"; text: string; images: readonly { mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp"; base64: string }[] }
+	| { kind: "permission"; requestId: string; allow: boolean }
+	| { kind: "interrupt" };
+
+/** What a live session pushes to the window that started it. `line` is
+    every parsed stdout line of the CLI (Claude stream-json or Codex
+    JSON-RPC), to be shown as TEXT only, with `seq`, its index in the run
+    store: a page reads the store (`readRun`), keeps listening, and drops a
+    `line` whose `seq` it already has (no replay on reattach, except the
+    pending permissions). `exit.parked`: the process was
+    stopped after five idle minutes; the next message resumes it. */
+export type LiveEvent =
+	| { kind: "line"; runId: string; seq: number; line: unknown }
+	| { kind: "permission"; runId: string; requestId: string; tool: string; input: Record<string, unknown> }
+	| { kind: "permissionGone"; runId: string; requestId: string }
+	| { kind: "turnEnd"; runId: string }
+	| { kind: "exit"; runId: string; code: number | null; parked: boolean };
+
+/** Why `HostLive.start` or `send` failed: the `name` of the rejected Error.
+    `untrusted`: the Neo Quiz root is not a trusted folder (the page shows its
+    trust modal); `not-installed`: no CLI of that name; `refused`: a payload,
+    run id or form the main process refused; `failed`: the CLI did not start
+    or answer; `busy`: six sessions are already in a turn (the live cap). */
+export type LiveErrorCode = "untrusted" | "not-installed" | "refused" | "failed" | "busy";
+
+/** Claude Code and Codex as LIVE sessions (2026-10-11): one long-lived
+    process per chat, in the Neo Quiz root, permissions asked to the app.
+    Only the desktop app has it. */
+export interface HostLive {
+	/** Starts (or, with the `runId` it was given, resumes or reattaches to) the
+	    session of a chat. A different model, effort or mode on a known run
+	    respawns its process with resume. */
+	start(o: { tool: "claude" | "codex"; chatId: string; model: string; effort?: string; mode: ModeAgent; runId?: string }): Promise<{ runId: string }>;
+	send(runId: string, input: LiveInput): Promise<void>;
+	/** Stops the process of the run; its history stays in the store. */
+	close(runId: string): Promise<void>;
+	onEvent(cb: (e: LiveEvent) => void): () => void;
+	/** One page of the stored run (default: the first 2000 events). */
+	readRun(runId: string, page?: { offset: number; limit: number }): Promise<RunPage | null>;
+	/** The full output of one tool call, fetched on demand. */
+	toolOutput(runId: string, toolUseId: string): Promise<string | null>;
+	/** Deletes runs of the chat `chatId` from the PC (a run whose header
+	    names another chat is kept: the ids come from a synced record). */
+	removeRuns(runIds: readonly string[], chatId: string): Promise<void>;
+	/** Deletes EVERY run of the store, known to a chat or not ("Delete all"). */
+	removeAllRuns(): Promise<void>;
+	storeSize(): Promise<number>;
+}
+
 export interface Host {
 	fs: HostFs;
 	links: HostLinks;
@@ -1109,6 +1213,8 @@ export interface Host {
 	video?: HostVideo;
 	/** Absent under the plugin — see `HostCode`. */
 	code?: HostCode;
+	/** Live AI sessions; only the desktop app has them — see `HostLive`. */
+	live?: HostLive;
 	/** Absent sous le greffon — voir `HostCollage`. */
 	collage?: HostCollage;
 	/** Absent sous le greffon — voir `HostDepot`. */

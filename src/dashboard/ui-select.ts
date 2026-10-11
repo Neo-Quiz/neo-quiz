@@ -485,6 +485,133 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	return { close: closeMenu };
 }
 
+/* ── openModelPicker : fournisseur + modèle, sur téléphone ───
+   Panneau au-dessus de la pastille, bord droit aligné sur elle : un rail
+   vertical (un bouton par fournisseur, masqué s'il n'y en a qu'un) et la
+   liste des modèles du fournisseur choisi. Un tap sur un modèle le choisit
+   et ferme ; un tap dehors, Échap ou un défilement ferment aussi. */
+
+export interface PickerModel {
+	id: string;
+	label: string;
+}
+
+export interface PickerProvider {
+	id: string;
+	/** Accessible name of the provider's rail button. */
+	name: string;
+	/** Brand logo key, drawn by `renderLogo`. */
+	logo: string;
+	models: PickerModel[];
+}
+
+export interface ModelPickerOptions {
+	providers: PickerProvider[];
+	selectedProvider: string;
+	selectedModel: string;
+	renderLogo: (el: HTMLElement, logo: string) => void;
+	onPick: (providerId: string, modelId: string) => void;
+}
+
+export function openModelPicker(anchorEl: HTMLElement, options: ModelPickerOptions): MenuHandle {
+	if (toggleCloseForAnchor(anchorEl)) return { close() {} };
+	const premier = options.providers[0];
+	if (!premier) return { close() {} };
+	closeAllSelects();
+
+	const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+	const panel = ajouter(document.body, "div", "qbd-select-menu qbd-model-picker");
+	panel.setAttribute("role", "dialog");
+	panel.setAttribute("aria-label", t("ai.model.pickerLabel"));
+	panel.style.width = Math.min(310, window.innerWidth - 16) + "px";
+	let actif: PickerProvider = options.providers.find(p => p.id === options.selectedProvider) ?? premier;
+
+	const rail = ajouter(panel, "div", "qbd-model-picker-rail");
+	const liste = ajouter(panel, "div", "qbd-model-picker-list");
+	if (options.providers.length > 1) panel.insertBefore(rail, liste);
+
+	const dessinerRail = (): void => {
+		rail.replaceChildren();
+		for (const p of options.providers) {
+			const brand = ajouter(rail, "button", "qbd-model-picker-brand");
+			brand.type = "button";
+			brand.setAttribute("aria-label", p.name);
+			brand.setAttribute("aria-pressed", String(p === actif));
+			options.renderLogo(ajouter(brand, "span", "qbd-model-picker-logo"), p.logo);
+			brand.addEventListener("click", () => { actif = p; dessinerRail(); dessinerListe(); });
+		}
+	};
+
+	const dessinerListe = (): void => {
+		liste.replaceChildren();
+		const p = actif;
+		for (const m of p.models) {
+			const coche = p.id === options.selectedProvider && m.id === options.selectedModel;
+			const ligne = ajouter(liste, "button", "qbd-model-picker-row");
+			ligne.type = "button";
+			ligne.setAttribute("role", "menuitemradio");
+			ligne.setAttribute("aria-checked", String(coche));
+			ajouter(ligne, "span", "qbd-model-picker-row-label", m.label);
+			if (coche) currentHost().ui.setIcon(ajouter(ligne, "span", "qbd-model-picker-check"), "check");
+			ligne.addEventListener("click", () => { close(); options.onPick(p.id, m.id); });
+		}
+	};
+
+	let ferme = false;
+	function close(): void {
+		if (ferme) return;
+		ferme = true;
+		openMenus.delete(close);
+		document.removeEventListener("mousedown", onDocDown, true);
+		document.removeEventListener("keydown", onKeyDown, true);
+		window.removeEventListener("scroll", onScroll, true);
+		window.removeEventListener("resize", close);
+		if (reduit) panel.remove();
+		else {
+			panel.classList.add("is-leaving");
+			window.setTimeout(() => panel.remove(), 150);
+		}
+		anchorEl.focus({ preventScroll: true });
+	}
+
+	function onDocDown(e: MouseEvent): void {
+		const cible = e.target as Node | null;
+		if (cible && (anchorEl.contains(cible) || panel.contains(cible))) return;
+		close();
+	}
+
+	function onKeyDown(e: KeyboardEvent): void {
+		if (e.key === "Escape") { e.stopPropagation(); close(); }
+	}
+
+	function onScroll(e: Event): void {
+		const cible = e.target as Node | null;
+		if (cible && panel.contains(cible)) return;
+		close();
+	}
+
+	dessinerRail();
+	dessinerListe();
+
+	// Au-dessus de la pastille, 8 px d'écart, bord droit aligné, bornée à la fenêtre.
+	const rect = anchorEl.getBoundingClientRect();
+	panel.style.visibility = "hidden";
+	panel.style.left = "0px";
+	panel.style.top = "0px";
+	const mesure = panel.getBoundingClientRect();
+	panel.style.left = Math.min(Math.max(8, rect.right - mesure.width), window.innerWidth - 8 - mesure.width) + "px";
+	panel.style.top = Math.max(8, rect.top - 8 - mesure.height) + "px";
+	panel.style.visibility = "";
+
+	openMenus.set(close, anchorEl);
+	document.addEventListener("mousedown", onDocDown, true);
+	document.addEventListener("keydown", onKeyDown, true);
+	window.addEventListener("scroll", onScroll, true);
+	window.addEventListener("resize", close);
+
+	return { close };
+}
+
 /* ── openModelMenu ────────────────────────────────────────── */
 
 export interface EffortOption {

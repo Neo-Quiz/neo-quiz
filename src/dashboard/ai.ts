@@ -1,3 +1,4 @@
+import type { ModuleInfo } from "./quiz-modules";
 import JSON5 from "json5";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
@@ -253,9 +254,13 @@ export interface AiUsageDeps {
     construit ce littéral sans greffon (`apps/windows/src/ui/dashboard-shell.ts`),
     le greffon le construit dans `src/dashboard.ts`. */
 export interface AiPageDeps {
+	/** Absolute path of a contract path inside the app's roots (null outside them). */
+	cheminAbsolu?(contrat: string): string | null;
 	settings: AiSettingsHost;
 	/** Pour indexer la note où le quiz vient d'être inséré, puis ouvrir sa page. */
 	scanner: Scanner;
+	/** The folder of a quiz note (its icon and colour, from the module map), for the result card. Absent: defaults. */
+	dossierDe?(chemin: string): Promise<ModuleInfo | null>;
 	statsStore: StatsStore;
 	navigate(view: DashboardViewName, data?: NavigateData): void;
 	/** The upcoming exams of every folder, for the "/exam" menu. Absent: an empty menu. */
@@ -428,12 +433,22 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			else host.ui.notice(t("ai.card.missing"));
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
+		dossierDe: deps.dossierDe,
 		copier: deps.copyText,
 		chat: chatSurEcran,
 		attente: () => attenteGenre,
 		repondre: (id, reponses) => repondreQuestions(id, reponses),
 		reprenable: (id) => reprenable(id),
 		relais: () => relaisAffiche(),
+		racine: () => {
+			const h = currentHost();
+			return deps.cheminAbsolu?.(h.paths.contractPath(h.paths.defaultRoot().id, "")) ?? null;
+		},
+		ouvrirFichier: (absolu) => {
+			void currentHost().shell.openExternal(absolu).then(ok => {
+				if (!ok) currentHost().ui.notice(t("ai.preview.openFailed", { name: absolu.split("\\").pop() ?? absolu }));
+			});
+		},
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la
@@ -4320,6 +4335,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   une seconde fois (revue codex 2026-07-31). */
 		if (demarrage) return;
 		demarrage = true;
+		/* WRITE WHILE IT WORKS (2026-10-11): a plain message written while
+		   the chat's Claude Code or Codex turn runs goes to that live session
+		   at once, as in a terminal, instead of waiting in the queue behind
+		   it. Anything else (documents, pictures, a video link, "/exam"), or
+		   a turn that ended meanwhile, takes the usual way below. */
+		try {
+			if (await envoyerPendantLeTour(container)) return;
+		} finally {
+			demarrage = false;
+		}
+		demarrage = true;
 		/* Les documents des vidéos YouTube prêtes partent avec la demande
 		   (spec « Vidéos YouTube » § 5.2). L'attente vit DANS le verrou :
 		   une transcription peut durer le temps qu'elle dure, et un second
@@ -4338,7 +4364,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   (or already refused) folder answers at once; any failure is "no
 			   tools", as in the call itself. */
 			if (fournisseurAgent()) {
-				try { await host.process?.trustFolder?.(destination || dossierParDefaut(settings().aiOutputFolder)); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
+				/* A live session works in the Neo Quiz ROOT (2026-10-11): one
+				   trust for the whole root, asked here once. */
+				const dossier = host.live ? host.paths.contractPath(host.paths.defaultRoot().id, "") : destination || dossierParDefaut(settings().aiOutputFolder);
+				try { await host.process?.trustFolder?.(dossier); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
 			}
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
@@ -4376,6 +4405,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
 		render(container);
+	}
+
+	/** A plain message sent to the chat's running live turn (see
+	    `startGeneration`). True when it was taken (sent, or its failure said). */
+	async function envoyerPendantLeTour(container: HTMLElement | null): Promise<boolean> {
+		const enCours = runningLineOfChat(fileGen.lignes(), activeChatId());
+		const texte = composerText.trim();
+		if (!enCours || !texte || images.length || noteAttachments.length || examCible || /youtu\.?be/i.test(texte) || retirerCommandeExam(texte).commande) return false;
+		if (!fileGen.tourVivant(enCours.id)) return false;
+		try {
+			if (!(await fileGen.envoyerPendant(enCours.id, texte, []))) return false;
+		} catch (e) {
+			host.ui.notice(t("ai.work.sendFailed", { detail: e instanceof Error ? e.message : String(e) }));
+			return true;
+		}
+		viderComposer();
+		render(container);
+		return true;
 	}
 
 	/** Le canal web : le composer GARDE la demande pendant l'attente du site ;

@@ -52,6 +52,14 @@ export const IGNORES: readonly string[] = [
 	/* The STAGING folder of an import (`share-import.ts`, `<parent>/.import-<id>`):
 	   only the finished folder, once renamed into place, may reach another device. */
 	"(?d).import-*",
+	/* Project AI config of the synced root. Live sessions load only the user's
+	   own settings (Claude Code `--setting-sources user`; Codex with the root
+	   marked untrusted, `argsLiveCodex`), never these, so a paired device must
+	   not be able to plant a hook, an MCP server or an exec policy that would
+	   run on this PC. */
+	"/.claude",
+	"/.mcp.json",
+	"/.codex",
 ];
 
 const RELAIS_DYNAMIQUE = "dynamic+https://relays.syncthing.net/endpoint";

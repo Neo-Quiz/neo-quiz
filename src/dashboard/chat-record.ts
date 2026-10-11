@@ -22,6 +22,11 @@ export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
 export type ChatResult = { kind: "quiz"; title: string; path: string } | { kind: "text"; text: string };
 export type RequestState = "done" | "failed" | "stopped";
+/** Where a request's AI work sits in a live run (2026-10-11): its turn's
+    lines, from `fromSeq` to `toSeq`, in the run store of the PC that ran
+    it. Read back to show the work of a chat reopened after a restart, or
+    of a request whose line left the queue. */
+export interface ChatRun { runId: string; fromSeq: number; toSeq: number }
 
 /** The clarifying questions Generate asked under a vague request (spec
     2026-10-07-generate-auto-kind): the questions, and the answers once all are
@@ -57,6 +62,10 @@ export interface ChatRequest {
 	    synced file, so bounded (`readFolder`); the main process still judges
 	    any folder before an agent runs there. */
 	folder?: string;
+	/** The live turns of the request, oldest first (an "/exam" plan has
+	    several). Read from a synced file: a run id and two `seq` only,
+	    validated (`readRuns`); the main process reads them, never a path. */
+	runs?: ChatRun[];
 }
 
 export interface ChatRecord {
@@ -69,6 +78,11 @@ export interface ChatRecord {
 	/** Tombstone: hides the chat, never dropped (a deleted chat must not come back). */
 	deleted?: true;
 	requests: ChatRequest[];
+	/** The live Claude Code / Codex runs of this chat (2026-10-11), oldest
+	    first: ids in the run store of the PC that ran them (`HostLive`), never
+	    a path. Read from a synced file: lowercase UUIDs only, each once, at
+	    most `MAX_RUN_IDS`. Absent on a chat stored before live sessions. */
+	runIds?: string[];
 }
 
 /** The chat that holds queue lines saved before chats existed. */
@@ -76,6 +90,52 @@ export const LEGACY_CHAT_ID = "queue-before-chats";
 export const MAX_CHATS = 200;
 /** A written answer is bounded: a chat is a few kilobytes, never a transcript. */
 export const MAX_RESULT_TEXT = 20_000;
+
+/** The most run ids a chat keeps (the newest). */
+export const MAX_RUN_IDS = 500;
+/** A run id as the main process creates it (`crypto.randomUUID()`). */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const isRunId = (x: unknown): x is string => typeof x === "string" && RUN_ID.test(x);
+
+/** Valid ids, each once, the newest `MAX_RUN_IDS`; `undefined` when none. */
+export function readRunIds(x: unknown): string[] | undefined {
+	if (!Array.isArray(x)) return undefined;
+	const out = [...new Set(x.filter(isRunId))].slice(-MAX_RUN_IDS);
+	return out.length ? out : undefined;
+}
+
+/** The most live turns a request keeps. */
+export const MAX_REQUEST_RUNS = 20;
+
+function readRun(x: unknown): ChatRun | null {
+	if (!isObj(x) || !isRunId(x.runId)) return null;
+	const { fromSeq, toSeq } = x;
+	if (!Number.isSafeInteger(fromSeq) || !Number.isSafeInteger(toSeq) || (fromSeq as number) < 0 || (toSeq as number) < (fromSeq as number)) return null;
+	return { runId: x.runId, fromSeq: fromSeq as number, toSeq: toSeq as number };
+}
+
+/** Valid turns, each once (same run and start), the newest
+    `MAX_REQUEST_RUNS`; `undefined` when none. */
+export function readRuns(x: unknown): ChatRun[] | undefined {
+	if (!Array.isArray(x)) return undefined;
+	const seen = new Set<string>();
+	const out: ChatRun[] = [];
+	for (const r of x.map(readRun)) {
+		if (!r || seen.has(r.runId + ":" + r.fromSeq)) continue;
+		seen.add(r.runId + ":" + r.fromSeq);
+		out.push(r);
+	}
+	return out.length ? out.slice(-MAX_REQUEST_RUNS) : undefined;
+}
+
+/** The chats once every run was deleted ("Delete all"): no run ids, no
+    request pointing into a run. Nothing else changes. */
+export function withoutRuns(chats: readonly ChatRecord[]): ChatRecord[] {
+	return chats.map(c => {
+		const { runIds: _ids, ...rest } = c;
+		return { ...rest, requests: c.requests.map(q => { const { runs: _runs, ...r } = q; return r; }) };
+	});
+}
 
 /** Bound of a stored provider / model / effort label. */
 export const MAX_LABEL = 100;
@@ -150,6 +210,8 @@ function readRequest(x: unknown): ChatRequest | null {
 	if (effort) req.effort = effort;
 	const folder = readFolder(x.folder);
 	if (folder) req.folder = folder;
+	const runs = readRuns(x.runs);
+	if (runs) req.runs = runs;
 	return req;
 }
 
@@ -161,6 +223,8 @@ function readChat(x: unknown): ChatRecord | null {
 	};
 	if (isStr(x.title)) chat.title = x.title;
 	if (x.deleted === true) chat.deleted = true;
+	const runIds = readRunIds(x.runIds);
+	if (runIds) chat.runIds = runIds;
 	return chat;
 }
 
@@ -230,4 +294,24 @@ export function deriveTitle(r: Pick<ChatRequest, "text" | "documents" | "results
 
 export function chatTitle(c: Pick<ChatRecord, "title" | "requests">): string {
 	return c.title || (c.requests[0] ? deriveTitle(c.requests[0]) : "");
+}
+
+/** The runs of a chat; none for an unknown or deleted chat. */
+export function runIdsOf(chats: readonly ChatRecord[], chatId: string): string[] {
+	const c = chats.find(x => x.id === chatId);
+	return c && !c.deleted ? [...(c.runIds ?? [])] : [];
+}
+
+/** A run started for a chat: kept with it (bounded, each id once). An
+    unknown chat is created empty (its first request is recorded when it
+    ends); a deleted chat is never revived; a bad id changes nothing. */
+export function addRunId(chats: readonly ChatRecord[], chatId: string, runId: string, device: string, now: number): ChatRecord[] {
+	if (!isRunId(runId)) return [...chats];
+	const idx = chats.findIndex(c => c.id === chatId);
+	if (idx < 0) return [...chats, { id: chatId, origin: device, createdAt: now, updatedAt: now, requests: [], runIds: [runId] }];
+	const c = chats[idx];
+	if (c.deleted || c.runIds?.includes(runId)) return [...chats];
+	const list = [...chats];
+	list[idx] = { ...c, updatedAt: now, runIds: [...(c.runIds ?? []), runId].slice(-MAX_RUN_IDS) };
+	return list;
 }

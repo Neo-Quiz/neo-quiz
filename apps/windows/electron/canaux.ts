@@ -77,6 +77,7 @@ import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises, argumentsAvecOutils } from "./gabarits-cli";
 import { ajouterApprouve, CLE_CONFIANCE_IA, VERSION_CONFIANCE, dossierCanonique, estApprouve, jugerDossierOutils, lireApprouves, retirerApprouve } from "./confiance-ia";
 import { creerReprises, estCleReprise } from "./resumable-runs";
+import { enregistrerCanauxLive } from "./live-canaux";
 
 /** How long a generation whose page reloaded waits to be claimed again
     before it is stopped: a reload takes seconds, a restored queue restarts
@@ -356,6 +357,8 @@ async function verifierDossierDefaut(perimetre: Perimetre, valeur: unknown): Pro
     la recevoir. */
 export interface ResultatCanaux {
 	arreterAttente(): void;
+	/** Kills every live AI session, tree included (`before-quit`). */
+	arreterLive(): Promise<void>;
 }
 
 export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
@@ -2025,5 +2028,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		}
 	});
 
-	return { arreterAttente: () => attente.arreter() };
+	/* LIVE AI SESSIONS (2026-10-11, `live-canaux.ts`): the Neo Quiz root is
+	   their working folder, judged at every spawn like the agent forms. */
+	const live = enregistrerCanauxLive({
+		userData: app.getPath("userData"),
+		version: app.getVersion(),
+		racine: dossierDefaut,
+		dossierJuge: dossierOutilsJuge,
+		depuisFenetrePrincipale,
+	});
+
+	return { arreterAttente: () => attente.arreter(), arreterLive: () => live.killAll() };
 }

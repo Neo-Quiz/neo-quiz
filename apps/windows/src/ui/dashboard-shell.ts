@@ -50,6 +50,8 @@ import { openCreateFolderModal } from "../../../../src/dashboard/folder-create";
 import { openNewQuizModal } from "../../../../src/dashboard/folder-add";
 import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
+import { lireModuleMap } from "../../../../src/dashboard/module-map-note";
+import { applyModuleOverrides, moduleForQuiz } from "../../../../src/dashboard/quiz-modules";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
 import { closeAllSelects, createSelect, openActionMenu } from "../../../../src/dashboard/ui-select";
@@ -700,6 +702,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   porte la même commande) : trois absences PRÉVUES par `AiPageDeps`, pas
 	   des trous. */
 	const ai = createAiHandlers({
+		// The folder of a quiz note, from the module map and its overrides: the card's icon and colour.
+		dossierDe: async (chemin) => moduleForQuiz(chemin, applyModuleOverrides(await lireModuleMap(ctx.settings.quizzesModuleMapNote || "Dashboard"), ctx.settings.quizzesModuleOverrides || {})),
+		cheminAbsolu: (contrat) => deps.cheminAbsolu(contrat),
 		settings: deps.aiSettings,
 		scanner: deps.scanner,
 		statsStore: deps.statsStore,

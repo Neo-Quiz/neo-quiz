@@ -13,6 +13,16 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code and Codex now run as live sessions: write while they work, approve their actions, and see everything they do, kept on this PC.
+- The phone composer shows the model as a pill with the provider logo; tapping it opens a provider and model picker, like MonoCode.
+
+### Fixed
+
+- The "Trust this folder?" question no longer draws a double outline around Trust.
+- The "scroll to the latest message" button no longer turns see-through on hover.
+
 ## [1.20.83] - 2026-10-10
 
 ### Fixed

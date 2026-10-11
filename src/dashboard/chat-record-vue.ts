@@ -8,8 +8,17 @@
    a card per quiz with "Open", the written answers as prose, the failure or
    the stop in one line. The only HTML written here is the Markdown of an
    answer, through `renderMarkdownPreview` (the first gate of the sanitizer).
+
+   THE AI WORK OF A RECORDED REQUEST (2026-10-11): a request that ran as a
+   live turn keeps where that turn sits in its run (`ChatRequest.runs`).
+   Each one is a folded "AI work" line; opened, the turn is read back from
+   the run store of this PC (page by page) and drawn by `work-view.ts`
+   (`textContent` only), so a chat reopened after a restart still shows
+   everything the AI did. A run deleted meanwhile, or a host without a run
+   store (the phone), shows no line.
 ══════════════════════════════════════════════════════════ */
 
+import { peindreCarteQuiz } from "./result-card";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
@@ -30,6 +39,49 @@ import { peindreQuestions } from "./generation-kind-vue";
 import type { PasteOutcome } from "./relay-flow";
 import { recordOrigin } from "../shared-state/request-origin";
 import { originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
+import type { ChatRun } from "./chat-record";
+import type { Thread } from "./live-thread";
+import { recordedToolOutput, recordedTurn } from "./live-generation";
+import { renderThread } from "./work-view";
+
+/** One folded "AI work" line per live turn of the request; the turn is read
+    from the store on the first unfolding only. */
+function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[], deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void }): void {
+	const host = currentHost();
+	if (!host.live) return;
+	for (const run of runs) {
+		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
+		bloc.setAttribute("role", "log");
+		bloc.setAttribute("aria-label", t("ai.transcript.label"));
+		const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
+		b.type = "button";
+		b.setAttribute("aria-expanded", "false");
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), "sparkles");
+		ajouter(b, "span", "qbd-ai-transcript-ligne-texte", t("ai.work.title"));
+		const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
+		host.ui.setIcon(chevron, "chevron-right");
+		let detail: HTMLElement | null = null;
+		let lu: Promise<Thread | null> | null = null;
+		b.addEventListener("click", () => {
+			const ouvrir = !detail;
+			b.setAttribute("aria-expanded", String(ouvrir));
+			host.ui.setIcon(chevron, ouvrir ? "chevron-down" : "chevron-right");
+			if (!ouvrir) { detail?.remove(); detail = null; return; }
+			const d = document.createElement("div");
+			d.className = "qbd-ai-transcript-detail qbd-ai-transcript-detail--anime";
+			b.after(d);
+			detail = d;
+			const racine = ajouter(d, "div", "qbd-work");
+			lu ??= recordedTurn(run).catch(() => null);
+			void lu.then(thread => {
+				// Gone from the store (deleted): the line goes too.
+				if (!thread || !thread.items.length) { bloc.remove(); return; }
+				// Read-only: a recorded turn has no permission left to answer.
+				if (detail === d) renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
+			});
+		});
+	}
+}
 
 /** The chips of the documents a request carried (thumbnail when there is one,
     else the name cut IN THE MIDDLE so the extension always shows). With `ouvrir`,
@@ -67,7 +119,7 @@ function rendreOuvrable(p: HTMLElement, action: () => void): void {
 	});
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void; chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -85,6 +137,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const id = q.id;
 		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
 	}
+	if (q.runs?.length) peindreTravail(tour, q.runs, deps);
 	for (const res of q.results) {
 		if (res.kind === "text") {
 			const rep = ajouter(tour, "div", "qbd-ai-chat-reponse");
@@ -102,13 +155,13 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 			continue;
 		}
 		const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--prete");
-		const carte = ajouter(rep, "div", "qbd-ai-resultat");
-		host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
-		ajouter(ajouter(carte, "div", "qbd-ai-resultat-corps"), "div", "qbd-ai-resultat-titre", res.title);
+		/* The whole card opens the quiz; with no note to open, it is inert. */
 		if (canOpenCard(res.path)) {
-			const b = ajouter(carte, "button", "qbd-ai-reponse-action", t("ai.queue.open"));
-			b.type = "button";
-			b.addEventListener("click", () => deps.ouvrir(res.path));
+			peindreCarteQuiz(rep, { titre: res.title, chemin: res.path }, () => deps.ouvrir(res.path));
+		} else {
+			const carte = ajouter(rep, "div", "qbd-ai-resultat qbd-ai-resultat--inerte");
+			host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
+			ajouter(ajouter(carte, "span", "qbd-ai-resultat-corps"), "span", "qbd-ai-resultat-titre", res.title);
 		}
 	}
 	if (q.state === "failed" || q.state === "stopped") {

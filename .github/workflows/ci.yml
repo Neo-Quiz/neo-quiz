@@ -50,6 +50,8 @@ jobs:
       # result of a Claude stream-json output is always found.
       - name: Generation transcript decoding
         run: npm run check:transcript
+      - name: Live AI work thread
+        run: npm run check:live-thread
       - name: Figures of a generated reading
         run: npm run check:figures
       - name: Zoom of a quiz picture
@@ -80,6 +82,10 @@ jobs:
       # sous `.quiz-code-output`, seulement comme texte (`textContent`).
       - name: Python run button output never interpreted
         run: npm run check:code-run
+        run: npm run check:work-view
+
+      - name: Compact HTML indented for display only
+        run: npm run check:pretty-code
 
       # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
       # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
@@ -195,6 +201,23 @@ jobs:
       # qui fermerait la chaîne du script PowerShell sont refusés ou cités.
       - name: Share names and script quoting
         run: npm run check:partage
+
+      # A live Claude session: its exact launch form (user settings only, never
+      # the project's) and the stdin lines the main process writes.
+      - name: Live Claude session protocol
+        run: npm run check:live-protocol
+
+      # The run store of live AI sessions: a run id is never a path, concurrent
+      # appends never interleave, the cap holds, a damaged line is skipped.
+      - name: Live session run store
+        run: npm run check:run-store
+
+      # The live session manager, on fake processes: window payloads validated,
+      # permissions only answered by the user outside Full access, interrupt
+      # denies pending ones first, idle park and resume, a run of another window
+      # refused, every process killed on quit, every line stored in order.
+      - name: Live session manager
+        run: npm run check:live-session
 
       # The share lock is released on every outcome of the panel process
       # (fake clock, fake child): no more stuck "share already in progress".
@@ -621,6 +644,12 @@ jobs:
       # Main-process file primitives on a real temp folder.
       - name: Electron file primitives
         run: npm run check:electron-fs
+
+      # The private Codex home of live sessions, on real junctions and hard
+      # links: login and config shared with ~/.codex, sessions and state kept
+      # out of it, a link to anywhere else refused.
+      - name: Private Codex home
+        run: npm run check:codex-home
 
       # Electron accounts handling.
       - name: Electron accounts

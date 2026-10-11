@@ -353,6 +353,29 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   gardée dans IndexedDB, limitée à la session de la fenêtre
   (`dashboard/generation-queue-store.ts`), et restaurée par
   `restaurer` (`check:file-generation`). Dans la CI.
+- `npm run check:live-protocol` — le PROTOCOLE d'une session Claude Code live
+  (`live-claude.ts`, `argumentsLiveClaude` de `gabarits-cli.ts`) : un lancement avec les
+  réglages du projet (`--setting-sources user,project` ferait tourner un hook planté dans
+  la racine synchronisée), une option glissée dans la ligne de lancement, une réponse de
+  contrôle hostile prise pour une demande de permission ; côté Codex, un lancement sans la
+  racine déclarée non fiable (`argsLiveCodex`). Dans la CI.
+- `npm run check:run-store` — le magasin des runs (`run-store.ts`, `userData/runs/`) : un
+  identifiant de run qui devient un chemin hors du magasin, deux écritures concurrentes
+  dont les lignes s'entrelacent, un fichier qui dépasse son plafond, une ligne abîmée qui
+  rend tout le run illisible. Dans la CI.
+- `npm run check:codex-home` — le dossier privé de Codex (`codex-home.ts`) : une session
+  qui écrit dans le vrai `~/.codex`, un `auth.json` copié au lieu d'être partagé (deuxième
+  connexion), une déconnexion qui survit dans le dossier privé. Dans la CI.
+- `npm run check:live-session` — le gestionnaire de sessions live (`live-sessions.ts`,
+  `live-drivers.ts`) : une charge de la fenêtre qui atteint un CLI sans contrôle, une
+  permission répondue sans l'utilisateur, une session jamais mise en veille. Dans la CI.
+- `npm run check:live-thread` — le fil complet du travail de l'IA
+  (`src/dashboard/live-thread.ts`) : une sortie d'outil gardée entière en mémoire, une
+  commande Bash coupée au point de ne plus se lire, une permission restée « en attente »
+  après sa réponse, un run tronqué qui paraît terminé. Dans la CI.
+- `npm run check:work-view` — la vue du travail de l'IA (`src/dashboard/work-view.ts`) :
+  une sortie d'outil, une demande de permission ou un texte du modèle rendu comme HTML au
+  lieu de texte (`textContent` seul), une réponse de permission envoyée deux fois. Dans la CI.
 - `npm run check:updater` — le noyau pur de la mise à jour automatique
   (`apps/windows/electron/mise-a-jour-etat.ts`) : une erreur après « prête »
   ne retire pas le paquet téléchargé, couper le réglage oublie une
@@ -994,8 +1017,7 @@ forme d'appel, une par mode, mesurée sur Claude Code 2.1.296 et Codex 0.162.1
 (`src/host/claude-outils.ts` côté page, `gabarits-cli.ts` côté principal,
 comparés par `check:partage`). Sous Windows, `-s workspace-write` de Codex reste
 en lecture seule : ses modes du milieu passent par `--approve-for-me`. Ce qui
-reste : forme exacte, dossier approuvé et jugé, aucun réglage, hook ni serveur MCP
-de l'utilisateur, `.neo-quiz/` refusé aux outils de fichiers, le travail de l'IA
+reste : forme exacte, dossier approuvé et jugé, `.neo-quiz/` refusé aux outils de fichiers, le travail de l'IA
 affiché OUVERT et résumé comme MonoCode (« Projet exploré · 6 outils utilisés »).
 La forme Supervisé est l'ancienne forme lecture seule ci-dessous. Hors dossier de
 confiance, le CLI est lancé **sans aucun outil**. Le dossier de confiance
@@ -1021,6 +1043,21 @@ l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les ch
 dans le composer (vault, chemin absolu, racine externe configurée) et
 `startGeneration` les attache via les mêmes fonctions que le picker « @ ». Un chemin
 introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
+
+**Sessions live Claude Code et Codex** (décision d'Ahmed du 2026-10-11, comme MonoCode) :
+elles chargent les réglages, hooks, skills et serveurs MCP PROPRES À L'UTILISATEUR —
+Claude Code avec `--setting-sources user`, Codex avec `~/.codex` partagé par un dossier
+privé `userData/codex-home/` (`codex-home.ts`). Elles ne chargent JAMAIS la configuration
+projet de la racine Neo Quiz, synchronisée (`.claude/`, `.mcp.json`, `.codex/`, exclus par
+`syncthing-regles.ts`) : un hook planté par un autre appareil ne tourne pas sur ce PC.
+Pour Codex, la racine est en plus déclarée NON FIABLE au lancement (`-c projects=…
+trust_level="untrusted"`, `argsLiveCodex`) : sans elle, un `thread/start` en Accès complet
+(ou Modifications auto, Auto) inscrit lui-même la racine comme fiable dans
+`CODEX_HOME/config.toml` et charge son `.codex/config.toml` (mesuré sur codex-cli 0.162.1,
+`check:live-protocol`).
+Chaque ligne d'une session est gardée dans `userData/runs/` (`run-store.ts`), jamais sous
+la racine. Les appels ponctuels (génération, clarification, « Expliquer ») gardent les
+formes isolées décrites plus haut.
 
 ## Composants UI (règles)
 

@@ -28,6 +28,8 @@ import { closableLines, groupLines, reconcileChats } from "./chat-requests";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
 import { getChats, importLegacyOnce, removeChat, setChats } from "./chat-store";
 import { getRemoteGenerations, onRemoteGenerations } from "./remote-generations";
+import { runIdsOf } from "./chat-record";
+import { removeRuns } from "./live-generation";
 
 /** Days listed by date; anything older is in the folded section. */
 const JOURS_RECENTS = 30;
@@ -45,7 +47,7 @@ function repeindre(): void {
 /** Brings the record up to date from the queue, lets the finished replies of
     other chats leave the queue, and tells whoever shows chats. */
 function synchroniser(file: FileGenerationApp): void {
-	const { chats, changed } = reconcileChats(getChats(), groupLines(file.lignes()), chatDevice(), Date.now());
+	const { chats, changed } = reconcileChats(getChats(), groupLines(file.lignes()), chatDevice(), Date.now(), l => file.placeTour(l.id));
 	if (changed) { setChats(chats); notifyChatsChanged(); return; }
 	const recorded = (chatId: string, key: string): boolean => !!getChats().find(c => c.id === chatId)?.requests.some(q => q.id === key);
 	const partantes = closableLines(file.lignes(), activeChatId(), recorded, id => !!getChats().find(c => c.id === id)?.deleted);
@@ -118,6 +120,10 @@ export function poserListeChats(parent: HTMLElement): void {
 		suppr.setAttribute("aria-label", t("ai.side.delete"));
 		host.ui.setIcon(suppr, "trash-2");
 		suppr.addEventListener("click", () => {
+			/* Its AI work history goes with it (2026-10-11): the runs of its
+			   live sessions are deleted from this PC's store. */
+			const runs = runIdsOf(getChats(), chat.id);
+			void removeRuns(runs, chat.id).catch(e => console.warn("[neo-quiz] runs of a deleted chat not removed:", e));
 			removeChat(chat.id, Date.now());
 			// The chat on screen was deleted: an empty one takes its place.
 			if (actif) startNewChat(); else notifyChatsChanged();

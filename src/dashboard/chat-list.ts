@@ -59,6 +59,8 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 			item = { id, title: firstLineOf(d.text) || d.notes[0]?.name || "", date: d.sentAt ?? now, running: false, origin: "", foreign: false, sender: "" };
 			items.set(id, item);
 		}
+		// A chat recorded before its first request (it only holds the id of its live run, 2026-10-11) is named by that request.
+		if (!item.title) item.title = firstLineOf(l.demande.text) || l.demande.notes[0]?.name || "";
 		if (isLive(l)) item.running = true;
 		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
 	}

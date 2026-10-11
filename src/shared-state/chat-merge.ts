@@ -32,11 +32,15 @@ export function mergeChats(perDevice: ReadonlyArray<ReadonlyArray<ChatRecord>>):
 	for (const list of copies.values()) {
 		const sorted = [...list].sort((a, b) => (wins(a, b) ? -1 : 1));
 		const winner = sorted[0];
-		if (winner.deleted) { out.push({ ...winner, requests: [] }); continue; }
+		if (winner.deleted) { const { runIds: _dropped, ...dead } = winner; out.push({ ...dead, requests: [] }); continue; }
 		const byId = new Map<string, ChatRequest>();
 		// Winner first: its copy of a request is the one kept.
 		for (const c of sorted) for (const q of c.deleted ? [] : c.requests) if (!byId.has(q.id)) byId.set(q.id, q);
-		out.push({ ...winner, requests: [...byId.values()].sort((a, b) => a.at - b.at) });
+		const merged: ChatRecord = { ...winner, requests: [...byId.values()].sort((a, b) => a.at - b.at) };
+		// The runs live on the PC that ran them: a copy without them (the phone's) never drops them.
+		const runIds = [...new Set(sorted.flatMap(c => c.runIds ?? []))];
+		if (runIds.length) merged.runIds = runIds; else delete merged.runIds;
+		out.push(merged);
 	}
 	return out;
 }

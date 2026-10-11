@@ -11,6 +11,7 @@
    l'envoi pour la file, lu à l'instant pour le canal web.
 ══════════════════════════════════════════════════════════ */
 
+import { compterItems } from "./question-count";
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { ModeGeneration } from "../quiz-format";
@@ -291,6 +292,7 @@ export interface QuizDuLot {
 	titre: string;
 	chemin: string;
 	questions: number;
+	readings: number;
 }
 
 export interface EnregistrementLot extends Omit<Enregistrement, "draft" | "questions" | "titreModele" | "titreImpose" | "demande" | "planTranches" | "noteLearn"> {
@@ -326,7 +328,7 @@ export async function enregistrerLot(e: EnregistrementLot, deja: readonly QuizDu
 			planTranches: lien?.plan, noteLearn: lien?.note,
 		});
 		if (!entree) return null;
-		faits.push({ document: q.document, titre: entree.title || entree.basename, chemin: entree.path, questions: draft.questions.length });
+		faits.push({ document: q.document, titre: entree.title || entree.basename, chemin: entree.path, ...compterItems(draft.questions) });
 		e.apresChaque?.(faits.map(f => f));
 	}
 	// The documents' order, whatever the order of the saves of several attempts.

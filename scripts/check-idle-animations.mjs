@@ -26,6 +26,7 @@ const KNOWN = {
 	"qbd-ai-logo-travail": "transient", "qbd-ai-reflet": "transient", "qbd-ai-plan-tourne": "transient", "qbd-ai-plan-respire": "transient",
 	"qbd-ai-nudge-float": "transient", "qbd-install-spin": "transient", "qbd-video-install-balayage": "transient",
 	"qbd-web-sonar": "transient", "qbd-glide": "transient", "qbd-usage-spin": "transient", // Generate page and its installers
+	"qbd-work-shimmer": "transient", "qbd-work-spin": "transient", "qbd-work-pulse": "transient", // live AI work view: only while a turn runs
 	"qbd-btn-shine": "transient", // `.qbd-btn--shine`: no element carries it today
 	"qbd-cta3d-reflet": "phone-off",
 	"qbd-folder-spin": "transient", "qbd-folder-sweep": "transient", // a folder row while its file opens

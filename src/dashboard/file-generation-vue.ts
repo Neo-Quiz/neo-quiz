@@ -23,6 +23,7 @@
    quelqu'un qui relit plus haut n'est pas déplacé.
 ══════════════════════════════════════════════════════════ */
 
+import type { ModuleInfo } from "./quiz-modules";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
@@ -31,6 +32,8 @@ import type { ChatRecord } from "./chat-record";
 import { compterJetons, peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { peindreOrigine, refsOf } from "./request-origin-vue";
+import { peindreCarteQuiz } from "./result-card";
+import { libelleLectures } from "./question-count";
 import { chatDevice } from "./chat-session";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcReachable } from "./remote-send";
@@ -45,6 +48,8 @@ import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
+import { renderThread, threadHasLiveRow } from "./work-view";
+import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
 
 export interface VueFile {
@@ -109,6 +114,8 @@ export function creerVueFile(opts: {
 	ouvrir: (chemin: string) => void;
 	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
+	/** The folder of a quiz note (its icon and colour, from the module map). Absent: the defaults. */
+	dossierDe?: (chemin: string) => Promise<ModuleInfo | null>;
 	/** Opens the preview of a document chip of a sent message (no attach). */
 	ouvrirPiece?: (n: { name: string; path?: string }) => void;
 	/** Copies a chat answer (the host's clipboard). */
@@ -124,6 +131,10 @@ export function creerVueFile(opts: {
 	reprenable?: (requestId: string) => boolean;
 	/** The request shared to an AI app (phone relay) waiting for its answer, for the chat on screen; shown last. */
 	relais?: () => RelaisVue | null;
+	/** The absolute Neo Quiz root, for the work view's relative paths (null when unknown). */
+	racine?: () => string | null;
+	/** Opens a file of the work view with its app (only inside the root). */
+	ouvrirFichier?: (absolu: string) => void;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -322,20 +333,13 @@ export function creerVueFile(opts: {
 			return;
 		}
 		if (l.etat === "prete" && l.resultat) {
-			/* La carte du quiz : c'est un CONTENU, elle a donc sa tuile ; son
-			   action est un texte, pas un bouton encadré dans la carte. */
+			/* La carte du quiz : c'est un CONTENU, elle a donc sa tuile, et la
+			   carte entière est le bouton (result-card.ts). */
 			const r = l.resultat;
 			/* ONE PASS (2026-10-01): one card per quiz written, each with its own
 			   Open; the close button sits on the last one. */
-			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0 }];
-			quiz.forEach((q, i) => {
-				const carte = ajouter(rep, "div", "qbd-ai-resultat");
-				host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
-				const corps = ajouter(carte, "div", "qbd-ai-resultat-corps");
-				ajouter(corps, "div", "qbd-ai-resultat-titre", q.titre);
-				if (q.questions) ajouter(corps, "div", "qbd-ai-resultat-sous", t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
-				bouton(carte, t("ai.queue.open"), () => opts.ouvrir(q.chemin));
-			});
+			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0, readings: r.readings ?? 0, mode: r.mode }];
+			for (const q of quiz) peindreCarteQuiz(rep, { titre: q.titre, chemin: q.chemin, comptes: { questions: q.questions, readings: q.readings ?? 0 }, mode: q.mode }, () => opts.ouvrir(q.chemin), opts.dossierDe);
 			return;
 		}
 		if (l.etat === "echouee") {
@@ -405,6 +409,7 @@ export function creerVueFile(opts: {
 		if (p.quiz !== null) parts.push(t("ai.transcript.progressQuizOf", { n: p.quiz, total: l.demande.notes.length }));
 		const total = l.demande.count;
 		parts.push(total ? t("ai.transcript.progressQuestionOf", { n: p.question, total }) : t("ai.transcript.progressQuestion", { n: p.question }));
+		if (p.readings > 0) parts.push(libelleLectures(p.readings));
 		parts.push(t(lignes === 1 ? "ai.transcript.progressLinesOne" : "ai.transcript.progressLinesOther", { count: lignes }));
 		/* The time left, from the pace of the questions already written (one
 		   pass over several documents has no single total: none shown). */
@@ -438,6 +443,61 @@ export function creerVueFile(opts: {
 		detail: (corps: HTMLElement) => void;
 	}
 
+	/** The heading of the tools, summed up by kind, as MonoCode titles it
+	    ("Explored the project · Ran 6 tools", "Ran a command · Edited SKILL.md"). */
+	function resumeOutils(tr: Transcript): { libelle: string; icone: string } {
+		const r = resumeTravail(tr.tools, tr.toolsHidden);
+		const refusees = tr.tools.filter(s => s.status === "refused").length;
+		const parts: string[] = [];
+		if (r.explore) parts.push(t("ai.transcript.explored"));
+		if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
+		if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
+		if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
+		const libelle = parts.join(" · ")
+			+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
+		return { libelle, icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench" };
+	}
+
+	/** A LIVE turn (2026-10-11): ONE summary line — the tools summed up, or
+	    what the model is doing — and under it the FULL work, in order
+	    (`work-view.ts`: every message, tool call with its whole input, output
+	    previews with "Show all", diffs, permission cards). Open while the turn
+	    runs, folded into its summary once it ends (a whole quiz in JSON5 is
+	    long); a click opens it for good. */
+	function specTravail(l: LigneGeneration, tr: Transcript, vue: LiveTurnView, vivant: boolean): SpecLigne {
+		const lignes = tr.text ? tr.text.split("\n").length : 0;
+		const libelle = tr.tools.length ? resumeOutils(tr).libelle
+			: tr.text ? (vivant ? libelleProgres(l, tr.text, lignes) ?? t("ai.transcript.writingLive") : t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes }))
+			: tr.thinking ? t(vivant ? "ai.transcript.thinkingLive" : "ai.transcript.thought")
+			: t("ai.work.title");
+		const enAttente = vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
+		return {
+			cle: "work", icone: tr.tools.length ? resumeOutils(tr).icone : "sparkles", libelle,
+			// A pending permission always shows: the turn waits for it.
+			ouvertParDefaut: vivant || enAttente,
+			detail: corps => {
+				let racine = corps.querySelector<HTMLElement>(":scope > .qbd-work");
+				if (!racine) racine = ajouter(corps, "div", "qbd-work");
+				renderThread(racine, vue.thread, {
+					loadOutput: toolId => opts.file.sortieOutil(l.id, toolId),
+					answer: (requestId, allow) => opts.file.repondreVivant(l.id, requestId, allow),
+					root: opts.racine?.() ?? undefined,
+					openFile: opts.ouvrirFichier,
+				});
+				// Only while no row of the thread is live: a live row carries its own spinner.
+				const busy = vue.thread.running && !threadHasLiveRow(vue.thread);
+				let marche = corps.querySelector<HTMLElement>(":scope > .qbd-work-running");
+				if (busy && !marche) {
+					marche = ajouter(corps, "div", "qbd-work-running");
+					const dot = ajouter(marche, "span", "qbd-work-dot is-running");
+					dot.setAttribute("role", "img");
+					dot.setAttribute("aria-label", t("ai.work.dotRunning"));
+					ajouter(marche, "span", undefined, t("ai.work.running"));
+				} else if (!busy && marche) marche.remove();
+			},
+		};
+	}
+
 	function synchroniserTranscript(bloc: HTMLElement, etat: BlocTranscript): void {
 		const { tr, vivant, ligne: l } = etat;
 		const id = l.id;
@@ -449,8 +509,11 @@ export function creerVueFile(opts: {
 		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
 
 		const specs: SpecLigne[] = [];
-		// Nothing said yet: the working line above already shows the model at work.
-		if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
+		const vue = opts.file.live(id);
+		if (vue) {
+			if (vue.thread.items.length) specs.push(specTravail(l, tr, vue, vivant));
+		} else if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
+			// Nothing said yet: the working line above already shows the model at work.
 			const ecrit = !!texte;
 			/* PRIVATE reasoning (Claude Code with Opus 5.5 sends its size, not
 			   its text): one line with the size, and a click says why there is
@@ -487,17 +550,9 @@ export function creerVueFile(opts: {
 				   ("Explored the project · Ran 6 tools", "Ran a command · Edited
 				   SKILL.md"), and the steps are shown open: the owner wants to see
 				   everything the AI did without a click (2026-10-10). */
-				const r = resumeTravail(tr.tools, tr.toolsHidden);
-				const refusees = tr.tools.filter(s => s.status === "refused").length;
-				const parts: string[] = [];
-				if (r.explore) parts.push(t("ai.transcript.explored"));
-				if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
-				if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
-				if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
-				const libelle = parts.join(" · ")
-					+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
+				const { libelle, icone } = resumeOutils(tr);
 				specs.push({
-					cle: "tools", icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench", libelle, ouvertParDefaut: true,
+					cle: "tools", icone, libelle, ouvertParDefaut: true,
 					detail: corps => peindreEtapes(corps, tr),
 				});
 			}
@@ -656,8 +711,10 @@ export function creerVueFile(opts: {
 		const activite = zone.querySelector<HTMLElement>(`.qbd-ai-reponse-activite[data-ligne="${id}"]`);
 		if (activite) { const v = texteActivite(tr); if (activite.textContent !== v) activite.textContent = v; }
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
-		// First chunk of a run painted before its transcript existed: one repaint.
-		if (!bloc) { if (enCours(l)) peindre(); return; }
+		/* First chunk of a run painted before its transcript existed, or the AI
+		   work of a finished line read back from the store after a reload
+		   (2026-10-11): one repaint. */
+		if (!bloc) { if (enCours(l) || opts.file.live(id)) peindre(); return; }
 		remplirTranscript(bloc, tr, enCours(l), l, enProse(l));
 		suivre(fil, enBas);
 	}
@@ -681,7 +738,7 @@ export function creerVueFile(opts: {
 		for (const item of items) {
 			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected()), opts.ouvrirPiece); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", racine: opts.racine, ouvrirFichier: opts.ouvrirFichier, ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");
