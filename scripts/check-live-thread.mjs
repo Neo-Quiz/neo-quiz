@@ -161,3 +161,55 @@ await withSrcModule("src/dashboard/live-thread.ts", ({ PREVIEW_LINES, emptyThrea
 
 	r.done();
 });
+
+/* ONE TURN of a live generation (2026-10-11, `live-turn.ts`,
+   `live-turn-store.ts`): the end of a turn and its text read as the one-shot
+   call read them (Claude `result`, Codex last agent message), the thread of
+   one turn cut out of its run with its prompt left out, and the summary line
+   computed from the full thread. */
+await withSrcModule(["src/dashboard/live-turn.ts", "src/dashboard/live-turn-store.ts"], (T, S) => {
+	const r = makeReporter("Live turn");
+	const o = T.emptyOutcome();
+	T.collectLine(o, { type: "assistant", message: { content: [{ type: "text", text: "x" }] } });
+	r.check("a Claude turn is not over before its result", o.ended, false);
+	const result = { type: "result", is_error: false, result: "[1]", usage: { input_tokens: 3 } };
+	T.collectLine(o, result);
+	r.check("a Claude result ends the turn and is kept whole", [o.ended, o.claudeResult], [true, result]);
+	const c = T.emptyOutcome();
+	T.collectLine(c, { method: "item/completed", params: { item: { type: "agentMessage", text: "first" } } });
+	T.collectLine(c, { method: "item/completed", params: { item: { type: "agentMessage", text: "[quiz]" } } });
+	T.collectLine(c, { method: "item/completed", params: { item: { type: "commandExecution", text: "ignored" } } });
+	T.collectLine(c, { method: "error", params: { error: { message: "retrying" }, willRetry: true } });
+	r.check("Codex: the last agent message is the answer, a retried error is not an error", [c.codexText, c.codexError, c.ended], ["[quiz]", null, false]);
+	T.collectLine(c, { method: "turn/completed", params: { turn: { id: "t", status: "failed", error: { message: "usage limit reached" } } } });
+	r.check("Codex: a failed turn ends with its message", [c.ended, c.codexError], [true, "usage limit reached"]);
+	r.check("hostile lines change nothing", JSON.stringify(T.collectLine(T.emptyOutcome(), null)) + JSON.stringify(T.collectLine(T.emptyOutcome(), [1])), JSON.stringify(T.emptyOutcome()).repeat(2));
+	r.check("the prompt line of a turn is told apart", [T.isPromptLine({ type: "user" }), T.isPromptLine({ method: "turn/start" }), T.isPromptLine({ type: "control_response" })], [true, true, false]);
+
+	const ev = (seq, dir, l) => ({ t: seq, seq, dir, l });
+	const user = (text) => ({ type: "user", message: { role: "user", content: [{ type: "text", text }] } });
+	const events = [
+		ev(0, "in", user("old prompt")), ev(1, "out", { type: "result", result: "old" }),
+		ev(2, "in", user("THE PROMPT")),
+		ev(3, "out", { type: "assistant", message: { content: [{ type: "tool_use", id: "tu", name: "Read", input: { file_path: "C:/Neo Quiz/cours/ch1.md" } }] } }),
+		ev(4, "in", user("also add a question")),
+		ev(5, "out", { type: "result", result: "[new]" }),
+		ev(6, "in", user("next turn")),
+	];
+	const { thread, outcome } = S.turnFromStore({ events, truncated: false }, { runId: "r", fromSeq: 2, toSeq: 5 }, false);
+	r.check("store: only the turn's own lines, its prompt left out, a message written meanwhile kept",
+		thread.items.map(i => i.kind + ":" + (i.text ?? i.name)), ["tool:Read", "user:also add a question"]);
+	r.check("store: the turn's own result", [outcome.ended, outcome.claudeResult.result], [true, "[new]"]);
+	const open = S.turnFromStore({ events, truncated: false }, { runId: "r", fromSeq: 6, toSeq: null }, true);
+	r.check("store: a turn cut by a crash says so", [open.outcome.ended, open.thread.items.at(-1)], [false, { kind: "notice", text: "interrupted" }]);
+
+	const tr = T.transcriptOfThread({ running: true, items: [
+		{ kind: "thinking", text: "hmm" }, { kind: "text", text: "a" }, { kind: "text", text: "b" },
+		{ kind: "tool", id: "1", name: "Read", input: JSON.stringify({ file_path: "cours/ch1.md" }, null, 2), preview: "", lines: 3, status: "ok", diff: null },
+		{ kind: "tool", id: "2", name: "Bash", input: "ls -la\nsecond line", preview: "", lines: 0, status: "running", diff: null },
+		{ kind: "tool", id: "3", name: "fileChange", input: "a.md\nb.md", preview: "", lines: 0, status: "refused", diff: null },
+	] });
+	r.check("summary: reasoning, text and every tool with its key input", [tr.thinking, tr.text, tr.tools.map(s => [s.name, s.input, s.status]), tr.started, tr.done],
+		["hmm", "a\nb", [["Read", "cours/ch1.md", "ok"], ["Bash", "ls -la", "running"], ["fileChange", "a.md, b.md", "refused"]], true, false]);
+	r.done();
+});

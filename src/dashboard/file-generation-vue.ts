@@ -45,6 +45,8 @@ import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
+import { renderThread } from "./work-view";
+import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
 
 export interface VueFile {
@@ -438,6 +440,55 @@ export function creerVueFile(opts: {
 		detail: (corps: HTMLElement) => void;
 	}
 
+	/** The heading of the tools, summed up by kind, as MonoCode titles it
+	    ("Explored the project · Ran 6 tools", "Ran a command · Edited SKILL.md"). */
+	function resumeOutils(tr: Transcript): { libelle: string; icone: string } {
+		const r = resumeTravail(tr.tools, tr.toolsHidden);
+		const refusees = tr.tools.filter(s => s.status === "refused").length;
+		const parts: string[] = [];
+		if (r.explore) parts.push(t("ai.transcript.explored"));
+		if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
+		if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
+		if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
+		const libelle = parts.join(" · ")
+			+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
+		return { libelle, icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench" };
+	}
+
+	/** A LIVE turn (2026-10-11): ONE summary line — the tools summed up, or
+	    what the model is doing — and under it the FULL work, in order
+	    (`work-view.ts`: every message, tool call with its whole input, output
+	    previews with "Show all", diffs, permission cards). Open while the turn
+	    runs, folded into its summary once it ends (a whole quiz in JSON5 is
+	    long); a click opens it for good. */
+	function specTravail(l: LigneGeneration, tr: Transcript, vue: LiveTurnView, vivant: boolean): SpecLigne {
+		const lignes = tr.text ? tr.text.split("\n").length : 0;
+		const libelle = tr.tools.length ? resumeOutils(tr).libelle
+			: tr.text ? (vivant ? libelleProgres(l, tr.text, lignes) ?? t("ai.transcript.writingLive") : t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes }))
+			: tr.thinking ? t(vivant ? "ai.transcript.thinkingLive" : "ai.transcript.thought")
+			: t("ai.work.title");
+		const enAttente = vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
+		return {
+			cle: "work", icone: tr.tools.length ? resumeOutils(tr).icone : "sparkles", libelle,
+			// A pending permission always shows: the turn waits for it.
+			ouvertParDefaut: vivant || enAttente,
+			detail: corps => {
+				let racine = corps.querySelector<HTMLElement>(":scope > .qbd-work");
+				if (!racine) racine = ajouter(corps, "div", "qbd-work");
+				renderThread(racine, vue.thread, {
+					loadOutput: toolId => opts.file.sortieOutil(l.id, toolId),
+					answer: (requestId, allow) => opts.file.repondreVivant(l.id, requestId, allow),
+				});
+				let marche = corps.querySelector<HTMLElement>(":scope > .qbd-work-running");
+				if (vue.thread.running && !marche) {
+					marche = ajouter(corps, "div", "qbd-work-running");
+					host.ui.setIcon(ajouter(marche, "span", "qbd-work-icon"), "loader");
+					ajouter(marche, "span", undefined, t("ai.work.running"));
+				} else if (!vue.thread.running && marche) marche.remove();
+			},
+		};
+	}
+
 	function synchroniserTranscript(bloc: HTMLElement, etat: BlocTranscript): void {
 		const { tr, vivant, ligne: l } = etat;
 		const id = l.id;
@@ -449,8 +500,11 @@ export function creerVueFile(opts: {
 		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
 
 		const specs: SpecLigne[] = [];
-		// Nothing said yet: the working line above already shows the model at work.
-		if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
+		const vue = opts.file.live(id);
+		if (vue) {
+			if (vue.thread.items.length) specs.push(specTravail(l, tr, vue, vivant));
+		} else if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
+			// Nothing said yet: the working line above already shows the model at work.
 			const ecrit = !!texte;
 			/* PRIVATE reasoning (Claude Code with Opus 5.5 sends its size, not
 			   its text): one line with the size, and a click says why there is
@@ -487,17 +541,9 @@ export function creerVueFile(opts: {
 				   ("Explored the project · Ran 6 tools", "Ran a command · Edited
 				   SKILL.md"), and the steps are shown open: the owner wants to see
 				   everything the AI did without a click (2026-10-10). */
-				const r = resumeTravail(tr.tools, tr.toolsHidden);
-				const refusees = tr.tools.filter(s => s.status === "refused").length;
-				const parts: string[] = [];
-				if (r.explore) parts.push(t("ai.transcript.explored"));
-				if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
-				if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
-				if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
-				const libelle = parts.join(" · ")
-					+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
+				const { libelle, icone } = resumeOutils(tr);
 				specs.push({
-					cle: "tools", icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench", libelle, ouvertParDefaut: true,
+					cle: "tools", icone, libelle, ouvertParDefaut: true,
 					detail: corps => peindreEtapes(corps, tr),
 				});
 			}
@@ -656,8 +702,10 @@ export function creerVueFile(opts: {
 		const activite = zone.querySelector<HTMLElement>(`.qbd-ai-reponse-activite[data-ligne="${id}"]`);
 		if (activite) { const v = texteActivite(tr); if (activite.textContent !== v) activite.textContent = v; }
 		const bloc = zone.querySelector<HTMLElement>(`.qbd-ai-transcript[data-ligne="${id}"]`);
-		// First chunk of a run painted before its transcript existed: one repaint.
-		if (!bloc) { if (enCours(l)) peindre(); return; }
+		/* First chunk of a run painted before its transcript existed, or the AI
+		   work of a finished line read back from the store after a reload
+		   (2026-10-11): one repaint. */
+		if (!bloc) { if (enCours(l) || opts.file.live(id)) peindre(); return; }
 		remplirTranscript(bloc, tr, enCours(l), l, enProse(l));
 		suivre(fil, enBas);
 	}

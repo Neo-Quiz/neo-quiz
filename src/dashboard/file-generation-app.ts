@@ -46,6 +46,9 @@ import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 import { LEGACY_CHAT_ID } from "./chat-record";
 import { UsageLimitError, resetFromRows } from "./usage-limit";
+import { answerLivePermission, liveToolOutput, liveTurnRunning, liveTurnView, onLiveTurn, sendDuringTurn } from "./live-generation";
+import type { LiveImage, LiveTurnView } from "./live-generation";
+import { transcriptOfThread } from "./live-turn";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -181,6 +184,18 @@ export interface FileGenerationApp {
 	    sent earlier would wait for it anyway, but a reader of `lignes()` must
 	    not look before it (the remote runner decides "interrupted" on it). */
 	readonly pret: Promise<void>;
+	/** The full AI work of a line that ran as a turn of a live session
+	    (2026-10-11), `null` for any other line. */
+	live(id: number): LiveTurnView | null;
+	/** Is the live turn of this line running (a message may join it)? */
+	tourVivant(id: number): boolean;
+	/** A message written while the line's live turn runs: sent to the
+	    session. False when the turn ended meanwhile. */
+	envoyerPendant(id: number, text: string, images: readonly LiveImage[]): Promise<boolean>;
+	/** The answer to a permission card of the line's live turn. */
+	repondreVivant(id: number, requestId: string, allow: boolean): void;
+	/** The full output of one tool call of the line's live turn. */
+	sortieOutil(id: number, toolId: string): Promise<string | null>;
 }
 
 let instance: FileGenerationApp | null = null;
@@ -245,6 +260,21 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}, 80);
 	}
 	/** Change l'étape affichée d'une ligne et prévient les abonnés. */
+	/* LIVE TURNS (2026-10-11): each change of a line's thread refreshes its
+	   summary (the transcript's shape) and is heard like a transcript chunk. */
+	const ligneDeCle = (cle: string): LigneGeneration | undefined => file.lignes.find(l => cleVivante(l) === cle);
+	onLiveTurn(cle => {
+		const l = ligneDeCle(cle);
+		if (!l) return;
+		// Summed up again when it is read (`transcript`), not at every chunk.
+		transcripts.delete(l.id);
+		transcriptChange(l.id);
+	});
+	const cleDe = (id: number): string | null => {
+		const l = F.ligne(file, id);
+		return l ? cleVivante(l) : null;
+	};
+
 	function etapeDe(id: number, e: EtapeGeneration | null): void {
 		if (e) etapes.set(id, e); else etapes.delete(id);
 		publier();
@@ -365,6 +395,9 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				   once the user trusts it. Never for a request from another
 				   device: nobody at this PC asked for it. */
 				dossier: d.fromDevice ? undefined : dossier,
+				/* A turn of the chat's live session (Claude Code, Codex), under
+				   the same key as the resume: a reload finds it again. */
+				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
@@ -478,6 +511,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, "redaction");
 			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mixte ? undefined : d.mode, {
 				dossier: d.fromDevice ? undefined : (d.destination || dossierParDefaut(d.reglages.aiOutputFolder)),
+				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
@@ -620,7 +654,37 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			file = F.fermer(file, id);
 			publier();
 		},
-		transcript: (id) => transcripts.get(id) ?? null,
+		transcript(id) {
+			const deja = transcripts.get(id);
+			if (deja) return deja;
+			// A line of before a reload: its live turn, read back from the store.
+			const cle = cleDe(id);
+			const vue = cle ? liveTurnView(cle) : null;
+			if (!vue) return null;
+			const tr = transcriptOfThread(vue.thread);
+			transcripts.set(id, tr);
+			return tr;
+		},
+		live(id) {
+			const cle = cleDe(id);
+			return cle ? liveTurnView(cle) : null;
+		},
+		tourVivant(id) {
+			const cle = cleDe(id);
+			return !!cle && tourne(id) && liveTurnRunning(cle);
+		},
+		async envoyerPendant(id, text, images) {
+			const cle = cleDe(id);
+			return !!cle && tourne(id) && await sendDuringTurn(cle, text, images);
+		},
+		repondreVivant(id, requestId, allow) {
+			const cle = cleDe(id);
+			if (cle) answerLivePermission(cle, requestId, allow);
+		},
+		sortieOutil(id, toolId) {
+			const cle = cleDe(id);
+			return cle ? liveToolOutput(cle, toolId) : Promise.resolve(null);
+		},
 		abonnerTranscript(ecouteur) {
 			ecouteursTranscript.add(ecouteur);
 			return () => { ecouteursTranscript.delete(ecouteur); };
@@ -653,6 +717,14 @@ export function titrePreparation(d: Pick<DemandeFile, "mode" | "preparation">): 
     retry (a new start). */
 function cleReprise(ligne: LigneGeneration): string {
 	return `${sessionDeFenetre()}-${ligne.id}-${ligne.debut ?? 0}`;
+}
+
+/** The key of a line's live turn (2026-10-11): the window's session and the
+    line, without its start, which a finished line no longer carries (its AI
+    work must still be found after a reload). A retry reuses it: its earlier
+    turn has ended, so the new one is sent and takes the key over. */
+function cleVivante(ligne: Pick<LigneGeneration, "id">): string {
+	return `${sessionDeFenetre()}-L${ligne.id}`;
 }
 
 /** Les images en base64 pour l'API de vision, lues au moment de partir. */

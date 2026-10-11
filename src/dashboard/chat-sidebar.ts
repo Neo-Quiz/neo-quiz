@@ -28,6 +28,8 @@ import { closableLines, groupLines, reconcileChats } from "./chat-requests";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
 import { getChats, importLegacyOnce, removeChat, setChats } from "./chat-store";
 import { getRemoteGenerations, onRemoteGenerations } from "./remote-generations";
+import { runIdsOf } from "./chat-record";
+import { removeRuns } from "./live-generation";
 
 /** Days listed by date; anything older is in the folded section. */
 const JOURS_RECENTS = 30;
@@ -118,6 +120,10 @@ export function poserListeChats(parent: HTMLElement): void {
 		suppr.setAttribute("aria-label", t("ai.side.delete"));
 		host.ui.setIcon(suppr, "trash-2");
 		suppr.addEventListener("click", () => {
+			/* Its AI work history goes with it (2026-10-11): the runs of its
+			   live sessions are deleted from this PC's store. */
+			const runs = runIdsOf(getChats(), chat.id);
+			void removeRuns(runs).catch(e => console.warn("[neo-quiz] runs of a deleted chat not removed:", e));
 			removeChat(chat.id, Date.now());
 			// The chat on screen was deleted: an empty one takes its place.
 			if (actif) startNewChat(); else notifyChatsChanged();

@@ -4320,6 +4320,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   une seconde fois (revue codex 2026-07-31). */
 		if (demarrage) return;
 		demarrage = true;
+		/* WRITE WHILE IT WORKS (2026-10-11): a plain message written while
+		   the chat's Claude Code or Codex turn runs goes to that live session
+		   at once, as in a terminal, instead of waiting in the queue behind
+		   it. Anything else (documents, pictures, a video link, "/exam"), or
+		   a turn that ended meanwhile, takes the usual way below. */
+		try {
+			if (await envoyerPendantLeTour(container)) return;
+		} finally {
+			demarrage = false;
+		}
+		demarrage = true;
 		/* Les documents des vidéos YouTube prêtes partent avec la demande
 		   (spec « Vidéos YouTube » § 5.2). L'attente vit DANS le verrou :
 		   une transcription peut durer le temps qu'elle dure, et un second
@@ -4338,7 +4349,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   (or already refused) folder answers at once; any failure is "no
 			   tools", as in the call itself. */
 			if (fournisseurAgent()) {
-				try { await host.process?.trustFolder?.(destination || dossierParDefaut(settings().aiOutputFolder)); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
+				/* A live session works in the Neo Quiz ROOT (2026-10-11): one
+				   trust for the whole root, asked here once. */
+				const dossier = host.live ? host.paths.contractPath(host.paths.defaultRoot().id, "") : destination || dossierParDefaut(settings().aiOutputFolder);
+				try { await host.process?.trustFolder?.(dossier); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
 			}
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
@@ -4376,6 +4390,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
 		render(container);
+	}
+
+	/** A plain message sent to the chat's running live turn (see
+	    `startGeneration`). True when it was taken (sent, or its failure said). */
+	async function envoyerPendantLeTour(container: HTMLElement | null): Promise<boolean> {
+		const enCours = runningLineOfChat(fileGen.lignes(), activeChatId());
+		const texte = composerText.trim();
+		if (!enCours || !texte || images.length || noteAttachments.length || examCible || /youtu\.?be/i.test(texte) || retirerCommandeExam(texte).commande) return false;
+		if (!fileGen.tourVivant(enCours.id)) return false;
+		try {
+			if (!(await fileGen.envoyerPendant(enCours.id, texte, []))) return false;
+		} catch (e) {
+			host.ui.notice(t("ai.work.sendFailed", { detail: e instanceof Error ? e.message : String(e) }));
+			return true;
+		}
+		viderComposer();
+		render(container);
+		return true;
 	}
 
 	/** Le canal web : le composer GARDE la demande pendant l'attente du site ;

@@ -820,4 +820,9 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.work.truncated": "La fin de cette exécution n'a pas été enregistrée",
 	"ai.work.resumed": "Reprise",
 	"ai.work.thinking": "Réflexion",
+	"ai.work.title": "Travail de l'IA",
+	"ai.work.running": "En cours…",
+	"ai.work.sendFailed": "Votre message n'a pas pu atteindre l'IA : {detail}",
+	"ai.live.busy": "Six sessions d'IA travaillent déjà. Attendez que l'une d'elles termine, puis réessayez.",
+	"ai.live.exited": "L'IA s'est arrêtée au milieu de son travail. Renvoyez votre message : la conversation reprend là où elle en était.",
 };

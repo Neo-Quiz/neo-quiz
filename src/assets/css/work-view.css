@@ -185,3 +185,15 @@
 	opacity: 0.5;
 	cursor: default;
 }
+
+/* The turn still runs (2026-10-11): one quiet line under the thread, in the
+   muted colour of a tool's status. No animation: the working line above the
+   answer already moves. */
+.qbd-work-running {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 10px;
+	font-size: 12px;
+	color: var(--text-faint);
+}

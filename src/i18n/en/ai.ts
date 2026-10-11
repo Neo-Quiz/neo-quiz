@@ -886,4 +886,10 @@ export const EN_AI = {
 	"ai.work.truncated": "The end of this run was not saved",
 	"ai.work.resumed": "Resumed",
 	"ai.work.thinking": "Thinking",
+	"ai.work.title": "AI work",
+	"ai.work.running": "Working…",
+	"ai.work.sendFailed": "Your message could not reach the AI: {detail}",
+	/* ── Live sessions of Claude Code and Codex (src/dashboard/live-generation.ts) ── */
+	"ai.live.busy": "Six AI sessions are already working. Wait for one of them to finish, then try again.",
+	"ai.live.exited": "The AI stopped in the middle of its work. Send your message again: the conversation resumes where it was.",
 } as const;
