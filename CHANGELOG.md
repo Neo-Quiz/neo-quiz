@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.85] - 2026-10-11
+
 ### Changed
 
 - The phone's model picker keeps its provider rail on the left and gains a "Search models" field above the list.
