@@ -46,7 +46,8 @@
    et la clé `folders` des réglages est gardée à l'écriture.
 ══════════════════════════════════════════════════════════ */
 
-import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun } from "../../../src/host/types";
+import type { AncreTerminal, EtatCompte, HostNetRequest, HostNetResponse, HostProcess, CodeJob, CodeRun, LiveErrorCode, LiveEvent, LiveInput, RunPage } from "../../../src/host/types";
+import type { ModeAgent } from "../../../src/host/claude-outils";
 import type { CodeLanguage } from "../../../src/code-languages";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
 import type { ResetsRequest, ResetsResult } from "../../../src/dashboard/codex-resets";
@@ -1067,6 +1068,28 @@ export interface Pont {
 	 * `video.installer`, the progress callback does not cross the IPC: the
 	 * bytes come back on a PUSHED channel (`langagesProgression`).
 	 */
+	/**
+	 * LIVE AI SESSIONS (2026-10-11, `live-sessions.ts`, `live-canaux.ts`):
+	 * Claude Code and Codex as one long-lived process per chat. The window
+	 * sends TYPED values only: start options, a `LiveInput`, a run id (a
+	 * lowercase UUID the main process created and that belongs to THIS
+	 * window). Never a path, an argument or a raw stdin line: the main
+	 * process validates every field and builds each line itself. Errors come
+	 * back as an envelope, the IPC losing an error's `name`.
+	 */
+	live: {
+		start(o: { tool: "claude" | "codex"; chatId: string; model: string; effort?: string; mode: ModeAgent; runId?: string }): Promise<EnveloppeLive<{ runId: string }>>;
+		send(runId: string, input: LiveInput): Promise<EnveloppeLive<null>>;
+		close(runId: string): Promise<EnveloppeLive<null>>;
+		/** PUSHED by the main process to the window that owns the run. */
+		surEvenement(rappel: (e: LiveEvent) => void): () => void;
+		/** One page of a stored run (`offset`, `limit` <= 2000), never the whole run. */
+		lireRun(runId: string, page?: { offset: number; limit: number }): Promise<RunPage | null>;
+		sortieOutil(runId: string, toolUseId: string): Promise<string | null>;
+		supprimerRuns(runIds: readonly string[]): Promise<EnveloppeLive<null>>;
+		tailleRuns(): Promise<number>;
+	};
+
 	langages: {
 		etat(nom: "c" | "python"): Promise<{ installe: boolean; version: string | null; octets: number }>;
 		installer(nom: "c" | "python", surProgression: (recus: number, total: number) => void): Promise<EnveloppeVideo<null, CodeInstallation>>;
@@ -1259,7 +1282,20 @@ export const CANAUX = {
 	/** PUSHED by the main process, like `videoProgression`: bytes received
 	    and the pack's pinned size. */
 	langagesProgression: "neo:langages/progression",
+	liveDemarrer: "neo:live/start",
+	liveEnvoyer: "neo:live/send",
+	liveFermer: "neo:live/close",
+	/** PUSHED by the main process (`webContents.send`) to the owner window. */
+	liveEvenement: "neo:live/event",
+	runsLire: "neo:runs/read",
+	runsSortie: "neo:runs/output",
+	runsSupprimer: "neo:runs/remove",
+	runsTaille: "neo:runs/size",
 } as const;
+
+/** The answer of a live-session verb: its value, or the CODE of the refusal
+    (`LiveErrorCode`), which the renderer host turns back into an Error name. */
+export type EnveloppeLive<T> = { ok: true; valeur: T } | { ok: false; code: LiveErrorCode; message: string };
 
 /** La clé des RÉGLAGES IA de l'application (`neo.reglages`) : les MÊMES
     champs que `plugin.settings` du greffon, dont `aiOllamaUrl`. Écrite ici,

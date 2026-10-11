@@ -35,6 +35,7 @@ import { createWindowsUi } from "./ui";
 import { createWindowsCollage } from "./collage";
 import { createWindowsVideo } from "./video";
 import { createWindowsCode } from "./code";
+import { createWindowsLive } from "./live";
 
 export { createWindowsIndex } from "./fs";
 export type { MiroirDisque, WindowsIndex } from "./fs";
@@ -171,6 +172,8 @@ export function createWindowsHost(carte: CarteRacines, index: MiroirDisque): Hos
 		   task 4 of 2026-09-28-c-cpp-execution): OPTIONAL member, absent
 		   under the plugin. A pass-through to the bridge. */
 		code: createWindowsCode(pont),
+		/* Live AI sessions (2026-10-11): a pass-through to the bridge. */
+		live: createWindowsLive(pont),
 		/* Disposer les fenêtres, glisser un fichier (la même résolution de
 		   chemin qu'`openExternal` : un `HostFile` du contrat → absolu par
 		   l'index ; une chaîne = un absolu déjà admis), et finir. */

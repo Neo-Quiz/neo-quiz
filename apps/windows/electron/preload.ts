@@ -22,6 +22,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { CANAUX } from "./pont";
 import type { EtatFenetre, EtatMiseAJour, EtatMoodle, EtatSync, EvenementDisque, Pont } from "./pont";
+import type { LiveEvent } from "../../../src/host/types";
 
 /* Les rappels de fermeture, et l'écouteur UNIQUE qui les sert. Un écouteur par
    appel à `surFermeture` répondrait autant de fois au principal, qui détruirait
@@ -337,6 +338,26 @@ const pont: Pont = {
 	code: {
 		run: job => ipcRenderer.invoke(CANAUX.codeRun, job),
 		warm: language => ipcRenderer.invoke(CANAUX.codeWarm, language),
+	},
+
+	/* LIVE AI SESSIONS: typed values only; the main process validates them. */
+	live: {
+		start: o => ipcRenderer.invoke(CANAUX.liveDemarrer, o),
+		send: (runId, input) => ipcRenderer.invoke(CANAUX.liveEnvoyer, runId, input),
+		close: runId => ipcRenderer.invoke(CANAUX.liveFermer, runId),
+		surEvenement(rappel) {
+			// Only an event of a known kind for a run id is relayed.
+			const ecouteur = (_e: unknown, p: unknown): void => {
+				const r = p && typeof p === "object" ? p as { kind?: unknown; runId?: unknown } : null;
+				if (r && typeof r.runId === "string" && ["line", "permission", "permissionGone", "turnEnd", "exit"].includes(r.kind as string)) rappel(p as LiveEvent);
+			};
+			ipcRenderer.on(CANAUX.liveEvenement, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.liveEvenement, ecouteur); };
+		},
+		lireRun: (runId, page) => ipcRenderer.invoke(CANAUX.runsLire, runId, page),
+		sortieOutil: (runId, toolUseId) => ipcRenderer.invoke(CANAUX.runsSortie, runId, toolUseId),
+		supprimerRuns: runIds => ipcRenderer.invoke(CANAUX.runsSupprimer, runIds),
+		tailleRuns: () => ipcRenderer.invoke(CANAUX.runsTaille),
 	},
 
 	/* THE LANGUAGE PACKS (task 9): same subscribe-before, unsubscribe-in-

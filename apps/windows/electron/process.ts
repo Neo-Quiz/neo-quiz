@@ -2154,6 +2154,77 @@ export function lancer(spec: {
 }
 
 /**
+ * A LIVE CLI PROCESS (2026-10-11, `live-sessions.ts`): stdin stays OPEN, one
+ * JSON line at a time, with backpressure (`write` waits for `drain`); stdout
+ * and stderr are the caller's. Launched by the main process only, with the
+ * EXACT arguments a live form of `gabarits-cli.ts` accepts (the caller
+ * checks them); no per-tool lock (one process per chat).
+ *
+ * Same resolution and same `cmd.exe` fallback as `lancer` (a `.cmd` shim of
+ * an npm install), decided BEFORE the spawn by the extension; no argument
+ * may carry a newline. `kill` kills the whole TREE (`tuerArbre`).
+ */
+export function lancerVivant(spec: {
+	tool: Outil;
+	args: string[];
+	cwd: string;
+	/** Fixed variables of the main process (`CODEX_HOME`…), never the window's. */
+	envExtra?: Record<string, string>;
+}, env: NodeJS.ProcessEnv = process.env): { child: ChildProcess; write(line: string): Promise<void>; kill(): void } {
+	if (!estOutilAutorise(spec.tool)) throw erreurCli("refuse", "CLI hors liste : " + String(spec.tool));
+	if (spec.args.some(porteSautDeLigne)) throw erreurCli("refuse", "argument refusé : un saut de ligne ne peut pas être cité");
+	const executable = resoudreExecutable(spec.tool, env);
+	if (!executable) throw erreurCli("introuvable", "CLI introuvable : " + spec.tool);
+	const envLance = Object.assign(environnementEnfant(env), spec.tool === "claude" ? ENV_SORTIE_CLAUDE : null, spec.envExtra ?? null);
+	const options = {
+		env: envLance,
+		cwd: spec.cwd,
+		windowsHide: true,
+		stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"],
+		detached: process.platform !== "win32",
+	};
+	const parCmd = process.platform === "win32" && /\.(cmd|bat)$/i.test(executable);
+	let child: ChildProcess;
+	try {
+		child = parCmd
+			? spawn(env.ComSpec || "cmd.exe", ["/d", "/s", "/c", ligneCmd(executable, spec.args)], Object.assign({ windowsVerbatimArguments: true }, options))
+			: spawn(executable, spec.args, options);
+	} catch (e) {
+		throw erreurCli("introuvable", "CLI " + spec.tool + " : " + (e instanceof Error ? e.message : String(e)));
+	}
+	// An EPIPE after the CLI died arrives on the stream: without a listener it would kill the main process.
+	child.stdin?.on("error", () => { /* the exit of the child settles */ });
+	return {
+		child,
+		write(line) {
+			return new Promise((resolve, reject) => {
+				const stdin = child.stdin;
+				if (!stdin || stdin.destroyed || !stdin.writable) { reject(erreurCli("erreur", "stdin closed")); return; }
+				try {
+					if (stdin.write(line, "utf8")) { resolve(); return; }
+				} catch (e) {
+					reject(e instanceof Error ? e : new Error(String(e)));
+					return;
+				}
+				const fin = (err?: Error): void => {
+					stdin.off("drain", ok);
+					stdin.off("close", ferme);
+					if (err) reject(err); else resolve();
+				};
+				const ok = (): void => fin();
+				const ferme = (): void => fin(erreurCli("erreur", "stdin closed"));
+				stdin.once("drain", ok);
+				stdin.once("close", ferme);
+			});
+		},
+		kill() {
+			if (typeof child.pid === "number") void tuerArbre(child.pid);
+			else { try { child.kill(); } catch { /* already dead */ } }
+		},
+	};
+}
+
+/**
  * UN SEUL `run` PAR OUTIL À LA FOIS — ET LE SUIVANT ATTEND SON TOUR.
  *
  * Le verrou vit ICI, dans le principal, et non dans le rendu : c'est le
