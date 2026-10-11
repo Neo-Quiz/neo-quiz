@@ -206,6 +206,13 @@ jobs:
       - name: Live session run store
         run: npm run check:run-store
 
+      # The live session manager, on fake processes: window payloads validated,
+      # permissions only answered by the user outside Full access, interrupt
+      # denies pending ones first, idle park and resume, a run of another window
+      # refused, every process killed on quit, every line stored in order.
+      - name: Live session manager
+        run: npm run check:live-session
+
       # The share lock is released on every outcome of the panel process
       # (fake clock, fake child): no more stuck "share already in progress".
       - name: Share lock
