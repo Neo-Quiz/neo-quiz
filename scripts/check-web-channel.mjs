@@ -249,6 +249,8 @@ for (const avecImage of [false, true]) {
 		sentMessage: { text: "Demande précédente", images: [], notes: [] }, sentAnimPending: false,
 		arrets: 0, retraits: 0, rendus: [],
 		attachPromptPaths: async () => {}, couperSondeConnexion: () => {},
+		// Helpers added to startGeneration later (inherited documents, a send during a live turn): no-ops here.
+		rattacherDocumentsHerites: async () => {}, envoyerPendantLeTour: async () => false, fournisseurAgent: () => false,
 		/* Un identifiant qui n'est PAS dans le registre : les trois sites du
 		   registre sont câblés depuis le 2026-09-20, et nommer l'un d'eux ici
 		   laisserait croire que ce cas les décrit. Ce qui est éprouvé, c'est le
