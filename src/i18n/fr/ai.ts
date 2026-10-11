@@ -794,7 +794,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.notify.failed": "Échec de la génération : {error}",
 	"ai.notify.channel": "Conversations",
 	"ai.pc.nudge": "Choisis un appareil",
-	"ai.model.pill": "Claude Code · {model}",
+	"ai.model.pickerLabel": "Choisir le modèle",
 	"ai.model.pillDefault": "Claude Code",
 	"ai.pc.button": "État du PC",
 	"ai.pc.fallbackName": "Ton PC",

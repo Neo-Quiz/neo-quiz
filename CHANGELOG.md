@@ -16,6 +16,7 @@ release notes.
 ### Added
 
 - Claude Code and Codex now run as live sessions: write while they work, approve their actions, and see everything they do, kept on this PC.
+- The phone composer shows the model as a pill with the provider logo; tapping it opens a provider and model picker, like MonoCode.
 
 ### Fixed
 

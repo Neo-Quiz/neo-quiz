@@ -21,7 +21,8 @@ import type { PcStatus } from "./pc-status";
 import { chooseDevice, chosenPc, getDevices, getOwnRequests, getOwnSettings, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations, remoteModel, setRemoteModel } from "./remote-generations";
 import { deviceInfo, pcIcon, soleOnlinePc } from "../shared-state/devices";
 import { isStale } from "../shared-state/generations";
-import { openActionMenu } from "./ui-select";
+import { openModelPicker } from "./ui-select";
+import { getMarque, setBrandLogo } from "./ai-providers";
 import { ilYA } from "./sync-page";
 import { demanderClaudeCode } from "./ai-remote";
 
@@ -224,13 +225,15 @@ function ouvrirFenetrePc(chat: () => ChatRecord | null): void {
 
 /* ── The model pill: "Claude Code · <model>" ── */
 
+const CLAUDE_CODE = "claude-code";
+
 /** The Claude models the target PC lists in its device file, empty when it has none (or no PC is known). */
 function modelesDuPc(chat: () => ChatRecord | null): Array<{ id: string; label: string }> {
 	const s = etatPc(chat);
 	return deviceInfo(getDevices(), s.device)?.claudeModels ?? [];
 }
 
-/** The pill in the composer's bottom row. The only provider is Claude Code; a tap lists the target PC's own Claude models (the same menu component as the other action menus). The choice is a phone setting, sent as the request's optional `model`. */
+/** The pill in the composer's bottom row: provider logo, model name, chevron. The only provider is Claude Code; a tap opens the provider/model picker over the target PC's own Claude models. The choice is a phone setting, sent as the request's optional `model`. */
 export function poserPuceModele(parent: HTMLElement, chat: () => ChatRecord | null): HTMLButtonElement {
 	const b = ajouter(parent, "button", "qbd-ai-model-pill");
 	b.type = "button";
@@ -241,14 +244,19 @@ export function poserPuceModele(parent: HTMLElement, chat: () => ChatRecord | nu
 		const courant = modeles.find(m => m.id === choix);
 		b.hidden = modeles.length === 0;
 		b.replaceChildren();
-		ajouter(b, "span", "qbd-ai-model-pill-texte", courant ? t("ai.model.pill", { model: courant.label }) : t("ai.model.pillDefault"));
+		setBrandLogo(ajouter(b, "span", "qbd-ai-model-pill-logo"), "claude");
+		ajouter(b, "span", "qbd-ai-model-pill-texte", courant ? courant.label : t("ai.model.pillDefault"));
 		currentHost().ui.setIcon(ajouter(b, "span", "qbd-ai-model-pill-chevron"), "chevron-down");
 	};
 	pcBoutons.add(peindre);
 	b.addEventListener("click", () => {
-		const modeles = modelesDuPc(chat);
-		const choix = remoteModel();
-		openActionMenu(b, modeles.map(m => ({ label: m.label, checked: m.id === choix, onClick: () => { setRemoteModel(m.id); } })), { className: "qbd-menu-claude" });
+		openModelPicker(b, {
+			providers: [{ id: CLAUDE_CODE, name: getMarque(CLAUDE_CODE)?.name ?? "Claude Code", logo: "claude", models: modelesDuPc(chat) }],
+			selectedProvider: CLAUDE_CODE,
+			selectedModel: remoteModel() ?? "",
+			renderLogo: setBrandLogo,
+			onPick: (_providerId, modelId) => { setRemoteModel(modelId); },
+		});
 	});
 	peindre();
 	return b;

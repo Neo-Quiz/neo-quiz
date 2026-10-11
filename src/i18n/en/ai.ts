@@ -860,7 +860,7 @@ export const EN_AI = {
 	"ai.notify.failed": "Generation failed: {error}",
 	"ai.notify.channel": "Chats",
 	"ai.pc.nudge": "Choose a device",
-	"ai.model.pill": "Claude Code · {model}",
+	"ai.model.pickerLabel": "Choose the model",
 	"ai.model.pillDefault": "Claude Code",
 	"ai.pc.button": "PC status",
 	"ai.pc.fallbackName": "Your PC",
