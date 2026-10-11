@@ -5,10 +5,13 @@
    Everything Claude Code and Codex did in the live sessions of the Generate
    page is kept on this PC with no time limit (the run store of the main
    process, `<userData>/runs/`). Here: its total size, and "Delete all",
-   confirmed in the app's own modal (never a native dialog). The page only
-   names the runs it knows (the ids its chats keep): the main process deletes
-   them, never a path from here. The chats stay; their run ids are dropped,
-   so their next message starts a new session.
+   confirmed in the app's own modal (never a native dialog). "Delete all"
+   deletes EVERY run file of the store for real (`run-store.ts`,
+   `removeAll`), the ones no chat names too (a chat deleted on another
+   device, ids past a chat's cap): the main process lists them itself, the
+   page sends no id and no path. The chats stay; their run ids and the
+   places of their requests' AI work are dropped, so their next message
+   starts a new session.
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost } from "../../../../src/host/current";
@@ -17,7 +20,8 @@ import { ajouter } from "../../../../src/dom";
 import { openConfirmModal } from "../../../../src/editor/modals";
 import { getChats, setChats } from "../../../../src/dashboard/chat-store";
 import { notifyChatsChanged } from "../../../../src/dashboard/chat-session";
-import { removeRuns } from "../../../../src/dashboard/live-generation";
+import { withoutRuns } from "../../../../src/dashboard/chat-record";
+import { removeAllRuns } from "../../../../src/dashboard/live-generation";
 
 /** Bytes in the user's language ("1.2 MB", "1,2 Mo"). */
 function taille(octets: number): string {
@@ -51,10 +55,9 @@ export function mountAiHistorySettings(card: HTMLElement, row: (parent: HTMLElem
 				if (!ok) return;
 				supprimer.disabled = true;
 				void (async () => {
-					const chats = getChats();
 					try {
-						await removeRuns([...new Set(chats.flatMap(c => c.runIds ?? []))]);
-						setChats(getChats().map(c => { const { runIds: _gone, ...rest } = c; return rest; }));
+						await removeAllRuns();
+						setChats(withoutRuns(getChats()));
 						notifyChatsChanged();
 					} catch (e) {
 						console.warn("[neo-quiz] AI work history not deleted:", e);

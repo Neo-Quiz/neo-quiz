@@ -358,7 +358,8 @@ const pont: Pont = {
 		},
 		lireRun: (runId, page) => ipcRenderer.invoke(CANAUX.runsLire, runId, page),
 		sortieOutil: (runId, toolUseId) => ipcRenderer.invoke(CANAUX.runsSortie, runId, toolUseId),
-		supprimerRuns: runIds => ipcRenderer.invoke(CANAUX.runsSupprimer, runIds),
+		supprimerRuns: (runIds, chatId) => ipcRenderer.invoke(CANAUX.runsSupprimer, runIds, chatId),
+		supprimerToutesRuns: () => ipcRenderer.invoke(CANAUX.runsToutSupprimer),
 		tailleRuns: () => ipcRenderer.invoke(CANAUX.runsTaille),
 	},
 

@@ -1086,7 +1086,10 @@ export interface Pont {
 		/** One page of a stored run (`offset`, `limit` <= 2000), never the whole run. */
 		lireRun(runId: string, page?: { offset: number; limit: number }): Promise<RunPage | null>;
 		sortieOutil(runId: string, toolUseId: string): Promise<string | null>;
-		supprimerRuns(runIds: readonly string[]): Promise<EnveloppeLive<null>>;
+		/** Deletes runs of the chat `chatId` (a run of another chat is kept). */
+		supprimerRuns(runIds: readonly string[], chatId: string): Promise<EnveloppeLive<null>>;
+		/** Deletes EVERY run of the store ("Delete all"). */
+		supprimerToutesRuns(): Promise<EnveloppeLive<null>>;
 		tailleRuns(): Promise<number>;
 	};
 
@@ -1290,6 +1293,7 @@ export const CANAUX = {
 	runsLire: "neo:runs/read",
 	runsSortie: "neo:runs/output",
 	runsSupprimer: "neo:runs/remove",
+	runsToutSupprimer: "neo:runs/removeAll",
 	runsTaille: "neo:runs/size",
 } as const;
 

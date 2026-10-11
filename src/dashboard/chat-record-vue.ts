@@ -8,6 +8,14 @@
    a card per quiz with "Open", the written answers as prose, the failure or
    the stop in one line. The only HTML written here is the Markdown of an
    answer, through `renderMarkdownPreview` (the first gate of the sanitizer).
+
+   THE AI WORK OF A RECORDED REQUEST (2026-10-11): a request that ran as a
+   live turn keeps where that turn sits in its run (`ChatRequest.runs`).
+   Each one is a folded "AI work" line; opened, the turn is read back from
+   the run store of this PC (page by page) and drawn by `work-view.ts`
+   (`textContent` only), so a chat reopened after a restart still shows
+   everything the AI did. A run deleted meanwhile, or a host without a run
+   store (the phone), shows no line.
 ══════════════════════════════════════════════════════════ */
 
 import { ajouter } from "../dom";
@@ -30,6 +38,49 @@ import { peindreQuestions } from "./generation-kind-vue";
 import type { PasteOutcome } from "./relay-flow";
 import { recordOrigin } from "../shared-state/request-origin";
 import { originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
+import type { ChatRun } from "./chat-record";
+import type { Thread } from "./live-thread";
+import { recordedToolOutput, recordedTurn } from "./live-generation";
+import { renderThread } from "./work-view";
+
+/** One folded "AI work" line per live turn of the request; the turn is read
+    from the store on the first unfolding only. */
+function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[]): void {
+	const host = currentHost();
+	if (!host.live) return;
+	for (const run of runs) {
+		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
+		bloc.setAttribute("role", "log");
+		bloc.setAttribute("aria-label", t("ai.transcript.label"));
+		const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
+		b.type = "button";
+		b.setAttribute("aria-expanded", "false");
+		host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), "sparkles");
+		ajouter(b, "span", "qbd-ai-transcript-ligne-texte", t("ai.work.title"));
+		const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
+		host.ui.setIcon(chevron, "chevron-right");
+		let detail: HTMLElement | null = null;
+		let lu: Promise<Thread | null> | null = null;
+		b.addEventListener("click", () => {
+			const ouvrir = !detail;
+			b.setAttribute("aria-expanded", String(ouvrir));
+			host.ui.setIcon(chevron, ouvrir ? "chevron-down" : "chevron-right");
+			if (!ouvrir) { detail?.remove(); detail = null; return; }
+			const d = document.createElement("div");
+			d.className = "qbd-ai-transcript-detail qbd-ai-transcript-detail--anime";
+			b.after(d);
+			detail = d;
+			const racine = ajouter(d, "div", "qbd-work");
+			lu ??= recordedTurn(run).catch(() => null);
+			void lu.then(thread => {
+				// Gone from the store (deleted): the line goes too.
+				if (!thread || !thread.items.length) { bloc.remove(); return; }
+				// Read-only: a recorded turn has no permission left to answer.
+				if (detail === d) renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {} });
+			});
+		});
+	}
+}
 
 /** The chips of the documents a request carried (thumbnail when there is one,
     else the name cut IN THE MIDDLE so the extension always shows). With `ouvrir`,
@@ -85,6 +136,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const id = q.id;
 		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
 	}
+	if (q.runs?.length) peindreTravail(tour, q.runs);
 	for (const res of q.results) {
 		if (res.kind === "text") {
 			const rep = ajouter(tour, "div", "qbd-ai-chat-reponse");

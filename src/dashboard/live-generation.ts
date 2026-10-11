@@ -43,6 +43,7 @@ import type { TurnOutcome } from "./live-turn";
 import { readAll, readSaved, turnFromStore, writeSaved } from "./live-turn-store";
 import type { Saved } from "./live-turn-store";
 import { addRunId, runIdsOf } from "./chat-record";
+import type { ChatRun } from "./chat-record";
 import { getChats, setChats } from "./chat-store";
 import { chatDevice, notifyChatsChanged } from "./chat-session";
 
@@ -197,6 +198,31 @@ export function liveTurnView(key: string): LiveTurnView | null {
 	return null;
 }
 
+/** Where the FINISHED turn of a generation sits in its run, to keep with
+    its request in the chat record (`ChatRequest.runs`); `null` while it
+    runs or for a generation that never ran live. */
+export function liveTurnPlace(key: string): ChatRun | null {
+	const saved = readSaved(key);
+	return saved && saved.toSeq !== null && saved.toSeq >= saved.fromSeq ? { runId: saved.runId, fromSeq: saved.fromSeq, toSeq: saved.toSeq } : null;
+}
+
+/** The AI work of a recorded request's turn (a chat reopened after a
+    restart, a request whose line left the queue), read back from the run
+    store page by page; `null` when the run is gone or this host has none. */
+export async function recordedTurn(run: ChatRun): Promise<Thread | null> {
+	const live = currentHost().live;
+	if (!live) return null;
+	const stored = await readAll(live, run.runId).catch(() => null);
+	if (!stored) return null;
+	return turnFromStore(stored, run, false).thread;
+}
+
+/** The full output of one tool call of a recorded turn ("Show all"). */
+export function recordedToolOutput(runId: string, toolId: string): Promise<string | null> {
+	const live = currentHost().live;
+	return live ? live.toolOutput(runId, toolId) : Promise.resolve(null);
+}
+
 /** Is the turn of this generation running now (a message may join it)?
     A stopped turn winding down takes no message: it goes to the queue. */
 export function liveTurnRunning(key: string): boolean {
@@ -234,21 +260,32 @@ export function liveToolOutput(key: string, toolId: string): Promise<string | nu
 	return live && turn ? live.toolOutput(turn.runId, toolId) : Promise.resolve(null);
 }
 
-/** Deletes runs from the store (a deleted chat, "Delete all"), by lots
-    the main process takes, and forgets them here. */
-export async function removeRuns(runIds: readonly string[]): Promise<void> {
+/** Deletes the runs of a deleted chat from the PC, by lots the main
+    process takes (it keeps any run whose header names another chat), and
+    forgets them here. */
+export async function removeRuns(runIds: readonly string[], chatId: string): Promise<void> {
 	const live = currentHost().live;
 	if (!live || !runIds.length) return;
-	for (let i = 0; i < runIds.length; i += 500) await live.removeRuns(runIds.slice(i, i + 500));
+	for (let i = 0; i < runIds.length; i += 500) await live.removeRuns(runIds.slice(i, i + 500), chatId);
 	forgetRuns(runIds);
 }
 
-/** Forgets runs removed from the store. */
+/** "Delete all": every run of the PC's store, known to a chat or not. */
+export async function removeAllRuns(): Promise<void> {
+	const live = currentHost().live;
+	if (!live) return;
+	await live.removeAllRuns();
+	forgetRuns([...sessions.keys(), ...bound.values(), ...[...turns.values()].map(x => x.runId)]);
+}
+
+/** Forgets runs removed from the store. A session with a turn running stays
+    known until its `exit` (the main process closed it first): its turn
+    must still end. */
 function forgetRuns(runIds: readonly string[]): void {
 	const gone = new Set(runIds);
-	for (const id of gone) sessions.delete(id);
+	for (const id of gone) if (!sessions.get(id)?.current) sessions.delete(id);
 	for (const [k, id] of [...bound]) if (gone.has(id)) bound.delete(k);
-	for (const [k, turn] of [...turns]) if (gone.has(turn.runId)) turns.delete(k);
+	for (const [k, turn] of [...turns]) if (gone.has(turn.runId) && sessions.get(turn.runId)?.current !== turn) turns.delete(k);
 }
 
 /** `start`, asking the user to trust the Neo Quiz root when the main process

@@ -816,6 +816,16 @@ await withSrcModule([
 		r.check("claude: a result while idle (nothing sent) ends no turn", turnEnds(t), 1);
 	});
 
+	await cas(r, "Delete all: closeOwn closes only this window's sessions; heldElsewhere names the other window's runs", async () => {
+		const t = setup(M);
+		const a = await t.m.start(1, START({ chatId: "x" }));
+		const b = await t.m.start(2, START({ chatId: "y" }));
+		const others = [...t.m.heldElsewhere(1)];
+		await t.m.closeOwn(1);
+		r.check("Delete all: closeOwn closes only this window's sessions; heldElsewhere names the other window's runs",
+			[others, t.children[0].killed, t.children[1].killed, t.m.holder(1, a.runId), t.m.holder(1, b.runId)], [[b.runId], true, false, "none", "other"]);
+	});
+
 	await cas(r, "two queued turns, a CLI that never echoes: the first result does not park the second turn", async () => {
 		const t = setup(M);
 		const { runId } = await t.m.start(1, START());

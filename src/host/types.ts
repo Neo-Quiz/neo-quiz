@@ -1184,7 +1184,11 @@ export interface HostLive {
 	readRun(runId: string, page?: { offset: number; limit: number }): Promise<RunPage | null>;
 	/** The full output of one tool call, fetched on demand. */
 	toolOutput(runId: string, toolUseId: string): Promise<string | null>;
-	removeRuns(runIds: readonly string[]): Promise<void>;
+	/** Deletes runs of the chat `chatId` from the PC (a run whose header
+	    names another chat is kept: the ids come from a synced record). */
+	removeRuns(runIds: readonly string[], chatId: string): Promise<void>;
+	/** Deletes EVERY run of the store, known to a chat or not ("Delete all"). */
+	removeAllRuns(): Promise<void>;
 	storeSize(): Promise<number>;
 }
 

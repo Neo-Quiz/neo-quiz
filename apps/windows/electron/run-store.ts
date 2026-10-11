@@ -20,6 +20,13 @@
    it comes from the window through IPC, and `../x` or `C:\x` would otherwise
    be a path outside the store.
 
+   Deleting is DELETING (2026-10-11): the runs are logs the app owns and
+   the user asked to delete (a deleted chat, "Delete all"), and they hold
+   the content of the user's files and the tools' outputs. A moved copy in
+   `<userData>/.trash/runs/` stayed there forever while the settings said
+   "0 kB"; `remove` and `removeAll` unlink the files, and purge what an
+   earlier version left in that trash.
+
    Appends to one run go through a per-run promise chain: two lines written
    at once would otherwise interleave, or reach the file out of order, and
    the byte counter would race. Node only (no Electron): the root is a
@@ -29,7 +36,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { RunEvent, RunHeader, RunRead } from "../../../src/host/types";
-import { creerFichiers } from "./fichiers";
 
 export const RUN_CAP_BYTES = 100 * 1024 * 1024;
 
@@ -67,8 +73,14 @@ export interface RunStore {
 	/** Full text of that tool result (Claude `tool_result`) or command output
 	    (Codex `commandExecution`), from the lines RECEIVED only; `null` if none. */
 	toolOutput(runId: string, toolUseId: string): Promise<string | null>;
-	/** Moves the runs to the host trash; an absent run is not an error. */
-	remove(runIds: readonly string[]): Promise<void>;
+	/** Deletes the runs (and their leftovers in the old trash); an absent
+	    run is not an error. With `chatId`, a run whose header names another
+	    chat is kept: a synced chat record cannot delete another chat's runs. */
+	remove(runIds: readonly string[], chatId?: string): Promise<void>;
+	/** Deletes EVERY run file of the store, known to a chat or not, and
+	    empties the old trash of runs. `keep`: runs still held by a live
+	    session of another window. */
+	removeAll(keep?: ReadonlySet<string>): Promise<void>;
 	/** Total bytes of the run files of the store. */
 	size(): Promise<number>;
 }
@@ -76,9 +88,15 @@ export interface RunStore {
 export interface RunStoreOptions {
 	/** Test-only: a smaller cap than `RUN_CAP_BYTES`. */
 	capBytes?: number;
-	/** The trash primitive; defaults to the main process's (`fichiers.ts`). */
-	trash?: (chemin: string, racine: string) => Promise<void>;
 }
+
+/** A run file of the store, and nothing else: `<uuid>.jsonl`. */
+const RUN_FILE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/;
+/** A run an earlier version moved to the trash: `<uuid>.jsonl`, or
+    `<uuid>-<n>.jsonl` when the name was taken (`fichiers.ts`, `cheminLibre`). */
+const TRASHED_RUN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:-\d{1,2})?\.jsonl$/;
+/** The header line is short; past this, the file is not a run. */
+const HEADER_BYTES = 64 * 1024;
 
 function checkRunId(id: unknown): asserts id is string {
 	if (typeof id !== "string" || !RUN_ID.test(id)) throw new Error("Invalid run id");
@@ -167,10 +185,8 @@ interface RunState {
 export function createRunStore(root: string, options: RunStoreOptions = {}): RunStore {
 	const cap = options.capBytes ?? RUN_CAP_BYTES;
 	const limit = Math.max(0, cap - RESERVE_BYTES);
-	const trash = options.trash ?? creerFichiers().trash;
-	// The trash lives NEXT TO the store (`<userData>/.trash/runs/`), never in
-	// it: `size()` must go down when runs are removed.
-	const trashRoot = path.dirname(root);
+	// Where an earlier version MOVED removed runs: purged, never written.
+	const oldTrash = path.join(path.dirname(root), ".trash", "runs");
 	const queues = new Map<string, Promise<void>>();
 	const states = new Map<string, RunState>();
 
@@ -230,6 +246,40 @@ export function createRunStore(root: string, options: RunStoreOptions = {}): Run
 		}
 		state.bytes += Buffer.byteLength(text, "utf-8");
 		state.torn = false;
+	}
+
+	/** The header line alone (not the whole run); `null` when unreadable. */
+	async function headerOf(runId: string): Promise<RunHeader | null> {
+		let h: fs.FileHandle;
+		try {
+			h = await fs.open(fileOf(runId), "r");
+		} catch {
+			return null;
+		}
+		try {
+			const buf = Buffer.alloc(HEADER_BYTES);
+			const { bytesRead } = await h.read(buf, 0, HEADER_BYTES, 0);
+			const text = buf.subarray(0, bytesRead).toString("utf-8");
+			const end = text.indexOf("\n");
+			return readHeader(parseLine(end < 0 ? text : text.slice(0, end)), runId);
+		} finally {
+			await h.close();
+		}
+	}
+
+	/** Deletes the runs an earlier version moved to `<userData>/.trash/runs/`
+	    whose id `which` names: run files only, by their exact name. */
+	async function purgeOldTrash(which: (runId: string) => boolean): Promise<void> {
+		let names: string[];
+		try {
+			names = await fs.readdir(oldTrash);
+		} catch {
+			return;
+		}
+		for (const n of names) {
+			const m = TRASHED_RUN.exec(n);
+			if (m && which(m[1])) await fs.rm(path.join(oldTrash, n), { force: true });
+		}
 	}
 
 	async function read(runId: string): Promise<RunRead | null> {
@@ -321,20 +371,37 @@ export function createRunStore(root: string, options: RunStoreOptions = {}): Run
 			return null;
 		},
 
-		async remove(runIds) {
+		async remove(runIds, chatId) {
 			if (!Array.isArray(runIds)) throw new Error("Invalid run id");
-			// Every id checked before the first move: a bad one moves nothing.
+			// Every id checked before the first deletion: a bad one deletes nothing.
 			for (const id of runIds) checkRunId(id);
-			await Promise.all(runIds.map(runId => enqueue(runId, async () => {
-				const file = fileOf(runId);
-				states.delete(runId);
-				try {
-					await fs.access(file);
-				} catch {
-					return;
+			const deleted = new Set<string>();
+			await Promise.all([...new Set(runIds)].map(runId => enqueue(runId, async () => {
+				if (chatId !== undefined) {
+					const header = await headerOf(runId);
+					if (header && header.chatId !== chatId) return;
 				}
-				await trash(file, trashRoot);
+				states.delete(runId);
+				await fs.rm(fileOf(runId), { force: true });
+				deleted.add(runId);
 			})));
+			await purgeOldTrash(id => deleted.has(id));
+		},
+
+		async removeAll(keep = new Set()) {
+			let names: string[];
+			try {
+				names = await fs.readdir(root);
+			} catch {
+				names = [];
+			}
+			await Promise.all(names.filter(n => RUN_FILE.test(n)).map(n => n.slice(0, -".jsonl".length)).filter(id => !keep.has(id)).map(runId => enqueue(runId, async () => {
+				states.delete(runId);
+				await fs.rm(fileOf(runId), { force: true });
+			})));
+			await purgeOldTrash(id => !keep.has(id));
+			// The old trash folder itself, once empty (never a non-empty one).
+			await fs.rmdir(oldTrash).catch(() => undefined);
 		},
 
 		async size() {

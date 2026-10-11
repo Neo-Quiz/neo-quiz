@@ -47,6 +47,16 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	const ko2 = R.recordRequest(R.groupLines([{ ...line(1, "echouee"), erreur: "boom" }])[0], dev, 5000);
 	r.check("the error of a failed request is kept", ko2.error, "boom");
 	r.check("a stopped line (arret) is a stopped request", R.recordRequest(g(line(1, "arret"))[0], dev, 5000).state, "stopped");
+	/* 2026-10-11: the place of a line's finished live turn is kept with its
+	   request, so its AI work is read back once the line left the queue. */
+	const RUN = "00000000-0000-4000-8000-000000000001";
+	const place = (l) => (l.id === 1 ? { runId: RUN, fromSeq: 3, toSeq: 8 } : l.id === 2 ? { runId: RUN, fromSeq: 9, toSeq: 12 } : null);
+	const avecTour = R.recordRequest(g(line(1, "prete", {}, quiz("A", "a.md")))[0], dev, 5000, undefined, place);
+	r.check("a live line's turn is kept with its request", avecTour.runs, [{ runId: RUN, fromSeq: 3, toSeq: 8 }]);
+	r.check("recorded again with a second turn (a plan's step): both kept, the first never lost",
+		R.recordRequest(g(line(2, "prete", {}, quiz("B", "b.md")))[0], dev, 6000, avecTour, place).runs, [{ runId: RUN, fromSeq: 3, toSeq: 8 }, { runId: RUN, fromSeq: 9, toSeq: 12 }]);
+	r.check("a line that never ran live: no runs", "runs" in R.recordRequest(g(line(3, "prete", {}, quiz("C", "c.md")))[0], dev, 5000, undefined, place), false);
+	r.check("reconcile passes the places on", R.reconcileChats([], g(line(1, "prete", {}, quiz("A", "a.md"))), dev, 5000, place).chats[0].requests[0].runs, [{ runId: RUN, fromSeq: 3, toSeq: 8 }]);
 	r.check("a plan line and its steps: one request, the plan as a text answer then the quizzes",
 		R.recordRequest(g(line(1, "prete", { planifier: true }, { titre: "", chemin: "", texte: "Plan: 2 quizzes" }), line(2, "prete", { planifier: false }, quiz("S1", "s1.md")), line(3, "prete", { planifier: false }, quiz("S2", "s2.md")))[0], dev, 5000).results.map(x => x.kind),
 		["text", "quiz", "quiz"]);

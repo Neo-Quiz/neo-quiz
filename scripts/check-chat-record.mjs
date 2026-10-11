@@ -104,6 +104,19 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	r.check("addRunId: an unknown chat is created, empty, with the run", C.addRunId([], "n", uuid(1), "d1", 9), [{ id: "n", origin: "d1", createdAt: 9, updatedAt: 9, requests: [], runIds: [uuid(1)] }]);
 	r.check("addRunId: never revives a deleted chat", C.addRunId([{ ...chat("a", 1), deleted: true, requests: [] }], "a", uuid(1), "d1", 9)[0].runIds, undefined);
 	r.check("addRunId: bounded to 500, the oldest dropped", C.addRunId([chat("a", 1, { runIds: many.slice(0, 500) })], "a", uuid(999), "d1", 9)[0].runIds.slice(-2), [uuid(499), uuid(999)]);
+	/* The AI work of a request (2026-10-11): where its live turns sit in their
+	   runs, so a chat reopened after a restart shows it again. Read from a
+	   synced file: a lowercase run id and two safe integers, from <= to. */
+	const reqR = (over) => ({ id: "q", at: 1, from: "d1", text: "t", mode: "learn", documents: [], results: [], state: "done", ...over });
+	const runsOf = (runs) => C.readChats({ v: 1, chats: [chat("a", 1, { requests: [reqR({ runs })] })] })[0].requests[0].runs;
+	r.check("request runs: round trip", runsOf([{ runId: uuid(1), fromSeq: 4, toSeq: 9 }]), [{ runId: uuid(1), fromSeq: 4, toSeq: 9 }]);
+	r.check("request runs: absent on an old request, and the request kept", [runsOf(undefined), C.readChats({ v: 1, chats: [chat("a", 1, { requests: [reqR({ runs: "x" })] })] })[0].requests.length], [undefined, 1]);
+	r.check("request runs: hostile turns dropped one by one (bad id, negative, reversed, not an integer, extra key not kept)",
+		runsOf([{ runId: "../x", fromSeq: 0, toSeq: 1 }, { runId: uuid(2), fromSeq: -1, toSeq: 1 }, { runId: uuid(2), fromSeq: 5, toSeq: 4 }, { runId: uuid(2), fromSeq: 1.5, toSeq: 4 }, { runId: uuid(2), fromSeq: 1, toSeq: 4, path: "C:/x" }, { runId: uuid(2), fromSeq: 1, toSeq: 9 }]),
+		[{ runId: uuid(2), fromSeq: 1, toSeq: 4 }]);
+	r.check("request runs: at most 20, the newest", (() => { const l = runsOf(Array.from({ length: 30 }, (_, i) => ({ runId: uuid(1), fromSeq: i, toSeq: i }))); return [l.length, l[0].fromSeq]; })(), [C.MAX_REQUEST_RUNS, 10]);
+	const sansRuns = C.withoutRuns([chat("a", 1, { runIds: [uuid(1)], requests: [reqR({ runs: [{ runId: uuid(1), fromSeq: 0, toSeq: 3 }] })] })]);
+	r.check("Delete all: no run id and no request run left, the rest untouched", [sansRuns[0].runIds, sansRuns[0].requests[0].runs, sansRuns[0].requests[0].text, sansRuns[0].updatedAt], [undefined, undefined, "t", 1]);
 	r.check("runIdsOf: a chat's runs, none for an unknown or deleted chat", [C.runIdsOf(avecRun, "a"), C.runIdsOf(avecRun, "zz"), C.runIdsOf([{ ...chat("a", 1), deleted: true, requests: [], runIds: [uuid(1)] }], "a")], [[uuid(7)], [], []]);
 	r.done();
 });

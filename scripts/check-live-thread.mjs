@@ -314,3 +314,46 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 	}
 	r.done();
 });
+
+/* THE AI WORK OF A RECORDED REQUEST (2026-10-11, `recordedTurn`): a chat
+   reopened after a restart shows what the AI did, read back from the run
+   store page by page (2000 events a page), cut to the request's own turn,
+   its prompt left out; a deleted run gives nothing. Before this, the store
+   was write-only for the user: no code read it back for a saved chat. */
+await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"], async (G, H) => {
+	const r = makeReporter("Recorded AI work, read back");
+	const RUN = "00000000-0000-4000-8000-0000000000bb";
+	const user = (text) => ({ type: "user", message: { role: "user", content: [{ type: "text", text }] } });
+	const events = [];
+	for (let i = 0; i < 2500; i++) events.push({ t: i, seq: i, dir: "out", l: { type: "system", subtype: "status" } });
+	events.push({ t: 1, seq: 2500, dir: "in", l: user("THE PROMPT") });
+	events.push({ t: 1, seq: 2501, dir: "out", l: { type: "assistant", message: { content: [{ type: "tool_use", id: "tu", name: "Read", input: { file_path: "cours/ch1.md" } }] } } });
+	events.push({ t: 1, seq: 2502, dir: "out", l: { type: "result", result: "[quiz]" } });
+	events.push({ t: 1, seq: 2503, dir: "in", l: user("next request") });
+	const pages = [];
+	H.installHost({
+		live: {
+			readRun: async (runId, page) => {
+				pages.push(page);
+				if (runId !== RUN) return null;
+				return { header: { runId }, events: events.slice(page.offset, page.offset + page.limit), interrupted: false, truncated: false, offset: page.offset, total: events.length, live: false };
+			},
+			toolOutput: async () => null,
+		},
+	});
+	try {
+		const thread = await G.recordedTurn({ runId: RUN, fromSeq: 2500, toSeq: 2502 });
+		r.check("the request's own turn, read across store pages, its prompt left out",
+			[thread?.items.map((i) => i.kind + ":" + (i.name ?? i.text)), pages.length, thread?.running], [["tool:Read"], 2, false]);
+		r.check("a run deleted meanwhile gives nothing", await G.recordedTurn({ runId: "00000000-0000-4000-8000-0000000000cc", fromSeq: 0, toSeq: 3 }), null);
+	} finally {
+		H.uninstallHost();
+	}
+	H.installHost({});
+	try {
+		r.check("a host without a run store (the phone) gives nothing", await G.recordedTurn({ runId: RUN, fromSeq: 0, toSeq: 3 }), null);
+	} finally {
+		H.uninstallHost();
+	}
+	r.done();
+});

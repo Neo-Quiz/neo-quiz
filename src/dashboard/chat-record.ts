@@ -22,6 +22,11 @@ export type ChatMode = "learn" | "practice";
 export interface ChatDocument { name: string; path?: string }
 export type ChatResult = { kind: "quiz"; title: string; path: string } | { kind: "text"; text: string };
 export type RequestState = "done" | "failed" | "stopped";
+/** Where a request's AI work sits in a live run (2026-10-11): its turn's
+    lines, from `fromSeq` to `toSeq`, in the run store of the PC that ran
+    it. Read back to show the work of a chat reopened after a restart, or
+    of a request whose line left the queue. */
+export interface ChatRun { runId: string; fromSeq: number; toSeq: number }
 
 /** The clarifying questions Generate asked under a vague request (spec
     2026-10-07-generate-auto-kind): the questions, and the answers once all are
@@ -57,6 +62,10 @@ export interface ChatRequest {
 	    synced file, so bounded (`readFolder`); the main process still judges
 	    any folder before an agent runs there. */
 	folder?: string;
+	/** The live turns of the request, oldest first (an "/exam" plan has
+	    several). Read from a synced file: a run id and two `seq` only,
+	    validated (`readRuns`); the main process reads them, never a path. */
+	runs?: ChatRun[];
 }
 
 export interface ChatRecord {
@@ -93,6 +102,39 @@ export function readRunIds(x: unknown): string[] | undefined {
 	if (!Array.isArray(x)) return undefined;
 	const out = [...new Set(x.filter(isRunId))].slice(-MAX_RUN_IDS);
 	return out.length ? out : undefined;
+}
+
+/** The most live turns a request keeps. */
+export const MAX_REQUEST_RUNS = 20;
+
+function readRun(x: unknown): ChatRun | null {
+	if (!isObj(x) || !isRunId(x.runId)) return null;
+	const { fromSeq, toSeq } = x;
+	if (!Number.isSafeInteger(fromSeq) || !Number.isSafeInteger(toSeq) || (fromSeq as number) < 0 || (toSeq as number) < (fromSeq as number)) return null;
+	return { runId: x.runId, fromSeq: fromSeq as number, toSeq: toSeq as number };
+}
+
+/** Valid turns, each once (same run and start), the newest
+    `MAX_REQUEST_RUNS`; `undefined` when none. */
+export function readRuns(x: unknown): ChatRun[] | undefined {
+	if (!Array.isArray(x)) return undefined;
+	const seen = new Set<string>();
+	const out: ChatRun[] = [];
+	for (const r of x.map(readRun)) {
+		if (!r || seen.has(r.runId + ":" + r.fromSeq)) continue;
+		seen.add(r.runId + ":" + r.fromSeq);
+		out.push(r);
+	}
+	return out.length ? out.slice(-MAX_REQUEST_RUNS) : undefined;
+}
+
+/** The chats once every run was deleted ("Delete all"): no run ids, no
+    request pointing into a run. Nothing else changes. */
+export function withoutRuns(chats: readonly ChatRecord[]): ChatRecord[] {
+	return chats.map(c => {
+		const { runIds: _ids, ...rest } = c;
+		return { ...rest, requests: c.requests.map(q => { const { runs: _runs, ...r } = q; return r; }) };
+	});
 }
 
 /** Bound of a stored provider / model / effort label. */
@@ -168,6 +210,8 @@ function readRequest(x: unknown): ChatRequest | null {
 	if (effort) req.effort = effort;
 	const folder = readFolder(x.folder);
 	if (folder) req.folder = folder;
+	const runs = readRuns(x.runs);
+	if (runs) req.runs = runs;
 	return req;
 }
 

@@ -240,13 +240,13 @@ await withSrcModule("apps/windows/electron/run-store.ts", async ({ createRunStor
 			], ["A\nB", "plain", "User declined tool execution.", "Failed to create unified exec process: helper_unknown_error: setup refresh had errors", null, null, null, null]);
 		});
 
-		await cas(r, "remove moves the runs to the trash and size goes down", async () => {
+		/* DELETING IS DELETING (2026-10-11): the runs hold the content of the
+		   user's files; "Delete all" and a deleted chat used to MOVE them to
+		   `<userData>/.trash/runs/`, never emptied, while the settings said
+		   "0 kB". */
+		await cas(r, "remove deletes the runs for real and size goes down", async () => {
 			const root = join(dir, "g", "runs");
-			const binDir = join(dir, "g-bin");
-			await mkdir(binDir, { recursive: true });
-			const calls = [];
-			const trash = async (abs, racine) => { calls.push([abs, racine]); await rename(abs, join(binDir, abs.split(/[\\/]/).pop())); };
-			const store = createRunStore(root, { trash });
+			const store = createRunStore(root);
 			r.check("size of a store that does not exist yet is 0", await store.size(), 0);
 			for (const n of [10, 11, 12]) {
 				await store.open(header(ID(n)));
@@ -256,21 +256,52 @@ await withSrcModule("apps/windows/electron/run-store.ts", async ({ createRunStor
 			const s10 = (await stat(join(root, ID(10) + ".jsonl"))).size;
 			await store.remove([ID(10), ID(11), ID(13)]); // 13 never existed: not an error
 			const after = await store.size();
-			r.check("remove moves the runs to the trash and size goes down", [
+			r.check("remove deletes the runs for real and size goes down", [
 				before > 3 * 500, after < before, before - after >= 2 * s10 - 10,
-				(await readdir(root)).sort(), (await readdir(binDir)).sort(), calls.length, calls.every(([, rc]) => rc === join(dir, "g")),
-				await store.read(ID(10)),
-			], [true, true, true, [ID(12) + ".jsonl"], [ID(10) + ".jsonl", ID(11) + ".jsonl"], 2, true, null]);
+				await tree(join(dir, "g")), await store.read(ID(10)),
+			], [true, true, true, ["runs", "runs/" + ID(12) + ".jsonl"], null]);
 		});
 
-		await cas(r, "the default trash is the main-process primitive, outside the store", async () => {
-			const root = join(dir, "h", "runs");
+		await cas(r, "remove with a chat id keeps a run whose header names another chat", async () => {
+			const root = join(dir, "g2", "runs");
 			const store = createRunStore(root);
-			await store.open(header(ID(14)));
-			await store.remove([ID(14)]);
-			r.check("the default trash is the main-process primitive, outside the store",
-				[await tree(join(dir, "h")), await store.size()],
-				[[".trash", ".trash/runs", ".trash/runs/" + ID(14) + ".jsonl", "runs"], 0]);
+			await store.open(header(ID(20)));
+			await store.open({ ...header(ID(21)), chatId: "other-chat" });
+			await store.remove([ID(20), ID(21)], "c1");
+			r.check("remove with a chat id keeps a run whose header names another chat", (await readdir(root)).sort(), [ID(21) + ".jsonl"]);
+		});
+
+		await cas(r, "leftovers of the old trash are purged: by remove for its ids, by removeAll for all", async () => {
+			const base = join(dir, "h");
+			const root = join(base, "runs");
+			const old = join(base, ".trash", "runs");
+			await mkdir(old, { recursive: true });
+			for (const n of [ID(30) + ".jsonl", ID(30) + "-2.jsonl", ID(31) + ".jsonl", "notes.txt"]) await writeFile(join(old, n), "x");
+			const store = createRunStore(root);
+			await store.remove([ID(30)]);
+			const afterRemove = (await readdir(old)).sort();
+			await store.removeAll();
+			r.check("leftovers of the old trash are purged: by remove for its ids, by removeAll for all",
+				[afterRemove, (await readdir(old)).sort()], [[ID(31) + ".jsonl", "notes.txt"].sort(), ["notes.txt"]]);
+			await rm(join(old, "notes.txt"));
+			await store.removeAll();
+			r.check("the emptied old trash folder goes too", await tree(base), [".trash"]);
+		});
+
+		await cas(r, "removeAll deletes every run file, known or not, keeps held runs and any other file", async () => {
+			const root = join(dir, "k", "runs");
+			const store = createRunStore(root);
+			for (const n of [40, 41, 42]) {
+				await store.open(header(ID(n)));
+				await store.append(ID(n), { dir: "out", l: "z" });
+			}
+			await writeFile(join(root, "readme.txt"), "not a run");
+			await writeFile(join(root, "A" + ID(43).slice(1) + ".jsonl"), "not a run name");
+			await store.removeAll(new Set([ID(42)]));
+			r.check("removeAll deletes every run file, known or not, keeps held runs and any other file",
+				[(await readdir(root)).sort(), await store.read(ID(40))], [[ID(42) + ".jsonl", "A" + ID(43).slice(1) + ".jsonl", "readme.txt"].sort(), null]);
+			await store.append(ID(42), { dir: "out", l: "still written" });
+			r.check("a held run is still written after removeAll", (await store.read(ID(42))).events.length, 2);
 		});
 
 		await cas(r, "a damaged header reads as null", async () => {

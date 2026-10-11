@@ -30,7 +30,7 @@ import type { LiveErrorCode, RunPage } from "../../../src/host/types";
 import { prepareCodexHome } from "./codex-home";
 import { createLiveManager, LiveError } from "./live-sessions";
 import type { LiveChild, LiveManager } from "./live-sessions";
-import { isRunId, MAX_PAGE_CHARS, validatePage } from "./live-session-rules";
+import { isRunId, isSafeId, MAX_PAGE_CHARS, validatePage } from "./live-session-rules";
 import { lancerVivant } from "./process";
 import { CANAUX } from "./pont";
 import type { EnveloppeLive } from "./pont";
@@ -175,13 +175,26 @@ export function enregistrerCanauxLive(deps: DependancesLive): LiveManager {
 	});
 	ipcMain.handle(CANAUX.runsSortie, async (e, runId: unknown, toolUseId: unknown): Promise<string | null> =>
 		lisible(e, runId) && typeof toolUseId === "string" ? store.toolOutput(runId, toolUseId) : null);
-	ipcMain.handle(CANAUX.runsSupprimer, (e, runIds: unknown): Promise<EnveloppeLive<null>> => {
-		if (!deps.depuisFenetrePrincipale(e) || !Array.isArray(runIds) || runIds.length > MAX_REMOVE || !runIds.every(id => lisible(e, id))) return refus();
+	ipcMain.handle(CANAUX.runsSupprimer, (e, runIds: unknown, chatId: unknown): Promise<EnveloppeLive<null>> => {
+		if (!deps.depuisFenetrePrincipale(e) || !Array.isArray(runIds) || runIds.length > MAX_REMOVE || !runIds.every(id => lisible(e, id)) || !isSafeId(chatId)) return refus();
 		const owner = suivre(e.sender);
 		return enveloppe((async () => {
 			// A run still running is stopped first: its process would write on.
 			for (const id of runIds as string[]) if (manager.holder(owner, id) === "own") await manager.close(owner, id);
-			await store.remove(runIds as string[]);
+			// Deleted for real (`run-store.ts`), and only the runs of THIS chat.
+			await store.remove(runIds as string[], chatId);
+			return null;
+		})());
+	});
+	/* "Delete all": every run file, known to a chat or not (a chat deleted on
+	   another device, ids past a chat's cap). This window's sessions are
+	   closed first; a run another window holds live is kept. */
+	ipcMain.handle(CANAUX.runsToutSupprimer, (e): Promise<EnveloppeLive<null>> => {
+		if (!deps.depuisFenetrePrincipale(e)) return refus();
+		const owner = suivre(e.sender);
+		return enveloppe((async () => {
+			await manager.closeOwn(owner);
+			await store.removeAll(manager.heldElsewhere(owner));
 			return null;
 		})());
 	});

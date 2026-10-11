@@ -47,7 +47,8 @@ export function createWindowsLive(pont: () => Pont): HostLive {
 		onEvent: cb => live().surEvenement(cb),
 		readRun: (runId, page) => live().lireRun(runId, page ? { offset: page.offset, limit: page.limit } : undefined),
 		toolOutput: (runId, toolUseId) => live().sortieOutil(runId, toolUseId),
-		async removeRuns(runIds) { valeur(await live().supprimerRuns([...runIds])); },
+		async removeRuns(runIds, chatId) { valeur(await live().supprimerRuns([...runIds], String(chatId))); },
+		async removeAllRuns() { valeur(await live().supprimerToutesRuns()); },
 		storeSize: () => live().tailleRuns(),
 	};
 }

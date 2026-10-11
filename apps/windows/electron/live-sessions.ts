@@ -363,6 +363,11 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			}
 		},
 
+		async closeOwn(owner) {
+			await Promise.all([...sessions.values()].filter(s => s.owner === owner).map(s => terminate(s)));
+		},
+		heldElsewhere: owner => new Set([...sessions.values()].filter(s => s.owner !== owner).map(s => s.runId)),
+
 		async killAll() {
 			for (const s of [...sessions.values()]) void terminate(s);
 			await Promise.all([...dying]);

@@ -96,6 +96,10 @@ export interface LiveManager {
 	holder(owner: number, runId: string): "own" | "other" | "none";
 	isLive(runId: string): boolean;
 	pageGone(owner: number, definitive: boolean): void;
+	/** Closes every session of this window (before "Delete all"). */
+	closeOwn(owner: number): Promise<void>;
+	/** The runs other windows hold in memory: never deleted under them. */
+	heldElsewhere(owner: number): Set<string>;
 	killAll(): Promise<void>;
 }
 

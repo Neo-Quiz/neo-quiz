@@ -45,8 +45,9 @@ import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 import { LEGACY_CHAT_ID } from "./chat-record";
+import type { ChatRun } from "./chat-record";
 import { UsageLimitError, resetFromRows } from "./usage-limit";
-import { answerLivePermission, liveToolOutput, liveTurnRunning, liveTurnView, onLiveTurn, sendDuringTurn } from "./live-generation";
+import { answerLivePermission, liveToolOutput, liveTurnPlace, liveTurnRunning, liveTurnView, onLiveTurn, sendDuringTurn } from "./live-generation";
 import type { LiveImage, LiveTurnView } from "./live-generation";
 import { transcriptOfThread } from "./live-turn";
 
@@ -196,6 +197,9 @@ export interface FileGenerationApp {
 	repondreVivant(id: number, requestId: string, allow: boolean): void;
 	/** The full output of one tool call of the line's live turn. */
 	sortieOutil(id: number, toolId: string): Promise<string | null>;
+	/** Where the line's finished live turn sits in its run, kept with its
+	    request in the chat record; `null` otherwise. */
+	placeTour(id: number): ChatRun | null;
 }
 
 let instance: FileGenerationApp | null = null;
@@ -684,6 +688,10 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		sortieOutil(id, toolId) {
 			const cle = cleDe(id);
 			return cle ? liveToolOutput(cle, toolId) : Promise.resolve(null);
+		},
+		placeTour(id) {
+			const cle = cleDe(id);
+			return cle ? liveTurnPlace(cle) : null;
 		},
 		abonnerTranscript(ecouteur) {
 			ecouteursTranscript.add(ecouteur);

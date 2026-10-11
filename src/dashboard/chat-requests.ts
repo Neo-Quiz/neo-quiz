@@ -11,10 +11,10 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { LigneGeneration } from "./file-generation-app";
-import type { ChatClarify, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, RequestState } from "./chat-record";
+import type { ChatClarify, ChatDocument, ChatMode, ChatRecord, ChatRequest, ChatResult, ChatRun, RequestState } from "./chat-record";
 import { absoluteInRoot } from "../shared-state/chat-merge";
 import type { RemoteRequest } from "../shared-state/remote-request";
-import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel, readFolder } from "./chat-record";
+import { LEGACY_CHAT_ID, deriveTitle, mergeResults, readLabel, readFolder, readRuns } from "./chat-record";
 
 export const isLive = (l: LigneGeneration): boolean => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement" || l.etat === "pause";
 export const isTerminal = (l: LigneGeneration): boolean => l.etat === "prete" || l.etat === "echouee" || l.etat === "arret";
@@ -79,8 +79,10 @@ function unionDocuments(old: readonly ChatDocument[], now: readonly ChatDocument
     `old` is what was recorded before: its time and author stay, its results
     are kept. A request with an answer in and a sibling still working is
     "stopped" until it ends (an interrupted one stays so: "running" is never
-    stored, it is read from the live queue). */
-export function recordRequest(g: RequestGroup, device: string, now: number, old?: ChatRequest): ChatRequest | null {
+    stored, it is read from the live queue). `runOf` gives the place of a
+    line's finished live turn in its run (`ChatRun`): kept with the request,
+    so its AI work can be read back once the line has left the queue. */
+export function recordRequest(g: RequestGroup, device: string, now: number, old?: ChatRequest, runOf?: (l: LigneGeneration) => ChatRun | null): ChatRequest | null {
 	const terminal = g.lines.filter(isTerminal);
 	if (terminal.length === 0) return null;
 	const first = g.lines[0].demande;
@@ -120,13 +122,16 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	if (folder) req.folder = folder;
 	const error = failed?.erreur ?? old?.error;
 	if (error && state === "failed") req.error = error;
+	// The AI work of its live turns: the ones recorded, plus the lines' own.
+	const runs = readRuns([...(old?.runs ?? []), ...(runOf ? g.lines.map(runOf).filter((x): x is ChatRun => !!x) : [])]);
+	if (runs) req.runs = runs;
 	return req;
 }
 
 /** The chats brought up to date from the queue. A group with nothing ended is
     skipped; a deleted chat is never revived; a request already recorded is
     only replaced when something changed (so `updatedAt` only moves then). */
-export function reconcileChats(chats: readonly ChatRecord[], groups: readonly RequestGroup[], device: string, now: number): { chats: ChatRecord[]; changed: boolean } {
+export function reconcileChats(chats: readonly ChatRecord[], groups: readonly RequestGroup[], device: string, now: number, runOf?: (l: LigneGeneration) => ChatRun | null): { chats: ChatRecord[]; changed: boolean } {
 	const list = [...chats];
 	let changed = false;
 	for (const g of groups) {
@@ -134,7 +139,7 @@ export function reconcileChats(chats: readonly ChatRecord[], groups: readonly Re
 		const prev = idx >= 0 ? list[idx] : null;
 		if (prev?.deleted) continue;
 		const old = prev?.requests.find(q => q.id === g.key);
-		const next = recordRequest(g, device, now, old);
+		const next = recordRequest(g, device, now, old, runOf);
 		if (!next) continue;
 		if (old && JSON.stringify(old) === JSON.stringify(next)) continue;
 		const requests = old ? prev!.requests.map(q => (q.id === g.key ? next : q)) : [...(prev?.requests ?? []), next].sort((a, b) => a.at - b.at);
