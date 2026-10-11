@@ -18,6 +18,7 @@
    store (the phone), shows no line.
 ══════════════════════════════════════════════════════════ */
 
+import { peindreCarteQuiz } from "./result-card";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
@@ -154,13 +155,13 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 			continue;
 		}
 		const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--prete");
-		const carte = ajouter(rep, "div", "qbd-ai-resultat");
-		host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
-		ajouter(ajouter(carte, "div", "qbd-ai-resultat-corps"), "div", "qbd-ai-resultat-titre", res.title);
+		/* The whole card opens the quiz; with no note to open, it is inert. */
 		if (canOpenCard(res.path)) {
-			const b = ajouter(carte, "button", "qbd-ai-reponse-action", t("ai.queue.open"));
-			b.type = "button";
-			b.addEventListener("click", () => deps.ouvrir(res.path));
+			peindreCarteQuiz(rep, { titre: res.title, chemin: res.path }, () => deps.ouvrir(res.path));
+		} else {
+			const carte = ajouter(rep, "div", "qbd-ai-resultat qbd-ai-resultat--inerte");
+			host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
+			ajouter(ajouter(carte, "span", "qbd-ai-resultat-corps"), "span", "qbd-ai-resultat-titre", res.title);
 		}
 	}
 	if (q.state === "failed" || q.state === "stopped") {

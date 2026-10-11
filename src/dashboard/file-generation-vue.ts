@@ -23,6 +23,7 @@
    quelqu'un qui relit plus haut n'est pas déplacé.
 ══════════════════════════════════════════════════════════ */
 
+import type { ModuleInfo } from "./quiz-modules";
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import * as aiProviders from "./ai-providers";
@@ -31,6 +32,8 @@ import type { ChatRecord } from "./chat-record";
 import { compterJetons, peindreEnAttente, peindrePieces, peindreProgressionDistante, peindreRelais, peindreTourEnregistre } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { peindreOrigine, refsOf } from "./request-origin-vue";
+import { peindreCarteQuiz } from "./result-card";
+import { libelleLectures } from "./question-count";
 import { chatDevice } from "./chat-session";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcReachable } from "./remote-send";
@@ -111,6 +114,8 @@ export function creerVueFile(opts: {
 	ouvrir: (chemin: string) => void;
 	/** Montre le quiz d'une ligne dont l'enregistrement a échoué, sans note. */
 	ouvrirSansEnregistrer: (ligne: LigneGeneration) => void;
+	/** The folder of a quiz note (its icon and colour, from the module map). Absent: the defaults. */
+	dossierDe?: (chemin: string) => Promise<ModuleInfo | null>;
 	/** Opens the preview of a document chip of a sent message (no attach). */
 	ouvrirPiece?: (n: { name: string; path?: string }) => void;
 	/** Copies a chat answer (the host's clipboard). */
@@ -328,20 +333,13 @@ export function creerVueFile(opts: {
 			return;
 		}
 		if (l.etat === "prete" && l.resultat) {
-			/* La carte du quiz : c'est un CONTENU, elle a donc sa tuile ; son
-			   action est un texte, pas un bouton encadré dans la carte. */
+			/* La carte du quiz : c'est un CONTENU, elle a donc sa tuile, et la
+			   carte entière est le bouton (result-card.ts). */
 			const r = l.resultat;
 			/* ONE PASS (2026-10-01): one card per quiz written, each with its own
 			   Open; the close button sits on the last one. */
-			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0 }];
-			quiz.forEach((q, i) => {
-				const carte = ajouter(rep, "div", "qbd-ai-resultat");
-				host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-icone"), "file-check-2");
-				const corps = ajouter(carte, "div", "qbd-ai-resultat-corps");
-				ajouter(corps, "div", "qbd-ai-resultat-titre", q.titre);
-				if (q.questions) ajouter(corps, "div", "qbd-ai-resultat-sous", t(q.questions === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: q.questions }));
-				bouton(carte, t("ai.queue.open"), () => opts.ouvrir(q.chemin));
-			});
+			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0, readings: r.readings ?? 0, mode: r.mode }];
+			for (const q of quiz) peindreCarteQuiz(rep, { titre: q.titre, chemin: q.chemin, comptes: { questions: q.questions, readings: q.readings ?? 0 }, mode: q.mode }, () => opts.ouvrir(q.chemin), opts.dossierDe);
 			return;
 		}
 		if (l.etat === "echouee") {
@@ -411,6 +409,7 @@ export function creerVueFile(opts: {
 		if (p.quiz !== null) parts.push(t("ai.transcript.progressQuizOf", { n: p.quiz, total: l.demande.notes.length }));
 		const total = l.demande.count;
 		parts.push(total ? t("ai.transcript.progressQuestionOf", { n: p.question, total }) : t("ai.transcript.progressQuestion", { n: p.question }));
+		if (p.readings > 0) parts.push(libelleLectures(p.readings));
 		parts.push(t(lignes === 1 ? "ai.transcript.progressLinesOne" : "ai.transcript.progressLinesOther", { count: lignes }));
 		/* The time left, from the pace of the questions already written (one
 		   pass over several documents has no single total: none shown). */

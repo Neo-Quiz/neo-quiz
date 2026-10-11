@@ -15,6 +15,7 @@
  * a changed or new row is rebuilt, and it keeps the expanded state of the
  * node it replaces. A thread that shrinks drops its tail.
  */
+import { libelleComptes } from "./question-count";
 import { refractor } from "refractor/core";
 import bash from "refractor/bash";
 import powershell from "refractor/powershell";
@@ -738,7 +739,7 @@ function quizRow(block: string, live: boolean): HTMLElement {
 	title.appendChild(el("span", "qbd-work-tool-name", live ? t("ai.work.quizWriting") : t("ai.work.quizWritten")));
 	head.appendChild(title);
 	wrap.appendChild(head);
-	const count = live ? (progress.question > 0 ? t("ai.work.quizQuestion", { n: progress.question }) : "") : t("ai.work.quizCount", { n: progress.question });
+	const count = live ? (progress.question > 0 ? t("ai.work.quizQuestion", { n: progress.question }) : "") : libelleComptes({ questions: progress.question, readings: progress.readings });
 	if (count) {
 		const line = el("div", "qbd-work-summary");
 		line.appendChild(el("span", "qbd-work-branch", "└"));

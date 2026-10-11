@@ -23,6 +23,7 @@
    l'écran.
 ══════════════════════════════════════════════════════════ */
 
+import { compterItems } from "./question-count";
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
@@ -134,11 +135,15 @@ export interface ResultatFile {
 	texte?: string;
 	/** How long the model worked on a prose answer, in ms. */
 	dureeMs?: number;
-	/** Le nombre de questions écrites, pour la carte de résultat. */
+	/** Le nombre de questions écrites, pour la carte de résultat (readings apart). */
 	questions?: number;
+	/** The reading cards (role "read"), counted apart from the questions. */
+	readings?: number;
+	/** Learn or Test, for the result card's meta line. */
+	mode?: ModeGeneration;
 	/** ONE PASS: the quizzes saved, one per document, listed on the line
 	    (`titre` then only counts them, `chemin` is the first one). */
-	quiz?: { titre: string; chemin: string; questions: number }[];
+	quiz?: { titre: string; chemin: string; questions: number; readings?: number; mode?: ModeGeneration }[];
 }
 
 /** L'étape d'une génération en cours, que la réponse affiche comme le texte
@@ -569,7 +574,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			return;
 		}
 		const titre = entree.title || entree.basename;
-		file = F.terminer(file, id, { titre, chemin: entree.path, questions: draft.questions.length });
+		file = F.terminer(file, id, { titre, chemin: entree.path, ...compterItems(draft.questions), mode: d.mode });
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 
@@ -589,7 +594,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			return;
 		}
 		const titre = t("ai.queue.lotSaved", { count: faits.length });
-		file = F.terminer(file, id, { titre, chemin: faits[0].chemin, questions: faits.reduce((n, f) => n + f.questions, 0), quiz: faits.map(f => ({ titre: f.titre, chemin: f.chemin, questions: f.questions })) });
+		file = F.terminer(file, id, { titre, chemin: faits[0].chemin, questions: faits.reduce((n, f) => n + f.questions, 0), readings: faits.reduce((n, f) => n + f.readings, 0), quiz: faits.map(f => ({ titre: f.titre, chemin: f.chemin, questions: f.questions, readings: f.readings, mode: d.mode })) });
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 

@@ -140,7 +140,7 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("a runaway stream is bounded and keeps its end", [t.text.length <= 200_000, t.text.endsWith("29")], [true, true]);
 
 	// PROGRESS: which question the model is at, read off partial JSON5.
-	const qp = (text, batch = false) => quizProgress(text, { batch });
+	const qp = (text, batch = false) => { const { readings, ...rest } = quizProgress(text, { batch }); return rest; };
 	r.check("progress: nothing written yet", qp(""), { quiz: null, question: 0 });
 	r.check("progress: prose with an apostrophe before the array is skipped", qp("Here's the quiz:\n[\n{ prompt: 'a' }").question, 1);
 	r.check("progress: unquoted keys, cut mid-object",

@@ -1,3 +1,4 @@
+import type { ModuleInfo } from "./quiz-modules";
 import JSON5 from "json5";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
@@ -258,6 +259,8 @@ export interface AiPageDeps {
 	settings: AiSettingsHost;
 	/** Pour indexer la note où le quiz vient d'être inséré, puis ouvrir sa page. */
 	scanner: Scanner;
+	/** The folder of a quiz note (its icon and colour, from the module map), for the result card. Absent: defaults. */
+	dossierDe?(chemin: string): Promise<ModuleInfo | null>;
 	statsStore: StatsStore;
 	navigate(view: DashboardViewName, data?: NavigateData): void;
 	/** The upcoming exams of every folder, for the "/exam" menu. Absent: an empty menu. */
@@ -430,6 +433,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			else host.ui.notice(t("ai.card.missing"));
 		},
 		ouvrirSansEnregistrer: (l) => ouvrirSansEnregistrer(l),
+		dossierDe: deps.dossierDe,
 		copier: deps.copyText,
 		chat: chatSurEcran,
 		attente: () => attenteGenre,

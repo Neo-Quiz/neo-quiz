@@ -479,6 +479,8 @@ export interface QuizProgress {
 	quiz: number | null;
 	/** Questions begun so far in that quiz (the current one included). */
 	question: number;
+	/** Reading cards (`role: "read"`) begun so far, counted apart. */
+	readings: number;
 }
 
 interface ScanFrame { object: boolean; counted: boolean; reading: boolean }
@@ -499,6 +501,7 @@ export function quizProgress(text: string, opts: { batch?: boolean } = {}): Quiz
 	const stack: ScanFrame[] = [];
 	let expectKey = false;
 	let questions = 0;
+	let readings = 0;
 	let docs = 0;
 	while (i < n) {
 		const c = text[i];
@@ -542,11 +545,14 @@ export function quizProgress(text: string, opts: { batch?: boolean } = {}): Quiz
 		if (!frame || !colon) continue;
 		if (key === "prompt" && !frame.counted && !frame.reading) { frame.counted = true; questions++; }
 		else if (key === "role" && /^\s*:\s*(["'])read\1/.test(text.slice(i, i + 40))) {
-			frame.reading = true;
-			if (frame.counted) { frame.counted = false; questions--; }
-		} else if (key === "document" && opts.batch) { docs++; questions = 0; }
+			if (!frame.reading) {
+				readings++;
+				frame.reading = true;
+				if (frame.counted) { frame.counted = false; questions--; }
+			}
+		} else if (key === "document" && opts.batch) { docs++; questions = 0; readings = 0; }
 	}
-	return { quiz: opts.batch && docs > 0 ? docs : null, question: Math.max(0, questions) };
+	return { quiz: opts.batch && docs > 0 ? docs : null, question: Math.max(0, questions), readings };
 }
 
 /**
