@@ -1,8 +1,8 @@
 {
-  "versionCode": 31,
-  "versionName": "0.2.29",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.29/NeoQuiz-0.2.29.apk",
-  "sha256": "a21cee10bdf912c8c332975739403922e205176688d7ecb9c0e9968e39f47332",
-  "size": 56054029,
-  "notes": "Choose the PC's Claude model from the composer."
+  "versionCode": 32,
+  "versionName": "0.2.30",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.30/NeoQuiz-0.2.30.apk",
+  "sha256": "94bf0dd86b16f4f79ee697f58ef62f56626f947775b5685d23747e8e279d13fa",
+  "size": 56138173,
+  "notes": "New model picker, live AI sessions and fixes"
 }
