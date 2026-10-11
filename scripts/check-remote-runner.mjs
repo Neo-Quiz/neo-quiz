@@ -28,6 +28,7 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	const dev = (device, name) => ({ device, name, kind: "laptop", claudeModels: [], updatedAt: 1 }), peer = (name, connected = true, paused = false) => ({ name, connected, paused });
 	r.check("preferred: the PC tapped by hand while it has a device file", S.preferredPc("pcB", [dev("pcA", "A"), dev("pcB", "B")]), "pcB");
 	r.check("preferred: a chosen PC with no device file is ignored (null, never the sole online PC)", [S.preferredPc("gone", [dev("pcA", "A")]), S.preferredPc(null, [dev("pcA", "A")])], [null, null]);
+	r.check("preferred: an older duplicate file of a machine targets its kept id (one entry per machine)", [S.preferredPc("pcA", [dev("pcA", "A"), { ...dev("pcA2", "A"), updatedAt: 9 }]), S.preferredPc("pcA2", [dev("pcA", "A"), { ...dev("pcA2", "A"), updatedAt: 9 }], S.activityOf([{ device: "pcA", file: { v: 1, at: 50, running: [] } }]))], ["pcA2", "pcA"]);
 	const gs = (device, at) => ({ device, file: { v: 1, at, running: [] } });
 	r.check("sole online PC never overrides a fresh chat origin", S.pickTarget({ origin: "pcA" }, [gs("pcA", NOW - 1000), gs("pcB", NOW - 500)], NOW, null, null, "pcB"), "pcA");
 	r.check("sole online PC never overrides the last PC seen fresh", S.pickTarget(null, [gs("pcA", NOW - 1000)], NOW, null, null, "pcB"), "pcA");

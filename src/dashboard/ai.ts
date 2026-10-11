@@ -45,7 +45,7 @@ import { threadItems, toursOfThread } from "./chat-thread";
 import { chosenPc, getDevices, getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
 import { soleOnlinePc } from "../shared-state/devices";
-import { pcReachable, pickTarget, preferredPc, refusPourTelephone } from "./remote-send";
+import { activityOf, pcReachable, pickTarget, preferredPc, refusPourTelephone } from "./remote-send";
 import { pasteAnswer, RelayRefused, startRelay } from "./relay-flow";
 import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
@@ -4202,13 +4202,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function pcJoignable(): boolean {
 		const now = Date.now();
 		const files = getRemoteGenerations();
-		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver(), preferredPc(chosenPc(), getDevices()), soleOnlinePc(getPairedPeers(), getDevices()));
+		const vus = activityOf(files);
+		const cible = pickTarget(chatSurEcran().record, files, now, lastPcEver(), preferredPc(chosenPc(), getDevices(), vus), soleOnlinePc(getPairedPeers(), getDevices(), vus));
 		return pcReachable(cible, files, now, getPeerConnected());
 	}
 
 	/** Phone: a request can be sent when a PC was ever seen (the chat's, else the last one). The request then waits for that PC. */
 	function pcConnu(): boolean {
-		return pickTarget(chatSurEcran().record, getRemoteGenerations(), Date.now(), lastPcEver(), preferredPc(chosenPc(), getDevices()), soleOnlinePc(getPairedPeers(), getDevices())) !== null;
+		const files = getRemoteGenerations();
+		const vus = activityOf(files);
+		return pickTarget(chatSurEcran().record, files, Date.now(), lastPcEver(), preferredPc(chosenPc(), getDevices(), vus), soleOnlinePc(getPairedPeers(), getDevices(), vus)) !== null;
 	}
 
 	/** The relay card for the chat on screen; null without a session or when the session belongs to another chat. */

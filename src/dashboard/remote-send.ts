@@ -5,8 +5,8 @@ export { latestDevice } from "../shared-state/generations";
 import type { GenerationsFile } from "../shared-state/generations";
 import { pendingState, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest } from "../shared-state/remote-request";
-import { deviceInfo } from "../shared-state/devices";
-import type { DeviceFile } from "../shared-state/devices";
+import { canonicalDevice, deviceInfo } from "../shared-state/devices";
+import type { DeviceActivity, DeviceFile } from "../shared-state/devices";
 import type { SettingRequest } from "../shared-state/remote-setting";
 import { MAX_AGE_MS } from "../shared-state/remote-request";
 import { relativeToRoot } from "../shared-state/chat-merge";
@@ -57,9 +57,14 @@ export function targetOf(chat: { origin: string } | null, files: ReadonlyArray<{
 	return pickTarget(chat, files, now, lastSeen, preferred, sole);
 }
 
-/** The PC the user chose by hand, while it still has a device file, else null. The name-matched sole online PC is NOT here: it is the last resort of `pickTarget`. */
-export function preferredPc(chosen: string | null, devices: ReadonlyArray<DeviceFile>): string | null {
-	return chosen ? deviceInfo(devices, chosen)?.device ?? null : null;
+/** The PC the user chose by hand, while it still has a device file, else null; an older duplicate file of a machine stands for its newest one (`canonicalDevice`). The name-matched sole online PC is NOT here: it is the last resort of `pickTarget`. */
+export function preferredPc(chosen: string | null, devices: ReadonlyArray<DeviceFile>, activity: ReadonlyArray<DeviceActivity> = []): string | null {
+	return canonicalDevice(devices, chosen, activity);
+}
+
+/** The PCs' last signs of life from their generations files, to tell duplicate device files of one machine apart (`uniqueDevices`). */
+export function activityOf(files: ReadonlyArray<{ device: string; file: GenerationsFile }>): DeviceActivity[] {
+	return files.map(f => ({ device: f.device, at: f.file.at }));
 }
 
 /** The model a request carries: the phone's choice, only while the target PC lists it (its device file); else none, and the PC uses its own default. */

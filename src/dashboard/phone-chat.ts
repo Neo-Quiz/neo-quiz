@@ -19,7 +19,8 @@ import { getChats } from "./chat-store";
 import { pcStatus } from "./pc-status";
 import type { PcStatus } from "./pc-status";
 import { chooseDevice, chosenPc, getDevices, getOwnRequests, getOwnSettings, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver, onRemoteGenerations, remoteModel, setRemoteModel } from "./remote-generations";
-import { deviceInfo, pcIcon, soleOnlinePc } from "../shared-state/devices";
+import { canonicalDevice, deviceInfo, pcIcon, soleOnlinePc, uniqueDevices } from "../shared-state/devices";
+import { activityOf } from "./remote-send";
 import { isStale } from "../shared-state/generations";
 import { openModelPicker } from "./ui-select";
 import { getMarque, setBrandLogo } from "./ai-providers";
@@ -180,16 +181,19 @@ function ouvrirFenetrePc(chat: () => ChatRecord | null): void {
 				const now = Date.now();
 				const files = getRemoteGenerations();
 				const devices = getDevices();
-				const seul = soleOnlinePc(getPairedPeers(), devices);
-				// The device files, plus the target itself when it only has a generations file (an older PC app).
-				const liste = devices.map(d => ({ id: d.device, name: d.name || t("ai.pc.fallbackName"), kind: d.kind }));
+				const vus = activityOf(files);
+				const seul = soleOnlinePc(getPairedPeers(), devices, vus);
+				// One entry per machine (duplicate files of isolated instances folded), plus the target itself when it only has a generations file (an older PC app).
+				const liste = uniqueDevices(devices, vus).map(d => ({ id: d.device, name: d.name || t("ai.pc.fallbackName"), kind: d.kind }));
 				if (s.device && !deviceInfo(devices, s.device)) liste.push({ id: s.device, name: s.name || t("ai.pc.fallbackName"), kind: "laptop" as const });
+				// A target on an older duplicate file is checked on its machine's entry.
+				const cible = canonicalDevice(devices, s.device, vus) ?? s.device;
 				if (liste.length === 0) {
 					ajouter(c, "p", "qbd-ai-pc-note", t("ai.pc.state.never"));
 					return;
 				}
 				for (const d of liste) {
-					const choisi = d.id === s.device;
+					const choisi = d.id === cible;
 					const f = files.find(x => x.device === d.id);
 					const tone = choisi ? s.tone : (f && !isStale(f.file, now)) || seul === d.id ? "ok" : "off";
 					const l = ajouter(c, "button", "qbd-ai-pc-device");

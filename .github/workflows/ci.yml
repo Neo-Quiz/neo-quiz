@@ -300,7 +300,8 @@ jobs:
         run: npm run check:generations
 
       # THE DEVICE FILES (synced folder): a PC publishes name, kind and Claude
-      # models only at start and on a content change; every reader is strict.
+      # models only at start and on a content change; every reader is strict;
+      # duplicate files of one machine (same name and kind) list as one entry.
       - name: Device files
         run: npm run check:devices
 

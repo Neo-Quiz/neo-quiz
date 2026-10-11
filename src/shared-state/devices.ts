@@ -94,17 +94,76 @@ export function deviceInfo(files: ReadonlyArray<DeviceFile>, device: string | nu
 	return files.find(f => f.device.toLowerCase() === device.toLowerCase()) ?? null;
 }
 
+/* ONE ENTRY PER MACHINE. A device id is per installation and per profile: an
+   isolated test instance of the PC app (its own user-data folder) gets a new
+   id and publishes its own file under the SAME computer name, so a phone
+   listed one PC nine times (2026-10-11). Files of the same name (trimmed,
+   case-folded) and kind are one machine, and the most recently updated
+   device stands for it: the later of its file's `updatedAt` and its last
+   sign of life in `activity` (its generations file's `at`). `updatedAt`
+   alone would let a test instance started once today win over the real PC,
+   whose file is only rewritten when its content changes. A tie goes to the
+   smaller id (never the read order). A file without a name is never merged. */
+
+type MachineFile = Pick<DeviceFile, "device" | "name" | "kind" | "updatedAt">;
+/** A device's last sign of life outside its device file (its generations file's `at`). */
+export interface DeviceActivity { device: string; at: number }
+
+const machineKey = (f: MachineFile): string => {
+	const name = f.name.trim().toLowerCase();
+	return name ? `name:${f.kind}:${name}` : `id:${f.device.toLowerCase()}`;
+};
+
+/** The ranking of each file: the later of its `updatedAt` and its device's activity. */
+function rankOf(activity: ReadonlyArray<DeviceActivity>): (f: MachineFile) => number {
+	const last = new Map<string, number>();
+	for (const a of activity) {
+		if (!Number.isFinite(a.at)) continue;
+		const id = a.device.toLowerCase();
+		last.set(id, Math.max(last.get(id) ?? -Infinity, a.at));
+	}
+	return f => Math.max(f.updatedAt, last.get(f.device.toLowerCase()) ?? -Infinity);
+}
+
+const newer = (rank: (f: MachineFile) => number, a: MachineFile, b: MachineFile): boolean =>
+	rank(a) !== rank(b) ? rank(a) > rank(b) : a.device.toLowerCase() < b.device.toLowerCase();
+
+/** One file per machine (same name and kind), the most recently updated one, in the order of the input. */
+export function uniqueDevices<T extends MachineFile>(files: ReadonlyArray<T>, activity: ReadonlyArray<DeviceActivity> = []): T[] {
+	const rank = rankOf(activity);
+	const best = new Map<string, T>();
+	for (const f of files) {
+		const key = machineKey(f);
+		const cur = best.get(key);
+		if (!cur || newer(rank, f, cur)) best.set(key, f);
+	}
+	const kept = new Set(best.values());
+	return files.filter(f => kept.has(f));
+}
+
+/** The device id that stands for `device`'s machine (see `uniqueDevices`): itself when it is the most recent of its machine, the most recent one otherwise; null when no file names it. */
+export function canonicalDevice(files: ReadonlyArray<MachineFile>, device: string | null, activity: ReadonlyArray<DeviceActivity> = []): string | null {
+	const own = device ? files.find(f => f.device.toLowerCase() === device.toLowerCase()) : undefined;
+	if (!own) return null;
+	const rank = rankOf(activity);
+	const key = machineKey(own);
+	let best = own;
+	for (const f of files) if (machineKey(f) === key && newer(rank, f, best)) best = f;
+	return best.device;
+}
+
 /** The icon of a PC from its `kind`: a laptop when unknown. */
 export function pcIcon(info: Pick<DeviceFile, "kind"> | null): "laptop" | "monitor" {
 	return info?.kind === "desktop" ? "monitor" : "laptop";
 }
 
 /** The only PC online by its paired-device link, as a device id, or null. The generations file and the Syncthing link name a PC differently (journal id vs Syncthing id), so the two are matched by NAME (the computer name both publish): exactly one connected, unpaused peer and exactly one device file of that name, else null (never a guess). */
-export function soleOnlinePc(peers: ReadonlyArray<{ name: string; connected: boolean; paused: boolean }>, files: ReadonlyArray<Pick<DeviceFile, "device" | "name">>): string | null {
+export function soleOnlinePc(peers: ReadonlyArray<{ name: string; connected: boolean; paused: boolean }>, files: ReadonlyArray<MachineFile>, activity: ReadonlyArray<DeviceActivity> = []): string | null {
 	const online = peers.filter(p => p.connected && !p.paused);
 	if (online.length !== 1) return null;
 	const name = online[0].name.trim().toLowerCase();
 	if (!name) return null;
-	const same = files.filter(f => f.name.trim().toLowerCase() === name);
+	// Duplicate files of one machine (see `uniqueDevices`) are one PC, not an ambiguity.
+	const same = uniqueDevices(files, activity).filter(f => f.name.trim().toLowerCase() === name);
 	return same.length === 1 ? same[0].device : null;
 }

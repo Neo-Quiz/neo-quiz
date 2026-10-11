@@ -82,5 +82,24 @@ await withSrcModule(["src/shared-state/devices.ts", "src/dashboard/device-publis
 	const status = provider => PS.pcStatus({ chat: null, files: [g], now: 1500, lastEver: PC, peerConnected: true, peers: [], chats: [], own: [], device: "ph", devices: [D.buildDevice({ device: PC, name: "Aero", kind: "laptop", models: [], provider }, 1)] });
 	r.check("a reachable PC whose provider is not Claude Code is red with that reason", [status("ollama").tone, status("ollama").reason], ["error", "notClaude"]);
 	r.check("Claude Code, or a file without provider: not red", [status("claude-code").reason, status(undefined).reason], ["ready", "ready"]);
+
+	// ONE ENTRY PER MACHINE: isolated test instances of the PC app publish new ids under the same computer name (the same PC listed 9 times on the phone, 2026-10-11).
+	const f = (device, name, kind, updatedAt) => ({ v: 1, device, name, kind, claudeModels: [], updatedAt });
+	const ids = list => list.map(x => x.device);
+	const dup = [f("a1", "Aero", "laptop", 10), f("a2", "aero ", "laptop", 30), f("a3", "AERO", "laptop", 20), f("d1", "Tower", "desktop", 5)];
+	r.check("same name (trimmed, any case) and kind: one entry, the most recently updated, in input order", ids(D.uniqueDevices(dup)), ["a2", "d1"]);
+	r.check("the same name with another kind is another machine", ids(D.uniqueDevices([f("x1", "Aero", "laptop", 1), f("x2", "Aero", "desktop", 2)])), ["x1", "x2"]);
+	r.check("files without a name are never merged", ids(D.uniqueDevices([f("n1", "", "laptop", 1), f("n2", "", "laptop", 2)])), ["n1", "n2"]);
+	r.check("a tie goes to the smaller id, whatever the read order", [ids(D.uniqueDevices([f("b2", "B", "laptop", 7), f("b1", "B", "laptop", 7)])), ids(D.uniqueDevices([f("b1", "B", "laptop", 7), f("b2", "B", "laptop", 7)]))], [["b1"], ["b1"]]);
+	// A test instance started once today has the newest updatedAt; the real PC, idle, only writes its generations file: its activity wins.
+	r.check("a fresher generations file outranks a newer device file", ids(D.uniqueDevices(dup, [{ device: "a1", at: 99 }])), ["a1", "d1"]);
+	r.check("activity matches ids case-insensitively, non-finite stamps are ignored", [ids(D.uniqueDevices(dup, [{ device: "A3", at: 50 }])), ids(D.uniqueDevices(dup, [{ device: "a1", at: Infinity }, { device: "a1", at: NaN }]))], [["a3", "d1"], ["a2", "d1"]]);
+	r.check("canonical: an older duplicate stands for its machine's kept id; the kept one for itself", [D.canonicalDevice(dup, "a1"), D.canonicalDevice(dup, "A3"), D.canonicalDevice(dup, "a2"), D.canonicalDevice(dup, "d1")], ["a2", "a2", "a2", "d1"]);
+	r.check("canonical: unknown or no device is null, never a guess", [D.canonicalDevice(dup, "zz"), D.canonicalDevice(dup, null)], [null, null]);
+	r.check("canonical follows the same activity ranking as the list", [D.canonicalDevice(dup, "a2", [{ device: "a1", at: 99 }]), ids(D.uniqueDevices(dup, [{ device: "a1", at: 99 }]))[0]], ["a1", "a1"]);
+	const on = [{ name: "Aero", connected: true, paused: false }];
+	r.check("sole online PC: duplicate files of one machine are one PC, not an ambiguity", [D.soleOnlinePc(on, dup), D.soleOnlinePc(on, dup, [{ device: "a3", at: 99 }])], ["a2", "a3"]);
+	r.check("sole online PC: two machines of that name (laptop and desktop) stay ambiguous", D.soleOnlinePc(on, [f("x1", "Aero", "laptop", 1), f("x2", "Aero", "desktop", 2)]), null);
+	r.check("the PC status targets the kept file when an older duplicate was chosen", PS.pcStatus({ chat: null, files: [], now: 1500, lastEver: null, peerConnected: false, peers: [], chats: [], own: [], device: "ph", devices: dup, chosen: "a1" }).device, "a2");
 	r.done();
 });
