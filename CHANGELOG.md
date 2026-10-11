@@ -13,6 +13,15 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The phone's model picker keeps its provider rail on the left and gains a "Search models" field above the list.
+
+### Fixed
+
+- The phone's model picker no longer closes right after the first tap on the pill.
+- The phone lists each PC once in "Choose a device", even when test copies of the app published it under new ids.
+
 ## [1.20.84] - 2026-10-11
 
 ### Added
