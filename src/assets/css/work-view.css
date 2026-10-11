@@ -1,0 +1,187 @@
+/* ══════════════════════════════════════════════════════════
+   THE FULL AI WORK VIEW (src/dashboard/work-view.ts)
+
+   Plain blocks on the page, no tile inside a tile: only the permission card
+   carries a border (its accent edge). Text wraps at any width (a 360 px
+   phone included), so no horizontal scrollbar appears; outputs and tool
+   input use the monospace font. No uppercase label anywhere.
+══════════════════════════════════════════════════════════ */
+
+.qbd-work {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+	color: var(--text-normal);
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.qbd-work-item {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.qbd-work-user {
+	align-self: flex-end;
+	max-width: 85%;
+	padding: 8px 12px;
+	border-radius: 12px;
+	background: var(--background-modifier-hover);
+	white-space: pre-wrap;
+}
+
+.qbd-work-text .qbd-work-body {
+	white-space: pre-wrap;
+}
+
+.qbd-work-thinking {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.qbd-work-label {
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+.qbd-work-body {
+	white-space: pre-wrap;
+}
+
+.qbd-work-notice {
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+.qbd-work-tool {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-left: 10px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+
+.qbd-work-tool-head {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.qbd-work-icon {
+	display: inline-flex;
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.qbd-work-tool-name {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.qbd-work-status {
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+.qbd-work-pre {
+	margin: 0;
+	padding: 6px 8px;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 17px;
+	color: var(--text-muted);
+	background: var(--code-background);
+	border-radius: 6px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	overflow-x: hidden;
+	scrollbar-width: none;
+}
+
+.qbd-work-input {
+	color: var(--text-normal);
+}
+
+.qbd-work-diff {
+	display: flex;
+	flex-direction: column;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 17px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.qbd-work-diff-add {
+	color: var(--text-success);
+}
+
+.qbd-work-diff-del {
+	color: var(--text-error);
+}
+
+.qbd-work-toggle {
+	align-self: flex-start;
+	padding: 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	font-size: 12px;
+	color: var(--interactive-accent);
+	cursor: pointer;
+}
+
+.qbd-work-toggle:hover {
+	text-decoration: underline;
+}
+
+.qbd-work-permission {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-left: 3px solid var(--interactive-accent);
+	border-radius: 8px;
+}
+
+.qbd-work-permission-title {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.qbd-work-permission-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.qbd-work-allow,
+.qbd-work-deny {
+	min-height: 32px;
+	padding: 4px 14px;
+	border-radius: 6px;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.qbd-work-allow {
+	border: none;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.qbd-work-deny {
+	border: 1px solid var(--background-modifier-border);
+	background: none;
+	color: var(--text-normal);
+}
+
+.qbd-work-allow:disabled,
+.qbd-work-deny:disabled {
+	opacity: 0.5;
+	cursor: default;
+}

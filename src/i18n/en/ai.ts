@@ -876,4 +876,14 @@ export const EN_AI = {
 	"ai.chat.new": "New conversation",
 	"ai.chat.closeMenu": "Close the menu",
 
+	/* ── Full work view of a live session (src/dashboard/work-view.ts) ── */
+	"ai.work.showAll": "Show all ({n} lines)",
+	"ai.work.showLess": "Show less",
+	"ai.work.allow": "Allow",
+	"ai.work.deny": "Deny",
+	"ai.work.permissionTitle": "{tool} wants to run",
+	"ai.work.interrupted": "Interrupted",
+	"ai.work.truncated": "The end of this run was not saved",
+	"ai.work.resumed": "Resumed",
+	"ai.work.thinking": "Thinking",
 } as const;

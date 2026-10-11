@@ -82,6 +82,7 @@ jobs:
       # sous `.quiz-code-output`, seulement comme texte (`textContent`).
       - name: Python run button output never interpreted
         run: npm run check:code-run
+        run: npm run check:work-view
 
       # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
       # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.

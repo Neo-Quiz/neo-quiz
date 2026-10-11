@@ -810,4 +810,14 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.chat.new": "Nouvelle conversation",
 	"ai.chat.closeMenu": "Fermer le menu",
 
+	/* ── Vue de travail complète d'une session live (src/dashboard/work-view.ts) ── */
+	"ai.work.showAll": "Tout afficher ({n} lignes)",
+	"ai.work.showLess": "Réduire",
+	"ai.work.allow": "Autoriser",
+	"ai.work.deny": "Refuser",
+	"ai.work.permissionTitle": "{tool} veut s'exécuter",
+	"ai.work.interrupted": "Interrompu",
+	"ai.work.truncated": "La fin de cette exécution n'a pas été enregistrée",
+	"ai.work.resumed": "Reprise",
+	"ai.work.thinking": "Réflexion",
 };
