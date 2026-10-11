@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.84] - 2026-10-11
+
 ### Added
 
 - Claude Code and Codex now run as live sessions: write while they work, approve their actions, and see everything they do, kept on this PC.
