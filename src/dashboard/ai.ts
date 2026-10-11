@@ -253,6 +253,8 @@ export interface AiUsageDeps {
     construit ce littéral sans greffon (`apps/windows/src/ui/dashboard-shell.ts`),
     le greffon le construit dans `src/dashboard.ts`. */
 export interface AiPageDeps {
+	/** Absolute path of a contract path inside the app's roots (null outside them). */
+	cheminAbsolu?(contrat: string): string | null;
 	settings: AiSettingsHost;
 	/** Pour indexer la note où le quiz vient d'être inséré, puis ouvrir sa page. */
 	scanner: Scanner;
@@ -434,6 +436,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		repondre: (id, reponses) => repondreQuestions(id, reponses),
 		reprenable: (id) => reprenable(id),
 		relais: () => relaisAffiche(),
+		racine: () => {
+			const h = currentHost();
+			return deps.cheminAbsolu?.(h.paths.contractPath(h.paths.defaultRoot().id, "")) ?? null;
+		},
+		ouvrirFichier: (absolu) => {
+			void currentHost().shell.openExternal(absolu).then(ok => {
+				if (!ok) currentHost().ui.notice(t("ai.preview.openFailed", { name: absolu.split("\\").pop() ?? absolu }));
+			});
+		},
 	});
 
 	/* ── La page en CONVERSATION (`conversation-mode.ts`) : elle suit la

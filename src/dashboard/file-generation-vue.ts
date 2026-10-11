@@ -126,6 +126,10 @@ export function creerVueFile(opts: {
 	reprenable?: (requestId: string) => boolean;
 	/** The request shared to an AI app (phone relay) waiting for its answer, for the chat on screen; shown last. */
 	relais?: () => RelaisVue | null;
+	/** The absolute Neo Quiz root, for the work view's relative paths (null when unknown). */
+	racine?: () => string | null;
+	/** Opens a file of the work view with its app (only inside the root). */
+	ouvrirFichier?: (absolu: string) => void;
 }): VueFile {
 	const host = currentHost();
 	let zone: HTMLElement | null = null;
@@ -478,6 +482,8 @@ export function creerVueFile(opts: {
 				renderThread(racine, vue.thread, {
 					loadOutput: toolId => opts.file.sortieOutil(l.id, toolId),
 					answer: (requestId, allow) => opts.file.repondreVivant(l.id, requestId, allow),
+					root: opts.racine?.() ?? undefined,
+					openFile: opts.ouvrirFichier,
 				});
 				let marche = corps.querySelector<HTMLElement>(":scope > .qbd-work-running");
 				if (vue.thread.running && !marche) {

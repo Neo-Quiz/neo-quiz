@@ -30,7 +30,7 @@ export interface ToolDiff { added: string[]; removed: string[] }
     or "resumed". The view maps each to its translated string with `t()`. */
 export type ThreadItem =
 	| { kind: "user"; text: string }
-	| { kind: "thinking"; text: string }
+	| { kind: "thinking"; text: string; tokens?: number }
 	| { kind: "text"; text: string }
 	| { kind: "tool"; id: string; name: string; input: string; preview: string; lines: number; status: ToolStatus; diff: ToolDiff | null }
 	| { kind: "permission"; requestId: string; tool: string; input: string; state: PermissionState }
@@ -159,6 +159,8 @@ function applyClaude(t: Thread, l: Rec, live: boolean): void {
 			return streamEvent(t, l.event);
 		case "assistant":
 			return assistantMessage(t, l.message);
+		case "system":
+			return thinkingTokens(t, l);
 		case "user":
 			return toolResults(t, l);
 		case "control_request": {
@@ -166,6 +168,20 @@ function applyClaude(t: Thread, l: Rec, live: boolean): void {
 			const id = str(l.request_id);
 			if (live || rq.subtype !== "can_use_tool" || id === undefined) return;
 			pushPermission(t, id, str(rq.tool_name) ?? "", rq.input);
+			return;
+		}
+	}
+}
+
+/** The reasoning's size while its text stays private (`system` /
+    `thinking_tokens`): kept on the last thinking item, never a new one. */
+function thinkingTokens(t: Thread, l: Rec): void {
+	const total = l.estimated_tokens;
+	if (str(l.subtype) !== "thinking_tokens" || typeof total !== "number" || !Number.isFinite(total) || total <= 0) return;
+	for (let i = t.items.length - 1; i >= 0; i--) {
+		const item = t.items[i];
+		if (item.kind === "thinking") {
+			item.tokens = Math.round(total);
 			return;
 		}
 	}

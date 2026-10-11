@@ -1,29 +1,75 @@
 /**
  * The full AI work view of a live session: draws a `Thread`
- * (src/dashboard/live-thread.ts) into a root element.
+ * (src/dashboard/live-thread.ts) into a root element, one row per tool call
+ * like Claude Code (`Read(lib\a.ts · lines 1-120)`, a `└` summary line),
+ * consecutive calls of one family folded into one row (MonoCode).
  *
  * Every string here comes from the CLI (model text, tool names, tool input,
  * tool output, permission requests): it is untrusted. Each one is written
  * with `textContent` and never with `innerHTML`, never through a sanitizer
- * gate. The check is `scripts/check-work-view.mjs`.
+ * gate. The command colours come from refractor's hast tree, rebuilt here
+ * node by node. The check is `scripts/check-work-view.mjs`.
  *
- * Re-rendering is keyed by item index: an item whose JSON is unchanged keeps
+ * Re-rendering is keyed by row index: a row whose JSON is unchanged keeps
  * its node (and whatever the user already expanded or answered in it); only
- * a changed or new item is rebuilt. A thread that shrinks drops its tail.
+ * a changed or new row is rebuilt, and it keeps the expanded state of the
+ * node it replaces. A thread that shrinks drops its tail.
  */
+import { refractor } from "refractor/core";
+import bash from "refractor/bash";
+import powershell from "refractor/powershell";
+import markup from "refractor/markup";
+import css from "refractor/css";
+import javascript from "refractor/javascript";
+import typescript from "refractor/typescript";
+import python from "refractor/python";
+import json from "refractor/json";
+import markdown from "refractor/markdown";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { PREVIEW_LINES, type Thread, type ThreadItem } from "./live-thread";
+
+refractor.register(bash);
+refractor.register(powershell);
+refractor.register(markup);
+refractor.register(css);
+refractor.register(javascript);
+refractor.register(typescript);
+refractor.register(python);
+refractor.register(json);
+refractor.register(markdown);
+
+/** File extension to grammar for the diff lines; an unknown extension stays plain text. */
+const DIFF_LANGUAGES = new Map<string, string>([
+	["md", "markdown"], ["markdown", "markdown"], ["html", "markup"], ["htm", "markup"], ["xml", "markup"], ["svg", "markup"],
+	["css", "css"], ["js", "javascript"], ["mjs", "javascript"], ["cjs", "javascript"], ["jsx", "javascript"],
+	["ts", "typescript"], ["tsx", "typescript"], ["py", "python"], ["json", "json"],
+]);
 
 export interface WorkViewDeps {
 	/** The full output of one tool call, fetched on demand (null if gone). */
 	loadOutput(toolId: string): Promise<string | null>;
 	/** A permission answer; sent once per request. */
 	answer(requestId: string, allow: boolean): void;
+	/** The absolute Neo Quiz root (Windows path). Paths inside it are shown relative to it. */
+	root?: string;
+	/** Opens a file with the app that owns it. Only called with an absolute path inside `root`. */
+	openFile?(absPath: string): void;
 }
 
-/** The signature of the item each node was built from, to skip unchanged ones. */
+type ToolItem = Extract<ThreadItem, { kind: "tool" }>;
+type ThinkingItem = Extract<ThreadItem, { kind: "thinking" }>;
+type Family = "read" | "run" | "search";
+type Entry = { kind: "item"; item: ThreadItem } | { kind: "group"; family: Family; items: ToolItem[] };
+/** A title segment: plain text, or a path (clickable when it is a file in the root). */
+type Segment = string | { path: string; file: boolean };
+
+/** The signature of the row each node was built from, to skip unchanged ones. */
 const SIGNATURE = new WeakMap<HTMLElement, string>();
+/** When each live thinking row started (ms), carried over to its rebuilt node. */
+const SINCE = new WeakMap<HTMLElement, number>();
+/** The one timer that refreshes the elapsed counter of a running thread. */
+const TICKERS = new WeakMap<HTMLElement, ReturnType<typeof setInterval>>();
 
 const NOTICE_KEYS: Record<string, "ai.work.interrupted" | "ai.work.truncated" | "ai.work.resumed"> = {
 	interrupted: "ai.work.interrupted",
@@ -31,41 +77,83 @@ const NOTICE_KEYS: Record<string, "ai.work.interrupted" | "ai.work.truncated" | 
 	resumed: "ai.work.resumed",
 };
 
-const STATUS_ICONS: Record<string, string> = {
-	running: "loader",
-	ok: "check",
-	error: "circle-alert",
-	refused: "ban",
-};
+/** Token colours of the app's code blocks (quiz-card.css, `--qmc-*`), applied to a command. */
+const COMMAND_LIMIT = 20000;
+const TITLE_LIMIT = 80;
+const COMMAND_LANGUAGES: Record<string, string> = { Bash: "bash", commandExecution: "bash", PowerShell: "powershell" };
+
+interface HastNode { type: string; value?: string; children?: HastNode[]; properties?: { className?: unknown } }
 
 export function renderThread(root: HTMLElement, thread: Thread, deps: WorkViewDeps): void {
 	root.classList.add("qbd-work");
-	thread.items.forEach((item, i) => {
-		const signature = JSON.stringify(item);
+	const entries = groupItems(thread.items);
+	const last = entries.length - 1;
+	// A permission waiting for an answer: its command row opens to show what is approved.
+	const awaiting = thread.items.some(i => i.kind === "permission" && i.state === "pending");
+	entries.forEach((entry, i) => {
+		const live = thread.running && i === last;
+		const signature = (live ? "1" : "0") + (awaiting ? "1" : "0") + JSON.stringify(entry.kind === "item" ? entry.item : entry.items);
 		const current = root.children.item(i) as HTMLElement | null;
 		if (current && SIGNATURE.get(current) === signature) return;
-		const fresh = buildItem(item, deps);
+		const fresh = buildEntry(entry, current ?? undefined, deps, live, awaiting);
 		SIGNATURE.set(fresh, signature);
 		if (current) root.replaceChild(fresh, current);
 		else root.appendChild(fresh);
 	});
-	while (root.children.length > thread.items.length) {
+	while (root.children.length > entries.length) {
 		root.removeChild(root.lastElementChild as Element);
 	}
+	const liveThinking = thread.running && last >= 0 && entries[last].kind === "item" && (entries[last] as { item: ThreadItem }).item.kind === "thinking";
+	syncTicker(root, liveThinking);
 }
 
-function buildItem(item: ThreadItem, deps: WorkViewDeps): HTMLElement {
+// --- Grouping -------------------------------------------------------------------
+
+/** Consecutive calls of one family fold into one row. Only a call that finished
+    OK is folded: a running, failed or refused call stays a row of its own, so
+    it is never hidden inside a collapsed group. */
+function groupItems(items: ThreadItem[]): Entry[] {
+	const out: Entry[] = [];
+	for (const item of items) {
+		const family = item.kind === "tool" && item.status === "ok" ? familyOf(item) : null;
+		const prev = out[out.length - 1];
+		if (family && prev?.kind === "group" && prev.family === family) {
+			prev.items.push(item as ToolItem);
+		} else if (family && prev?.kind === "item" && prev.item.kind === "tool" && prev.item.status === "ok" && familyOf(prev.item) === family) {
+			out[out.length - 1] = { kind: "group", family, items: [prev.item, item as ToolItem] };
+		} else {
+			out.push({ kind: "item", item });
+		}
+	}
+	return out;
+}
+
+function familyOf(item: ToolItem): Family | null {
+	if (item.name === "Read") return "read";
+	if (item.name === "Bash" || item.name === "PowerShell" || item.name === "commandExecution") return "run";
+	if (item.name === "Grep" || item.name === "Glob") return "search";
+	return null;
+}
+
+// --- Rows -----------------------------------------------------------------------
+
+function buildEntry(entry: Entry, prev: HTMLElement | undefined, deps: WorkViewDeps, live: boolean, awaiting: boolean): HTMLElement {
+	if (entry.kind === "group") return groupBlock(entry.family, entry.items, deps, prev);
+	return buildItem(entry.item, deps, live, prev, awaiting);
+}
+
+function buildItem(item: ThreadItem, deps: WorkViewDeps, live: boolean, prev: HTMLElement | undefined, awaiting: boolean): HTMLElement {
 	switch (item.kind) {
 		case "user":
 			return textBlock("qbd-work-item qbd-work-user", item.text);
 		case "text":
 			return textBlock("qbd-work-item qbd-work-text", item.text);
 		case "thinking":
-			return thinkingBlock(item.text);
+			return thinkingBlock(item, live, prev);
 		case "notice":
 			return noticeBlock(item.text);
 		case "tool":
-			return toolBlock(item, deps);
+			return toolBlock(item, deps, prev, awaiting);
 		case "permission":
 			return permissionBlock(item, deps);
 	}
@@ -84,11 +172,54 @@ function textBlock(className: string, text: string): HTMLElement {
 	return block;
 }
 
-function thinkingBlock(text: string): HTMLElement {
+function thinkingBlock(item: ThinkingItem, live: boolean, prev: HTMLElement | undefined): HTMLElement {
 	const block = el("div", "qbd-work-item qbd-work-thinking");
-	block.appendChild(el("div", "qbd-work-label", t("ai.work.thinking")));
-	block.appendChild(el("div", "qbd-work-body", text));
+	const since = prev && SINCE.has(prev) ? (SINCE.get(prev) as number) : Date.now();
+	SINCE.set(block, since);
+	const label = el("div", "qbd-work-label");
+	label.appendChild(el("span", live ? "qbd-work-thinking-label is-live" : "qbd-work-thinking-label", t("ai.work.thinking")));
+	label.appendChild(el("span", "qbd-work-sep", " · "));
+	const elapsed = el("span", "qbd-work-elapsed", formatElapsed(Date.now() - since));
+	elapsed.setAttribute("data-since", String(since));
+	label.appendChild(elapsed);
+	if (item.tokens) {
+		label.appendChild(el("span", "qbd-work-sep", " · "));
+		label.appendChild(el("span", "qbd-work-tokens", t("ai.work.thinkingTokens", { n: item.tokens })));
+	}
+	block.appendChild(label);
+	if (item.text) block.appendChild(el("div", "qbd-work-body", item.text));
 	return block;
+}
+
+function formatElapsed(ms: number): string {
+	const s = Math.max(0, Math.floor(ms / 1000));
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Refreshes the elapsed counter of a live thinking row once a second; the
+    timer stops when the thread is no longer running or its root is detached. */
+function syncTicker(root: HTMLElement, live: boolean): void {
+	const timer = TICKERS.get(root);
+	if (live && timer === undefined) {
+		const id = setInterval(() => tick(root, id), 1000);
+		TICKERS.set(root, id);
+	} else if (!live && timer !== undefined) {
+		clearInterval(timer);
+		TICKERS.delete(root);
+	}
+}
+
+function tick(root: HTMLElement, id: ReturnType<typeof setInterval>): void {
+	if (root.isConnected === false) {
+		clearInterval(id);
+		TICKERS.delete(root);
+		return;
+	}
+	const now = Date.now();
+	root.querySelectorAll(".qbd-work-elapsed").forEach(node => {
+		const since = Number(node.getAttribute("data-since"));
+		if (Number.isFinite(since)) node.textContent = formatElapsed(now - since);
+	});
 }
 
 function noticeBlock(text: string): HTMLElement {
@@ -98,66 +229,372 @@ function noticeBlock(text: string): HTMLElement {
 	return el("div", "qbd-work-item qbd-work-notice", key ? t(key) : text);
 }
 
+function groupBlock(family: Family, items: ToolItem[], deps: WorkViewDeps, prev: HTMLElement | undefined): HTMLElement {
+	const block = el("div", "qbd-work-item qbd-work-group");
+	const count = items.length;
+	const title = family === "read" ? "ai.work.groupRead" : family === "run" ? "ai.work.groupRun" : "ai.work.groupSearch";
+	const head = el("div", "qbd-work-group-head");
+	head.appendChild(el("span", "qbd-work-group-title", t(title, { count })));
+	head.appendChild(chevron());
+	const body = el("div", "qbd-work-group-body");
+	const prevBody = prev?.children.item(1) as HTMLElement | null | undefined;
+	items.forEach((item, i) => body.appendChild(toolBlock(item, deps, prevBody?.children.item(i) as HTMLElement | undefined, false)));
+	const open = prev ? prev.classList.contains("is-open") : false;
+	setOpen(block, body, open);
+	expandable(head, block, body);
+	block.appendChild(head);
+	block.appendChild(body);
+	return block;
+}
+
+/** Makes a head row open its body on click or Enter/Space, with the chevron that shows it. */
+function expandable(head: HTMLElement, block: HTMLElement, body: HTMLElement): void {
+	head.classList.add("is-expandable");
+	if (!head.querySelector(".qbd-work-chevron")) head.appendChild(chevron());
+	toggleOn(head, () => setOpen(block, body, !block.classList.contains("is-open")));
+}
+
+/** A Lucide chevron; CSS turns it when its row is open. */
+function chevron(): HTMLElement {
+	const node = el("span", "qbd-work-chevron");
+	currentHost().ui.setIcon(node, "chevron-right");
+	return node;
+}
+
+function setOpen(block: HTMLElement, body: HTMLElement, open: boolean): void {
+	body.hidden = !open;
+	if (open) block.classList.add("is-open");
+	else block.classList.remove("is-open");
+}
+
+/** A row that opens and closes on a click or on Enter/Space. */
+function toggleOn(trigger: HTMLElement, onToggle: () => void): void {
+	trigger.tabIndex = 0;
+	trigger.setAttribute("role", "button");
+	trigger.addEventListener("click", onToggle);
+	trigger.addEventListener("keydown", (e: KeyboardEvent) => {
+		if (e.key === "Enter" || e.key === " ") {
+			e.preventDefault();
+			onToggle();
+		}
+	});
+}
+
 function monoPre(text: string, className = "qbd-work-pre"): HTMLPreElement {
 	return el("pre", className, text);
 }
 
-function toolBlock(item: Extract<ThreadItem, { kind: "tool" }>, deps: WorkViewDeps): HTMLElement {
+// --- Tool calls -----------------------------------------------------------------
+
+/** Collapsed by default, Bash included: the title and the `└` line show it.
+    The one exception is a running command whose permission is still asked:
+    it opens, so the owner sees the command he approves. A row the user
+    already opened or closed keeps that state. */
+function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undefined, awaiting: boolean): HTMLElement {
+	const isRun = familyOf(item) === "run";
 	const block = el("div", "qbd-work-item qbd-work-tool");
+	const open = prev ? prev.classList.contains("is-open") : awaiting && isRun && item.status === "running";
+
 	const head = el("div", "qbd-work-tool-head");
-	const icon = el("span", "qbd-work-icon");
-	const iconName = STATUS_ICONS[item.status];
-	if (iconName) currentHost().ui.setIcon(icon, iconName);
-	head.appendChild(icon);
-	head.appendChild(el("span", "qbd-work-tool-name", item.name));
-	if (item.status === "running") head.appendChild(el("span", "qbd-work-status", t("ai.transcript.stepRunning")));
-	if (item.status === "refused") head.appendChild(el("span", "qbd-work-status", t("ai.transcript.stepRefusedBare")));
-	if (item.status === "error") head.appendChild(el("span", "qbd-work-status", t("ai.transcript.stepErrorBare")));
+	head.appendChild(statusIcon(item));
+	const title = el("span", "qbd-work-title");
+	appendTitle(title, item, deps);
+	head.appendChild(title);
 	block.appendChild(head);
 
-	if (item.input) block.appendChild(monoPre(item.input, "qbd-work-pre qbd-work-input"));
+	const summary = summaryNode(item);
+	if (summary) block.appendChild(summary);
 
-	if (item.diff) {
-		const diff = el("div", "qbd-work-diff");
-		for (const line of item.diff.removed) diff.appendChild(el("div", "qbd-work-diff-del", "- " + line));
-		for (const line of item.diff.added) diff.appendChild(el("div", "qbd-work-diff-add", "+ " + line));
-		block.appendChild(diff);
-	}
-
-	if (item.preview) block.appendChild(monoPre(item.preview));
-
-	if (item.lines > PREVIEW_LINES) {
-		const full = monoPre("", "qbd-work-pre qbd-work-full");
-		full.hidden = true;
-		block.appendChild(full);
-		const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: item.lines }));
-		toggle.type = "button";
-		let loaded = false;
-		let loading = false;
-		toggle.addEventListener("click", () => {
-			if (loaded) {
-				const open = full.hidden;
-				full.hidden = !open;
-				toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: item.lines });
-				return;
-			}
-			if (loading) return;
-			loading = true;
-			deps.loadOutput(item.id).then(output => {
-				loading = false;
-				if (output === null) return;
-				loaded = true;
-				full.textContent = output;
-				full.hidden = false;
-				toggle.textContent = t("ai.work.showLess");
-			}, () => {
-				loading = false;
-			});
-		});
-		block.appendChild(toggle);
-	}
+	const body = el("div", "qbd-work-tool-body");
+	if (isRun && item.input) body.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
+	if (item.diff) body.appendChild(diffNode(item, item.diff));
+	const output = outputNode(item, deps);
+	if (output) body.appendChild(output);
+	setOpen(block, body, open);
+	if (body.childNodes.length > 0) expandable(head, block, body);
+	block.appendChild(body);
 	return block;
 }
+
+function statusIcon(item: ToolItem): HTMLElement {
+	const icon = el("span", "qbd-work-icon");
+	if (item.status === "running") {
+		icon.classList.add("is-running");
+		currentHost().ui.setIcon(icon, "loader");
+	} else if (item.status === "ok") {
+		// A muted dash, drawn by CSS: no glyph, no icon.
+		icon.classList.add("is-ok");
+	} else {
+		icon.classList.add("is-error");
+		currentHost().ui.setIcon(icon, "x");
+	}
+	return icon;
+}
+
+const BASH_VERBS = new Set(["Bash", "PowerShell", "commandExecution"]);
+
+/** The title: `Name(args)`, with the args Claude Code shows for each tool. */
+function titleSegments(item: ToolItem, deps: WorkViewDeps): { verb: string; args: Segment[] } {
+	if (item.name === "fileChange") {
+		const paths = item.input.split("\n").filter(p => p !== "");
+		return { verb: t("ai.work.verbEdit"), args: joinSegments(paths.map(p => ({ path: p, file: true }))) };
+	}
+	if (BASH_VERBS.has(item.name)) {
+		return { verb: item.name === "PowerShell" ? "PowerShell" : "Bash", args: [ellipsize(firstLine(item.input), TITLE_LIMIT)] };
+	}
+	const input = parseInput(item.input);
+	switch (item.name) {
+		case "Read": {
+			const path = str(input.file_path) || str(input.path);
+			const args: Segment[] = [{ path, file: true }];
+			const range = lineRange(input.offset, input.limit);
+			if (range) args.push(" · " + range);
+			return { verb: t("ai.work.verbRead"), args };
+		}
+		case "Write":
+			return { verb: t("ai.work.verbWrite"), args: [{ path: str(input.file_path), file: true }] };
+		case "Edit":
+		case "MultiEdit":
+			return { verb: t("ai.work.verbEdit"), args: [{ path: str(input.file_path), file: true }] };
+		case "Grep": {
+			const args: Segment[] = [`"${ellipsize(str(input.pattern), TITLE_LIMIT)}"`];
+			const path = str(input.path);
+			if (path) args.push(t("ai.work.inPath"), { path, file: false });
+			return { verb: t("ai.work.verbSearch"), args };
+		}
+		case "Glob":
+			return { verb: t("ai.work.verbFind"), args: [ellipsize(str(input.pattern), TITLE_LIMIT)] };
+		case "WebFetch":
+			return { verb: t("ai.work.verbFetch"), args: [ellipsize(str(input.url), TITLE_LIMIT)] };
+		case "WebSearch":
+			return { verb: t("ai.work.verbWebSearch"), args: [`"${ellipsize(str(input.query), TITLE_LIMIT)}"`] };
+	}
+	void deps;
+	const short = ellipsize(item.input.replace(/\s+/g, " ").trim(), TITLE_LIMIT);
+	return { verb: item.name, args: short ? [short] : [] };
+}
+
+function appendTitle(node: HTMLElement, item: ToolItem, deps: WorkViewDeps): void {
+	const { verb, args } = titleSegments(item, deps);
+	node.appendChild(el("span", "qbd-work-tool-name", verb));
+	if (args.length === 0) return;
+	node.appendChild(document.createTextNode("("));
+	for (const seg of args) {
+		if (typeof seg === "string") node.appendChild(document.createTextNode(seg));
+		else node.appendChild(pathNode(seg, deps));
+	}
+	node.appendChild(document.createTextNode(")"));
+}
+
+function joinSegments(paths: Segment[]): Segment[] {
+	const out: Segment[] = [];
+	paths.forEach((p, i) => {
+		if (i > 0) out.push(", ");
+		out.push(p);
+	});
+	return out;
+}
+
+/** A path inside the root is shown relative to it, with Windows backslashes.
+    It is clickable only for a file, inside the root, and when the view has `openFile`. */
+function pathNode(seg: { path: string; file: boolean }, deps: WorkViewDeps): HTMLElement {
+	const absolute = toWindows(seg.path);
+	const rel = relativeToRoot(absolute, deps.root);
+	if (seg.file && rel !== null && deps.openFile) {
+		const link = el("span", "qbd-work-path is-link", rel);
+		const open = () => deps.openFile?.(absolute);
+		link.tabIndex = 0;
+		link.setAttribute("role", "link");
+		link.addEventListener("click", e => {
+			e.stopPropagation();
+			open();
+		});
+		link.addEventListener("keydown", (e: KeyboardEvent) => {
+			if (e.key === "Enter") {
+				e.stopPropagation();
+				open();
+			}
+		});
+		return link;
+	}
+	return el("span", "qbd-work-path", rel ?? absolute);
+}
+
+/** The path relative to the root, or null when it is outside it (or not absolute). */
+function relativeToRoot(absolute: string, root: string | undefined): string | null {
+	const r = root ? toWindows(root) : "";
+	if (!r || !/^[a-zA-Z]:\\/.test(absolute) || absolute.split("\\").includes("..")) return null;
+	if (absolute.toLowerCase().startsWith(r.toLowerCase() + "\\")) return absolute.slice(r.length + 1);
+	return null;
+}
+
+function toWindows(p: string): string {
+	return p.replace(/\//g, "\\").replace(/\\+$/, "");
+}
+
+function lineRange(offset: unknown, limit: unknown): string {
+	const from = numOf(offset);
+	const count = numOf(limit);
+	if (count !== undefined) return t("ai.work.lineRange", { from: from ?? 1, to: (from ?? 1) + count - 1 });
+	if (from !== undefined) return t("ai.work.lineFrom", { from });
+	return "";
+}
+
+/** The `└` line under a title: the change, the size of the output, or the error. */
+function summaryNode(item: ToolItem): HTMLElement | null {
+	const s = summaryOf(item);
+	if (!s) return null;
+	const line = el("div", s.error ? "qbd-work-summary is-error" : "qbd-work-summary");
+	line.appendChild(el("span", "qbd-work-branch", "└"));
+	line.appendChild(el("span", "qbd-work-summary-text", s.text));
+	return line;
+}
+
+function summaryOf(item: ToolItem): { text: string; error: boolean } | null {
+	if (item.status === "running") return null;
+	if (item.status === "refused") return { text: t("ai.transcript.stepRefusedBare"), error: true };
+	if (item.status === "error") return { text: firstLine(item.preview) || t("ai.transcript.stepErrorBare"), error: true };
+	if (item.diff && item.diff.added.length + item.diff.removed.length > 0) {
+		const added = item.diff.added.length;
+		if (item.name === "Write") return { text: t("ai.work.wrote", { count: added }), error: false };
+		return { text: t("ai.work.editCounts", { added, removed: item.diff.removed.length }), error: false };
+	}
+	const n = item.lines;
+	if (n === 0) return null;
+	if (item.name === "Read") return { text: n === 1 ? t("ai.work.sumReadOne") : t("ai.work.sumReadOther", { count: n }), error: false };
+	if (item.name === "Glob") return { text: n === 1 ? t("ai.transcript.stepFilesOne") : t("ai.transcript.stepFilesOther", { count: n }), error: false };
+	return { text: n === 1 ? t("ai.transcript.stepLinesOne") : t("ai.transcript.stepLinesOther", { count: n }), error: false };
+}
+
+/** The command as a terminal shows it: a `$ ` prompt, then coloured tokens. */
+function commandNode(command: string, language: string): HTMLElement {
+	const pre = el("pre", "qbd-work-pre qbd-work-term");
+	pre.appendChild(el("span", "qbd-work-prompt", "$ "));
+	if (command.length <= COMMAND_LIMIT && refractor.registered(language)) {
+		const tree = refractor.highlight(command, language) as unknown as { children?: HastNode[] };
+		appendHast(pre, tree.children ?? []);
+	} else {
+		pre.appendChild(document.createTextNode(command));
+	}
+	return pre;
+}
+
+/** Builds the DOM of a refractor (hast) tree node by node: text stays text. */
+function appendHast(parent: Node, nodes: HastNode[]): void {
+	for (const node of nodes) {
+		if (node.type === "text") {
+			parent.appendChild(document.createTextNode(node.value ?? ""));
+		} else if (node.type === "element") {
+			const span = document.createElement("span");
+			const classes = Array.isArray(node.properties?.className) ? node.properties.className : [];
+			const safe = classes.filter((c): c is string => typeof c === "string" && /^[a-z0-9-]+$/.test(c));
+			if (safe.length) span.className = safe.join(" ");
+			appendHast(span, node.children ?? []);
+			parent.appendChild(span);
+		}
+	}
+}
+
+type ToolDiff = NonNullable<ToolItem["diff"]>;
+
+/** The lines of a change: removed first, then added, as Claude Code shows an edit.
+    A Write numbers its lines from 1 (its whole file is new); an Edit has no
+    numbers, since the stream carries no structured patch. Each line keeps the
+    file's syntax colours and only a faint tint marks a change. More than
+    PREVIEW_LINES lines: the rest is hidden behind "Show all". */
+function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
+	const lang = DIFF_LANGUAGES.get(extensionOf(diffPath(item))) ?? null;
+	const rows: { cls: string; marker: string; text: string; num: string }[] = [];
+	for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "−", text: line, num: "" });
+	let n = 1;
+	for (const line of diff.added) rows.push({ cls: "qbd-work-diff-add", marker: "+", text: line, num: item.name === "Write" ? String(n++) : "" });
+	const box = el("div", "qbd-work-diff");
+	rows.forEach((r, i) => {
+		const row = el("div", "qbd-work-diff-row " + r.cls);
+		if (i >= PREVIEW_LINES) row.hidden = true;
+		row.appendChild(el("span", "qbd-work-gutter", r.num));
+		row.appendChild(el("span", "qbd-work-marker", r.marker));
+		const code = el("span", "qbd-work-code");
+		appendHighlighted(code, r.text, lang);
+		row.appendChild(code);
+		box.appendChild(row);
+	});
+	if (rows.length > PREVIEW_LINES) {
+		const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: rows.length }));
+		toggle.type = "button";
+		let shown = false;
+		toggle.addEventListener("click", e => {
+			e.stopPropagation();
+			shown = !shown;
+			box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
+				if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+			});
+			toggle.textContent = shown ? t("ai.work.showLess") : t("ai.work.showAll", { n: rows.length });
+		});
+		box.appendChild(toggle);
+	}
+	return box;
+}
+
+function diffPath(item: ToolItem): string {
+	if (item.name === "fileChange") return firstLine(item.input);
+	return str(parseInput(item.input).file_path);
+}
+
+function extensionOf(path: string): string {
+	const m = /\.([A-Za-z0-9]+)$/.exec(path);
+	return m ? m[1].toLowerCase() : "";
+}
+
+/** One line of code: coloured by its grammar when there is one, text otherwise. */
+function appendHighlighted(parent: Node, text: string, language: string | null): void {
+	if (language && text.length <= COMMAND_LIMIT && refractor.registered(language)) {
+		const tree = refractor.highlight(text, language) as unknown as { children?: HastNode[] };
+		appendHast(parent, tree.children ?? []);
+	} else {
+		parent.appendChild(document.createTextNode(text));
+	}
+}
+
+/** The output: the first lines are already in the model; the rest is fetched on demand. */
+function outputNode(item: ToolItem, deps: WorkViewDeps): HTMLElement | null {
+	if (!item.preview && item.lines === 0) return null;
+	const box = el("div", "qbd-work-output");
+	box.appendChild(monoPre(item.preview));
+	if (item.lines <= PREVIEW_LINES) return box;
+	const full = monoPre("", "qbd-work-pre qbd-work-full");
+	full.hidden = true;
+	box.appendChild(full);
+	const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: item.lines }));
+	toggle.type = "button";
+	let loaded = false;
+	let loading = false;
+	toggle.addEventListener("click", e => {
+		e.stopPropagation();
+		if (loaded) {
+			const open = full.hidden;
+			full.hidden = !open;
+			toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: item.lines });
+			return;
+		}
+		if (loading) return;
+		loading = true;
+		deps.loadOutput(item.id).then(output => {
+			loading = false;
+			if (output === null) return;
+			loaded = true;
+			full.textContent = output;
+			full.hidden = false;
+			toggle.textContent = t("ai.work.showLess");
+		}, () => {
+			loading = false;
+		});
+	});
+	box.appendChild(toggle);
+	return box;
+}
+
+// --- Permissions ----------------------------------------------------------------
 
 function permissionBlock(item: Extract<ThreadItem, { kind: "permission" }>, deps: WorkViewDeps): HTMLElement {
 	const card = el("div", "qbd-work-item qbd-work-permission");
@@ -183,4 +620,23 @@ function permissionBlock(item: Extract<ThreadItem, { kind: "permission" }>, deps
 	actions.appendChild(deny);
 	card.appendChild(actions);
 	return card;
+}
+
+// --- Small helpers --------------------------------------------------------------
+
+function parseInput(input: string): Record<string, unknown> {
+	try {
+		const v: unknown = JSON.parse(input);
+		return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+	} catch {
+		return {};
+	}
+}
+
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const numOf = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+const firstLine = (s: string): string => s.split("\n").find(l => l.trim() !== "")?.trim() ?? "";
+
+function ellipsize(s: string, max: number): string {
+	return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }

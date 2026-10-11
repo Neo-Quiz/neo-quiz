@@ -1,10 +1,12 @@
 /* ══════════════════════════════════════════════════════════
    THE FULL AI WORK VIEW (src/dashboard/work-view.ts)
 
-   Plain blocks on the page, no tile inside a tile: only the permission card
-   carries a border (its accent edge). Text wraps at any width (a 360 px
-   phone included), so no horizontal scrollbar appears; outputs and tool
-   input use the monospace font. No uppercase label anywhere.
+   Plain rows on the page, no tile inside a tile: only the permission card
+   carries a border (its accent edge). A tool call reads like Claude Code: a
+   title Name(args), a corner summary line, then the body, collapsed.
+   Clickable rows get the list hover tint and a chevron; non-interactive
+   rows never change on hover. Text wraps at any width (360 px included), so
+   no horizontal scrollbar appears. No uppercase label, no emoji.
 ══════════════════════════════════════════════════════════ */
 
 .qbd-work {
@@ -31,12 +33,15 @@
 	white-space: pre-wrap;
 }
 
-.qbd-work-text .qbd-work-body {
+.qbd-work-body {
 	white-space: pre-wrap;
 }
 
 .qbd-work-thinking {
 	color: var(--text-muted);
+}
+
+.qbd-work-thinking .qbd-work-body {
 	font-style: italic;
 }
 
@@ -45,8 +50,25 @@
 	color: var(--text-faint);
 }
 
-.qbd-work-body {
-	white-space: pre-wrap;
+.qbd-work-tokens {
+	font-variant-numeric: tabular-nums;
+}
+
+/* The live "Thinking" label: a light sheen sweeps across the word while the
+   reasoning runs. The class is removed with the item (and the turn), and the
+   reduced-motion rule below turns it off. */
+.qbd-work-thinking-label.is-live {
+	background-image: linear-gradient(90deg, var(--text-faint) 0%, var(--text-faint) 40%, var(--text-normal) 50%, var(--text-faint) 60%, var(--text-faint) 100%);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: qbd-work-shimmer 1.6s linear infinite;
+}
+
+@keyframes qbd-work-shimmer {
+	from { background-position: 100% 0; }
+	to { background-position: -100% 0; }
 }
 
 .qbd-work-notice {
@@ -54,7 +76,54 @@
 	color: var(--text-faint);
 }
 
-.qbd-work-tool {
+/* Clickable rows: the list hover tint, the same radius and timing everywhere. */
+.qbd-work-tool-head.is-expandable,
+.qbd-work-group-head,
+.qbd-work-toggle,
+.qbd-work-path.is-link {
+	border-radius: 6px;
+	transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* The hover area is the title line only, sized to its content. */
+.qbd-work-tool-head.is-expandable,
+.qbd-work-group-head {
+	display: inline-flex;
+	width: fit-content;
+	max-width: 100%;
+}
+
+.qbd-work-tool-head.is-expandable:hover,
+.qbd-work-group-head:hover {
+	background-color: var(--background-modifier-hover);
+	cursor: pointer;
+}
+
+.qbd-work-tool-head:focus-visible,
+.qbd-work-group-head:focus-visible,
+.qbd-work-path.is-link:focus-visible,
+.qbd-work-toggle:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.qbd-work-group {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.qbd-work-group-head {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	align-self: flex-start;
+	padding: 2px 6px 2px 4px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.qbd-work-group-body {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -62,28 +131,142 @@
 	border-left: 2px solid var(--background-modifier-border);
 }
 
-.qbd-work-tool-head {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: 6px;
+.qbd-work-group-body[hidden] {
+	display: none;
 }
 
-.qbd-work-icon {
-	display: inline-flex;
-	width: 14px;
-	height: 14px;
+.qbd-work-tool {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.qbd-work-tool-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 0;
+	padding: 2px 6px 2px 4px;
+	margin: 0 -6px 0 -4px;
+}
+
+.qbd-work-title {
+	min-width: 0;
+	font-family: var(--font-monospace);
+	font-size: 13px;
+	line-height: 20px;
 	color: var(--text-muted);
+	overflow-wrap: anywhere;
 }
 
 .qbd-work-tool-name {
 	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.qbd-work-path {
+	color: var(--text-normal);
+}
+
+.qbd-work-path.is-link {
+	color: var(--interactive-accent);
+	cursor: pointer;
+}
+
+.qbd-work-path.is-link:hover {
+	text-decoration: underline;
+}
+
+.qbd-work-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 20px;
+	color: var(--text-muted);
+}
+
+.qbd-work-icon.is-running {
+	animation: qbd-work-spin 1s linear infinite;
+}
+
+@keyframes qbd-work-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+/* A success is a muted dash: drawn, not a glyph. */
+.qbd-work-icon.is-ok::before {
+	content: "";
+	width: 8px;
+	height: 1px;
+	background: currentColor;
+}
+
+.qbd-work-icon.is-error {
+	color: var(--text-error);
+}
+
+/* The chevron of an expandable row: it turns to point down when open. */
+.qbd-work-chevron {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	width: 12px;
+	height: 20px;
+	color: var(--text-muted);
+	opacity: 0.35;
+	transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.qbd-work-chevron svg {
+	width: 12px;
+	height: 12px;
+}
+
+.qbd-work-tool-head:hover .qbd-work-chevron,
+.qbd-work-tool-head:focus-visible .qbd-work-chevron,
+.qbd-work-group-head:hover .qbd-work-chevron,
+.qbd-work-group-head:focus-visible .qbd-work-chevron {
+	opacity: 1;
+}
+
+.is-open > .qbd-work-tool-head .qbd-work-chevron,
+.is-open > .qbd-work-group-head .qbd-work-chevron {
+	transform: rotate(90deg);
+}
+
+.qbd-work-summary {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	padding-left: 20px;
+	font-size: 12px;
+	line-height: 17px;
+	color: var(--text-faint);
 	overflow-wrap: anywhere;
 }
 
-.qbd-work-status {
-	font-size: 12px;
-	color: var(--text-faint);
+.qbd-work-summary.is-error {
+	color: var(--text-error);
+}
+
+.qbd-work-branch {
+	flex: 0 0 auto;
+	font-family: var(--font-monospace);
+}
+
+.qbd-work-tool-body {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-left: 20px;
+	min-width: 0;
+}
+
+.qbd-work-tool-body[hidden] {
+	display: none;
 }
 
 .qbd-work-pre {
@@ -101,31 +284,174 @@
 	scrollbar-width: none;
 }
 
-.qbd-work-input {
-	color: var(--text-normal);
+.qbd-work-pre[hidden] {
+	display: none;
 }
 
+/* A terminal line: the $ prompt, then the command in the app's token colours. */
+.qbd-work-term {
+	--qwv-comment: #565f89;
+	--qwv-keyword: #7aa2f7;
+	--qwv-operator: #89ddff;
+	--qwv-function: #7dcfff;
+	--qwv-string: #9ece6a;
+	--qwv-number: #ff9e64;
+	--qwv-class: #2ac3de;
+	--qwv-punctuation: #c0caf5;
+	--qwv-tag: #f7768e;
+	--qwv-attr: #e0af68;
+	background: #1a1b26;
+	color: #c0caf5;
+	font-size: 12px;
+	line-height: 17px;
+}
+
+.qbd-work-prompt {
+	color: #565f89;
+	user-select: none;
+}
+
+.qbd-work-term .token.comment,
+.qbd-work-term .token.prolog,
+.qbd-work-term .token.doctype,
+.qbd-work-term .token.cdata,
+.qbd-work-diff .token.comment,
+.qbd-work-diff .token.prolog {
+	color: var(--qwv-comment);
+	font-style: italic;
+}
+
+.qbd-work-term .token.keyword,
+.qbd-work-term .token.control,
+.qbd-work-term .token.directive,
+.qbd-work-term .token.important,
+.qbd-work-term .token.atrule,
+.qbd-work-diff .token.keyword,
+.qbd-work-diff .token.control,
+.qbd-work-diff .token.atrule {
+	color: var(--qwv-keyword);
+}
+
+.qbd-work-term .token.operator,
+.qbd-work-diff .token.operator {
+	color: var(--qwv-operator);
+}
+
+.qbd-work-term .token.function,
+.qbd-work-term .token.method,
+.qbd-work-diff .token.function,
+.qbd-work-diff .token.method {
+	color: var(--qwv-function);
+}
+
+.qbd-work-term .token.string,
+.qbd-work-term .token.char,
+.qbd-work-term .token.regex,
+.qbd-work-term .token.attr-value,
+.qbd-work-diff .token.string,
+.qbd-work-diff .token.attr-value {
+	color: var(--qwv-string);
+}
+
+.qbd-work-term .token.number,
+.qbd-work-term .token.boolean,
+.qbd-work-term .token.constant,
+.qbd-work-term .token.symbol,
+.qbd-work-diff .token.number,
+.qbd-work-diff .token.boolean {
+	color: var(--qwv-number);
+}
+
+.qbd-work-term .token.class-name,
+.qbd-work-term .token.builtin,
+.qbd-work-term .token.type,
+.qbd-work-diff .token.class-name,
+.qbd-work-diff .token.builtin {
+	color: var(--qwv-class);
+}
+
+.qbd-work-term .token.punctuation {
+	color: var(--qwv-punctuation);
+}
+
+.qbd-work-term .token.tag,
+.qbd-work-term .token.selector,
+.qbd-work-term .token.namespace,
+.qbd-work-diff .token.tag,
+.qbd-work-diff .token.selector {
+	color: var(--qwv-tag);
+}
+
+.qbd-work-term .token.attr-name,
+.qbd-work-diff .token.attr-name {
+	color: var(--qwv-attr);
+}
+
+/* A diff: a gutter of line numbers, a marker column, then the code. Only the
+   background is tinted; the text keeps its syntax colours. The diff takes the
+   same token palette as a command, so its colours match. */
 .qbd-work-diff {
+	--qwv-comment: #565f89;
+	--qwv-keyword: #7aa2f7;
+	--qwv-operator: #89ddff;
+	--qwv-function: #7dcfff;
+	--qwv-string: #9ece6a;
+	--qwv-number: #ff9e64;
+	--qwv-class: #2ac3de;
+	--qwv-tag: #f7768e;
+	--qwv-attr: #e0af68;
 	display: flex;
 	flex-direction: column;
 	font-family: var(--font-monospace);
 	font-size: 12px;
 	line-height: 17px;
+	color: var(--text-normal);
+	min-width: 0;
+}
+
+.qbd-work-diff-row {
+	display: flex;
+	align-items: flex-start;
+	min-width: 0;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 
+.qbd-work-diff-row[hidden] {
+	display: none;
+}
+
 .qbd-work-diff-add {
-	color: var(--text-success);
+	background: color-mix(in srgb, var(--color-green, #4caf50) 8%, transparent);
 }
 
 .qbd-work-diff-del {
-	color: var(--text-error);
+	background: color-mix(in srgb, var(--color-red, #e5484d) 11%, transparent);
+}
+
+.qbd-work-gutter {
+	flex: 0 0 3.5em;
+	padding-right: 8px;
+	text-align: right;
+	color: var(--text-faint);
+	user-select: none;
+	font-variant-numeric: tabular-nums;
+}
+
+.qbd-work-marker {
+	flex: 0 0 1.2em;
+	color: var(--text-muted);
+	user-select: none;
+}
+
+.qbd-work-code {
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .qbd-work-toggle {
 	align-self: flex-start;
-	padding: 0;
+	padding: 0 4px;
 	border: none;
 	background: none;
 	box-shadow: none;
@@ -135,6 +461,7 @@
 }
 
 .qbd-work-toggle:hover {
+	background-color: var(--background-modifier-hover);
 	text-decoration: underline;
 }
 
@@ -186,9 +513,7 @@
 	cursor: default;
 }
 
-/* The turn still runs (2026-10-11): one quiet line under the thread, in the
-   muted colour of a tool's status. No animation: the working line above the
-   answer already moves. */
+/* The turn still runs: one quiet line under the thread. */
 .qbd-work-running {
 	display: flex;
 	align-items: center;
@@ -196,4 +521,28 @@
 	margin-top: 10px;
 	font-size: 12px;
 	color: var(--text-faint);
+}
+
+/* Reduced motion: the sheen, the spin and the chevron turn stop; the elapsed
+   counter keeps running. */
+@media (prefers-reduced-motion: reduce) {
+	.qbd-work-thinking-label.is-live {
+		animation: none;
+		background-image: none;
+		-webkit-background-clip: border-box;
+		background-clip: border-box;
+		color: inherit;
+	}
+
+	.qbd-work-icon.is-running {
+		animation: none;
+	}
+
+	.qbd-work-chevron,
+	.qbd-work-tool-head.is-expandable,
+	.qbd-work-group-head,
+	.qbd-work-toggle,
+	.qbd-work-path.is-link {
+		transition: none;
+	}
 }

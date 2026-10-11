@@ -128,5 +128,175 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 		r.check("moins d'éléments : nœuds retirés", root.children.length, 1);
 	}
 
+
+	// 7. Titles per tool kind, Claude Code style, Windows paths relative to the root.
+	{
+		const RACINE = "C:\\neo\\racine";
+		const outil = (id, name, input) => ({ kind: "tool", id, name, input, preview: "", lines: 0, status: "ok", diff: null });
+		const root = document.createElement("div");
+		renderThread(root, fil([
+			outil("a1", "Read", JSON.stringify({ file_path: RACINE + "\\XTI303\\CM1.pdf", offset: 1, limit: 120 })),
+			outil("a2", "Bash", "ls -la\nsecond line"),
+			outil("a3", "Grep", JSON.stringify({ pattern: "foo", path: RACINE + "\\src" })),
+			outil("a4", "Glob", JSON.stringify({ pattern: "*.ts" })),
+			outil("a5", "Write", JSON.stringify({ file_path: RACINE + "\\n.md" })),
+			outil("a6", "Edit", JSON.stringify({ file_path: "C:\\autre\\b.md" })),
+			outil("a7", "WebFetch", JSON.stringify({ url: "https://x.test/a" })),
+			outil("a8", "WebSearch", JSON.stringify({ query: "quiz" })),
+		]), { ...deps, root: RACINE });
+		const titres = [...root.querySelectorAll(".qbd-work-title")].map(n => n.textContent);
+		r.check("titre Read : chemin relatif, plage", titres[0], "Read(XTI303\\CM1.pdf · lines 1-120)");
+		r.check("titre Bash : première ligne", titres[1], "Bash(ls -la)");
+		r.check("titre Grep", titres[2], 'Search("foo" in src)');
+		r.check("titre Glob", titres[3], "Find(*.ts)");
+		r.check("titre Write", titres[4], "Write(n.md)");
+		r.check("titre Edit hors racine : chemin absolu", titres[5], "Edit(C:\\autre\\b.md)");
+		r.check("titre WebFetch", titres[6], "Fetch(https://x.test/a)");
+		r.check("titre WebSearch", titres[7], 'WebSearch("quiz")');
+	}
+
+	// 8. openFile: an in-root file is clickable and gets its absolute path; an outside file is not.
+	{
+		const RACINE = "C:\\neo\\racine";
+		const ouverts = [];
+		const root = document.createElement("div");
+		renderThread(root, fil([
+			{ kind: "tool", id: "o1", name: "Read", input: JSON.stringify({ file_path: RACINE + "\\notes\\a.md" }), preview: "", lines: 0, status: "ok", diff: null },
+			{ kind: "tool", id: "o2", name: "Read", input: JSON.stringify({ file_path: "C:\\autre\\b.md" }), preview: "", lines: 0, status: "ok", diff: null },
+		]), { ...deps, root: RACINE, openFile: p => ouverts.push(p) });
+		const liens = root.querySelectorAll(".qbd-work-path.is-link");
+		r.check("chemin dans la racine : cliquable", liens.length, 1);
+		r.check("chemin hors racine : aucun lien", root.querySelectorAll(".qbd-work-path").length, 2);
+		if (liens[0]) click(liens[0]);
+		r.check("openFile : chemin absolu, une fois", JSON.stringify(ouverts), JSON.stringify([RACINE + "\\notes\\a.md"]));
+		const sansDep = document.createElement("div");
+		renderThread(sansDep, fil([
+			{ kind: "tool", id: "o3", name: "Read", input: JSON.stringify({ file_path: RACINE + "\\x.md" }), preview: "", lines: 0, status: "ok", diff: null },
+		]), { ...deps, root: RACINE });
+		r.check("sans openFile : aucun lien", sansDep.querySelectorAll(".is-link").length, 0);
+	}
+
+	// 9. Write and Edit: summary wording, gutter numbers, markers; a hostile diff line stays text.
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([
+			{ kind: "tool", id: "w1", name: "Write", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["a", CHARGE, "c"], removed: [] } },
+			{ kind: "tool", id: "w2", name: "Edit", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["new"], removed: ["old"] } },
+		]), deps);
+		const resumes = root.querySelectorAll(".qbd-work-summary-text");
+		r.check("Write : « Wrote 3 lines »", resumes[0]?.textContent, "Wrote 3 lines");
+		r.check("Edit : added / removed", resumes[1]?.textContent, "Added 1 lines, removed 1 lines");
+		const numeros = [...root.querySelectorAll(".qbd-work-diff")[0].querySelectorAll(".qbd-work-gutter")].map(n => n.textContent);
+		r.check("Write : numéros depuis 1", numeros.join(","), "1,2,3");
+		const edition = root.querySelectorAll(".qbd-work-diff")[1];
+		r.check("Edit : pas de numéros", [...edition.querySelectorAll(".qbd-work-gutter")].every(n => n.textContent === ""), true);
+		r.check("Edit : une ligne retirée, une ajoutée", edition.querySelectorAll(".qbd-work-diff-del").length + edition.querySelectorAll(".qbd-work-diff-add").length, 2);
+		r.check("marqueurs : − puis +", [...edition.querySelectorAll(".qbd-work-marker")].map(n => n.textContent).join(""), "−+");
+		r.check("corps replié par défaut", root.querySelectorAll(".qbd-work-tool-body")[0].hidden, true);
+		r.check("diff : aucun img/script hostile", root.querySelectorAll("img,script").length, 0);
+		r.check("diff : la ligne hostile reste du texte", root.textContent.includes(CHARGE), true);
+	}
+
+	// 10. Bash: collapsed by default; a failed one stays collapsed with its first error line in red;
+	//     a running one waiting for a permission opens with its card.
+	{
+		const root = document.createElement("div");
+		const cmd = { kind: "tool", id: "b1", name: "Bash", input: "echo " + CHARGE + "\n" + FIN, preview: "", lines: 0, status: "ok", diff: null };
+		renderThread(root, fil([cmd, { ...cmd, id: "b2", status: "error", preview: "boom " + FIN + "\nsuite" }]), deps);
+		const corps = root.querySelectorAll(".qbd-work-tool-body");
+		r.check("Bash ok : replié", corps[0].hidden, true);
+		r.check("Bash en erreur : replié", corps[1].hidden, true);
+		r.check("Bash en erreur : première ligne rouge", root.querySelector(".qbd-work-summary.is-error")?.textContent.includes("boom"), true);
+		r.check("Bash : aucun img/script hostile", root.querySelectorAll("img,script").length, 0);
+		const attente = document.createElement("div");
+		renderThread(attente, fil([
+			{ kind: "tool", id: "b3", name: "Bash", input: "rm -rf x", preview: "", lines: 0, status: "running", diff: null },
+			{ kind: "permission", requestId: "p9", tool: "Bash", input: "rm -rf x", state: "pending" },
+		], true), deps);
+		r.check("Bash en attente de permission : ouvert", attente.querySelector(".qbd-work-tool-body").hidden, false);
+		r.check("Bash en attente : carte Autoriser visible", attente.querySelectorAll(".qbd-work-permission").length, 1);
+		const enCours = document.createElement("div");
+		renderThread(enCours, fil([
+			{ kind: "tool", id: "b4", name: "Bash", input: "sleep 9", preview: "", lines: 0, status: "running", diff: null },
+		], true), deps);
+		r.check("Bash en cours sans permission : replié", enCours.querySelector(".qbd-work-tool-body").hidden, true);
+		renderThread(enCours, fil([], false), deps);
+	}
+
+	// 11. Grouping: consecutive OK reads fold; a running, failed or pending call stays on its own row.
+	{
+		const root = document.createElement("div");
+		const lecture = (id, status) => ({ kind: "tool", id, name: "Read", input: JSON.stringify({ file_path: "C:\\x\\" + id + ".md" }), preview: "", lines: 0, status, diff: null });
+		renderThread(root, fil([
+			lecture("g1", "ok"), lecture("g2", "ok"), lecture("g3", "running"), lecture("g4", "ok"), lecture("g5", "error"),
+			{ kind: "permission", requestId: "pg", tool: "Read", input: "", state: "pending" },
+		]), deps);
+		const groupes = root.querySelectorAll(".qbd-work-group");
+		r.check("groupe : une ligne", groupes.length, 1);
+		r.check("groupe : titre « Read 2 files »", groupes[0]?.querySelector(".qbd-work-group-title")?.textContent, "Read 2 files");
+		r.check("groupe : chevron", groupes[0]?.querySelectorAll(".qbd-work-chevron").length, 1);
+		r.check("en cours : hors groupe, visible", root.querySelectorAll(".qbd-work-icon.is-running").length, 1);
+		r.check("en erreur : hors groupe, visible", root.querySelectorAll(".qbd-work-icon.is-error").length, 1);
+		r.check("permission : visible", root.querySelectorAll(".qbd-work-permission").length, 1);
+		r.check("rien d'en cours ou en erreur dans le groupe", groupes[0] ? groupes[0].querySelectorAll(".is-running, .is-error").length : -1, 0);
+	}
+
+	// 12. Thinking: elapsed and tokens shown; the live sheen only while running.
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([{ kind: "thinking", text: "", tokens: 1240 }], false), deps);
+		r.check("réflexion : temps affiché", root.querySelector(".qbd-work-elapsed") !== null, true);
+		r.check("réflexion : jetons", root.querySelector(".qbd-work-tokens")?.textContent, "~1240 tokens");
+		r.check("réflexion finie : pas de reflet", root.querySelectorAll(".is-live").length, 0);
+		const vivant = document.createElement("div");
+		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5 }], true), deps);
+		r.check("réflexion en cours : reflet", vivant.querySelectorAll(".qbd-work-thinking-label.is-live").length, 1);
+		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5 }], false), deps);
+		r.check("réflexion arrêtée : reflet retiré", vivant.querySelectorAll(".is-live").length, 0);
+	}
+
+	// 13. Keyboard: an expandable row is a button; Enter opens it.
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([
+			{ kind: "tool", id: "k1", name: "Write", input: JSON.stringify({ file_path: "C:\\x\\a.md" }), preview: "", lines: 0, status: "ok", diff: { added: ["u"], removed: [] } },
+		]), deps);
+		const tete = root.querySelector(".qbd-work-tool-head");
+		r.check("ligne : rôle bouton", tete?.getAttribute("role"), "button");
+		r.check("ligne : au clavier", tete?.getAttribute("tabindex"), "0");
+		const touche = new document.defaultView.Event("keydown");
+		touche.key = "Enter";
+		tete.dispatchEvent(touche);
+		r.check("Entrée ouvre le corps", root.querySelector(".qbd-work-tool-body").hidden, false);
+		r.check("corps ouvert : classe is-open", root.querySelector(".qbd-work-tool").classList.contains("is-open"), true);
+	}
+
+
+	// 14. Every tool kind, every state: no raw translation key ever reaches the page.
+	{
+		const root = document.createElement("div");
+		const base = { preview: "p", lines: 2, diff: null };
+		renderThread(root, fil([
+			{ kind: "notice", text: "interrupted" },
+			{ kind: "thinking", text: "", tokens: 3 },
+			{ kind: "tool", id: "k1", name: "Read", input: JSON.stringify({ file_path: "C:\\neo\\racine\\a.md", limit: 5 }), status: "ok", ...base },
+			{ kind: "tool", id: "k2", name: "Bash", input: "ls", status: "error", ...base },
+			{ kind: "tool", id: "k3", name: "Grep", input: JSON.stringify({ pattern: "x" }), status: "refused", ...base },
+			{ kind: "tool", id: "k4", name: "Glob", input: JSON.stringify({ pattern: "*" }), status: "ok", ...base },
+			{ kind: "tool", id: "k5", name: "Write", input: JSON.stringify({ file_path: "C:\\neo\\racine\\w.md" }), status: "ok", preview: "", lines: 0, diff: { added: ["x"], removed: [] } },
+			{ kind: "tool", id: "k6", name: "Edit", input: JSON.stringify({ file_path: "C:\\neo\\racine\\e.md" }), status: "ok", preview: "", lines: 0, diff: { added: ["x"], removed: ["y"] } },
+			{ kind: "tool", id: "k7", name: "fileChange", input: "C:\\neo\\racine\\f.md", status: "ok", preview: "", lines: 0, diff: null },
+			{ kind: "tool", id: "k8", name: "WebFetch", input: JSON.stringify({ url: "https://x.test" }), status: "running", preview: "", lines: 0, diff: null },
+			{ kind: "tool", id: "k9", name: "WebSearch", input: JSON.stringify({ query: "q" }), status: "ok", preview: "", lines: 0, diff: null },
+			{ kind: "tool", id: "k10", name: "Other", input: JSON.stringify({ a: 1 }), status: "ok", preview: "", lines: 0, diff: null },
+			{ kind: "tool", id: "k11", name: "Bash", input: "ls", status: "ok", preview: "", lines: 0, diff: null },
+			{ kind: "tool", id: "k12", name: "Bash", input: "ls", status: "ok", preview: "", lines: 0, diff: null },
+			{ kind: "permission", requestId: "pz", tool: "Bash", input: "rm", state: "denied" },
+			{ kind: "text", text: "fin" },
+		]), { ...deps, root: "C:\\neo\\racine" });
+		const brut = [...root.querySelectorAll("*")].some(n => [...n.childNodes].some(c => c.nodeType === 3 && c.textContent.includes("ai.")));
+		r.check("aucune clé de traduction brute à l'écran", brut, false);
+		r.check("aucun texte « ai.work. »", root.textContent.includes("ai.work."), false);
+	}
 	r.done();
 });

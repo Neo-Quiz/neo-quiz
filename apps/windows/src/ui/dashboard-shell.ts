@@ -700,6 +700,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	   porte la même commande) : trois absences PRÉVUES par `AiPageDeps`, pas
 	   des trous. */
 	const ai = createAiHandlers({
+		cheminAbsolu: (contrat) => deps.cheminAbsolu(contrat),
 		settings: deps.aiSettings,
 		scanner: deps.scanner,
 		statsStore: deps.statsStore,
