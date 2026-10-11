@@ -357,7 +357,8 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   (`live-claude.ts`, `argumentsLiveClaude` de `gabarits-cli.ts`) : un lancement avec les
   réglages du projet (`--setting-sources user,project` ferait tourner un hook planté dans
   la racine synchronisée), une option glissée dans la ligne de lancement, une réponse de
-  contrôle hostile prise pour une demande de permission. Dans la CI.
+  contrôle hostile prise pour une demande de permission ; côté Codex, un lancement sans la
+  racine déclarée non fiable (`argsLiveCodex`). Dans la CI.
 - `npm run check:run-store` — le magasin des runs (`run-store.ts`, `userData/runs/`) : un
   identifiant de run qui devient un chemin hors du magasin, deux écritures concurrentes
   dont les lignes s'entrelacent, un fichier qui dépasse son plafond, une ligne abîmée qui
@@ -1047,8 +1048,13 @@ introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
 elles chargent les réglages, hooks, skills et serveurs MCP PROPRES À L'UTILISATEUR —
 Claude Code avec `--setting-sources user`, Codex avec `~/.codex` partagé par un dossier
 privé `userData/codex-home/` (`codex-home.ts`). Elles ne chargent JAMAIS la configuration
-projet de la racine Neo Quiz, synchronisée (`.claude/`, `.mcp.json`, exclus par
+projet de la racine Neo Quiz, synchronisée (`.claude/`, `.mcp.json`, `.codex/`, exclus par
 `syncthing-regles.ts`) : un hook planté par un autre appareil ne tourne pas sur ce PC.
+Pour Codex, la racine est en plus déclarée NON FIABLE au lancement (`-c projects=…
+trust_level="untrusted"`, `argsLiveCodex`) : sans elle, un `thread/start` en Accès complet
+(ou Modifications auto, Auto) inscrit lui-même la racine comme fiable dans
+`CODEX_HOME/config.toml` et charge son `.codex/config.toml` (mesuré sur codex-cli 0.162.1,
+`check:live-protocol`).
 Chaque ligne d'une session est gardée dans `userData/runs/` (`run-store.ts`), jamais sous
 la racine. Les appels ponctuels (génération, clarification, « Expliquer ») gardent les
 formes isolées décrites plus haut.

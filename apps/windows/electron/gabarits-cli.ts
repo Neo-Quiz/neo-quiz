@@ -265,25 +265,48 @@ export function argumentsLiveClaude(args: unknown): boolean {
    the main process only, with the env `CODEX_HOME` and `CODEX_SQLITE_HOME`
    set to the private Codex home (`codex-home.ts`). The `sqlite_home` override
    repeats it so Codex's databases cannot land in the user's `~/.codex`
-   whatever the user's config says. The only variable is the home, written
-   as a quoted string (JSON escapes are valid TOML basic-string escapes), so
-   a quote or a newline in the path cannot become another override. Never
-   accepted by `argumentsAutorises`: the window would own the app-server's
-   stdin, the whole JSON-RPC surface. */
+   whatever the user's config says.
+
+   The ROOT (the session's cwd) is marked UNTRUSTED for Codex by a
+   `projects` override. Measured on codex-cli 0.162.1 (2026-10-11): a
+   `thread/start` whose cwd has NO trust level and whose sandbox can write
+   it (Full access, Accept edits, Auto) writes `trust_level = "trusted"` for
+   that folder into `CODEX_HOME/config.toml` and reloads its config WITH the
+   folder's project layer: a `<root>/.codex/config.toml` planted by a paired
+   device was loaded (a probe's `developer_instructions` reached the model).
+   Source: `codex-rs/app-server/src/request_processors/thread_processor.rs`
+   (`set_project_trust_level`, only when `active_project.trust_level` is
+   none) and `codex-rs/config/src/project_trust.rs` (a cwd entry wins over a
+   repository-root entry; Windows keys compared without case). An explicit
+   "untrusted" for the cwd stops both: nothing is written, and the project
+   layer stays disabled ("is marked as untrusted in the effective
+   configuration"), even when the user's own config trusts the folder. The
+   thread's sandbox and approval policy are unchanged.
+
+   The only variables are the home and the root, each written as a quoted
+   string (JSON escapes are valid TOML basic-string escapes), so a quote or
+   a newline in a path cannot become another override. Never accepted by
+   `argumentsAutorises`: the window would own the app-server's stdin, the
+   whole JSON-RPC surface. */
 
 /** An absolute path: `C:\…`, `C:/…`, `\\server\…` or `/…`. */
 const ABSOLU = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
 
-/** The launch arguments of a live Codex session in the private home `home`. */
-export function argsLiveCodex(home: string): string[] {
+/** The launch arguments of a live Codex session in the private home `home`,
+    run in `root` (its cwd), which Codex must treat as untrusted. */
+export function argsLiveCodex(home: string, root: string): string[] {
 	if (typeof home !== "string" || !ABSOLU.test(home)) throw new Error("The private Codex home must be an absolute path");
-	return ["app-server", "-c", "sqlite_home=" + JSON.stringify(home)];
+	if (typeof root !== "string" || !ABSOLU.test(root)) throw new Error("The root must be an absolute path");
+	// Lowercase: the form Codex itself writes for a Windows trust key.
+	const untrusted = "projects={" + JSON.stringify(root.toLowerCase()) + "={trust_level=\"untrusted\"}}";
+	return ["app-server", "-c", "sqlite_home=" + JSON.stringify(home), "-c", untrusted];
 }
 
-/** True when `args` is exactly the live Codex launch for the private home `home`. */
-export function argumentsLiveCodex(args: unknown, home: unknown): boolean {
-	if (!Array.isArray(args) || typeof home !== "string" || !ABSOLU.test(home)) return false;
-	const expected = argsLiveCodex(home);
+/** True when `args` is exactly the live Codex launch for the private home
+    `home` in the root `root`. */
+export function argumentsLiveCodex(args: unknown, home: unknown, root: unknown): boolean {
+	if (!Array.isArray(args) || typeof home !== "string" || !ABSOLU.test(home) || typeof root !== "string" || !ABSOLU.test(root)) return false;
+	const expected = argsLiveCodex(home, root);
 	return args.length === expected.length && expected.every((x, i) => args[i] === x);
 }
 

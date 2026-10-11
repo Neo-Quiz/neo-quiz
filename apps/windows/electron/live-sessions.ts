@@ -168,8 +168,8 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 				if (!argumentsLiveClaude(args)) throw new Error("form");
 			} else {
 				await deps.codex.prepare();
-				args = argsLiveCodex(deps.codex.home);
-				if (!argumentsLiveCodex(args, deps.codex.home)) throw new Error("form");
+				args = argsLiveCodex(deps.codex.home, cwd);
+				if (!argumentsLiveCodex(args, deps.codex.home, cwd)) throw new Error("form");
 			}
 		} catch (e) {
 			throw refused("Launch refused: " + message(e));

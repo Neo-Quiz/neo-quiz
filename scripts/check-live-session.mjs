@@ -481,14 +481,14 @@ await withSrcModule([
 	const CSTART = (o = {}) => START({ tool: "codex", model: "gpt-6-luna", effort: "low", ...o });
 	const methods = (c, from = 0) => lines(c).slice(from).map((l) => l.method ?? ("answer:" + JSON.stringify(l.result ?? l.error)));
 
-	await cas(r, "codex start: home prepared before spawn, exact form, handshake, thread id stored", async () => {
+	await cas(r, "codex start: home prepared before spawn, exact form (root untrusted), handshake, thread id stored", async () => {
 		const t = setup(M);
 		const { runId } = await t.m.start(1, CSTART());
 		const c = t.children[0];
-		r.check("codex start: home prepared before spawn, exact form, handshake, thread id stored",
-			[t.order, c.o.args, c.o.codexHome, G.argumentsLiveCodex(c.o.args, HOME), G.argumentsAutorises("codex", c.o.args, undefined), methods(c),
+		r.check("codex start: home prepared before spawn, exact form (root untrusted), handshake, thread id stored",
+			[t.order, c.o.args, c.o.codexHome, G.argumentsLiveCodex(c.o.args, HOME, ROOT), c.o.args.at(-1), G.argumentsAutorises("codex", c.o.args, undefined), methods(c),
 				lines(c)[2].params, t.store.log.filter((x) => x.meta?.threadId).map((x) => x.meta.threadId)],
-			[["prepare", "spawn"], G.argsLiveCodex(HOME), HOME, true, false, ["initialize", "initialized", "thread/start"],
+			[["prepare", "spawn"], G.argsLiveCodex(HOME, ROOT), HOME, true, "projects={\"c:/neo quiz\"={trust_level=\"untrusted\"}}", false, ["initialize", "initialized", "thread/start"],
 				X.codexThreadStartParams({ cwd: ROOT, model: "gpt-6-luna", effort: "low", mode: "supervised" }), ["th-new"]]);
 	});
 

@@ -45,7 +45,7 @@
    is skipped as untrusted.
 
    The caller spawns `codex` with the env `CODEX_HOME=<home>`,
-   `CODEX_SQLITE_HOME=<home>` and the args of `argsLiveCodex(home)`
+   `CODEX_SQLITE_HOME=<home>` and the args of `argsLiveCodex(home, root)`
    (`gabarits-cli.ts`). Never delete the home with a tool that follows
    junctions: they point into the user's `~/.codex`.
 

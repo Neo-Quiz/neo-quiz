@@ -20,8 +20,11 @@
  * permissions request takes `permissions`, not `decision`), and a drift from
  * the lines a real Codex session exchanged
  * (`scripts/fixtures/live/codex-session.jsonl`). Its launch form
- * (`argsLiveCodex`) is checked too: only the private home varies, quoted, and
- * the user's own home (a bare `app-server`) or an extra override is refused.
+ * (`argsLiveCodex`) is checked too: only the private home and the root vary,
+ * quoted; the root is always marked untrusted for Codex (a planted
+ * `<root>/.codex/config.toml` is never loaded); the user's own home (a bare
+ * `app-server`), a form without the untrusted root, or an extra override is
+ * refused.
  *
  *     npm run check:live-protocol
  */
@@ -192,30 +195,45 @@ await withSrcModule(["apps/windows/electron/live-codex.ts", "apps/windows/electr
 	const canon = (v) => Array.isArray(v) ? v.map(canon)
 		: v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
 
-	// The launch form: the private Codex home (`codex-home.ts`) is also the SQLite home.
+	// The launch form: the private Codex home (`codex-home.ts`) is also the SQLite
+	// home, and the root (the cwd) is UNTRUSTED for Codex: without it, a Full
+	// access `thread/start` trusts the root itself and loads `<root>/.codex/`.
 	const H = "C:\\Users\\a b\\AppData\\Roaming\\Neo Quiz\\codex-home\\default";
-	r.check("launch: exact form", argsLiveCodex(H), ["app-server", "-c", "sqlite_home=\"C:\\\\Users\\\\a b\\\\AppData\\\\Roaming\\\\Neo Quiz\\\\codex-home\\\\default\""]);
-	r.check("launch: the value is a TOML string that reads back as the home", JSON.parse(argsLiveCodex(H)[2].slice("sqlite_home=".length)), H);
+	const R = "C:\\Neo Quiz";
+	const UNTRUSTED = "projects={\"c:\\\\neo quiz\"={trust_level=\"untrusted\"}}";
+	r.check("launch: exact form", argsLiveCodex(H, R), ["app-server", "-c", "sqlite_home=\"C:\\\\Users\\\\a b\\\\AppData\\\\Roaming\\\\Neo Quiz\\\\codex-home\\\\default\"", "-c", UNTRUSTED]);
+	r.check("launch: the value is a TOML string that reads back as the home", JSON.parse(argsLiveCodex(H, R)[2].slice("sqlite_home=".length)), H);
+	const rootKey = (a) => JSON.parse(a[4].slice("projects={".length, a[4].length - "={trust_level=\"untrusted\"}}".length));
+	r.check("launch: the root is marked untrusted by its lowercase key (Codex's own form)", rootKey(argsLiveCodex(H, "D:\\Cours\\ÉTÉ")), "d:\\cours\\été");
 	const odd = "C:\\x\"\n -c y=1";
 	r.check("launch: a quote or a newline in the home stays inside the string",
-		[JSON.parse(argsLiveCodex(odd)[2].slice("sqlite_home=".length)), argsLiveCodex(odd).length, argsLiveCodex(odd)[2].includes("\n")], [odd, 3, false]);
+		[JSON.parse(argsLiveCodex(odd, R)[2].slice("sqlite_home=".length)), argsLiveCodex(odd, R).length, argsLiveCodex(odd, R)[2].includes("\n")], [odd, 5, false]);
+	const oddRoot = "C:\\r\"}} -c x=1\n";
+	r.check("launch: a quote or a newline in the root stays inside the key",
+		[rootKey(argsLiveCodex(H, oddRoot)), argsLiveCodex(H, oddRoot).length, argsLiveCodex(H, oddRoot)[4].includes("\n")], [oddRoot.toLowerCase(), 5, false]);
 	r.check("launch: an empty or relative home throws",
-		[throws(() => argsLiveCodex("")), throws(() => argsLiveCodex("codex-home")), throws(() => argsLiveCodex(null))], [true, true, true]);
-	r.check("form: the built form is accepted for its own home", argumentsLiveCodex(argsLiveCodex(H), H), true);
-	r.check("form: another home refused", argumentsLiveCodex(argsLiveCodex(H), H + "2"), false);
-	r.check("form: the bare app-server (the user's own home) refused", argumentsLiveCodex(["app-server"], H), false);
+		[throws(() => argsLiveCodex("", R)), throws(() => argsLiveCodex("codex-home", R)), throws(() => argsLiveCodex(null, R))], [true, true, true]);
+	r.check("launch: an empty, relative or missing root throws",
+		[throws(() => argsLiveCodex(H, "")), throws(() => argsLiveCodex(H, "Neo Quiz")), throws(() => argsLiveCodex(H))], [true, true, true]);
+	r.check("form: the built form is accepted for its own home and root", argumentsLiveCodex(argsLiveCodex(H, R), H, R), true);
+	r.check("form: another home refused", argumentsLiveCodex(argsLiveCodex(H, R), H + "2", R), false);
+	r.check("form: another root refused", argumentsLiveCodex(argsLiveCodex(H, R), H, "C:\\Other"), false);
+	r.check("form: the bare app-server (the user's own home) refused", argumentsLiveCodex(["app-server"], H, R), false);
+	r.check("form: the form without the untrusted root refused (Codex would trust it itself)", argumentsLiveCodex(argsLiveCodex(H, R).slice(0, 3), H, R), false);
+	r.check("form: the root trusted instead refused", argumentsLiveCodex(argsLiveCodex(H, R).map(a => a.replace("untrusted", "trusted")), H, R), false);
 	r.check("form: an extra option refused", [
-		argumentsLiveCodex([...argsLiveCodex(H), "-c", "sandbox_mode=\"danger-full-access\""], H),
-		argumentsLiveCodex(["app-server", "--dangerously-bypass-approvals-and-sandbox", "-c", argsLiveCodex(H)[2]], H),
-		argumentsLiveCodex(argsLiveCodex(H).slice(0, 2), H),
+		argumentsLiveCodex([...argsLiveCodex(H, R), "-c", "sandbox_mode=\"danger-full-access\""], H, R),
+		argumentsLiveCodex(["app-server", "--dangerously-bypass-approvals-and-sandbox", ...argsLiveCodex(H, R).slice(1)], H, R),
+		argumentsLiveCodex(argsLiveCodex(H, R).slice(0, 2), H, R),
 	], [false, false, false]);
 	r.check("form: unquoted or reordered value refused",
-		[argumentsLiveCodex(["app-server", "-c", "sqlite_home=" + H], H), argumentsLiveCodex(["-c", argsLiveCodex(H)[2], "app-server"], H)], [false, false]);
-	r.check("form: non-arrays, non-strings, a bad home", [
-		argumentsLiveCodex("app-server", H), argumentsLiveCodex(null, H), argumentsLiveCodex(["app-server", "-c", 7], H), argumentsLiveCodex(argsLiveCodex(H), ""),
-	], [false, false, false, false]);
+		[argumentsLiveCodex(["app-server", "-c", "sqlite_home=" + H, "-c", UNTRUSTED], H, R), argumentsLiveCodex(["-c", argsLiveCodex(H, R)[2], "app-server", "-c", UNTRUSTED], H, R)], [false, false]);
+	r.check("form: non-arrays, non-strings, a bad home or root", [
+		argumentsLiveCodex("app-server", H, R), argumentsLiveCodex(null, H, R), argumentsLiveCodex(["app-server", "-c", 7], H, R),
+		argumentsLiveCodex(argsLiveCodex(H, R), "", R), argumentsLiveCodex(argsLiveCodex(H, R), H, ""),
+	], [false, false, false, false, false]);
 	r.check("form: never accepted from the window, nor taken for the resets probe",
-		[argumentsAutorises("codex", argsLiveCodex(H), "0".repeat(32)), argumentsAppServer("codex", argsLiveCodex(H))], [false, false]);
+		[argumentsAutorises("codex", argsLiveCodex(H, R), "0".repeat(32)), argumentsAppServer("codex", argsLiveCodex(H, R))], [false, false]);
 
 	// The lines the app writes.
 	const init = codexRequest(1, "initialize", codexInitializeParams("1.2.3"));
