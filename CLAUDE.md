@@ -637,6 +637,15 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   téléphone, une fois la sélection commencée par un appui long (450 ms, doigt
   à moins de 10 px), un tap bascule. Échap et Ctrl+A ne valent que pendant une
   sélection. Dans la CI.
+- `npm run check:model-picker` — le SÉLECTEUR DE MODÈLE du téléphone
+  (`openModelPicker`, `src/dashboard/ui-select.ts`), sur un DOM linkedom : le
+  panneau ne se ferme ni sur un `scroll` ni sur un `resize`, il se replace
+  (le premier tap sur la pastille fermait le panneau aussitôt : le champ du
+  prompt perd le focus, le clavier se replie, la WebView grandit, 2026-10-11) ;
+  rail toujours dessiné même pour un seul fournisseur, recherche qui filtre,
+  coche sur le modèle courant, panneau ancré au-dessus de la pastille par son
+  bord BAS, aligné à droite et borné à la fenêtre ; tap dehors, Échap, choix
+  et second tap sur la pastille le ferment. Dans la CI.
 - `npm run check:swipe` — la décision de balayage (`src/swipe.ts`) : un balayage
   horizontal change de page comme les flèches, jamais un défilement vertical qui
   dérive sur le côté, ni depuis les zones de bord, un champ de saisie, un

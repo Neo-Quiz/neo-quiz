@@ -270,6 +270,11 @@ jobs:
       - name: Card selection
         run: npm run check:selection
 
+      # THE PHONE'S MODEL PICKER: stays open when the keyboard folds after the
+      # first tap (scroll, resize), rail always drawn, search filters, closes right.
+      - name: Model picker
+        run: npm run check:model-picker
+
       # THE PDF SOURCES of a quiz: which documents it cites and which file each name designates.
       - name: PDF sources
         run: npm run check:pdf-sources

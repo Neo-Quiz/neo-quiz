@@ -485,11 +485,17 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	return { close: closeMenu };
 }
 
-/* ── openModelPicker : fournisseur + modèle, sur téléphone ───
-   Panneau au-dessus de la pastille, bord droit aligné sur elle : un rail
-   vertical (un bouton par fournisseur, masqué s'il n'y en a qu'un) et la
-   liste des modèles du fournisseur choisi. Un tap sur un modèle le choisit
-   et ferme ; un tap dehors, Échap ou un défilement ferment aussi. */
+/* ── openModelPicker: provider + model, on the phone ───
+   A panel above the pill, its right edge aligned on it (MonoCode's flyout):
+   a vertical rail on the left (one button per provider, always shown, even
+   with a single provider), then a search field over the chosen provider's
+   models. A tap on a model picks it and closes; a tap outside or Escape
+   closes too. A scroll or a resize does NOT close it: they only move it.
+   On the phone, the tap on the pill blurs the prompt field, so the soft
+   keyboard folds, the WebView grows (`resize`) and the page's scrollers
+   shift (`scroll`) right after the panel opened; closing on those events
+   shut the panel at once on the first tap (the second tap, keyboard already
+   down, worked). */
 
 export interface PickerModel {
 	id: string;
@@ -523,12 +529,19 @@ export function openModelPicker(anchorEl: HTMLElement, options: ModelPickerOptio
 	const panel = ajouter(document.body, "div", "qbd-select-menu qbd-model-picker");
 	panel.setAttribute("role", "dialog");
 	panel.setAttribute("aria-label", t("ai.model.pickerLabel"));
-	panel.style.width = Math.min(310, window.innerWidth - 16) + "px";
 	let actif: PickerProvider = options.providers.find(p => p.id === options.selectedProvider) ?? premier;
 
+	// As in MonoCode: the provider rail on the left (always shown), then a search field over the model list.
 	const rail = ajouter(panel, "div", "qbd-model-picker-rail");
-	const liste = ajouter(panel, "div", "qbd-model-picker-list");
-	if (options.providers.length > 1) panel.insertBefore(rail, liste);
+	const droite = ajouter(panel, "div", "qbd-model-picker-main");
+	const recherche = ajouter(droite, "label", "qbd-model-picker-search");
+	currentHost().ui.setIcon(ajouter(recherche, "span", "qbd-model-picker-search-icon"), "search");
+	const champ = ajouter(recherche, "input", "qbd-model-picker-search-input");
+	champ.type = "search";
+	champ.placeholder = t("ai.model.searchPlaceholder");
+	champ.setAttribute("aria-label", t("ai.model.searchPlaceholder"));
+	const liste = ajouter(droite, "div", "qbd-model-picker-list");
+	champ.addEventListener("input", () => dessinerListe());
 
 	const dessinerRail = (): void => {
 		rail.replaceChildren();
@@ -545,7 +558,9 @@ export function openModelPicker(anchorEl: HTMLElement, options: ModelPickerOptio
 	const dessinerListe = (): void => {
 		liste.replaceChildren();
 		const p = actif;
+		const filtre = champ.value.trim().toLowerCase();
 		for (const m of p.models) {
+			if (filtre && !m.label.toLowerCase().includes(filtre)) continue;
 			const coche = p.id === options.selectedProvider && m.id === options.selectedModel;
 			const ligne = ajouter(liste, "button", "qbd-model-picker-row");
 			ligne.type = "button";
@@ -564,8 +579,9 @@ export function openModelPicker(anchorEl: HTMLElement, options: ModelPickerOptio
 		openMenus.delete(close);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
-		window.removeEventListener("scroll", onScroll, true);
-		window.removeEventListener("resize", close);
+		window.removeEventListener("scroll", replacerBientot, true);
+		window.removeEventListener("resize", replacerBientot);
+		if (cadre) window.cancelAnimationFrame(cadre);
 		if (reduit) panel.remove();
 		else {
 			panel.classList.add("is-leaving");
@@ -584,30 +600,35 @@ export function openModelPicker(anchorEl: HTMLElement, options: ModelPickerOptio
 		if (e.key === "Escape") { e.stopPropagation(); close(); }
 	}
 
-	function onScroll(e: Event): void {
-		const cible = e.target as Node | null;
-		if (cible && panel.contains(cible)) return;
-		close();
+	/* Above the pill, 8 px apart, right edge aligned, clamped to the window.
+	   Anchored by its BOTTOM, so a search that shortens the list keeps the
+	   panel on the pill; never taller than the room above the pill. */
+	const placer = (): void => {
+		if (ferme) return;
+		const rect = anchorEl.getBoundingClientRect();
+		const largeur = Math.min(310, window.innerWidth - 16);
+		panel.style.width = largeur + "px";
+		panel.style.maxHeight = Math.max(120, rect.top - 16) + "px";
+		panel.style.left = Math.min(Math.max(8, rect.right - largeur), window.innerWidth - 8 - largeur) + "px";
+		panel.style.top = "auto";
+		panel.style.bottom = Math.max(8, window.innerHeight - rect.top + 8) + "px";
+	};
+	let cadre = 0;
+	function replacerBientot(): void {
+		if (cadre) return;
+		cadre = window.requestAnimationFrame(() => { cadre = 0; placer(); });
 	}
 
 	dessinerRail();
 	dessinerListe();
 
-	// Au-dessus de la pastille, 8 px d'écart, bord droit aligné, bornée à la fenêtre.
-	const rect = anchorEl.getBoundingClientRect();
-	panel.style.visibility = "hidden";
-	panel.style.left = "0px";
-	panel.style.top = "0px";
-	const mesure = panel.getBoundingClientRect();
-	panel.style.left = Math.min(Math.max(8, rect.right - mesure.width), window.innerWidth - 8 - mesure.width) + "px";
-	panel.style.top = Math.max(8, rect.top - 8 - mesure.height) + "px";
-	panel.style.visibility = "";
+	placer();
 
 	openMenus.set(close, anchorEl);
 	document.addEventListener("mousedown", onDocDown, true);
 	document.addEventListener("keydown", onKeyDown, true);
-	window.addEventListener("scroll", onScroll, true);
-	window.addEventListener("resize", close);
+	window.addEventListener("scroll", replacerBientot, true);
+	window.addEventListener("resize", replacerBientot);
 
 	return { close };
 }

@@ -861,6 +861,7 @@ export const EN_AI = {
 	"ai.notify.channel": "Chats",
 	"ai.pc.nudge": "Choose a device",
 	"ai.model.pickerLabel": "Choose the model",
+	"ai.model.searchPlaceholder": "Search models",
 	"ai.model.pillDefault": "Claude Code",
 	"ai.pc.button": "PC status",
 	"ai.pc.fallbackName": "Your PC",

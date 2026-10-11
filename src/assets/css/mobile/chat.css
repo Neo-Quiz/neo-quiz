@@ -423,6 +423,9 @@
 }
 .is-mobile .qbd-model-picker {
 	display: flex;
+	/* `.qbd-select-menu` stacks its children: the rail sits LEFT of the list here. */
+	flex-direction: row;
+	gap: 0;
 	box-sizing: border-box;
 	max-height: calc(100vh - 16px);
 	padding: 0;
@@ -462,9 +465,48 @@
 .is-mobile .qbd-model-picker-brand[aria-pressed="true"] { background: color-mix(in srgb, var(--text-normal) 12%, transparent); }
 .is-mobile .qbd-model-picker-logo svg,
 .is-mobile .qbd-model-picker-logo img { width: 16px; height: 16px; }
+/* Right column: the search field, then the model list (MonoCode's flyout). */
+.is-mobile .qbd-model-picker-main {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	/* The panel's inline max-height (the room above the pill): the list below shrinks into it. */
+	max-height: inherit;
+	display: flex;
+	flex-direction: column;
+}
+.is-mobile .qbd-model-picker-search {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	border-bottom: 1px solid color-mix(in srgb, var(--text-normal) 10%, transparent);
+	color: var(--text-muted);
+}
+.is-mobile .qbd-model-picker-search-icon { display: inline-flex; flex: none; }
+.is-mobile .qbd-model-picker-search-icon svg { width: 15px; height: 15px; }
+.is-mobile .qbd-model-picker-search-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 14px;
+	outline: none;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.is-mobile .qbd-model-picker-search-input::placeholder { color: var(--text-muted); opacity: 1; }
+.is-mobile .qbd-model-picker-search-input::-webkit-search-cancel-button,
+.is-mobile .qbd-model-picker-search-input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .is-mobile .qbd-model-picker-list {
 	flex: 1 1 auto;
 	min-width: 0;
+	min-height: 0;
 	max-height: min(55vh, 360px);
 	padding: 6px;
 	overflow-y: auto;
