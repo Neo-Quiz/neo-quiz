@@ -1110,6 +1110,9 @@ export interface RunHeader {
     (`out`), a note of the app (`meta`), or the end of the run (`end`). */
 export interface RunEvent {
 	t: number;
+	/** The line's index in its run (monotonic; a dropped line leaves a gap):
+	    the same number a live `line` event carries, to merge the two. */
+	seq: number;
 	dir?: "in" | "out";
 	l?: unknown;
 	meta?: Record<string, unknown>;
@@ -1146,10 +1149,13 @@ export type LiveInput =
 
 /** What a live session pushes to the window that started it. `line` is
     every parsed stdout line of the CLI (Claude stream-json or Codex
-    JSON-RPC), to be shown as TEXT only. `exit.parked`: the process was
+    JSON-RPC), to be shown as TEXT only, with `seq`, its index in the run
+    store: a page reads the store (`readRun`), keeps listening, and drops a
+    `line` whose `seq` it already has (no replay on reattach, except the
+    pending permissions). `exit.parked`: the process was
     stopped after five idle minutes; the next message resumes it. */
 export type LiveEvent =
-	| { kind: "line"; runId: string; line: unknown }
+	| { kind: "line"; runId: string; seq: number; line: unknown }
 	| { kind: "permission"; runId: string; requestId: string; tool: string; input: Record<string, unknown> }
 	| { kind: "permissionGone"; runId: string; requestId: string }
 	| { kind: "turnEnd"; runId: string }
@@ -1159,8 +1165,8 @@ export type LiveEvent =
     `untrusted`: the Neo Quiz root is not a trusted folder (the page shows its
     trust modal); `not-installed`: no CLI of that name; `refused`: a payload,
     run id or form the main process refused; `failed`: the CLI did not start
-    or answer. */
-export type LiveErrorCode = "untrusted" | "not-installed" | "refused" | "failed";
+    or answer; `busy`: six sessions are already in a turn (the live cap). */
+export type LiveErrorCode = "untrusted" | "not-installed" | "refused" | "failed" | "busy";
 
 /** Claude Code and Codex as LIVE sessions (2026-10-11): one long-lived
     process per chat, in the Neo Quiz root, permissions asked to the app.

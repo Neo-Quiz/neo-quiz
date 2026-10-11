@@ -9,14 +9,19 @@
      only accepted when the store holds that run for the same tool and chat
      (resume after a restart of the app), and no other window has it;
    - every line written to or read from the process goes to the run store
-     (`run-store.ts`) first, in order; a spawn adds a `{meta:{spawn}}` line,
-     an exit an `{end}` line;
-   - after a turn, five idle minutes PARK the session (its tree killed); the
-     next message respawns it with resume. A model, effort or mode change
-     respawns it with resume too;
-   - a reloaded window has 60 s to come back (`start` with its run id) before
-     its sessions are stopped; a destroyed window takes them at once; the app
-     quitting kills them all (`killAll`).
+     (`run-store.ts`) first, in order, with its `seq` (the line's index in
+     the run); a `line` event carries the same `seq`, so a page that read
+     the store drops what it already has. A spawn adds `{meta:{spawn}}`, an
+     exit an `{end}` line;
+   - five idle minutes PARK a session (its tree killed): armed after every
+     spawn and every turn end, cleared while a turn runs; the next message
+     respawns it with resume. A model, effort or mode change respawns it
+     with resume too. At most `MAX_LIVE` sessions have a process: a new one
+     parks the least recently used idle one, or is refused `busy`;
+   - a session is CLOSED synchronously (close, quit, window destroyed, or a
+     reload not back within 60 s): nothing is sent to it any more, a spawn
+     in flight kills what it started, and its process is killed at once,
+     never behind its queue.
    Permissions stay pending with no timeout (MonoCode); an interrupt first
    denies every pending one, then stops the turn.
 
@@ -25,128 +30,91 @@
    with fake processes.
 ══════════════════════════════════════════════════════════ */
 
-import type { ModeAgent } from "../../../src/host/claude-outils";
-import type { LiveErrorCode, LiveEvent, LiveInput } from "../../../src/host/types";
+import type { LiveEvent, LiveInput } from "../../../src/host/types";
 import { argsLiveCodex, argumentsLiveClaude, argumentsLiveCodex } from "./gabarits-cli";
 import { liveClaudeArgs } from "./live-claude";
-import type { ClaudeImage } from "./live-claude";
 import { claudeDriver, codexDriver } from "./live-drivers";
-import type { Driver, DriverIo, Pending, Timers } from "./live-drivers";
-import { createLineReader, isRunId, isSafeId, MAX_LINE, settingsKey, validateLiveInput, validateLiveStart } from "./live-session-rules";
+import type { Driver, DriverIo } from "./live-drivers";
+import { createLineReader, isRunId, isSafeId, MAX_LINE, MAX_LIVE, settingsKey, validateLiveInput, validateLiveStart } from "./live-session-rules";
 import type { LiveStart } from "./live-session-rules";
-import type { RunStore } from "./run-store";
+import type { RunRecord } from "./run-store";
+import { LiveError } from "./live-session-types";
+import type { LiveDeps, LiveManager, Proc, Session } from "./live-session-types";
+
+export { LiveError } from "./live-session-types";
+export type { LiveChild, LiveDeps, LiveManager } from "./live-session-types";
 
 export const IDLE_PARK_MS = 300_000;
 export const DETACH_MS = 60_000;
 const KILL_WAIT_MS = 5_000;
 
-export class LiveError extends Error {
-	constructor(code: LiveErrorCode, message: string) {
-		super(message);
-		this.name = code;
-	}
-}
-
-/** A spawned process, as the manager sees it (`process.ts`, `lancerVivant`). */
-export interface LiveChild {
-	onStdout(cb: (chunk: string) => void): void;
-	onExit(cb: (code: number | null) => void): void;
-	write(line: string): Promise<void>;
-	/** Kills the whole tree; `onExit` follows. */
-	kill(): void;
-}
-
-export interface LiveDeps {
-	store: RunStore;
-	/** Throws a `LiveError` (`not-installed`, `failed`). `codexHome` is set
-	    for Codex: the spawner puts it in `CODEX_HOME` and `CODEX_SQLITE_HOME`. */
-	launch(o: { tool: "claude" | "codex"; args: string[]; cwd: string; codexHome?: string }): LiveChild;
-	/** The Neo Quiz root, resolved, inside the perimeter and trusted; `null` otherwise. */
-	root(): Promise<string | null>;
-	/** The private Codex home, and its preparation before EVERY spawn. */
-	codex: { home: string; prepare(): Promise<void> };
-	emit(owner: number, e: LiveEvent): void;
-	version: string;
-	/** Codex takes pictures by path: written for the run, dropped at its exit. */
-	writeImages(runId: string, images: readonly ClaudeImage[]): Promise<{ path: string }[]>;
-	dropImages(runId: string): Promise<void>;
-	uuid(): string;
-	now(): number;
-	timers: Timers;
-	log(...a: unknown[]): void;
-}
-
-interface Proc {
-	child: LiveChild;
-	driver: Driver;
-	alive: boolean;
-	reason: "park" | "respawn" | "close" | "failed" | null;
-	exited: Promise<void>;
-}
-
-interface Session {
-	runId: string;
-	tool: "claude" | "codex";
-	chatId: string;
-	owner: number;
-	settings: { model: string; effort?: string; mode: ModeAgent };
-	proc: Proc | null;
-	pending: Map<string, Pending>;
-	busy: boolean;
-	/** Claude: a user line was written once, so the next spawn resumes. */
-	messageSent: boolean;
-	threadId: string | null;
-	idle: unknown;
-	detach: unknown;
-	chain: Promise<unknown>;
-}
-
-/** The three verbs take the window's RAW payloads and validate them here
-    (`live-session-rules.ts`): an invalid one is refused before anything is
-    written or spawned. */
-export interface LiveManager {
-	start(owner: number, raw: unknown): Promise<{ runId: string }>;
-	send(owner: number, runId: unknown, raw: unknown): Promise<void>;
-	close(owner: number, runId: unknown): Promise<void>;
-	/** Who holds a run in memory: this window, another one, or nobody. */
-	holder(owner: number, runId: string): "own" | "other" | "none";
-	isLive(runId: string): boolean;
-	pageGone(owner: number, definitive: boolean): void;
-	killAll(): Promise<void>;
-}
-
 const refused = (m: string) => new LiveError("refused", m);
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function createLiveManager(deps: LiveDeps): LiveManager {
 	const sessions = new Map<string, Session>();
 	const dying = new Set<Promise<void>>();
 	const t = deps.timers;
 	const emit = (s: Session, e: LiveEvent): void => { try { deps.emit(s.owner, e); } catch { /* a dead window never stops a run */ } };
-	const store = (runId: string, rec: Parameters<RunStore["append"]>[1]): void => {
-		void deps.store.append(runId, rec).catch(e => deps.log("run store append failed:", e instanceof Error ? e.message : e));
+	/** Stores one line of the run with the next `seq`, which it returns. */
+	const store = (s: Session, rec: RunRecord): number => {
+		const seq = s.seq++;
+		void deps.store.append(s.runId, { ...rec, seq } as RunRecord).catch(e => deps.log("run store append failed:", message(e)));
+		return seq;
 	};
 	const stop = (h: unknown): void => { if (h !== null && h !== undefined) t.clear(h); };
 
-	/** Runs `task` after every earlier task of the session. */
+	/** Runs `task` after every earlier task of the session, unless it is closed by then. */
 	function enqueue<T>(s: Session, task: () => Promise<T>): Promise<T> {
-		const run = s.chain.then(task, task);
+		const guarded = (): Promise<T> => (s.closed ? Promise.reject(refused("closed")) : task());
+		const run = s.chain.then(guarded, guarded);
 		s.chain = run.catch(() => undefined);
 		return run;
 	}
 
 	function own(owner: number, runId: unknown): Session {
 		const s = isRunId(runId) ? sessions.get(runId) : undefined;
-		if (!s || s.owner !== owner) throw refused("unknown run");
+		if (!s || s.owner !== owner || s.closed) throw refused("unknown run");
 		return s;
 	}
 
-	async function kill(s: Session, proc: Proc, reason: NonNullable<Proc["reason"]>): Promise<void> {
+	/** Kills `proc` NOW (synchronously); every request it awaited fails at
+	    once, so no queue waits on it. The wait for its exit is tracked:
+	    `killAll` (the app quitting) waits for every kill in flight. */
+	function kill(s: Session, proc: Proc, reason: NonNullable<Proc["reason"]>): Promise<void> {
 		proc.reason ??= reason;
-		proc.child.kill();
-		let h: unknown = null;
-		await Promise.race([proc.exited, new Promise<void>(r => { h = t.set(r, KILL_WAIT_MS); })]);
-		stop(h);
 		if (s.proc === proc) s.proc = null;
+		proc.child.kill();
+		proc.driver.failAll(new Error("The CLI was stopped"));
+		let h: unknown = null;
+		const k = Promise.race([proc.exited, new Promise<void>(r => { h = t.set(r, KILL_WAIT_MS); })]).then(() => stop(h));
+		dying.add(k);
+		void k.finally(() => dying.delete(k));
+		return k;
+	}
+
+	/** Closes a session NOW: out of the map, timers off, process killed. */
+	function terminate(s: Session): Promise<void> {
+		s.closed = true;
+		if (sessions.get(s.runId) === s) sessions.delete(s.runId);
+		stop(s.idle); stop(s.detach);
+		s.idle = null; s.detach = null;
+		return s.proc ? kill(s, s.proc, "close") : s.exiting ?? Promise.resolve();
+	}
+
+	function park(s: Session): void {
+		if (!s.proc) return;
+		const k = kill(s, s.proc, "park");
+		s.exiting = k;
+		void k.finally(() => { if (s.exiting === k) s.exiting = null; });
+	}
+
+	function armIdle(s: Session): void {
+		stop(s.idle);
+		s.idle = s.turns > 0 || s.closed ? null : t.set(() => {
+			s.idle = null;
+			if (s.turns === 0 && !s.closed) park(s);
+		}, IDLE_PARK_MS);
 	}
 
 	function onExit(s: Session, proc: Proc, code: number | null, done: () => void): void {
@@ -155,25 +123,41 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 		proc.driver.failAll(new Error("The CLI exited"));
 		if (s.proc === proc) s.proc = null;
 		stop(s.idle); s.idle = null;
-		s.busy = false;
+		s.turns = 0;
 		for (const id of s.pending.keys()) emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
 		s.pending.clear();
-		store(s.runId, { end: { code, cancelled: proc.reason !== null } });
+		store(s, { end: { code, cancelled: proc.reason !== null } });
 		if (proc.reason !== "respawn") emit(s, { kind: "exit", runId: s.runId, code, parked: proc.reason === "park" });
 		if (s.tool === "codex") void deps.dropImages(s.runId).catch(() => undefined);
 		done();
 	}
 
-	function turnEnded(s: Session): void {
-		s.busy = false;
-		stop(s.idle);
-		s.idle = t.set(() => {
-			s.idle = null;
-			void enqueue(s, async () => { if (s.proc && !s.busy) await kill(s, s.proc, "park"); });
-		}, IDLE_PARK_MS);
+	/** Takes one of the `MAX_LIVE` places, parking the least recently used
+	    idle session if they are all taken; `busy` if none is idle. */
+	function reserve(s: Session): void {
+		const live = [...sessions.values()].filter(o => o !== s && !o.closed && (o.proc || o.spawning));
+		if (live.length >= MAX_LIVE) {
+			const idle = live.filter(o => o.proc && !o.spawning && o.turns === 0 && o.pending.size === 0).sort((a, b) => a.lastUsed - b.lastUsed)[0];
+			if (!idle) throw new LiveError("busy", "Too many AI sessions are working");
+			park(idle);
+		}
+		s.spawning = true;
 	}
 
 	async function spawnProc(s: Session): Promise<void> {
+		reserve(s);
+		try {
+			await launchProc(s);
+		} finally {
+			s.spawning = false;
+		}
+		armIdle(s);
+	}
+
+	const checkOpen = (s: Session): void => { if (s.closed) throw refused("closed"); };
+
+	async function launchProc(s: Session): Promise<void> {
+		if (s.exiting) await s.exiting;
 		const cwd = await deps.root();
 		if (!cwd) throw new LiveError("untrusted", "The Neo Quiz folder is not trusted");
 		const resume = s.tool === "claude" ? s.messageSent : s.threadId !== null;
@@ -188,18 +172,16 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 				if (!argumentsLiveCodex(args, deps.codex.home)) throw new Error("form");
 			}
 		} catch (e) {
-			if (e instanceof LiveError) throw e;
-			throw refused("Launch refused: " + (e instanceof Error ? e.message : String(e)));
+			throw refused("Launch refused: " + message(e));
 		}
+		// Closed while awaiting `root()` or `prepare()`: nothing is launched.
+		checkOpen(s);
 		const child = deps.launch({ tool: s.tool, args, cwd, ...(s.tool === "codex" ? { codexHome: deps.codex.home } : {}) });
-		store(s.runId, { meta: { spawn: { model: s.settings.model, effort: s.settings.effort ?? null, mode: s.settings.mode, resume } } });
+		store(s, { meta: { spawn: { model: s.settings.model, effort: s.settings.effort ?? null, mode: s.settings.mode, resume } } });
 		let done: () => void = () => {};
 		const proc: Proc = { child, driver: null as unknown as Driver, alive: true, reason: null, exited: new Promise<void>(r => { done = r; }) };
 		const io: DriverIo = {
-			write(line) {
-				if (!proc.alive) return Promise.reject(new Error("The CLI exited"));
-				return writeTo(s, proc, line);
-			},
+			write: line => (proc.alive ? writeTo(s, proc, line) : Promise.reject(new Error("The CLI exited"))),
 			permission(p) {
 				s.pending.set(p.requestId, p);
 				emit(s, { kind: "permission", runId: s.runId, requestId: p.requestId, tool: p.tool, input: p.input });
@@ -207,14 +189,15 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			gone(id) {
 				if (s.pending.delete(id)) emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
 			},
-			turnStarted() { s.busy = true; stop(s.idle); s.idle = null; },
+			turnStarted() { s.turns++; stop(s.idle); s.idle = null; },
 			turnEnded() {
-				turnEnded(s);
+				s.turns = Math.max(0, s.turns - 1);
+				armIdle(s);
 				emit(s, { kind: "turnEnd", runId: s.runId });
 			},
 			meta(m) {
 				if (typeof m.threadId === "string") s.threadId = m.threadId;
-				store(s.runId, { meta: m });
+				store(s, { meta: m });
 			},
 			log: deps.log,
 			timers: t,
@@ -222,37 +205,38 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 		proc.driver = s.tool === "claude"
 			? claudeDriver({ mode: s.settings.mode }, io)
 			: codexDriver({ cwd, ...s.settings, version: deps.version, threadId: s.threadId, images: im => deps.writeImages(s.runId, im) }, io);
-		const read = createLineReader(MAX_LINE, line => {
+		child.onStdout(createLineReader(MAX_LINE, line => {
 			let v: unknown;
-			try { v = JSON.parse(line); } catch { store(s.runId, { meta: { nonJson: line.slice(0, 2000) } }); return; }
-			store(s.runId, { dir: "out", l: v });
-			emit(s, { kind: "line", runId: s.runId, line: v });
+			try { v = JSON.parse(line); } catch { store(s, { meta: { nonJson: line.slice(0, 2000) } }); return; }
+			const seq = store(s, { dir: "out", l: v });
+			emit(s, { kind: "line", runId: s.runId, seq, line: v });
 			proc.driver.onLine(v);
-		}, length => store(s.runId, { meta: { oversizedLine: length } }));
-		child.onStdout(read);
+		}, length => store(s, { meta: { oversizedLine: length } })));
 		child.onExit(code => onExit(s, proc, code, done));
 		s.proc = proc;
 		try {
 			await proc.driver.init();
+			checkOpen(s);
 		} catch (e) {
-			deps.log("live session start failed:", e instanceof Error ? e.message : e);
-			await kill(s, proc, "failed");
-			throw new LiveError("failed", e instanceof Error ? e.message : String(e));
+			// Killed already (close, quit): never wait for a slow exit here.
+			if (proc.alive && proc.reason === null) void kill(s, proc, "failed");
+			if (s.closed) throw refused("closed");
+			deps.log("live session start failed:", message(e));
+			throw new LiveError("failed", message(e));
 		}
 	}
 
 	/** Denies every pending permission, in order, before anything else. */
-	async function denyAll(s: Session): Promise<void> {
-		const proc = s.proc;
+	async function denyAll(s: Session, proc: Proc): Promise<void> {
 		for (const [id, p] of [...s.pending]) {
 			s.pending.delete(id);
 			emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
-			if (proc) await writeTo(s, proc, p.answer(false));
+			await writeTo(s, proc, p.answer(false));
 		}
 	}
 	function writeTo(s: Session, proc: Proc, line: string): Promise<void> {
 		if (!proc.alive) return Promise.resolve();
-		store(s.runId, { dir: "in", l: JSON.parse(line) });
+		store(s, { dir: "in", l: JSON.parse(line) });
 		return proc.child.write(line);
 	}
 
@@ -269,6 +253,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			const l = ev.l as Record<string, unknown> | undefined;
 			if (ev.dir === "in" && l && l.type === "user") s.messageSent = true;
 			if (ev.meta && isSafeId(ev.meta.threadId)) s.threadId = ev.meta.threadId;
+			s.seq = Math.max(s.seq, ev.seq + 1);
 		}
 		sessions.set(o.runId, s);
 		return s;
@@ -276,9 +261,9 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 
 	function newSession(owner: number, runId: string, o: LiveStart): Session {
 		return {
-			runId, tool: o.tool, chatId: o.chatId, owner, proc: null, pending: new Map(), busy: false,
-			settings: { model: o.model, mode: o.mode, ...(o.effort !== undefined ? { effort: o.effort } : {}) },
-			messageSent: false, threadId: null, idle: null, detach: null, chain: Promise.resolve(),
+			runId, tool: o.tool, chatId: o.chatId, owner, proc: null, spawning: false, closed: false, exiting: null,
+			pending: new Map(), turns: 0, settings: { model: o.model, mode: o.mode, ...(o.effort !== undefined ? { effort: o.effort } : {}) },
+			messageSent: false, threadId: null, seq: 0, lastUsed: deps.now(), idle: null, detach: null, chain: Promise.resolve(),
 		};
 	}
 
@@ -302,17 +287,21 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 				await deps.store.open({ v: 1, tool: o.tool, model: o.model, ...(o.effort !== undefined ? { effort: o.effort } : {}), mode: o.mode, runId, cwd, chatId: o.chatId, start: deps.now() });
 			}
 			stop(s.detach); s.detach = null;
+			s.lastUsed = deps.now();
 			try {
 				return await enqueue(s, async () => {
 					const settings = { model: o.model, mode: o.mode, ...(o.effort !== undefined ? { effort: o.effort } : {}) };
 					if (s.proc && settingsKey(s.settings) !== settingsKey(settings)) await kill(s, s.proc, "respawn");
 					s.settings = settings;
 					if (!s.proc) await spawnProc(s);
-					else for (const p of s.pending.values()) emit(s, { kind: "permission", runId: s.runId, requestId: p.requestId, tool: p.tool, input: p.input });
+					else {
+						armIdle(s);
+						for (const p of s.pending.values()) emit(s, { kind: "permission", runId: s.runId, requestId: p.requestId, tool: p.tool, input: p.input });
+					}
 					return { runId: s.runId };
 				});
 			} catch (e) {
-				if (fresh) sessions.delete(s.runId);
+				if (fresh && sessions.get(s.runId) === s) sessions.delete(s.runId);
 				throw e;
 			}
 		},
@@ -322,43 +311,40 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			if (!input) throw refused("invalid input");
 			const s = own(owner, runId);
 			stop(s.detach); s.detach = null;
+			s.lastUsed = deps.now();
 			if (input.kind === "message") {
 				await enqueue(s, async () => {
 					if (!s.proc) await spawnProc(s);
 					const proc = s.proc as Proc | null;
 					if (!proc) throw new LiveError("failed", "The CLI exited");
 					s.messageSent = true;
+					const before = s.turns;
 					try {
 						await proc.driver.message(input.text, input.images);
 					} catch (e) {
 						// A message that never reached a turn: the session idles again.
-						if (s.busy) turnEnded(s);
-						throw new LiveError("failed", e instanceof Error ? e.message : String(e));
+						if (s.turns > before) { s.turns = before; armIdle(s); }
+						throw new LiveError("failed", message(e));
 					}
 				});
 				return;
 			}
+			const proc = s.proc;
 			if (input.kind === "permission") {
 				const p = s.pending.get(input.requestId);
-				const proc = s.proc;
 				if (!p || !proc) throw refused("unknown request");
 				s.pending.delete(input.requestId);
 				emit(s, { kind: "permissionGone", runId: s.runId, requestId: input.requestId });
 				await writeTo(s, proc, p.answer(input.allow));
 				return;
 			}
-			const proc = s.proc;
 			if (!proc) return;
-			await denyAll(s);
+			await denyAll(s, proc);
 			await proc.driver.interrupt();
 		},
 
 		async close(owner, runId) {
-			const s = own(owner, runId);
-			stop(s.detach); s.detach = null;
-			stop(s.idle); s.idle = null;
-			await enqueue(s, async () => { if (s.proc) await kill(s, s.proc, "close"); });
-			sessions.delete(s.runId);
+			await terminate(own(owner, runId));
 		},
 
 		holder(owner, runId) {
@@ -370,28 +356,14 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 		pageGone(owner, definitive) {
 			for (const s of [...sessions.values()]) {
 				if (s.owner !== owner) continue;
-				const close = (): void => {
-					stop(s.idle); s.idle = null;
-					s.detach = null;
-					sessions.delete(s.runId);
-					// Tracked: `killAll` (the app quitting) waits for it too.
-					const k = enqueue(s, async () => { if (s.proc) await kill(s, s.proc, "close"); });
-					dying.add(k);
-					void k.finally(() => dying.delete(k));
-				};
-				if (definitive) { stop(s.detach); close(); continue; }
-				if (s.detach === null) s.detach = t.set(close, DETACH_MS);
+				if (definitive) void terminate(s);
+				else if (s.detach === null) s.detach = t.set(() => { s.detach = null; void terminate(s); }, DETACH_MS);
 			}
 		},
 
 		async killAll() {
-			const all = [...sessions.values()];
-			sessions.clear();
-			await Promise.all([...dying, ...all.map(async s => {
-				stop(s.idle); stop(s.detach);
-				s.idle = null; s.detach = null;
-				if (s.proc) await kill(s, s.proc, "close");
-			})]);
+			for (const s of [...sessions.values()]) void terminate(s);
+			await Promise.all([...dying]);
 		},
 	};
 }

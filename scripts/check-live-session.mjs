@@ -56,7 +56,8 @@ function fakeStore() {
 			log.push({ runId, ...rec });
 			const run = runs.get(runId);
 			if (!run) throw new Error("Run not opened");
-			run.events.push({ t: 0, ...rec });
+			const { seq, ...rest } = rec;
+			run.events.push({ t: 0, seq, ...rest });
 		},
 		async read(runId) {
 			const run = runs.get(runId);
@@ -83,7 +84,7 @@ function fakeChild(o, reply) {
 			if (reply) reply(c, JSON.parse(line));
 			return Promise.resolve();
 		},
-		kill() { c.killed = true; setImmediate(() => c.exit(null)); },
+		kill() { c.killed = true; if (!reply || !reply.hang) setImmediate(() => c.exit(null)); },
 		exit(code) { if (c.exited) return; c.exited = true; if (exitCb) exitCb(code); },
 		send(obj) { c.sent.push(obj); stdout.write(JSON.stringify(obj) + "\n"); },
 		raw(text) { stdout.write(text); },
@@ -92,14 +93,14 @@ function fakeChild(o, reply) {
 }
 
 const claudeReply = (opts = {}) => (c, l) => {
-	if (l.type === "control_request" && l.request.subtype === "initialize" && !opts.silent) {
+	if (l.type === "control_request" && l.request.subtype === "initialize" && opts.silent !== true) {
 		setImmediate(() => c.send({ type: "control_response", response: { subtype: "success", request_id: l.request_id, response: {} } }));
 	}
 };
 const codexReply = (opts = {}) => {
 	let turns = 0;
 	return (c, l) => {
-		if (l.id === undefined || !l.method) return;
+		if (l.id === undefined || !l.method || (Array.isArray(opts.silent) && opts.silent.includes(l.method))) return;
 		let result = {};
 		if (l.method === "thread/start") result = { thread: { id: opts.resumeFails ? "th-fresh" : "th-new" } };
 		if (l.method === "thread/resume") {
@@ -115,6 +116,7 @@ const codexReply = (opts = {}) => {
 const ROOT = "C:/Neo Quiz";
 const HOME = "C:/data/codex-home/default";
 let uuidN = 0;
+const deferred = () => { let open; const p = new Promise((r) => { open = r; }); return { p, open }; };
 const UUID = () => `00000000-0000-4000-8000-${String(++uuidN).padStart(12, "0")}`;
 
 function setup(M, opts = {}) {
@@ -123,17 +125,21 @@ function setup(M, opts = {}) {
 	const events = [];
 	const children = [];
 	const order = [];
+	const gates = {};
+	const counts = { root: 0 };
 	let prepared = 0;
 	const deps = {
 		store,
 		launch(o) {
 			order.push("spawn");
-			const c = fakeChild(o, o.tool === "claude" ? claudeReply(opts) : codexReply(opts));
+			const reply = o.tool === "claude" ? claudeReply(opts) : codexReply(opts);
+			reply.hang = opts.hang === true;
+			const c = fakeChild(o, reply);
 			children.push(c);
 			return c;
 		},
-		root: async () => (opts.untrusted ? null : ROOT),
-		codex: { home: HOME, prepare: async () => { prepared++; order.push("prepare"); } },
+		root: async () => { counts.root++; if (gates.root) await gates.root.p; return opts.untrusted ? null : ROOT; },
+		codex: { home: HOME, prepare: async () => { if (gates.prepare) await gates.prepare.p; prepared++; order.push("prepare"); } },
 		emit: (owner, e) => events.push({ owner, ...e }),
 		version: "1.0.0",
 		writeImages: async (runId, ims) => ims.map((_, i) => ({ path: "C:/tmp/" + runId + "/" + i + ".png" })),
@@ -144,7 +150,7 @@ function setup(M, opts = {}) {
 		log: () => {},
 	};
 	const m = M.createLiveManager(deps);
-	return { m, timers, store, events, children, order, prepared: () => prepared };
+	return { m, timers, store, events, children, order, gates, counts, prepared: () => prepared };
 }
 
 const START = (o = {}) => ({ tool: "claude", chatId: "chat-1", model: "claude-haiku-5-5", mode: "supervised", ...o });
@@ -453,7 +459,7 @@ await withSrcModule([
 		await flush();
 		r.check("exit: end stored, pending permissions gone, exit event",
 			[t.store.log.at(-1), t.events.filter((e) => e.kind === "permissionGone").map((e) => e.requestId), t.events.at(-1), t.m.isLive(runId)],
-			[{ runId, end: { code: 1, cancelled: false } }, ["req-h"], { owner: 1, kind: "exit", runId, code: 1, parked: false }, false]);
+			[{ runId, end: { code: 1, cancelled: false }, seq: 4 }, ["req-h"], { owner: 1, kind: "exit", runId, code: 1, parked: false }, false]);
 	});
 
 	await cas(r, "restart: a stored run resumes (Claude --resume), same tool and chat only", async () => {
@@ -537,6 +543,8 @@ await withSrcModule([
 		const t = setup(M);
 		await t.m.start(1, CSTART({ mode: "acceptEdits" }));
 		const c = t.children[0];
+		c.send({ method: "item/started", params: { item: { type: "fileChange", id: "i", changes: [{ path: ROOT + "/notes/a.md", kind: { type: "update", move_path: null }, diff: "" }] } } });
+		await flush();
 		const from = c.written.length;
 		c.send(approval(1, "item/fileChange/requestApproval", {}));
 		c.send(approval(2, "item/fileChange/requestApproval", { reason: "command failed; retry without sandbox?" }));
@@ -592,14 +600,244 @@ await withSrcModule([
 			[["initialize", "initialized", "thread/resume", "thread/start"], "th-new", 1, ["th-new", "th-fresh"]]);
 	});
 
+
+	// ─── Fix round 1 ───
+	await cas(r, "seq: every stored line numbered in order; a line event carries its stored seq", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "hi", images: [] });
+		c.send({ type: "assistant", message: { content: [] } });
+		c.send({ type: "result", subtype: "success" });
+		await flush();
+		const stored = t.store.log.map((x) => x.seq);
+		const byLine = t.events.filter((e) => e.kind === "line").map((e) => {
+			const hit = t.store.log.find((x) => x.seq === e.seq);
+			return !!hit && hit.dir === "out" && JSON.stringify(hit.l) === JSON.stringify(e.line);
+		});
+		r.check("seq: every stored line numbered in order; a line event carries its stored seq",
+			[stored, byLine.length, byLine.every(Boolean)], [stored.map((_, i) => i), 3, true]);
+	});
+
+	await cas(r, "seq continues after a restart (adopted run)", async () => {
+		const store = fakeStore();
+		const t1 = setup(M, { store });
+		const { runId } = await t1.m.start(1, START());
+		await t1.m.send(1, runId, { kind: "message", text: "hi", images: [] });
+		await t1.m.killAll();
+		const last = store.log.at(-1).seq;
+		const t2 = setup(M, { store });
+		await t2.m.start(1, START({ runId }));
+		const next = store.log.filter((x) => x.runId === runId).map((x) => x.seq).filter((q) => q > last).slice(0, 2);
+		r.check("seq continues after a restart (adopted run)", next, [last + 1, last + 2]);
+	});
+
+	await cas(r, "closed: a send queued behind a respawn is refused when close comes first; nothing launched", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		await t.timers.advance(300_000);
+		t.gates.root = deferred();
+		const sent = rejectName(t.m.send(1, runId, { kind: "message", text: "x", images: [] }));
+		await flush();
+		await t.m.close(1, runId);
+		t.gates.root.open();
+		r.check("closed: a send queued behind a respawn is refused when close comes first; nothing launched",
+			[await sent, t.children.length, await rejectName(t.m.send(1, runId, { kind: "message", text: "y", images: [] }))], ["refused", 1, "refused"]);
+	});
+
+	await cas(r, "closed: a send queued behind another is refused before it runs (no root() asked)", async () => {
+		const t = setup(M, { silent: ["turn/start"] });
+		const { runId } = await t.m.start(1, START({ tool: "codex", model: "gpt-6-luna" }));
+		const s1 = rejectName(t.m.send(1, runId, { kind: "message", text: "1", images: [] }));
+		const s2 = rejectName(t.m.send(1, runId, { kind: "message", text: "2", images: [] }));
+		await flush();
+		const roots = t.counts.root;
+		await t.m.close(1, runId);
+		r.check("closed: a send queued behind another is refused before it runs (no root() asked)",
+			[await s1, await s2, t.counts.root - roots, t.children.length], ["failed", "refused", 0, 1]);
+	});
+
+	await cas(r, "a kill fails the requests at once, even when the process is slow to die", async () => {
+		const t = setup(M, { silent: ["thread/start"], hang: true });
+		let settled = null;
+		const p = rejectName(t.m.start(1, START({ tool: "codex", model: "gpt-6-luna" }))).then((n) => { settled = n; return n; });
+		await flush();
+		const k = t.m.killAll();
+		await flush();
+		const before = settled;
+		await t.timers.advance(60_000);
+		await k;
+		await p;
+		r.check("a kill fails the requests at once, even when the process is slow to die", [before, t.children[0].killed], ["refused", true]);
+	});
+
+	await cas(r, "killAll during a pending root() or codex prepare(): resolves, nothing launched after", async () => {
+		const t = setup(M);
+		const a = await t.m.start(1, START());
+		const b = await t.m.start(1, START({ tool: "codex", model: "gpt-6-luna", chatId: "c" }));
+		await t.timers.advance(300_000);
+		t.gates.prepare = deferred();
+		const s2 = rejectName(t.m.send(1, b.runId, { kind: "message", text: "x", images: [] }));
+		await flush();
+		t.gates.root = deferred();
+		const s1 = rejectName(t.m.send(1, a.runId, { kind: "message", text: "x", images: [] }));
+		await flush();
+		await t.m.killAll();
+		t.gates.prepare.open();
+		t.gates.root.open();
+		await flush();
+		r.check("killAll during a pending root() or codex prepare(): resolves, nothing launched after",
+			[t.children.length, await s1, await s2], [2, "refused", "refused"]);
+	});
+
+	await cas(r, "killAll kills at once, never behind a pending thread/start or initialize", async () => {
+		const t = setup(M, { silent: ["thread/start"] });
+		const p1 = rejectName(t.m.start(1, START({ tool: "codex", model: "gpt-6-luna" })));
+		const t2 = setup(M, { silent: true });
+		const p2 = rejectName(t2.m.start(1, START()));
+		await flush();
+		let done = false;
+		const k = Promise.all([t.m.killAll(), t2.m.killAll()]).then(() => { done = true; });
+		await flush();
+		const snapshot = [done, t.children[0].killed, t2.children[0].killed];
+		// Only now let the clocks run (a killAll queued behind the requests would end here).
+		await t.timers.advance(60_000);
+		await t2.timers.advance(60_000);
+		await k;
+		r.check("killAll kills at once, never behind a pending thread/start or initialize",
+			[...snapshot, await p1, await p2], [true, true, true, "refused", "refused"]);
+	});
+
+	await cas(r, "idle park armed at spawn: started with no message, parked after 5 min", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		await t.timers.advance(299_999);
+		const early = t.children[0].killed;
+		await t.timers.advance(1);
+		r.check("idle park armed at spawn: started with no message, parked after 5 min",
+			[early, t.children[0].killed, t.events.filter((e) => e.kind === "exit").map((e) => e.parked), t.m.isLive(runId)], [false, true, [true], false]);
+	});
+
+	await cas(r, "idle park after a respawn on mode change; a reattach restarts the clock", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		await t.m.send(1, runId, { kind: "message", text: "hi", images: [] });
+		t.children[0].send({ type: "result", subtype: "success" });
+		await flush();
+		await t.m.start(1, START({ runId, mode: "full" }));
+		await t.timers.advance(240_000);
+		await t.m.start(1, START({ runId, mode: "full" }));
+		await t.timers.advance(240_000);
+		const afterReattach = t.children[1].killed;
+		await t.timers.advance(60_000);
+		r.check("idle park after a respawn on mode change; a reattach restarts the clock",
+			[afterReattach, t.children[1].killed, t.children.length], [false, true, 2]);
+	});
+
+	await cas(r, "two queued turns: the first result does not park the second turn", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "1", images: [] });
+		await t.m.send(1, runId, { kind: "message", text: "2", images: [] });
+		c.send({ type: "result", subtype: "success" });
+		await flush();
+		await t.timers.advance(600_000);
+		const during = c.killed;
+		c.send({ type: "result", subtype: "success" });
+		await flush();
+		await t.timers.advance(300_000);
+		r.check("two queued turns: the first result does not park the second turn", [during, c.killed], [false, true]);
+	});
+
+	await cas(r, "live cap: a 7th session parks the least recently used idle one", async () => {
+		let now = 0;
+		const t = setup(M);
+		const ids = [];
+		for (let i = 0; i < 6; i++) ids.push((await t.m.start(1, START({ chatId: "c" + i }))).runId);
+		// Session 0 is mid-turn (not idle); session 1 is the least recently used idle one.
+		await t.m.send(1, ids[0], { kind: "message", text: "keep me", images: [] });
+		await t.m.start(1, START({ chatId: "c6" }));
+		await flush();
+		void now;
+		r.check("live cap: a 7th session parks the least recently used idle one",
+			[t.children.length, t.children.map((c) => c.killed), t.events.filter((e) => e.kind === "exit").map((e) => [e.runId === ids[1], e.parked])],
+			[7, [false, true, false, false, false, false, false], [[true, true]]]);
+	});
+
+	await cas(r, "live cap: six sessions mid-turn, a 7th is refused busy, nothing spawned", async () => {
+		const t = setup(M);
+		for (let i = 0; i < 6; i++) {
+			const { runId } = await t.m.start(1, START({ chatId: "c" + i }));
+			await t.m.send(1, runId, { kind: "message", text: "work", images: [] });
+		}
+		r.check("live cap: six sessions mid-turn, a 7th is refused busy, nothing spawned",
+			[await rejectName(t.m.start(1, START({ chatId: "c6" }))), t.children.length, t.children.some((c) => c.killed)], ["busy", 6, false]);
+	});
+
+	const fileItem = (paths) => ({ method: "item/started", params: { item: { type: "fileChange", id: "f", changes: paths.map((p) => ({ path: p, kind: { type: "update", move_path: null }, diff: "" })) } } });
+	await cas(r, "codex accept edits: auto only when every path is in the root and outside .neo-quiz", async () => {
+		const verdict = async (paths, extra = {}) => {
+			const t = setup(M);
+			await t.m.start(1, CSTART({ mode: "acceptEdits" }));
+			const c = t.children[0];
+			if (paths) c.send(fileItem(paths));
+			await flush();
+			const from = c.written.length;
+			c.send(approval(1, "item/fileChange/requestApproval", { itemId: "f", ...extra }));
+			await flush();
+			return c.written.length > from ? "auto" : "ask";
+		};
+		r.check("codex accept edits: auto only when every path is in the root and outside .neo-quiz", [
+			await verdict([ROOT + "/a.md", "notes/b.md"]),
+			await verdict([ROOT + "/.neo-quiz/review-log.jsonl"]),
+			await verdict(["C:\\Neo Quiz\\.NEO-QUIZ.\\x"]),
+			await verdict([ROOT + "/../outside.md"]),
+			await verdict(["C:/Windows/x.ini"]),
+			await verdict(["\\\\server\\share\\x"]),
+			await verdict([ROOT + "/NEO-QU~1/x"]),
+			await verdict([ROOT + "/a.md:stream"]),
+			await verdict(null),
+			await verdict([ROOT + "/a.md"], { grantRoot: ROOT }),
+		], ["auto", "ask", "ask", "ask", "ask", "ask", "ask", "ask", "ask", "ask"]);
+	});
+
+	await cas(r, "codex interrupt while turn/start awaits its id: sent once the turn is known", async () => {
+		const t = setup(M, { silent: ["turn/start"] });
+		const { runId } = await t.m.start(1, CSTART());
+		const c = t.children[0];
+		const sending = t.m.send(1, runId, { kind: "message", text: "go", images: [] });
+		await flush();
+		await t.m.send(1, runId, { kind: "interrupt" });
+		const before = methods(c);
+		const req = lines(c).find((l) => l.method === "turn/start");
+		c.send({ id: req.id, result: { turn: { id: "tu-9" } } });
+		await sending;
+		await flush();
+		r.check("codex interrupt while turn/start awaits its id: sent once the turn is known",
+			[before.at(-1), lines(c).at(-1).method, lines(c).at(-1).params], ["turn/start", "turn/interrupt", X.codexTurnInterruptParams("th-new", "tu-9")]);
+	});
+
+	await cas(r, "codex steer that times out does not start a second turn", async () => {
+		const t = setup(M, { silent: ["turn/steer"] });
+		const { runId } = await t.m.start(1, CSTART());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "one", images: [] });
+		const p = rejectName(t.m.send(1, runId, { kind: "message", text: "two", images: [] }));
+		await flush();
+		await t.timers.advance(30_000);
+		r.check("codex steer that times out does not start a second turn",
+			[await p, methods(c).slice(3)], ["failed", ["turn/start", "turn/steer"]]);
+	});
+
 	await cas(r, "rules: escalation, page bounds, line reader", async () => {
 		const got = [];
 		const read = R.createLineReader(10, (l) => got.push(l), (n) => got.push("over:" + n));
 		read("abc\nde"); read("f\r\n0123456789AB"); read("CD\nok\n");
 		r.check("rules: escalation, page bounds, line reader",
-			[got, R.asksEscalation({ reason: "Retry WITHOUT sandbox" }), R.asksEscalation({ grantRoot: "C:/" }), R.asksEscalation({ reason: "edit" }),
+			[got, R.asksEscalation({ reason: "Retry WITHOUT sandbox" }), R.asksEscalation({ grantRoot: "C:/" }), R.asksEscalation({ reason: "edit" }), R.asksEscalation({ threadId: "t", turnId: "u", itemId: "i", startedAtMs: 1, reason: null, grantRoot: null }), R.asksEscalation({ itemId: "i", newField: 1 }),
 				R.validatePage(undefined), R.validatePage({ offset: 0, limit: 2001 }), R.validatePage({ offset: -1, limit: 5 }), R.validatePage({ offset: 2, limit: 5, x: 1 })],
-			[["abc", "def", "over:14", "ok"], true, true, false, { offset: 0, limit: 2000 }, null, null, null]);
+			[["abc", "def", "over:14", "ok"], true, true, true, false, true, { offset: 0, limit: 2000 }, null, null, null]);
 	});
 
 	r.done();

@@ -118,23 +118,85 @@ export const settingsKey = (o: { model: string; effort?: string; mode: ModeAgent
     asks is asked to the user. */
 export const claudeAutoAllow = (mode: ModeAgent): boolean => mode === "full";
 
-/** An approval that asks to run OUTSIDE the sandbox (Codex "command failed;
-    retry without sandbox?", or a write root granted for the session). */
+/** Could this approval ask for MORE than a plain sandboxed edit? Codex
+    0.162.1 (`app-server generate-ts`, `FileChangeRequestApprovalParams`) has
+    ONE structured field for that, `grantRoot` (writes under a root for the
+    session); MonoCode has no detection at all (it auto-accepts every file
+    change in Accept edits). The "command failed; retry without sandbox?"
+    request measured in task 4 is told apart only by its free-text `reason`,
+    so ANY reason (or any field this list does not know to be harmless)
+    counts as unsure, and unsure is never auto-accepted. */
 export function asksEscalation(params: Rec): boolean {
-	const reason = typeof params.reason === "string" ? params.reason.toLowerCase() : "";
-	if (reason.includes("sandbox")) return true;
 	if (params.grantRoot !== undefined && params.grantRoot !== null) return true;
-	return params.additionalPermissions !== undefined && params.additionalPermissions !== null;
+	if (params.additionalPermissions !== undefined && params.additionalPermissions !== null) return true;
+	if (params.reason !== undefined && params.reason !== null && params.reason !== "") return true;
+	const known = ["threadId", "turnId", "itemId", "startedAtMs", "reason", "grantRoot"];
+	return Object.keys(params).some(k => !known.includes(k));
+}
+
+/** A path, lexically, with `/` separators, `.` and `..` resolved; `null`
+    when `..` climbs above its start. Relative paths are taken from `base`. */
+function normalize(p: string, base: string): string | null {
+	const abs = /^(?:[A-Za-z]:[\\/]|[\\/])/.test(p) ? p : base.replace(/[\\/]+$/, "") + "/" + p;
+	const out: string[] = [];
+	const parts = abs.replace(/\\/g, "/").split("/");
+	const head = (parts.shift() as string).toLowerCase();
+	for (const raw of parts) {
+		// Windows drops trailing dots and spaces: `.neo-quiz.` IS `.neo-quiz`.
+		const part = raw === "." || raw === ".." ? raw : raw.replace(/[. ]+$/, "");
+		if (part === "" || part === ".") continue;
+		if (part === "..") { if (!out.length) return null; out.pop(); continue; }
+		out.push(part.toLowerCase());
+	}
+	return head + "/" + out.join("/");
+}
+
+/** Is `p` inside `root`, and NOT under its `.neo-quiz/` (the app's journal
+    and shared state)? Lexical and case-insensitive (Windows paths). Refused
+    as unsure: a UNC or device path, a drive-relative `C:x`, a stream `x:y`,
+    an 8.3 short name (`NEO-QU~1` could be `.neo-quiz`). A junction inside
+    the root is not followed (Codex's own sandbox bounds the write). */
+export function pathInRoot(root: string, p: unknown): boolean {
+	if (typeof p !== "string" || !p || p.length > 4096 || CONTROL.test(p)) return false;
+	if (/^[\\/]{2}/.test(p) || /^[A-Za-z]:(?![\\/])/.test(p) || p.slice(2).includes(":") || /~\d/.test(p)) return false;
+	const r = normalize(root, root);
+	const n = normalize(p, root);
+	if (!r || !n) return false;
+	const rl = r.replace(/\/+$/, "");
+	if (!n.startsWith(rl + "/")) return false;
+	const rest = n.slice(rl.length + 1);
+	return rest !== ".neo-quiz" && !rest.startsWith(".neo-quiz/");
 }
 
 /** Codex: does the app accept this approval by itself? Full access accepts
-    everything; Accept edits accepts a file change, unless it asks to leave
-    the sandbox (task 4: an edit that failed in the sandbox comes back as
-    such a request, and accepting it would write unsandboxed). */
-export function codexAutoAccept(mode: ModeAgent, method: string, params: Rec): boolean {
+    everything. Accept edits accepts a file change only when nothing in it
+    asks for more (`asksEscalation`: task 4, an edit that failed in the
+    sandbox comes back as such a request, and accepting it would write
+    unsandboxed) AND every changed path (`paths`, from the change's
+    `item/started` / `item/fileChange/patchUpdated`) is in the trusted root,
+    outside `.neo-quiz/`. Unknown paths: asked. */
+export function codexAutoAccept(mode: ModeAgent, method: string, params: Rec, root: string, paths: readonly string[] | undefined): boolean {
 	if (mode === "full") return true;
-	return mode === "acceptEdits" && method === "item/fileChange/requestApproval" && !asksEscalation(params);
+	if (mode !== "acceptEdits" || method !== "item/fileChange/requestApproval" || asksEscalation(params)) return false;
+	return !!paths && paths.length > 0 && paths.every(p => pathInRoot(root, p));
 }
+
+/** The paths a Codex file change touches (`FileUpdateChange[]`: `path`, and
+    the destination of a move), or `null` when the list is not readable. */
+export function changePaths(changes: unknown): string[] | null {
+	if (!Array.isArray(changes)) return null;
+	const out: string[] = [];
+	for (const c of changes) {
+		if (!c || typeof c !== "object" || typeof (c as Rec).path !== "string") return null;
+		out.push((c as Rec).path as string);
+		const kind = (c as Rec).kind;
+		if (kind && typeof kind === "object" && typeof (kind as Rec).move_path === "string") out.push((kind as Rec).move_path as string);
+	}
+	return out;
+}
+
+/** At most this many sessions have a process at once. */
+export const MAX_LIVE = 6;
 
 /** The id of a server request the parser refused: answered "method not
     found", so Codex never waits on it. `null` when there is no usable id. */

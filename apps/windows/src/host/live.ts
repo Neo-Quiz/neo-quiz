@@ -5,7 +5,10 @@
    pass-through. Every value is rebuilt field by field before it crosses (a
    stray property of the page's object never reaches the main process, which
    refuses it anyway), and an envelope's refusal becomes an Error whose
-   `name` is its code (`untrusted`, `not-installed`, `refused`, `failed`).
+   `name` is its code (`untrusted`, `not-installed`, `refused`, `failed`,
+   `busy`). A `line` event and every stored event of `readRun` carry the
+   same `seq`: subscribe first, read the store, then drop a live `line`
+   whose `seq` is already shown (the preload relays no `line` without one).
    Nothing here pulls Node (`check:host`): `Pont` is a type.
 ══════════════════════════════════════════════════════════ */
 

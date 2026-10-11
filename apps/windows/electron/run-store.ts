@@ -49,10 +49,13 @@ const TAIL_BYTES = 1024;
     cannot be a real one. */
 const MAX_TOOL_ID = 256;
 
-export type RunRecord =
+/** `seq`: the line's index in its run, given by the writer (the session
+    manager), monotonic, stored as `"s"` and read back as `RunEvent.seq`. A
+    line the cap drops leaves a gap; the order never changes. */
+export type RunRecord = { seq?: number } & (
 	| { dir: "in" | "out"; l: unknown }
 	| { meta: Record<string, unknown> }
-	| { end: { code: number | null; cancelled: boolean } };
+	| { end: { code: number | null; cancelled: boolean } });
 
 export interface RunStore {
 	/** Creates `<root>/<runId>.jsonl` with the header if absent; idempotent. */
@@ -111,13 +114,19 @@ function readHeader(o: unknown, runId: string): RunHeader | null {
 	return pickHeader(o as unknown as RunHeader);
 }
 
-function readEvent(o: unknown): RunEvent | null {
+/** `fallback`: the seq of a line written without one (before seqs existed):
+    one more than the line before, so the order is kept. */
+function readEvent(o: unknown, fallback: number): RunEvent | null {
 	if (!isObject(o) || typeof o.t !== "number" || !Number.isFinite(o.t)) return null;
-	if (o.dir === "in" || o.dir === "out") return { t: o.t, dir: o.dir, l: o.l };
-	if (isObject(o.meta)) return { t: o.t, meta: o.meta };
-	if ("end" in o) return { t: o.t, end: o.end };
+	const seq = Number.isSafeInteger(o.s) && (o.s as number) >= 0 ? o.s as number : fallback;
+	if (o.dir === "in" || o.dir === "out") return { t: o.t, seq, dir: o.dir, l: o.l };
+	if (isObject(o.meta)) return { t: o.t, seq, meta: o.meta };
+	if ("end" in o) return { t: o.t, seq, end: o.end };
 	return null;
 }
+
+/** The `"s"` member of a stored line, when the writer gave one. */
+const seqOf = (rec: RunRecord): { s?: number } => (Number.isSafeInteger(rec.seq) && (rec.seq as number) >= 0 ? { s: rec.seq } : {});
 
 function isTruncatedMarker(o: unknown): boolean {
 	return isObject(o) && o.dir === undefined && isObject(o.meta) && o.meta.truncated === true;
@@ -238,7 +247,7 @@ export function createRunStore(root: string, options: RunStoreOptions = {}): Run
 			const events: RunEvent[] = [];
 			for (const line of lines.slice(1)) {
 				if (!line) continue;
-				const ev = readEvent(parseLine(line));
+				const ev = readEvent(parseLine(line), events.length ? events[events.length - 1].seq + 1 : 0);
 				if (ev) events.push(ev);
 			}
 			/* Judged on the LAST lifecycle event: a resumed session appends a
@@ -282,13 +291,13 @@ export function createRunStore(root: string, options: RunStoreOptions = {}): Run
 				if ("end" in rec) {
 					// Written even past the cap: its room is reserved.
 					const end = { code: typeof rec.end.code === "number" && Number.isFinite(rec.end.code) ? rec.end.code : null, cancelled: rec.end.cancelled === true };
-					await write(runId, state, JSON.stringify({ t, end }));
+					await write(runId, state, JSON.stringify({ t, ...seqOf(rec), end }));
 					return;
 				}
 				if (state.truncated) return;
-				const line = "dir" in rec ? JSON.stringify({ t, dir: rec.dir, l: rec.l }) : JSON.stringify({ t, meta: rec.meta });
+				const line = "dir" in rec ? JSON.stringify({ t, ...seqOf(rec), dir: rec.dir, l: rec.l }) : JSON.stringify({ t, ...seqOf(rec), meta: rec.meta });
 				if (state.bytes + Buffer.byteLength(line, "utf-8") + 2 > limit) {
-					await write(runId, state, JSON.stringify({ t, meta: { truncated: true } }));
+					await write(runId, state, JSON.stringify({ t, ...seqOf(rec), meta: { truncated: true } }));
 					state.truncated = true;
 					return;
 				}

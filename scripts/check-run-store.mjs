@@ -103,6 +103,20 @@ await withSrcModule("apps/windows/electron/run-store.ts", async ({ createRunStor
 				[ended, crashed, endedAgain], [false, true, false]);
 		});
 
+		await cas(r, "seq: stored as s and read back; a line without one follows the line before", async () => {
+			const root = join(dir, "seq");
+			const store = createRunStore(root);
+			await store.open(header(ID(21)));
+			await store.append(ID(21), { seq: 0, dir: "out", l: 1 });
+			await store.append(ID(21), { seq: 1, meta: { k: 1 } });
+			await appendFile(join(root, ID(21) + ".jsonl"), '{"t":1,"dir":"out","l":"old"}\n');
+			await store.append(ID(21), { seq: 7, end: { code: 0, cancelled: false } });
+			const raw = (await readFile(join(root, ID(21) + ".jsonl"), "utf-8")).split("\n").filter(Boolean).slice(1).map((l) => JSON.parse(l).s);
+			const got = await store.read(ID(21));
+			r.check("seq: stored as s and read back; a line without one follows the line before",
+				[raw, got.events.map((e) => e.seq)], [[0, 1, undefined, 7], [0, 1, 2, 7]]);
+		});
+
 		await cas(r, "a damaged line is skipped, the others are read", async () => {
 			const root = join(dir, "c");
 			const store = createRunStore(root);

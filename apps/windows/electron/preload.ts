@@ -346,10 +346,12 @@ const pont: Pont = {
 		send: (runId, input) => ipcRenderer.invoke(CANAUX.liveEnvoyer, runId, input),
 		close: runId => ipcRenderer.invoke(CANAUX.liveFermer, runId),
 		surEvenement(rappel) {
-			// Only an event of a known kind for a run id is relayed.
+			// Only an event of a known kind for a run id is relayed; a `line` needs its `seq`.
 			const ecouteur = (_e: unknown, p: unknown): void => {
-				const r = p && typeof p === "object" ? p as { kind?: unknown; runId?: unknown } : null;
-				if (r && typeof r.runId === "string" && ["line", "permission", "permissionGone", "turnEnd", "exit"].includes(r.kind as string)) rappel(p as LiveEvent);
+				const r = p && typeof p === "object" ? p as { kind?: unknown; runId?: unknown; seq?: unknown } : null;
+				if (!r || typeof r.runId !== "string" || !["line", "permission", "permissionGone", "turnEnd", "exit"].includes(r.kind as string)) return;
+				if (r.kind === "line" && !Number.isSafeInteger(r.seq)) return;
+				rappel(p as LiveEvent);
 			};
 			ipcRenderer.on(CANAUX.liveEvenement, ecouteur);
 			return () => { ipcRenderer.off(CANAUX.liveEvenement, ecouteur); };

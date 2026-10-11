@@ -27,7 +27,7 @@ import {
 	codexThreadResumeParams, codexThreadStartParams, codexTurnInterruptParams, codexTurnStartParams, codexTurnSteerParams, parseCodexMessage,
 } from "./live-codex";
 import type { CodexMethod } from "./live-codex";
-import { claudeAutoAllow, codexAutoAccept, codexRequestKey, isSafeId, malformedRequestId } from "./live-session-rules";
+import { changePaths, claudeAutoAllow, codexAutoAccept, codexRequestKey, isSafeId, malformedRequestId } from "./live-session-rules";
 
 type Rec = Record<string, unknown>;
 
@@ -79,13 +79,16 @@ export interface Driver {
 
 type Waiter = { ok: (v: unknown) => void; ko: (e: Error) => void };
 
+/** A request that got no answer in time (as opposed to an error answer). */
+class Timeout extends Error {}
+
 /** Answers to the app's own requests, by id, each with its own deadline. */
 function waiters(timers: Timers) {
 	const map = new Map<string, Waiter>();
 	return {
 		wait(id: string, ms: number, what: string): Promise<unknown> {
 			return new Promise((ok, ko) => {
-				const t = timers.set(() => { map.delete(id); ko(new Error(what + " timed out")); }, ms);
+				const t = timers.set(() => { map.delete(id); ko(new Timeout(what + " timed out")); }, ms);
 				map.set(id, { ok: v => { timers.clear(t); ok(v); }, ko: e => { timers.clear(t); ko(e); } });
 			});
 		},
@@ -167,6 +170,20 @@ export function codexDriver(o: CodexDriverOptions, io: DriverIo): Driver {
 	let next = 1;
 	let thread: string | null = null;
 	let turn: string | null = null;
+	/** An interrupt asked while `turn/start` awaited its turn id: sent once known. */
+	let interruptWanted = false;
+	/** The paths of each file change item, by item id, for Accept edits. */
+	const changes = new Map<string, string[]>();
+	const sendInterrupt = async (): Promise<void> => {
+		interruptWanted = false;
+		if (!thread || !turn) return;
+		await io.write(codexRequest(next++, "turn/interrupt", codexTurnInterruptParams(thread, turn)));
+	};
+	const setTurn = (id: string | null): void => {
+		if (!id) return;
+		turn = id;
+		if (interruptWanted) void sendInterrupt().catch(() => undefined);
+	};
 	const settings = { cwd: o.cwd, model: o.model, mode: o.mode, ...(o.effort ? { effort: o.effort } : {}) };
 
 	async function request(method: CodexMethod, params: Rec, ms: number): Promise<unknown> {
@@ -185,10 +202,16 @@ export function codexDriver(o: CodexDriverOptions, io: DriverIo): Driver {
 		return t && isSafeId(t.id) ? t.id : null;
 	};
 
+	let starting = false;
+
 	async function startTurn(text: string, paths: { path: string }[]): Promise<void> {
 		io.turnStarted();
-		const r = await request("turn/start", codexTurnStartParams(thread as string, text, paths), TURN_TIMEOUT_MS);
-		turn = turnOf(r) ?? turn;
+		starting = true;
+		try {
+			setTurn(turnOf(await request("turn/start", codexTurnStartParams(thread as string, text, paths), TURN_TIMEOUT_MS)));
+		} finally {
+			starting = false;
+		}
 	}
 
 	return {
@@ -215,16 +238,17 @@ export function codexDriver(o: CodexDriverOptions, io: DriverIo): Driver {
 					await request("turn/steer", codexTurnSteerParams(thread as string, turn, text, paths), TURN_TIMEOUT_MS);
 					return;
 				} catch (e) {
-					// The turn ended meanwhile: the message starts the next one.
+					// No answer in time: the turn may still run, a new one would race it.
+					if (e instanceof Timeout) throw e;
+					// Refused (the turn ended meanwhile): the message starts the next one.
 					io.log("Codex turn/steer refused, starting a turn:", e instanceof Error ? e.message : e);
 				}
 			}
 			await startTurn(text, paths);
 		},
 		async interrupt() {
-			if (!thread || !turn) return;
-			const id = next++;
-			await io.write(codexRequest(id, "turn/interrupt", codexTurnInterruptParams(thread, turn)));
+			if (turn) { await sendInterrupt(); return; }
+			if (starting) interruptWanted = true;
 		},
 		onLine(v) {
 			const m = parseCodexMessage(v);
@@ -245,7 +269,8 @@ export function codexDriver(o: CodexDriverOptions, io: DriverIo): Driver {
 				const answer = (allow: boolean): string => isPermissions
 					? codexPermissionsAnswer(id, allow ? plain(params.permissions) ?? {} : null)
 					: codexApprovalAnswer(id, allow);
-				if (codexAutoAccept(o.mode, m.method, params)) { void io.write(answer(true)).catch(() => undefined); return; }
+				const itemId = isSafeId(params.itemId) ? params.itemId : null;
+				if (codexAutoAccept(o.mode, m.method, params, o.cwd, itemId ? changes.get(itemId) : undefined)) { void io.write(answer(true)).catch(() => undefined); return; }
 				io.permission({ requestId: codexRequestKey(id), tool: SHORT[m.method], input: params, answer });
 				return;
 			}
@@ -255,9 +280,21 @@ export function codexDriver(o: CodexDriverOptions, io: DriverIo): Driver {
 				if ((typeof id === "number" && Number.isSafeInteger(id)) || isSafeId(id)) io.gone(codexRequestKey(id as number | string));
 				return;
 			}
-			if (m.method === "turn/started") { turn = turnOf(p) ?? turn; return; }
+			if (m.method === "item/started" || m.method === "item/fileChange/patchUpdated") {
+				const item = m.method === "item/started" ? plain(p.item) : p;
+				const id = item ? (m.method === "item/started" ? item.id : item.itemId) : null;
+				if (item && isSafeId(id) && (m.method !== "item/started" || item.type === "fileChange")) {
+					const paths = changePaths(item.changes);
+					// Unreadable changes: forgotten, so the approval is asked.
+					if (paths) changes.set(id, paths); else changes.delete(id);
+				}
+				return;
+			}
+			if (m.method === "turn/started") { setTurn(turnOf(p)); return; }
 			if (m.method === "turn/completed" || m.method === "turn/aborted") {
 				turn = null;
+				interruptWanted = false;
+				changes.clear();
 				io.turnEnded();
 			}
 		},
