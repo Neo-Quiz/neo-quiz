@@ -22,6 +22,14 @@
      the app-server; it replaces a stale hard link by a fresh one (the
      source wins), and removes the home's `auth.json` when the source has
      none (a sign-out from the CLI must sign the app out too).
+   - one exception to "the source wins": when the app-server refreshed the
+     login by rename IN THE HOME, its `auth.json` is newer than the source's,
+     and the source is still the very file the previous preparation linked
+     (its inode is recorded in `AUTH_RECORD`), the home's file is renamed
+     over the source's: the refreshed token reaches the terminal and the
+     old refresh token, possibly already revoked, is not put back. If the
+     source was replaced meanwhile (a new `codex login` in a terminal), the
+     source wins. A rename, never a copy: the token bytes are never read.
    Guards: the home is never inside the source nor the reverse (canonical
    paths, so a junction cannot hide it); a private entry of the home that is
    a link fails the preparation BEFORE anything is shared (Codex would write
@@ -48,7 +56,9 @@ import * as fs from "node:fs/promises";
 import type { BigIntStats } from "node:fs";
 import * as path from "node:path";
 
-/** Codex state that stays in the private home (MonoCode's `STATE_NAMES`). */
+/** Codex state that stays in the private home: MonoCode's `STATE_NAMES`,
+    plus `thread-writer-locks` and `.tmp` (measured: a live session left its
+    thread lock in the user's `~/.codex` through the shared junction). */
 export const PRIVATE_ENTRIES: readonly string[] = [
 	"sessions",
 	"archived_sessions",
@@ -60,14 +70,36 @@ export const PRIVATE_ENTRIES: readonly string[] = [
 	"shell_snapshots",
 	"memories",
 	"backups",
+	"thread-writer-locks",
+	".tmp",
 ];
 
+/** The prefixes of private entries: the app-server's own control and daemon
+    folders (`app-server-control`, `app-server-daemon`), and this module's
+    own files. */
+const PRIVATE_PREFIXES: readonly string[] = ["app-server-", ".neo-quiz-"];
+
+/** Private names that an earlier preparation SHARED by junction. Such a
+    link, if it leads exactly to the source's entry of the same name, is our
+    own old junction: it is removed (the link only) instead of failing every
+    preparation forever. Any other private link still fails. A name made
+    private in a later version goes here too. */
+function wasShared(n: string): boolean {
+	return n === "thread-writer-locks" || n === ".tmp" || n.startsWith("app-server-");
+}
+
+/** The record of the source `auth.json` the last preparation linked
+    (`dev` and `ino`), kept in the home. */
+const AUTH_RECORD = ".neo-quiz-auth-inode";
+
 /** True for an entry of a Codex home that is never shared: one of
-    `PRIVATE_ENTRIES`, or a SQLite database and its companions (`*.sqlite*`,
-    `*.db`, `*.db-wal`, `*.db-shm`). Case-insensitive: Windows names are. */
+    `PRIVATE_ENTRIES`, a name starting with `app-server-` or `.neo-quiz-`,
+    or a SQLite database and its companions (`*.sqlite*`, `*.db`, `*.db-wal`,
+    `*.db-shm`). Case-insensitive: Windows names are. */
 export function isPrivateEntry(name: string): boolean {
 	const n = name.toLowerCase();
-	return PRIVATE_ENTRIES.includes(n) || n.includes(".sqlite") || n.endsWith(".db") || n.endsWith(".db-wal") || n.endsWith(".db-shm");
+	return PRIVATE_ENTRIES.includes(n) || PRIVATE_PREFIXES.some(p => n.startsWith(p))
+		|| n.includes(".sqlite") || n.endsWith(".db") || n.endsWith(".db-wal") || n.endsWith(".db-shm");
 }
 
 const WINDOWS = process.platform === "win32";
@@ -125,6 +157,29 @@ async function resolvesTo(target: string, source: string): Promise<boolean> {
 	}
 }
 
+/** True when the link at `link` leads to `expected`: same real path, or,
+    for a dangling link, the same written target. */
+async function pointsTo(link: string, expected: string): Promise<boolean> {
+	if (await resolvesTo(link, expected)) return true;
+	try {
+		return key(path.resolve(path.dirname(link), await fs.readlink(link))) === key(expected);
+	} catch {
+		return false;
+	}
+}
+
+const sameInode = (a: BigIntStats, b: BigIntStats): boolean => a.ino === b.ino && a.dev === b.dev;
+
+const authRecord = (s: BigIntStats): string => s.dev + ":" + s.ino;
+
+async function readAuthRecord(home: string): Promise<string | null> {
+	try {
+		return (await fs.readFile(path.join(home, AUTH_RECORD), "utf8")).trim();
+	} catch {
+		return null;
+	}
+}
+
 /** Shares one entry of the source into the home (MonoCode's `link_entry`). */
 async function linkEntry(source: string, target: string): Promise<void> {
 	let s: BigIntStats;
@@ -148,7 +203,7 @@ async function linkEntry(source: string, target: string): Promise<void> {
 	if (!s.isFile()) return;
 	if (t) {
 		if (!t.isFile()) throw new Error("Unexpected entry in private Codex home: " + target);
-		if (t.ino === s.ino && t.dev === s.dev) return;
+		if (sameInode(t, s)) return;
 		/* A stale hard link (the CLI replaced the source file by rename), or a
 		   file Codex wrote in the home: the source wins, as in MonoCode. */
 		await fs.unlink(target);
@@ -168,21 +223,59 @@ async function prepare(sourceIn: string, homeIn: string): Promise<void> {
 
 	// No private entry of the home may lead elsewhere, checked before any link is made.
 	const names = new Set([...PRIVATE_ENTRIES, ...(await fs.readdir(home)).filter(isPrivateEntry)]);
+	const migrated: string[] = [];
 	for (const name of names) {
-		if ((await lstatOrNull(path.join(home, name)))?.isSymbolicLink()) {
-			throw new Error("Codex state must stay in the private Codex home: " + name);
+		const link = path.join(home, name);
+		if (!(await lstatOrNull(link))?.isSymbolicLink()) continue;
+		// Our own junction from an earlier version, where this name was shared.
+		if (wasShared(name.toLowerCase()) && await pointsTo(link, path.join(source, name))) {
+			migrated.push(name);
+			continue;
+		}
+		throw new Error("Codex state must stay in the private Codex home: " + name);
+	}
+	for (const name of migrated) {
+		// `unlink` removes the link only, never what it leads to.
+		await fs.unlink(path.join(home, name));
+		await fs.mkdir(path.join(home, name));
+	}
+
+	/* The login refreshed by rename in the home goes back to the source (see
+	   the top of this file); in every other case the source wins below. */
+	let keepHomeAuth = false;
+	const homeAuth = await lstatOrNull(path.join(home, "auth.json"));
+	const sourceAuth = await lstatOrNull(path.join(source, "auth.json"));
+	if (homeAuth?.isFile() && sourceAuth?.isFile() && !sameInode(homeAuth, sourceAuth)
+		&& homeAuth.mtimeNs > sourceAuth.mtimeNs && (await readAuthRecord(home)) === authRecord(sourceAuth)) {
+		try {
+			await fs.rename(path.join(home, "auth.json"), path.join(source, "auth.json"));
+		} catch {
+			// The source is busy: keep the newer login in the home and try again next time.
+			keepHomeAuth = true;
 		}
 	}
 
 	await fs.mkdir(path.join(source, "secrets"), { recursive: true });
 	for (const name of await fs.readdir(source)) {
-		if (isPrivateEntry(name)) continue;
+		if (isPrivateEntry(name) || (keepHomeAuth && name.toLowerCase() === "auth.json")) continue;
 		await linkEntry(path.join(source, name), path.join(home, name));
 	}
 	// A sign-out from the CLI deletes the source's auth.json; the hard link would keep the login alive.
 	const auth = await lstatOrNull(path.join(home, "auth.json"));
 	if (auth?.isFile() && !(await lstatOrNull(path.join(source, "auth.json")))) {
 		await fs.unlink(path.join(home, "auth.json"));
+	}
+	// Record the source auth.json the home is now linked to (written only when it changes).
+	const linked = await lstatOrNull(path.join(source, "auth.json"));
+	const current = await lstatOrNull(path.join(home, "auth.json"));
+	const record = path.join(home, AUTH_RECORD);
+	if (linked?.isFile() && current?.isFile() && sameInode(linked, current)) {
+		if ((await readAuthRecord(home)) !== authRecord(linked)) {
+			await fs.writeFile(record + ".tmp", authRecord(linked));
+			await fs.rename(record + ".tmp", record);
+		}
+	} else if (!keepHomeAuth) {
+		await fs.rm(record, { force: true });
 	}
 	await fs.mkdir(path.join(home, "sessions"), { recursive: true });
 }
