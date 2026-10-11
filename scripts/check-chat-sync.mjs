@@ -40,6 +40,16 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("settings survive the path conversion of a file",
 		M.chatsFromFile(M.chatsToFile([chat("a", 1, "pc", [withS])], ""), "")[0].requests[0].model, "opus");
 
+	/* The ids of a chat's live runs (2026-10-11): a newer copy without them
+	   (the phone's) must not drop the ones the PC holds. */
+	const u1 = "00000001-1111-4222-8333-000000000001", u2 = "00000002-1111-4222-8333-000000000002";
+	r.check("run ids: the union of every copy, each once, the winner's first",
+		M.mergeChats([[chat("a", 9, "ph", [], { runIds: [u2] })], [chat("a", 5, "ph", [], { runIds: [u1, u2] })]])[0].runIds, [u2, u1]);
+	r.check("run ids: a newer copy without them keeps the older copy's", M.mergeChats([[chat("a", 9, "ph")], [chat("a", 5, "ph", [], { runIds: [u1] })]])[0].runIds, [u1]);
+	r.check("run ids: no copy has any, no field", "runIds" in M.mergeChats([[chat("a", 9, "ph")], [chat("a", 5, "ph")]])[0], false);
+	r.check("run ids: a tombstone keeps none", "runIds" in M.mergeChats([[chat("a", 9, "ph", [], { deleted: true })], [chat("a", 5, "ph", [], { runIds: [u1] })]])[0], false);
+	r.check("run ids survive the path conversion of a file", M.chatsFromFile(M.chatsToFile([chat("a", 1, "pc", [], { runIds: [u1] })], ""), "")[0].runIds, [u1]);
+
 	// What a device may write.
 	const mine = chat("m", 5, "ph"), foreign = chat("f", 5, "pc", [rq("r", 1)]);
 	r.check("own file: own chats only, a live foreign chat is never copied",

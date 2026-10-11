@@ -69,6 +69,11 @@ export interface ChatRecord {
 	/** Tombstone: hides the chat, never dropped (a deleted chat must not come back). */
 	deleted?: true;
 	requests: ChatRequest[];
+	/** The live Claude Code / Codex runs of this chat (2026-10-11), oldest
+	    first: ids in the run store of the PC that ran them (`HostLive`), never
+	    a path. Read from a synced file: lowercase UUIDs only, each once, at
+	    most `MAX_RUN_IDS`. Absent on a chat stored before live sessions. */
+	runIds?: string[];
 }
 
 /** The chat that holds queue lines saved before chats existed. */
@@ -76,6 +81,19 @@ export const LEGACY_CHAT_ID = "queue-before-chats";
 export const MAX_CHATS = 200;
 /** A written answer is bounded: a chat is a few kilobytes, never a transcript. */
 export const MAX_RESULT_TEXT = 20_000;
+
+/** The most run ids a chat keeps (the newest). */
+export const MAX_RUN_IDS = 500;
+/** A run id as the main process creates it (`crypto.randomUUID()`). */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const isRunId = (x: unknown): x is string => typeof x === "string" && RUN_ID.test(x);
+
+/** Valid ids, each once, the newest `MAX_RUN_IDS`; `undefined` when none. */
+export function readRunIds(x: unknown): string[] | undefined {
+	if (!Array.isArray(x)) return undefined;
+	const out = [...new Set(x.filter(isRunId))].slice(-MAX_RUN_IDS);
+	return out.length ? out : undefined;
+}
 
 /** Bound of a stored provider / model / effort label. */
 export const MAX_LABEL = 100;
@@ -161,6 +179,8 @@ function readChat(x: unknown): ChatRecord | null {
 	};
 	if (isStr(x.title)) chat.title = x.title;
 	if (x.deleted === true) chat.deleted = true;
+	const runIds = readRunIds(x.runIds);
+	if (runIds) chat.runIds = runIds;
 	return chat;
 }
 
@@ -230,4 +250,24 @@ export function deriveTitle(r: Pick<ChatRequest, "text" | "documents" | "results
 
 export function chatTitle(c: Pick<ChatRecord, "title" | "requests">): string {
 	return c.title || (c.requests[0] ? deriveTitle(c.requests[0]) : "");
+}
+
+/** The runs of a chat; none for an unknown or deleted chat. */
+export function runIdsOf(chats: readonly ChatRecord[], chatId: string): string[] {
+	const c = chats.find(x => x.id === chatId);
+	return c && !c.deleted ? [...(c.runIds ?? [])] : [];
+}
+
+/** A run started for a chat: kept with it (bounded, each id once). An
+    unknown chat is created empty (its first request is recorded when it
+    ends); a deleted chat is never revived; a bad id changes nothing. */
+export function addRunId(chats: readonly ChatRecord[], chatId: string, runId: string, device: string, now: number): ChatRecord[] {
+	if (!isRunId(runId)) return [...chats];
+	const idx = chats.findIndex(c => c.id === chatId);
+	if (idx < 0) return [...chats, { id: chatId, origin: device, createdAt: now, updatedAt: now, requests: [], runIds: [runId] }];
+	const c = chats[idx];
+	if (c.deleted || c.runIds?.includes(runId)) return [...chats];
+	const list = [...chats];
+	list[idx] = { ...c, updatedAt: now, runIds: [...(c.runIds ?? []), runId].slice(-MAX_RUN_IDS) };
+	return list;
 }
