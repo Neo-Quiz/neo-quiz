@@ -196,6 +196,11 @@ jobs:
       - name: Share names and script quoting
         run: npm run check:partage
 
+      # A live Claude session: its exact launch form (user settings only, never
+      # the project's) and the stdin lines the main process writes.
+      - name: Live Claude session protocol
+        run: npm run check:live-protocol
+
       # The share lock is released on every outcome of the panel process
       # (fake clock, fake child): no more stuck "share already in progress".
       - name: Share lock

@@ -19,6 +19,9 @@
    PUR (ni Node ni Electron) : `npm run check:partage` l'éprouve.
 ══════════════════════════════════════════════════════════ */
 
+import { MODES_AGENT } from "../../../src/host/claude-outils";
+import { liveClaudeArgs } from "./live-claude";
+
 /** Un nom de modèle : ne commence jamais par un tiret (ce serait une
     option), ni espace, ni `%`, ni guillemet. Couvre `claude-opus-4-1`,
     `gpt-5.1-codex`, `gemini-2.5-pro`, `opus[1m]`, `qwen3:8b`. */
@@ -227,6 +230,33 @@ export function argumentsImages(tool: string, args: unknown): boolean {
 	if (tool !== "claude" || !Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
 	const queue: Piece[] = ["--tools", "Read", ...RESTRICTIONS];
 	return correspond(args, [...teteClaude(), ...queue]) || correspond(args, [...teteClaude(), ...effortClaude, ...queue]);
+}
+
+/* ── A LIVE CLAUDE SESSION (2026-10-11) ──
+
+   The long-lived Claude Code process of a chat (`live-claude.ts`): stream-json
+   in and out, permissions asked to the app on stdin. Unlike the agent forms
+   above, it loads the user's OWN settings (`--setting-sources user`), as a
+   terminal would, and keeps its session so a thread can be resumed. Never
+   the project's or local settings: the Neo Quiz root is synced, and a
+   `.claude/settings.json` planted in it would run its hooks on this PC.
+   Launched by the main process only; never accepted by `argumentsAutorises`.
+   The form is the one `liveClaudeArgs` builds, compared word for word: only
+   the model, the effort, the mode and the session id vary. */
+
+/** True when `args` is exactly a live Claude session form (`live-claude.ts`). */
+export function argumentsLiveClaude(args: unknown): boolean {
+	if (!Array.isArray(args) || !args.every(a => typeof a === "string")) return false;
+	const a = args as string[];
+	const id = a[a.length - 1];
+	const model = a[a.indexOf("--model") + 1];
+	for (const mode of MODES_AGENT) for (const resume of [false, true]) for (const effort of [undefined, "low", "medium", "high", "xhigh", "max"]) {
+		try {
+			const expected = liveClaudeArgs({ model, effort, mode, sessionId: id, resume });
+			if (expected.length === a.length && expected.every((x, i) => x === a[i])) return true;
+		} catch { /* invalid model or id: not this form */ }
+	}
+	return false;
 }
 
 /** True when `args` is exactly the app-server launch. */
