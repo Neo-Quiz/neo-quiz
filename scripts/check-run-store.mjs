@@ -86,6 +86,23 @@ await withSrcModule("apps/windows/electron/run-store.ts", async ({ createRunStor
 				[got.interrupted, got.events.length, await store.read(ID(99))], [true, 1, null]);
 		});
 
+		await cas(r, "interrupted is judged after the LAST spawn: a resumed run that crashed reads interrupted", async () => {
+			const store = createRunStore(join(dir, "b2"));
+			await store.open(header(ID(20)));
+			const spawn = { meta: { spawn: { model: "m", effort: null, mode: "supervised", resume: false } } };
+			await store.append(ID(20), spawn);
+			await store.append(ID(20), { dir: "out", l: 1 });
+			await store.append(ID(20), { end: { code: 0, cancelled: false } });
+			const ended = (await store.read(ID(20))).interrupted;
+			await store.append(ID(20), { meta: { spawn: { ...spawn.meta.spawn, resume: true } } });
+			await store.append(ID(20), { dir: "out", l: 2 });
+			const crashed = (await store.read(ID(20))).interrupted;
+			await store.append(ID(20), { end: { code: null, cancelled: true } });
+			const endedAgain = (await store.read(ID(20))).interrupted;
+			r.check("interrupted is judged after the LAST spawn: a resumed run that crashed reads interrupted",
+				[ended, crashed, endedAgain], [false, true, false]);
+		});
+
 		await cas(r, "a damaged line is skipped, the others are read", async () => {
 			const root = join(dir, "c");
 			const store = createRunStore(root);

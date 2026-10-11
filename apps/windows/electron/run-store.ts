@@ -241,10 +241,16 @@ export function createRunStore(root: string, options: RunStoreOptions = {}): Run
 				const ev = readEvent(parseLine(line));
 				if (ev) events.push(ev);
 			}
+			/* Judged on the LAST lifecycle event: a resumed session appends a
+			   `{meta:{spawn}}` line to the same file, so an end line of an
+			   EARLIER process says nothing of the last one. A run whose last
+			   process crashed reads interrupted. */
+			let lastSpawn = -1;
+			events.forEach((e, i) => { if (e.meta && isObject(e.meta.spawn)) lastSpawn = i; });
 			return {
 				header,
 				events,
-				interrupted: !events.some(e => e.end !== undefined),
+				interrupted: !events.slice(lastSpawn + 1).some(e => e.end !== undefined),
 				truncated: events.some(e => e.meta?.truncated === true),
 			};
 		});
