@@ -17,6 +17,10 @@ release notes.
 
 - Claude Code and Codex now run as live sessions: write while they work, approve their actions, and see everything they do, kept on this PC.
 
+### Fixed
+
+- The "Trust this folder?" question no longer draws a double outline around Trust.
+
 ## [1.20.83] - 2026-10-10
 
 ### Fixed
