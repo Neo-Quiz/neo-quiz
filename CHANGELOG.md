@@ -20,6 +20,7 @@ release notes.
 ### Fixed
 
 - The "Trust this folder?" question no longer draws a double outline around Trust.
+- The "scroll to the latest message" button no longer turns see-through on hover.
 
 ## [1.20.83] - 2026-10-10
 
