@@ -19,6 +19,7 @@
 import type { UsageRead } from "../dashboard/usage-format";
 import type { ResetsRequest, ResetsResult } from "../dashboard/codex-resets";
 import type { CodeLanguage } from "../code-languages";
+import type { ModeAgent } from "./claude-outils";
 
 /** Un fichier vu par l'hôte. Volontairement plat et sérialisable. */
 export interface HostFile {
@@ -1086,6 +1087,42 @@ export interface HostDepot {
 	/** La fin : l'application reprend sa taille d'avant, centrée, et revient au
 	    premier plan ; le site reste derrière. Sans effet sans `disposer`. */
 	terminer(): Promise<void>;
+}
+
+/** First line of a run file of the live-session store (spec
+    2026-10-11-live-cli-sessions-design, section 5): one file per live Claude
+    Code / Codex run, `<userData>/runs/<runId>.jsonl`, kept on the PC only. */
+export interface RunHeader {
+	v: 1;
+	tool: "claude" | "codex";
+	model: string;
+	effort?: string;
+	mode: ModeAgent;
+	/** A UUID: the store refuses anything else before it builds a path. */
+	runId: string;
+	cwd: string;
+	chatId: string;
+	/** Epoch milliseconds. */
+	start: number;
+}
+
+/** One line after the header: a raw CLI line sent (`in`) or received
+    (`out`), a note of the app (`meta`), or the end of the run (`end`). */
+export interface RunEvent {
+	t: number;
+	dir?: "in" | "out";
+	l?: unknown;
+	meta?: Record<string, unknown>;
+	end?: unknown;
+}
+
+/** A run as read back. `interrupted`: no end line (the app or the CLI died
+    mid-run). `truncated`: the run hit its size cap and stopped recording. */
+export interface RunRead {
+	header: RunHeader;
+	events: RunEvent[];
+	interrupted: boolean;
+	truncated: boolean;
 }
 
 export interface Host {

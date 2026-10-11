@@ -201,6 +201,11 @@ jobs:
       - name: Live Claude session protocol
         run: npm run check:live-protocol
 
+      # The run store of live AI sessions: a run id is never a path, concurrent
+      # appends never interleave, the cap holds, a damaged line is skipped.
+      - name: Live session run store
+        run: npm run check:run-store
+
       # The share lock is released on every outcome of the panel process
       # (fake clock, fake child): no more stuck "share already in progress".
       - name: Share lock
