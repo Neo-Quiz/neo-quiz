@@ -2,7 +2,8 @@
    A LIVE CODEX SESSION: THE JSON-RPC LINES OF `codex app-server` (2026-10-11).
 
    Codex runs as a long-lived `codex app-server` (the launch form is
-   `ARGS_CODEX_APP_SERVER` of `gabarits-cli.ts`), speaking JSON-RPC 2.0, one
+   `argsLiveCodex` of `gabarits-cli.ts`, in the private Codex home of
+   `codex-home.ts`), speaking JSON-RPC 2.0, one
    JSON per line, on stdio: `initialize` then the `initialized` notification,
    `thread/start` or `thread/resume`, `turn/start`, `turn/steer` for a message
    during a turn, `turn/interrupt`. Every approval the model needs comes to

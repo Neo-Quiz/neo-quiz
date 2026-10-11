@@ -259,6 +259,34 @@ export function argumentsLiveClaude(args: unknown): boolean {
 	return false;
 }
 
+/* ── A LIVE CODEX SESSION (2026-10-11) ──
+
+   The long-lived `codex app-server` of a chat (`live-codex.ts`), launched by
+   the main process only, with the env `CODEX_HOME` and `CODEX_SQLITE_HOME`
+   set to the private Codex home (`codex-home.ts`). The `sqlite_home` override
+   repeats it so Codex's databases cannot land in the user's `~/.codex`
+   whatever the user's config says. The only variable is the home, written
+   as a quoted string (JSON escapes are valid TOML basic-string escapes), so
+   a quote or a newline in the path cannot become another override. Never
+   accepted by `argumentsAutorises`: the window would own the app-server's
+   stdin, the whole JSON-RPC surface. */
+
+/** An absolute path: `C:\…`, `C:/…`, `\\server\…` or `/…`. */
+const ABSOLU = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
+
+/** The launch arguments of a live Codex session in the private home `home`. */
+export function argsLiveCodex(home: string): string[] {
+	if (typeof home !== "string" || !ABSOLU.test(home)) throw new Error("The private Codex home must be an absolute path");
+	return ["app-server", "-c", "sqlite_home=" + JSON.stringify(home)];
+}
+
+/** True when `args` is exactly the live Codex launch for the private home `home`. */
+export function argumentsLiveCodex(args: unknown, home: unknown): boolean {
+	if (!Array.isArray(args) || typeof home !== "string" || !ABSOLU.test(home)) return false;
+	const expected = argsLiveCodex(home);
+	return args.length === expected.length && expected.every((x, i) => args[i] === x);
+}
+
 /** True when `args` is exactly the app-server launch. */
 export function argumentsAppServer(tool: string, args: unknown): boolean {
 	return tool === "codex" && Array.isArray(args) && args.length === ARGS_CODEX_APP_SERVER.length && args.every((a, i) => a === ARGS_CODEX_APP_SERVER[i]);

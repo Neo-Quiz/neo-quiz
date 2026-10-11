@@ -632,6 +632,12 @@ jobs:
       - name: Electron file primitives
         run: npm run check:electron-fs
 
+      # The private Codex home of live sessions, on real junctions and hard
+      # links: login and config shared with ~/.codex, sessions and state kept
+      # out of it, a link to anywhere else refused.
+      - name: Private Codex home
+        run: npm run check:codex-home
+
       # Electron accounts handling.
       - name: Electron accounts
         run: npm run check:electron-comptes

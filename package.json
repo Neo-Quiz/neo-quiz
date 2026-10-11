@@ -97,6 +97,7 @@
     "check:partage": "node scripts/check-partage.mjs",
     "check:live-protocol": "node scripts/check-live-protocol.mjs",
     "check:run-store": "node scripts/check-run-store.mjs",
+    "check:codex-home": "node scripts/check-codex-home.mjs",
     "check:share-lock": "node scripts/check-share-lock.mjs",
     "check:share-roundtrip": "node scripts/check-share-roundtrip.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",

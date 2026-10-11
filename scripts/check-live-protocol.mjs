@@ -19,7 +19,9 @@
  * `jsonrpc` taken for an approval, an approval answer of the wrong shape (a
  * permissions request takes `permissions`, not `decision`), and a drift from
  * the lines a real Codex session exchanged
- * (`scripts/fixtures/live/codex-session.jsonl`).
+ * (`scripts/fixtures/live/codex-session.jsonl`). Its launch form
+ * (`argsLiveCodex`) is checked too: only the private home varies, quoted, and
+ * the user's own home (a bare `app-server`) or an extra override is refused.
  *
  *     npm run check:live-protocol
  */
@@ -176,7 +178,8 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 	r.done();
 });
 
-await withSrcModule(["apps/windows/electron/live-codex.ts"], (live) => {
+await withSrcModule(["apps/windows/electron/live-codex.ts", "apps/windows/electron/gabarits-cli.ts"], (live, gabarits) => {
+	const { argsLiveCodex, argumentsLiveCodex, argumentsAutorises, argumentsAppServer } = gabarits;
 	const {
 		codexRequest, codexNotification, codexInitializeParams, codexModeParams, codexThreadStartParams,
 		codexThreadResumeParams, codexTurnStartParams, codexTurnSteerParams, codexTurnInterruptParams,
@@ -188,6 +191,31 @@ await withSrcModule(["apps/windows/electron/live-codex.ts"], (live) => {
 	// Key order is not part of JSON: lines read from the fixture are compared sorted.
 	const canon = (v) => Array.isArray(v) ? v.map(canon)
 		: v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
+
+	// The launch form: the private Codex home (`codex-home.ts`) is also the SQLite home.
+	const H = "C:\\Users\\a b\\AppData\\Roaming\\Neo Quiz\\codex-home\\default";
+	r.check("launch: exact form", argsLiveCodex(H), ["app-server", "-c", "sqlite_home=\"C:\\\\Users\\\\a b\\\\AppData\\\\Roaming\\\\Neo Quiz\\\\codex-home\\\\default\""]);
+	r.check("launch: the value is a TOML string that reads back as the home", JSON.parse(argsLiveCodex(H)[2].slice("sqlite_home=".length)), H);
+	const odd = "C:\\x\"\n -c y=1";
+	r.check("launch: a quote or a newline in the home stays inside the string",
+		[JSON.parse(argsLiveCodex(odd)[2].slice("sqlite_home=".length)), argsLiveCodex(odd).length, argsLiveCodex(odd)[2].includes("\n")], [odd, 3, false]);
+	r.check("launch: an empty or relative home throws",
+		[throws(() => argsLiveCodex("")), throws(() => argsLiveCodex("codex-home")), throws(() => argsLiveCodex(null))], [true, true, true]);
+	r.check("form: the built form is accepted for its own home", argumentsLiveCodex(argsLiveCodex(H), H), true);
+	r.check("form: another home refused", argumentsLiveCodex(argsLiveCodex(H), H + "2"), false);
+	r.check("form: the bare app-server (the user's own home) refused", argumentsLiveCodex(["app-server"], H), false);
+	r.check("form: an extra option refused", [
+		argumentsLiveCodex([...argsLiveCodex(H), "-c", "sandbox_mode=\"danger-full-access\""], H),
+		argumentsLiveCodex(["app-server", "--dangerously-bypass-approvals-and-sandbox", "-c", argsLiveCodex(H)[2]], H),
+		argumentsLiveCodex(argsLiveCodex(H).slice(0, 2), H),
+	], [false, false, false]);
+	r.check("form: unquoted or reordered value refused",
+		[argumentsLiveCodex(["app-server", "-c", "sqlite_home=" + H], H), argumentsLiveCodex(["-c", argsLiveCodex(H)[2], "app-server"], H)], [false, false]);
+	r.check("form: non-arrays, non-strings, a bad home", [
+		argumentsLiveCodex("app-server", H), argumentsLiveCodex(null, H), argumentsLiveCodex(["app-server", "-c", 7], H), argumentsLiveCodex(argsLiveCodex(H), ""),
+	], [false, false, false, false]);
+	r.check("form: never accepted from the window, nor taken for the resets probe",
+		[argumentsAutorises("codex", argsLiveCodex(H), "0".repeat(32)), argumentsAppServer("codex", argsLiveCodex(H))], [false, false]);
 
 	// The lines the app writes.
 	const init = codexRequest(1, "initialize", codexInitializeParams("1.2.3"));
