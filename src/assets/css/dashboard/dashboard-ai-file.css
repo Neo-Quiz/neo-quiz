@@ -730,9 +730,11 @@
 	height: 18px;
 }
 
+/* The hover tint is translucent: layered OVER the opaque base, never in its
+   place, or the thread shows through the button. */
 .qbd-ai-fil-bas:hover,
 .qbd-ai-fil-bas:focus-visible {
-	background: var(--background-modifier-hover);
+	background: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary);
 }
 
 .qbd-ai-fil-bas:hover .qbd-ai-fil-bas-points,
