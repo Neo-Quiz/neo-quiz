@@ -50,6 +50,8 @@ jobs:
       # result of a Claude stream-json output is always found.
       - name: Generation transcript decoding
         run: npm run check:transcript
+      - name: Live AI work thread
+        run: npm run check:live-thread
       - name: Figures of a generated reading
         run: npm run check:figures
       - name: Zoom of a quiz picture
