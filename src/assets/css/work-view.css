@@ -252,6 +252,14 @@
 	color: var(--text-error);
 }
 
+/* The summary is one line: a long error is cut with an ellipsis (title = full text). */
+.qbd-work-summary-text {
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .qbd-work-branch {
 	flex: 0 0 auto;
 	font-family: var(--font-monospace);

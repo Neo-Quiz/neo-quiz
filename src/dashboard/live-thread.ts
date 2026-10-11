@@ -24,7 +24,13 @@ export const PREVIEW_LINES = 8;
 
 export type ToolStatus = "running" | "ok" | "error" | "refused";
 export type PermissionState = "pending" | "allowed" | "denied" | "gone";
-export interface ToolDiff { added: string[]; removed: string[] }
+/** One line of a reduced structured patch: `num` is the new-file line number
+    for context and additions, the old-file one for a removal. */
+export interface DiffLine { kind: "ctx" | "add" | "del"; text: string; num: number }
+/** `lines` is present when the CLI carried a structured patch with real line
+    numbers (at most DIFF_LINE_CAP lines); otherwise only the two arrays. */
+export interface ToolDiff { added: string[]; removed: string[]; lines?: DiffLine[] }
+export const DIFF_LINE_CAP = 2000;
 
 /** `notice.text` is a stable KEY, not a sentence: "interrupted", "truncated"
     or "resumed". The view maps each to its translated string with `t()`. */
@@ -225,6 +231,7 @@ function assistantMessage(t: Thread, msg: unknown): void {
 
 function toolResults(t: Thread, l: Rec): void {
 	const message = isRec(l.message) ? l.message : {};
+	const patch = arr(isRec(l.tool_use_result) ? l.tool_use_result.structuredPatch : undefined);
 	const declinedByPolicy = arr(l.tool_result_meta).some((m) => isRec(m) && isRec(m.permission_decision) && m.permission_decision.decision === "reject");
 	for (const b of arr(message.content).filter(isRec)) {
 		if (b.type !== "tool_result") continue;
@@ -234,6 +241,8 @@ function toolResults(t: Thread, l: Rec): void {
 		tool.preview = preview(text);
 		tool.lines = lineCount(text);
 		tool.status = b.is_error === true ? (declinedByPolicy || /declined|rejected/i.test(text) ? "refused" : "error") : "ok";
+		// The CLI's own patch replaces the input-derived diff: it has the real line numbers.
+		if (patch.length > 0 && (tool.name === "Edit" || tool.name === "Write" || tool.name === "MultiEdit")) tool.diff = diffFromPatch(patch);
 	}
 }
 
@@ -356,6 +365,35 @@ function replaceOrPush(t: Thread, kind: "text" | "thinking", s: string): void {
 function formatInput(tool: string, input: unknown): string {
 	if ((tool === "Bash" || tool === "PowerShell") && isRec(input) && typeof input.command === "string") return input.command;
 	return JSON.stringify(input ?? {}, null, 2);
+}
+
+/** Reduces the CLI's `structuredPatch` hunks: `lines` keep the file's line
+    numbers. Over DIFF_LINE_CAP lines, `lines` is left out and the view falls
+    back to the two arrays. */
+function diffFromPatch(hunks: unknown[]): ToolDiff {
+	const d: ToolDiff = { added: [], removed: [] };
+	const lines: DiffLine[] = [];
+	for (const h of hunks.filter(isRec)) {
+		let oldNo = typeof h.oldStart === "number" ? h.oldStart : 1;
+		let newNo = typeof h.newStart === "number" ? h.newStart : 1;
+		for (const raw of arr(h.lines)) {
+			const line = str(raw) ?? "";
+			const text = line.slice(1);
+			if (line.startsWith("+")) {
+				d.added.push(text);
+				lines.push({ kind: "add", text, num: newNo++ });
+			} else if (line.startsWith("-")) {
+				d.removed.push(text);
+				lines.push({ kind: "del", text, num: oldNo++ });
+			} else {
+				lines.push({ kind: "ctx", text: line.startsWith(" ") ? text : line, num: newNo });
+				oldNo++;
+				newNo++;
+			}
+		}
+	}
+	if (lines.length <= DIFF_LINE_CAP) d.lines = lines;
+	return d;
 }
 
 function editDiff(name: string, input: unknown): ToolDiff | null {

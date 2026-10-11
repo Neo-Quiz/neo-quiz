@@ -735,7 +735,7 @@ export function creerVueFile(opts: {
 		for (const item of items) {
 			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected()), opts.ouvrirPiece); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", racine: opts.racine, ouvrirFichier: opts.ouvrirFichier, ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");

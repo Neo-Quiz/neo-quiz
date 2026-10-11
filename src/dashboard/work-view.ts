@@ -28,6 +28,7 @@ import markdown from "refractor/markdown";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { PREVIEW_LINES, type Thread, type ThreadItem } from "./live-thread";
+import { quizProgress } from "./transcript";
 
 refractor.register(bash);
 refractor.register(powershell);
@@ -147,7 +148,7 @@ function buildItem(item: ThreadItem, deps: WorkViewDeps, live: boolean, prev: HT
 		case "user":
 			return textBlock("qbd-work-item qbd-work-user", item.text);
 		case "text":
-			return textBlock("qbd-work-item qbd-work-text", item.text);
+			return textItem(item.text, live);
 		case "thinking":
 			return thinkingBlock(item, live, prev);
 		case "notice":
@@ -248,10 +249,14 @@ function groupBlock(family: Family, items: ToolItem[], deps: WorkViewDeps, prev:
 }
 
 /** Makes a head row open its body on click or Enter/Space, with the chevron that shows it. */
-function expandable(head: HTMLElement, block: HTMLElement, body: HTMLElement): void {
+function expandable(head: HTMLElement, block: HTMLElement, body: HTMLElement, onOpen?: () => void): void {
 	head.classList.add("is-expandable");
 	if (!head.querySelector(".qbd-work-chevron")) head.appendChild(chevron());
-	toggleOn(head, () => setOpen(block, body, !block.classList.contains("is-open")));
+	toggleOn(head, () => {
+		const open = !block.classList.contains("is-open");
+		if (open) onOpen?.();
+		setOpen(block, body, open);
+	});
 }
 
 /** A Lucide chevron; CSS turns it when its row is open. */
@@ -305,13 +310,22 @@ function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undef
 	const summary = summaryNode(item);
 	if (summary) block.appendChild(summary);
 
+	// The body is built on first open: a failed call's full message is not in
+	// the DOM before the row is expanded, and is never shown twice.
 	const body = el("div", "qbd-work-tool-body");
-	if (isRun && item.input) body.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
-	if (item.diff) body.appendChild(diffNode(item, item.diff));
-	const output = outputNode(item, deps);
-	if (output) body.appendChild(output);
+	let built = false;
+	const build = () => {
+		if (built) return;
+		built = true;
+		if (isRun && item.input) body.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
+		if (item.diff) body.appendChild(diffNode(item, item.diff));
+		const output = outputNode(item, deps);
+		if (output) body.appendChild(output);
+	};
+	if (open) build();
 	setOpen(block, body, open);
-	if (body.childNodes.length > 0) expandable(head, block, body);
+	const hasBody = (isRun && item.input !== "") || item.diff !== null || item.preview !== "" || item.lines > 0;
+	if (hasBody) expandable(head, block, body, build);
 	block.appendChild(body);
 	return block;
 }
@@ -446,14 +460,25 @@ function summaryNode(item: ToolItem): HTMLElement | null {
 	if (!s) return null;
 	const line = el("div", s.error ? "qbd-work-summary is-error" : "qbd-work-summary");
 	line.appendChild(el("span", "qbd-work-branch", "└"));
-	line.appendChild(el("span", "qbd-work-summary-text", s.text));
+	const text = el("span", "qbd-work-summary-text", s.text);
+	if (s.full && s.full !== s.text) text.setAttribute("title", s.full);
+	line.appendChild(text);
 	return line;
 }
 
-function summaryOf(item: ToolItem): { text: string; error: boolean } | null {
+function firstSentence(s: string): string {
+	const m = /^(.+?[.!?])(\s|$)/.exec(s);
+	return m ? m[1] : s;
+}
+
+function summaryOf(item: ToolItem): { text: string; error: boolean; full?: string } | null {
 	if (item.status === "running") return null;
 	if (item.status === "refused") return { text: t("ai.transcript.stepRefusedBare"), error: true };
-	if (item.status === "error") return { text: firstLine(item.preview) || t("ai.transcript.stepErrorBare"), error: true };
+	if (item.status === "error") {
+		// One sentence on one line; the full message lives in the body only.
+		const full = item.preview.trim();
+		return { text: firstSentence(firstLine(item.preview)) || t("ai.transcript.stepErrorBare"), error: true, full };
+	}
 	if (item.diff && item.diff.added.length + item.diff.removed.length > 0) {
 		const added = item.diff.added.length;
 		if (item.name === "Write") return { text: t("ai.work.wrote", { count: added }), error: false };
@@ -505,9 +530,17 @@ type ToolDiff = NonNullable<ToolItem["diff"]>;
 function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
 	const lang = DIFF_LANGUAGES.get(extensionOf(diffPath(item))) ?? null;
 	const rows: { cls: string; marker: string; text: string; num: string }[] = [];
-	for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "−", text: line, num: "" });
-	let n = 1;
-	for (const line of diff.added) rows.push({ cls: "qbd-work-diff-add", marker: "+", text: line, num: item.name === "Write" ? String(n++) : "" });
+	if (diff.lines) {
+		for (const l of diff.lines) {
+			const cls = l.kind === "add" ? "qbd-work-diff-add" : l.kind === "del" ? "qbd-work-diff-del" : "qbd-work-diff-ctx";
+			const marker = l.kind === "add" ? "+" : l.kind === "del" ? "−" : " ";
+			rows.push({ cls, marker, text: l.text, num: String(l.num) });
+		}
+	} else {
+		for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "−", text: line, num: "" });
+		let n = 1;
+		for (const line of diff.added) rows.push({ cls: "qbd-work-diff-add", marker: "+", text: line, num: item.name === "Write" ? String(n++) : "" });
+	}
 	const box = el("div", "qbd-work-diff");
 	rows.forEach((r, i) => {
 		const row = el("div", "qbd-work-diff-row " + r.cls);
@@ -592,6 +625,126 @@ function outputNode(item: ToolItem, deps: WorkViewDeps): HTMLElement | null {
 	});
 	box.appendChild(toggle);
 	return box;
+}
+
+// --- Text: prose, fenced code, and the quiz the model writes at the end -------
+
+/** A fence opens a block: ```lang, its code, then the closing fence (or the end
+    while it still streams). */
+const FENCE = /```([A-Za-z0-9_+-]*)[^\n]*\n([\s\S]*?)(?:```|$)/;
+const QUIZ_FENCE = /```quiz-blocks[^\n]*\n?/;
+const FENCE_LANGUAGES = new Map<string, string>([
+	["json", "javascript"], ["json5", "javascript"], ["js", "javascript"], ["javascript", "javascript"],
+	["ts", "typescript"], ["typescript", "typescript"], ["py", "python"], ["python", "python"],
+	["bash", "bash"], ["sh", "bash"], ["powershell", "powershell"], ["ps1", "powershell"],
+	["html", "markup"], ["xml", "markup"], ["css", "css"], ["md", "markdown"], ["markdown", "markdown"],
+]);
+
+/** A text item: the prose stays prose, a fenced block becomes a monospace coloured
+    block, and a quiz block (```quiz-blocks, or a bare JSON array that parses as a
+    quiz) becomes ONE row like a tool call. */
+function textItem(text: string, live: boolean): HTMLElement {
+	const block = el("div", "qbd-work-item qbd-work-text");
+	const quiz = QUIZ_FENCE.exec(text);
+	if (quiz) {
+		const before = text.slice(0, quiz.index);
+		const after = text.slice(quiz.index + quiz[0].length);
+		const close = after.indexOf("```");
+		const body = close < 0 ? after : after.slice(0, close);
+		const rest = close < 0 ? "" : after.slice(close + 3);
+		appendProse(block, before);
+		block.appendChild(quizRow(body, live && close < 0));
+		appendProse(block, rest);
+		return block;
+	}
+	if (/^\s*\[/.test(text) && quizProgress(text).question > 0) {
+		block.appendChild(quizRow(text.trim(), live));
+		return block;
+	}
+	appendProse(block, text);
+	return block;
+}
+
+/** Prose and fenced code, in order. A running fence is shown as code up to now. */
+function appendProse(parent: HTMLElement, text: string): void {
+	let rest = text;
+	for (;;) {
+		const m = FENCE.exec(rest);
+		if (!m) break;
+		if (m.index > 0) parent.appendChild(el("div", "qbd-work-body", rest.slice(0, m.index)));
+		parent.appendChild(codeBlock(m[2], FENCE_LANGUAGES.get(m[1].toLowerCase()) ?? null));
+		rest = rest.slice(m.index + m[0].length);
+		if (m[0].length === 0) break;
+	}
+	if (rest !== "") parent.appendChild(el("div", "qbd-work-body", rest));
+}
+
+function codeBlock(code: string, language: string | null): HTMLElement {
+	const pre = el("pre", "qbd-work-pre qbd-work-codeblock");
+	appendHighlighted(pre, code.replace(/\n$/, ""), language);
+	return pre;
+}
+
+/** The quiz the model writes: one row, collapsed. Its raw block is built only on open. */
+function quizRow(block: string, live: boolean): HTMLElement {
+	const wrap = el("div", "qbd-work-tool qbd-work-quiz");
+	const progress = quizProgress(block);
+	const head = el("div", "qbd-work-tool-head");
+	const icon = el("span", "qbd-work-icon");
+	if (live) {
+		icon.classList.add("is-running");
+		currentHost().ui.setIcon(icon, "loader");
+	} else {
+		icon.classList.add("is-ok");
+	}
+	head.appendChild(icon);
+	const title = el("span", "qbd-work-title");
+	title.appendChild(el("span", "qbd-work-tool-name", live ? t("ai.work.quizWriting") : t("ai.work.quizWritten")));
+	head.appendChild(title);
+	wrap.appendChild(head);
+	const count = live ? (progress.question > 0 ? t("ai.work.quizQuestion", { n: progress.question }) : "") : t("ai.work.quizCount", { n: progress.question });
+	if (count) {
+		const line = el("div", "qbd-work-summary");
+		line.appendChild(el("span", "qbd-work-branch", "└"));
+		line.appendChild(el("span", "qbd-work-summary-text", count));
+		wrap.appendChild(line);
+	}
+	const body = el("div", "qbd-work-tool-body");
+	let built = false;
+	const build = () => {
+		if (built || block === "") return;
+		built = true;
+		const lines = block.split("\n");
+		const box = el("div", "qbd-work-diff");
+		lines.forEach((line, i) => {
+			const row = el("div", "qbd-work-diff-row");
+			if (i >= PREVIEW_LINES) row.hidden = true;
+			row.appendChild(el("span", "qbd-work-gutter", String(i + 1)));
+			const code = el("span", "qbd-work-code");
+			appendHighlighted(code, line, "javascript");
+			row.appendChild(code);
+			box.appendChild(row);
+		});
+		body.appendChild(box);
+		if (lines.length > PREVIEW_LINES) {
+			const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: lines.length }));
+			toggle.type = "button";
+			let shown = false;
+			toggle.addEventListener("click", e => {
+				e.stopPropagation();
+				shown = !shown;
+				box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
+					if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+				});
+				toggle.textContent = shown ? t("ai.work.showLess") : t("ai.work.showAll", { n: lines.length });
+			});
+			body.appendChild(toggle);
+		}
+	};
+	setOpen(wrap, body, false);
+	wrap.appendChild(body);
+	if (block !== "") expandable(head, wrap, body, build);
+	return wrap;
 }
 
 // --- Permissions ----------------------------------------------------------------

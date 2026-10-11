@@ -45,7 +45,7 @@ import { renderThread } from "./work-view";
 
 /** One folded "AI work" line per live turn of the request; the turn is read
     from the store on the first unfolding only. */
-function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[]): void {
+function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[], deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void }): void {
 	const host = currentHost();
 	if (!host.live) return;
 	for (const run of runs) {
@@ -76,7 +76,7 @@ function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[]): void {
 				// Gone from the store (deleted): the line goes too.
 				if (!thread || !thread.items.length) { bloc.remove(); return; }
 				// Read-only: a recorded turn has no permission left to answer.
-				if (detail === d) renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {} });
+				if (detail === d) renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
 			});
 		});
 	}
@@ -118,7 +118,7 @@ function rendreOuvrable(p: HTMLElement, action: () => void): void {
 	});
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void; chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -136,7 +136,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const id = q.id;
 		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
 	}
-	if (q.runs?.length) peindreTravail(tour, q.runs);
+	if (q.runs?.length) peindreTravail(tour, q.runs, deps);
 	for (const res of q.results) {
 		if (res.kind === "text") {
 			const rep = ajouter(tour, "div", "qbd-ai-chat-reponse");

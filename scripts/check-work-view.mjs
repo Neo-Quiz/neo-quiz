@@ -18,7 +18,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async ({ renderThread }, { installHost }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread }, { installHost }, { threadFromRun }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -67,6 +67,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 		renderThread(root, fil([
 			{ kind: "tool", id: "t2", name: "Bash", input: "ls", preview: "a", lines: 40, status: "ok", diff: null },
 		]), deps);
+		click(root.querySelector(".qbd-work-tool-head"));
 		const bouton = [...root.querySelectorAll("button")].find(b => b.textContent.includes("40"));
 		r.check("Afficher tout : bouton présent quand lignes > aperçu", !!bouton, true);
 		if (bouton) {
@@ -86,6 +87,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 		renderThread(root, fil([
 			{ kind: "tool", id: "t3", name: "Edit", input: "x", preview: "", lines: 0, status: "ok", diff: { added: [CHARGE], removed: ["old"] } },
 		]), deps);
+		click(root.querySelector(".qbd-work-tool-head"));
 		r.check("diff : une ligne ajoutée", root.querySelectorAll(".qbd-work-diff-add").length, 1);
 		r.check("diff : une ligne retirée", root.querySelectorAll(".qbd-work-diff-del").length, 1);
 		r.check("diff : aucun img", root.querySelectorAll("img").length, 0);
@@ -183,6 +185,8 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 			{ kind: "tool", id: "w1", name: "Write", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["a", CHARGE, "c"], removed: [] } },
 			{ kind: "tool", id: "w2", name: "Edit", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["new"], removed: ["old"] } },
 		]), deps);
+		r.check("corps replié par défaut", root.querySelectorAll(".qbd-work-tool-body")[0].hidden, true);
+		root.querySelectorAll(".qbd-work-tool-head").forEach(h => click(h));
 		const resumes = root.querySelectorAll(".qbd-work-summary-text");
 		r.check("Write : « Wrote 3 lines »", resumes[0]?.textContent, "Wrote 3 lines");
 		r.check("Edit : added / removed", resumes[1]?.textContent, "Added 1 lines, removed 1 lines");
@@ -192,7 +196,6 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 		r.check("Edit : pas de numéros", [...edition.querySelectorAll(".qbd-work-gutter")].every(n => n.textContent === ""), true);
 		r.check("Edit : une ligne retirée, une ajoutée", edition.querySelectorAll(".qbd-work-diff-del").length + edition.querySelectorAll(".qbd-work-diff-add").length, 2);
 		r.check("marqueurs : − puis +", [...edition.querySelectorAll(".qbd-work-marker")].map(n => n.textContent).join(""), "−+");
-		r.check("corps replié par défaut", root.querySelectorAll(".qbd-work-tool-body")[0].hidden, true);
 		r.check("diff : aucun img/script hostile", root.querySelectorAll("img,script").length, 0);
 		r.check("diff : la ligne hostile reste du texte", root.textContent.includes(CHARGE), true);
 	}
@@ -297,6 +300,69 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts"], async
 		const brut = [...root.querySelectorAll("*")].some(n => [...n.childNodes].some(c => c.nodeType === 3 && c.textContent.includes("ai.")));
 		r.check("aucune clé de traduction brute à l'écran", brut, false);
 		r.check("aucun texte « ai.work. »", root.textContent.includes("ai.work."), false);
+	}
+
+	// 15. A failed call: the summary is ONE line holding the first sentence; the full
+	//     message is absent from the body until the row opens, then appears exactly once.
+	{
+		const root = document.createElement("div");
+		const MESSAGE = "Read failed: file missing. Details here\nline two of stack";
+		renderThread(root, fil([
+			{ kind: "tool", id: "e1", name: "Read", input: JSON.stringify({ file_path: "C:\\neo\\racine\\a.md" }), preview: MESSAGE, lines: 2, status: "error", diff: null },
+		]), deps);
+		const resume = root.querySelector(".qbd-work-summary-text");
+		r.check("erreur : résumé sur une ligne", resume?.textContent.includes("\n"), false);
+		r.check("erreur : résumé = première phrase", resume?.textContent, "Read failed: file missing.");
+		r.check("erreur : titre = message complet", resume?.getAttribute("title"), MESSAGE);
+		r.check("erreur : corps replié, message absent avant ouverture", root.textContent.split("line two of stack").length - 1, 0);
+		click(root.querySelector(".qbd-work-tool-head"));
+		r.check("erreur : message complet une fois après ouverture", root.textContent.split("line two of stack").length - 1, 1);
+		r.check("erreur : le corps est ouvert", root.querySelector(".qbd-work-tool-body").hidden, false);
+	}
+
+	// 16. A Claude Code `user` line carrying an Edit's structuredPatch: the diff keeps the
+	//     file's real line numbers; context lines are plain. The line below is sanitized from the
+	//     shape the CLI writes (empty hunks in the owner's run); the non-empty hunk follows the same
+	//     documented fields (oldStart, newStart, lines with a one-character prefix).
+	{
+		const RACINE = "C:\\neo\\racine";
+		const evenements = [
+			{ dir: "out", l: { type: "assistant", message: { content: [{ type: "tool_use", id: "tu1", name: "Edit", input: { file_path: RACINE + "\\a.md", old_string: "old line", new_string: "new line" } }] } } },
+			{ dir: "out", l: { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "tu1", content: "The file has been updated.", is_error: false }] }, tool_use_result: { filePath: RACINE + "\\a.md", originalFile: "x", structuredPatch: [{ oldStart: 3, oldLines: 2, newStart: 3, newLines: 2, lines: [" keep", "-old line", "+new line", " tail"] }], type: "update", userModified: false } } },
+		];
+		const fil2 = threadFromRun({ events: evenements, interrupted: false, truncated: false });
+		const diff = fil2.items[0].diff;
+		r.check("patch : lignes réduites avec numéros réels", JSON.stringify((diff.lines ?? []).map(l => [l.kind, l.num])), JSON.stringify([["ctx", 3], ["del", 4], ["add", 4], ["ctx", 5]]));
+		r.check("patch : compteurs", `${diff.added.length}/${diff.removed.length}`, "1/1");
+		const vue = document.createElement("div");
+		renderThread(vue, fil([{ kind: "tool", id: "tu1", name: "Edit", input: "", preview: "", lines: 0, status: "ok", diff }]), deps);
+		click(vue.querySelector(".qbd-work-tool-head"));
+		const numeros = [...vue.querySelectorAll(".qbd-work-gutter")].map(n => n.textContent).join(",");
+		r.check("patch : numéros affichés", numeros, "3,4,4,5");
+		r.check("patch : contexte sans teinte", vue.querySelectorAll(".qbd-work-diff-ctx").length, 2);
+	}
+
+	// 17. The quiz the model writes is ONE row: streaming it shows the question count and
+	//     no raw JSON until the row opens; hostile HTML inside the quiz creates no element.
+	{
+		const PARTIEL = "Voici le quiz.\n```quiz-blocks\n[\n  {\n    title: \"Q\",\n    questions: [\n" +
+			"      {prompt: \"Un\", options: [\"a\", \"b\"], correctIndex: 0},\n" +
+			"      {prompt: \"Deux\", options: [\"a\", \"b\"], correctIndex: 1},\n" +
+			"      {prompt: \"<img src=x onerror=alert(1)>\", options: [\"a\", \"b\"], correctIndex: 0,\n";
+		const root = document.createElement("div");
+		renderThread(root, fil([{ kind: "text", text: PARTIEL }], true), deps);
+		const rangee = root.querySelector(".qbd-work-quiz");
+		r.check("quiz en cours : une seule ligne", root.querySelectorAll(".qbd-work-quiz").length, 1);
+		r.check("quiz en cours : titre « Writing the quiz »", rangee?.querySelector(".qbd-work-tool-name")?.textContent, "Writing the quiz");
+		r.check("quiz en cours : « Question 3 »", rangee?.querySelector(".qbd-work-summary-text")?.textContent, "Question 3");
+		r.check("quiz en cours : prose avant le bloc gardée", root.textContent.includes("Voici le quiz."), true);
+		r.check("quiz en cours : JSON brut absent avant ouverture", root.textContent.includes("correctIndex"), false);
+		click(rangee.querySelector(".qbd-work-tool-head"));
+		r.check("quiz ouvert : JSON visible", root.textContent.includes("correctIndex"), true);
+		r.check("quiz ouvert : aucun img hostile", root.querySelectorAll("img,script").length, 0);
+		r.check("quiz ouvert : texte hostile visible", root.textContent.includes("<img src=x onerror=alert(1)>"), true);
+		renderThread(root, fil([{ kind: "text", text: PARTIEL + "]\n```" }], false), deps);
+		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
 	}
 	r.done();
 });
