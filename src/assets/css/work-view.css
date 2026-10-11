@@ -187,7 +187,10 @@
 	color: var(--text-muted);
 }
 
-.qbd-work-icon.is-running {
+/* The spin turns the Lucide svg itself, about its centre. */
+.qbd-work-icon.is-running svg {
+	display: inline-block;
+	transform-origin: center;
 	animation: qbd-work-spin 1s linear infinite;
 }
 
@@ -542,7 +545,7 @@
 		color: inherit;
 	}
 
-	.qbd-work-icon.is-running {
+	.qbd-work-icon.is-running svg {
 		animation: none;
 	}
 

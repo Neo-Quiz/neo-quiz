@@ -18,7 +18,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread }, { installHost }, { threadFromRun }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread, threadHasLiveRow }, { installHost }, { threadFromRun }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -363,6 +363,14 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("quiz ouvert : texte hostile visible", root.textContent.includes("<img src=x onerror=alert(1)>"), true);
 		renderThread(root, fil([{ kind: "text", text: PARTIEL + "]\n```" }], false), deps);
 		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
+	}
+
+	// 18. A live row carries its own spinner: the page's "Working" line stays hidden then.
+	{
+		const outil = { kind: "tool", id: "w9", name: "Bash", input: "sleep 9", preview: "", lines: 0, status: "running", diff: null };
+		r.check("outil en cours : pas de ligne « Working »", threadHasLiveRow(fil([outil], true)), true);
+		r.check("tour fini : la ligne « Working » ne reste pas", threadHasLiveRow(fil([{ ...outil, status: "ok" }], false)), false);
+		r.check("réflexion en cours : pas de ligne « Working »", threadHasLiveRow(fil([{ kind: "thinking", text: "" }], true)), true);
 	}
 	r.done();
 });

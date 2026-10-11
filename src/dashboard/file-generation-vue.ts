@@ -45,7 +45,7 @@ import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
 import { quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
-import { renderThread } from "./work-view";
+import { renderThread, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
 
@@ -485,12 +485,14 @@ export function creerVueFile(opts: {
 					root: opts.racine?.() ?? undefined,
 					openFile: opts.ouvrirFichier,
 				});
+				// Only while no row of the thread is live: a live row carries its own spinner.
+				const busy = vue.thread.running && !threadHasLiveRow(vue.thread);
 				let marche = corps.querySelector<HTMLElement>(":scope > .qbd-work-running");
-				if (vue.thread.running && !marche) {
+				if (busy && !marche) {
 					marche = ajouter(corps, "div", "qbd-work-running");
-					host.ui.setIcon(ajouter(marche, "span", "qbd-work-icon"), "loader");
+					host.ui.setIcon(ajouter(marche, "span", "qbd-work-icon is-running"), "loader");
 					ajouter(marche, "span", undefined, t("ai.work.running"));
-				} else if (!vue.thread.running && marche) marche.remove();
+				} else if (!busy && marche) marche.remove();
 			},
 		};
 	}

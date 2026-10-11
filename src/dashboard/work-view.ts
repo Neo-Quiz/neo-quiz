@@ -85,6 +85,18 @@ const COMMAND_LANGUAGES: Record<string, string> = { Bash: "bash", commandExecuti
 
 interface HastNode { type: string; value?: string; children?: HastNode[]; properties?: { className?: unknown } }
 
+/** True while a row of the thread is itself live (a running call, the thinking,
+    a quiz being written, or prose streaming): the page's "Working" line then
+    stays hidden, so no second spinner shows under a live row. */
+export function threadHasLiveRow(thread: Thread): boolean {
+	if (!thread.running) return false;
+	const last = thread.items[thread.items.length - 1];
+	if (!last) return false;
+	if (thread.items.some(i => i.kind === "tool" && i.status === "running")) return true;
+	if (last.kind === "thinking" || last.kind === "text") return true;
+	return false;
+}
+
 export function renderThread(root: HTMLElement, thread: Thread, deps: WorkViewDeps): void {
 	root.classList.add("qbd-work");
 	const entries = groupItems(thread.items);
