@@ -84,6 +84,9 @@ jobs:
         run: npm run check:code-run
         run: npm run check:work-view
 
+      - name: Compact HTML indented for display only
+        run: npm run check:pretty-code
+
       # DU MARKDOWN PARTOUT : un quiz en HTML s'ouvre en markdown dans
       # l'éditeur, seulement quand c'est SANS PERTE — sinon le HTML reste.
       - name: HTML to markdown conversion

@@ -23,6 +23,7 @@
     "check:code-sandbox": "node scripts/check-code-sandbox.mjs",
     "check:code-run": "node scripts/check-code-run.mjs",
     "check:work-view": "node scripts/check-work-view.mjs",
+    "check:pretty-code": "node scripts/check-pretty-code.mjs",
     "check:quiz-io": "node scripts/check-quiz-io.mjs",
     "check:markers": "node scripts/check-render-markers.mjs \"C:/obsidian-vaults/Personal\" \"C:/obsidian-vaults/Efrei\"",
     "check:scanner": "node scripts/check-scanner.mjs",

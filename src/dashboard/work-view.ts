@@ -29,6 +29,7 @@ import markdown from "refractor/markdown";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { PREVIEW_LINES, type Thread, type ThreadItem } from "./live-thread";
+import { prettyHtml } from "./pretty-code";
 import { quizProgress } from "./transcript";
 
 refractor.register(bash);
@@ -581,8 +582,11 @@ function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
 		for (const line of diff.removed) rows.push({ cls: "qbd-work-diff-del", marker: "-", text: line, num: "" });
 		// A Write is a file preview: numbered lines, no marker.
 		const write = item.name === "Write";
+		// A compact HTML page is shown re-indented; the model's text and the counts stay as written.
+		const ext = extensionOf(diffPath(item));
+		const added = write && (ext === "html" || ext === "htm") ? prettyHtml(diff.added.join("\n")).split("\n") : diff.added;
 		let n = 1;
-		for (const line of diff.added) rows.push({ cls: write ? "qbd-work-diff-write" : "qbd-work-diff-add", marker: write ? "" : "+", text: line, num: write ? String(n++) : "" });
+		for (const line of added) rows.push({ cls: write ? "qbd-work-diff-write" : "qbd-work-diff-add", marker: write ? "" : "+", text: line, num: write ? String(n++) : "" });
 	}
 	const box = el("div", "qbd-work-diff");
 	rows.forEach((r, i) => {
