@@ -29,20 +29,25 @@ function entree(input: LiveInput): LiveInput {
 }
 
 export function createWindowsLive(pont: () => Pont): HostLive {
+	const live = () => {
+		const l = pont().live;
+		if (!l) throw new Error("live sessions are not available on this host");
+		return l;
+	};
 	return {
 		async start(o) {
-			return valeur(await pont().live.start({
+			return valeur(await live().start({
 				tool: o.tool, chatId: o.chatId, model: o.model, mode: o.mode,
 				...(o.effort !== undefined ? { effort: o.effort } : {}),
 				...(o.runId !== undefined ? { runId: o.runId } : {}),
 			}));
 		},
-		async send(runId, input) { valeur(await pont().live.send(runId, entree(input))); },
-		async close(runId) { valeur(await pont().live.close(runId)); },
-		onEvent: cb => pont().live.surEvenement(cb),
-		readRun: (runId, page) => pont().live.lireRun(runId, page ? { offset: page.offset, limit: page.limit } : undefined),
-		toolOutput: (runId, toolUseId) => pont().live.sortieOutil(runId, toolUseId),
-		async removeRuns(runIds) { valeur(await pont().live.supprimerRuns([...runIds])); },
-		storeSize: () => pont().live.tailleRuns(),
+		async send(runId, input) { valeur(await live().send(runId, entree(input))); },
+		async close(runId) { valeur(await live().close(runId)); },
+		onEvent: cb => live().surEvenement(cb),
+		readRun: (runId, page) => live().lireRun(runId, page ? { offset: page.offset, limit: page.limit } : undefined),
+		toolOutput: (runId, toolUseId) => live().sortieOutil(runId, toolUseId),
+		async removeRuns(runIds) { valeur(await live().supprimerRuns([...runIds])); },
+		storeSize: () => live().tailleRuns(),
 	};
 }

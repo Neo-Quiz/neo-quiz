@@ -1077,7 +1077,7 @@ export interface Pont {
 	 * process validates every field and builds each line itself. Errors come
 	 * back as an envelope, the IPC losing an error's `name`.
 	 */
-	live: {
+	live?: {
 		start(o: { tool: "claude" | "codex"; chatId: string; model: string; effort?: string; mode: ModeAgent; runId?: string }): Promise<EnveloppeLive<{ runId: string }>>;
 		send(runId: string, input: LiveInput): Promise<EnveloppeLive<null>>;
 		close(runId: string): Promise<EnveloppeLive<null>>;
