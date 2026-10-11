@@ -70,8 +70,10 @@ export interface Session {
 	/** The process being killed (park), awaited before the next spawn. */
 	exiting: Promise<void> | null;
 	pending: Map<string, Pending>;
-	/** Turns started and not ended: the session is idle at 0. */
-	turns: number;
+	/** A message was sent and the driver has not said the session idle
+	    again (`turnEnded`): a FLAG, not a count, since one Claude `result`
+	    may answer several messages (`live-drivers.ts`). */
+	busy: boolean;
 	/** Claude: a user line was written once, so the next spawn resumes. */
 	messageSent: boolean;
 	threadId: string | null;

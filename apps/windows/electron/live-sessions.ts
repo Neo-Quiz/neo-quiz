@@ -14,7 +14,9 @@
      the store drops what it already has. A spawn adds `{meta:{spawn}}`, an
      exit an `{end}` line;
    - five idle minutes PARK a session (its tree killed): armed after every
-     spawn and every turn end, cleared while a turn runs; the next message
+     spawn and every turn end, cleared while the session is busy (a flag
+     the driver sets on a message and clears once every message written
+     is answered, `live-drivers.ts`); the next message
      respawns it with resume. A model, effort or mode change respawns it
      with resume too. At most `MAX_LIVE` sessions have a process: a new one
      parks the least recently used idle one, or is refused `busy`;
@@ -111,9 +113,9 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 
 	function armIdle(s: Session): void {
 		stop(s.idle);
-		s.idle = s.turns > 0 || s.closed ? null : t.set(() => {
+		s.idle = s.busy || s.closed ? null : t.set(() => {
 			s.idle = null;
-			if (s.turns === 0 && !s.closed) park(s);
+			if (!s.busy && !s.closed) park(s);
 		}, IDLE_PARK_MS);
 	}
 
@@ -123,7 +125,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 		proc.driver.failAll(new Error("The CLI exited"));
 		if (s.proc === proc) s.proc = null;
 		stop(s.idle); s.idle = null;
-		s.turns = 0;
+		s.busy = false;
 		for (const id of s.pending.keys()) emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
 		s.pending.clear();
 		store(s, { end: { code, cancelled: proc.reason !== null } });
@@ -137,7 +139,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 	function reserve(s: Session): void {
 		const live = [...sessions.values()].filter(o => o !== s && !o.closed && (o.proc || o.spawning));
 		if (live.length >= MAX_LIVE) {
-			const idle = live.filter(o => o.proc && !o.spawning && o.turns === 0 && o.pending.size === 0).sort((a, b) => a.lastUsed - b.lastUsed)[0];
+			const idle = live.filter(o => o.proc && !o.spawning && !o.busy && o.pending.size === 0).sort((a, b) => a.lastUsed - b.lastUsed)[0];
 			if (!idle) throw new LiveError("busy", "Too many AI sessions are working");
 			park(idle);
 		}
@@ -189,9 +191,9 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			gone(id) {
 				if (s.pending.delete(id)) emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
 			},
-			turnStarted() { s.turns++; stop(s.idle); s.idle = null; },
+			turnStarted() { s.busy = true; stop(s.idle); s.idle = null; },
 			turnEnded() {
-				s.turns = Math.max(0, s.turns - 1);
+				s.busy = false;
 				armIdle(s);
 				emit(s, { kind: "turnEnd", runId: s.runId });
 			},
@@ -262,7 +264,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 	function newSession(owner: number, runId: string, o: LiveStart): Session {
 		return {
 			runId, tool: o.tool, chatId: o.chatId, owner, proc: null, spawning: false, closed: false, exiting: null,
-			pending: new Map(), turns: 0, settings: { model: o.model, mode: o.mode, ...(o.effort !== undefined ? { effort: o.effort } : {}) },
+			pending: new Map(), busy: false, settings: { model: o.model, mode: o.mode, ...(o.effort !== undefined ? { effort: o.effort } : {}) },
 			messageSent: false, threadId: null, seq: 0, lastUsed: deps.now(), idle: null, detach: null, chain: Promise.resolve(),
 		};
 	}
@@ -318,12 +320,12 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 					const proc = s.proc as Proc | null;
 					if (!proc) throw new LiveError("failed", "The CLI exited");
 					s.messageSent = true;
-					const before = s.turns;
+					const before = s.busy;
 					try {
 						await proc.driver.message(input.text, input.images);
 					} catch (e) {
 						// A message that never reached a turn: the session idles again.
-						if (s.turns > before) { s.turns = before; armIdle(s); }
+						if (!before && s.busy) { s.busy = false; armIdle(s); }
 						throw new LiveError("failed", message(e));
 					}
 				});

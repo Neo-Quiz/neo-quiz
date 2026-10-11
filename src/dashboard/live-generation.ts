@@ -19,7 +19,16 @@
  *   resume key; a reloaded line whose turn still runs WAITS for it, one whose
  *   turn ended takes its result from the store, and only a dead one is sent
  *   again;
- * - Stop killing the session: it interrupts the turn, the session stays.
+ * - Stop killing the session: it interrupts the turn, the session stays;
+ * - the next request of the chat sent while a stopped turn is still winding
+ *   down (2026-10-11): Stop interrupts the turn, but the turn stays the
+ *   chat's running turn, and its promise rejects (`aborted`), freeing the
+ *   chat for the queue, only once the session says it ended (`turnEnd`,
+ *   `exit`). Settled at once, the queue sent the next request into the
+ *   dying turn: its first `result` (the interrupted one) ended the new
+ *   request, and each later request took the result of the one before. A
+ *   turn that does not end within `STOP_GRACE_MS` has its session closed
+ *   (process killed); the next message resumes it.
  *
  * Model text, tool input and output stay strings here: the view
  * (`work-view.ts`) writes them with `textContent` only.
@@ -72,6 +81,10 @@ interface Turn {
 	fromSeq: number;
 	toSeq: number | null;
 	settle: ((err: Error | null) => void) | null;
+	/** Stop was asked: the turn ends as `aborted`, whatever it brings back. */
+	stopping?: boolean;
+	/** The `STOP_GRACE_MS` timer of a stopped turn. */
+	grace?: ReturnType<typeof setTimeout>;
 }
 interface Session {
 	runId: string;
@@ -81,6 +94,9 @@ interface Session {
 	/** Events received while the store is read, applied after it. */
 	buffer: LiveEvent[] | null;
 }
+
+/** How long a stopped turn may take to end before its session is closed. */
+export const STOP_GRACE_MS = 15_000;
 
 const sessions = new Map<string, Session>();
 /** The run of each chat and tool (`chatId|tool`). */
@@ -135,13 +151,18 @@ function apply(s: Session, e: LiveEvent): void {
 	if (!again) applyLive(turn.thread, e);
 	if (e.kind === "line") { collectLine(turn.outcome, e.line); turn.toSeq = e.seq; }
 	if (turn === s.current && (e.kind === "turnEnd" || e.kind === "exit")) {
-		const err = e.kind === "exit" && !turn.outcome.ended ? Object.assign(new Error("The CLI exited"), { name: "exited" }) : null;
+		const err = turn.stopping ? stopped()
+			: e.kind === "exit" && !turn.outcome.ended ? Object.assign(new Error("The CLI exited"), { name: "exited" }) : null;
 		settle(s, turn, err);
 	}
 	notify(turn);
 }
 
+const stopped = (): Error => Object.assign(new Error("Stopped"), { name: "aborted" });
+
 function settle(s: Session, turn: Turn, err: Error | null): void {
+	if (turn.grace !== undefined) clearTimeout(turn.grace);
+	turn.grace = undefined;
 	if (s.current === turn) s.current = null;
 	s.last = turn;
 	turn.thread.running = false;
@@ -176,10 +197,11 @@ export function liveTurnView(key: string): LiveTurnView | null {
 	return null;
 }
 
-/** Is the turn of this generation running now (a message may join it)? */
+/** Is the turn of this generation running now (a message may join it)?
+    A stopped turn winding down takes no message: it goes to the queue. */
 export function liveTurnRunning(key: string): boolean {
 	const turn = turns.get(key);
-	return !!turn && sessions.get(turn.runId)?.current === turn;
+	return !!turn && !turn.stopping && sessions.get(turn.runId)?.current === turn;
 }
 
 /** A message written while the turn runs: shown in its thread and sent to
@@ -297,12 +319,21 @@ async function nextSeq(live: HostLive, s: Session): Promise<number> {
 	return s.maxSeq + 1;
 }
 
-/** Waits for the end of `turn`, stoppable by the page. */
+/** Waits for the end of `turn`, stoppable by the page. Stop interrupts the
+    turn and waits for its end (`turnEnd`, `exit`) before rejecting
+    `aborted`; past `STOP_GRACE_MS` the session is closed. */
 function waitFor(live: HostLive, s: Session, turn: Turn, spec: LiveTurnSpec): Promise<void> {
 	const done = new Promise<void>((resolve, reject) => { turn.settle = err => (err ? reject(err) : resolve()); });
 	spec.abortable(() => {
+		if (s.current !== turn || turn.stopping) return;
+		turn.stopping = true;
 		void live.send(turn.runId, { kind: "interrupt" }).catch(() => undefined);
-		if (s.current === turn) settle(s, turn, Object.assign(new Error("Stopped"), { name: "aborted" }));
+		turn.grace = setTimeout(() => {
+			turn.grace = undefined;
+			if (s.current !== turn) return;
+			// Still not ended: its process is killed, the next message resumes the session.
+			void live.close(turn.runId).catch(() => undefined).finally(() => { if (s.current === turn) settle(s, turn, stopped()); });
+		}, STOP_GRACE_MS);
 	});
 	return done;
 }
@@ -325,7 +356,15 @@ async function reattach(live: HostLive, spec: LiveTurnSpec, saved: Saved): Promi
 		turn.thread.running = true;
 		s.current = turn;
 		const done = waitFor(live, s, turn, spec);
-		await live.start({ ...settingsOf(spec), runId: saved.runId });
+		try {
+			await live.start({ ...settingsOf(spec), runId: saved.runId });
+		} catch (e) {
+			// Not reattached: the chat is not left with a turn that never ends.
+			turn.settle = null;
+			if (s.current === turn) s.current = null;
+			turn.thread.running = false;
+			throw e;
+		}
 		const buffered = s.buffer;
 		s.buffer = null;
 		for (const e of buffered) apply(s, e);

@@ -105,9 +105,38 @@ function waiters(timers: Timers) {
 	};
 }
 
+/** A user line the CLI echoes when it TAKES it (`--replay-user-messages`):
+    `{"type":"user",…,"isReplay":true}`. A tool result is a `user` line too,
+    without the flag. */
+const isReplay = (v: unknown): boolean => !!v && typeof v === "object" && (v as Rec).type === "user" && (v as Rec).isReplay === true;
+
+/* BUSY UNTIL EVERY MESSAGE IS ANSWERED (2026-10-11). A message written while
+   Claude works is queued by the CLI, and one `result` may close it or not.
+   Measured on Claude Code 2.1.296 with `--replay-user-messages`: each user
+   line is echoed (`isReplay`) when the CLI takes it, at the start of the turn
+   that answers it; a message taken in the middle of a turn is echoed before
+   that turn's `result` (one result for both), one taken after it is echoed
+   after it and gets its own turn and `result`; after an interrupt, a message
+   still queued is taken and answered anyway. So the session is busy while a
+   message was written and not echoed yet, or echoed and not answered yet;
+   `turnEnded` is said ONCE, when both are over. A `result` with a message
+   still queued belongs to the turn that goes on: the page never ends its
+   request on it, and the next request never takes the result meant for the
+   message before it. A Stop interrupts every turn a queued message starts
+   until the session is idle. A CLI that never echoes (an older version):
+   each `result` answers one message, as counted before. */
 export function claudeDriver(o: { mode: ModeAgent }, io: DriverIo): Driver {
 	const w = waiters(io.timers);
 	let next = 1;
+	/** Messages written and not echoed back yet. */
+	let queued = 0;
+	/** A message was taken and its `result` has not come. */
+	let answering = false;
+	/** The CLI echoes the messages it takes (seen at least once). */
+	let echoes = false;
+	/** A Stop was asked: every turn until idle is interrupted. */
+	let stopping = false;
+	const sendInterrupt = (): Promise<void> => io.write(claudeControlLine("nq_" + next++, "interrupt"));
 	return {
 		async init() {
 			const id = "nq_" + next++;
@@ -116,16 +145,39 @@ export function claudeDriver(o: { mode: ModeAgent }, io: DriverIo): Driver {
 			await answer;
 		},
 		async message(text, images) {
+			queued++;
 			io.turnStarted();
-			await io.write(claudeUserLine(text, images));
+			try {
+				await io.write(claudeUserLine(text, images));
+			} catch (e) {
+				queued--;
+				throw e;
+			}
 		},
 		async interrupt() {
-			await io.write(claudeControlLine("nq_" + next++, "interrupt"));
+			if (queued > 0 || answering) stopping = true;
+			await sendInterrupt();
 		},
 		onLine(v) {
 			const c = parseClaudeControl(v);
 			if (!c) {
-				if (v && typeof v === "object" && (v as Rec).type === "result") io.turnEnded();
+				if (isReplay(v)) {
+					echoes = true;
+					queued = Math.max(0, queued - 1);
+					answering = true;
+					if (stopping) void sendInterrupt().catch(() => undefined);
+					return;
+				}
+				if (v && typeof v === "object" && (v as Rec).type === "result") {
+					const busy = queued > 0 || answering;
+					answering = false;
+					if (!echoes) queued = Math.max(0, queued - 1);
+					// A result while idle (an interrupt of nothing) ends no turn.
+					if (busy && queued === 0) {
+						stopping = false;
+						io.turnEnded();
+					}
+				}
 				return;
 			}
 			if (c.kind === "controlResponse") { w.settle(c.requestId, c.ok ? null : new Error("control request refused")); return; }

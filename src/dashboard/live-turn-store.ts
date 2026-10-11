@@ -12,8 +12,10 @@
 import type { HostLive, RunEvent } from "../host/types";
 import { threadFromRun } from "./live-thread";
 import type { Thread } from "./live-thread";
-import { collectLine, emptyOutcome, isPromptLine } from "./live-turn";
+import { collectLine, emptyOutcome, isEcho, isPromptLine } from "./live-turn";
 import type { TurnOutcome } from "./live-turn";
+
+const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** A turn's place in its run: from `fromSeq`, to `toSeq` once it ended. */
 export interface Saved { runId: string; fromSeq: number; toSeq: number | null }
@@ -54,5 +56,12 @@ export function turnFromStore(run: Pick<StoredRun, "events" | "truncated">, save
 	const shown = prompt >= 0 ? [...mine.slice(0, prompt), ...mine.slice(prompt + 1)] : mine;
 	const outcome = emptyOutcome();
 	for (const e of mine) if (e.dir === "out") collectLine(outcome, e.l);
+	/* A Claude message written during the turn and not taken yet (its echo
+	   has not come): the session still works for this turn, whatever result
+	   came before it. Only when the CLI echoes at all (an older one never
+	   does, and its result is the end). */
+	const written = mine.filter(e => e.dir === "in" && isRec(e.l) && e.l.type === "user").length;
+	const echoed = mine.filter(e => e.dir === "out" && isEcho(e.l)).length;
+	if (echoed > 0 && written > echoed) outcome.ended = false;
 	return { thread: threadFromRun({ events: shown, interrupted, truncated: run.truncated }), outcome };
 }

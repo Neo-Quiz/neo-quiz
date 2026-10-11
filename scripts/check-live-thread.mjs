@@ -200,6 +200,29 @@ await withSrcModule(["src/dashboard/live-turn.ts", "src/dashboard/live-turn-stor
 	r.check("store: only the turn's own lines, its prompt left out, a message written meanwhile kept",
 		thread.items.map(i => i.kind + ":" + (i.text ?? i.name)), ["tool:Read", "user:also add a question"]);
 	r.check("store: the turn's own result", [outcome.ended, outcome.claudeResult.result], [true, "[new]"]);
+	/* A message written during the turn and answered by its OWN result
+	   (`--replay-user-messages` echoes it after the first result): the turn
+	   is not over at the first result, and its end is the second. */
+	const echo = (text) => ({ type: "user", message: { role: "user", content: [{ type: "text", text }] }, isReplay: true });
+	const mid = T.emptyOutcome();
+	T.collectLine(mid, echo("THE PROMPT"));
+	T.collectLine(mid, { type: "result", result: "[first]" });
+	T.collectLine(mid, echo("also add a question"));
+	r.check("live: a message taken after the result reopens the turn", [mid.ended, mid.claudeResult.result], [false, "[first]"]);
+	T.collectLine(mid, { type: "result", result: "[second]" });
+	r.check("live: the turn ends on the result of that message", [mid.ended, mid.claudeResult.result], [true, "[second]"]);
+	const queued = [
+		ev(10, "in", user("THE PROMPT")), ev(11, "out", echo("THE PROMPT")),
+		ev(12, "in", user("also add a question")),
+		ev(13, "out", { type: "result", result: "[first]" }),
+	];
+	r.check("store: a message written and not taken yet keeps the turn running after a result",
+		S.turnFromStore({ events: queued, truncated: false }, { runId: "r", fromSeq: 10, toSeq: null }, false).outcome.ended, false);
+	const answered = [...queued, ev(14, "out", echo("also add a question")), ev(15, "out", { type: "result", result: "[second]" })];
+	const back = S.turnFromStore({ events: answered, truncated: false }, { runId: "r", fromSeq: 10, toSeq: null }, false);
+	r.check("store: once taken and answered, the turn ended with the second result, the echoes never shown",
+		[back.outcome.ended, back.outcome.claudeResult.result, back.thread.items.map(i => i.kind + ":" + (i.text ?? ""))], [true, "[second]", ["user:also add a question"]]);
+	r.check("store: a CLI that never echoes ends on its result", S.turnFromStore({ events: [queued[0], queued[2], queued[3]], truncated: false }, { runId: "r", fromSeq: 10, toSeq: null }, false).outcome.ended, true);
 	const open = S.turnFromStore({ events, truncated: false }, { runId: "r", fromSeq: 6, toSeq: null }, true);
 	r.check("store: a turn cut by a crash says so", [open.outcome.ended, open.thread.items.at(-1)], [false, { kind: "notice", text: "interrupted" }]);
 
@@ -211,5 +234,83 @@ await withSrcModule(["src/dashboard/live-turn.ts", "src/dashboard/live-turn-stor
 	] });
 	r.check("summary: reasoning, text and every tool with its key input", [tr.thinking, tr.text, tr.tools.map(s => [s.name, s.input, s.status]), tr.started, tr.done],
 		["hmm", "a\nb", [["Read", "cours/ch1.md", "ok"], ["Bash", "ls -la", "running"], ["fileChange", "a.md, b.md", "refused"]], true, false]);
+	r.done();
+});
+
+/* STOP WAITS FOR THE END OF THE TURN (2026-10-11, `live-generation.ts`):
+   Stop interrupts a live turn, but the turn's promise rejects (`aborted`),
+   which frees the chat for the queue, only once the session says the turn
+   ended (`turnEnd`, `exit`). Settled at once, the next request of the chat
+   was sent into the dying turn: the interrupted turn's `result` ended the
+   NEW request, and each later request took the result of the one before. A
+   turn that never ends has its session closed after `STOP_GRACE_MS`. Driven
+   with a fake `HostLive` and a fake clock for that one timer. */
+await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"], async (G, H) => {
+	const r = makeReporter("Live Stop and the next request");
+	const RUN = "00000000-0000-4000-8000-0000000000aa";
+	const sent = [];
+	const closed = [];
+	let emit = () => {};
+	let seq = 0;
+	H.installHost({
+		live: {
+			start: async () => ({ runId: RUN }),
+			send: async (runId, input) => { sent.push(input.kind === "message" ? "message:" + input.text : input.kind); },
+			close: async (runId) => { closed.push(runId); },
+			onEvent: (cb) => { emit = cb; return () => {}; },
+			readRun: async () => null,
+			toolOutput: async () => null,
+			removeRuns: async () => {},
+			storeSize: async () => 0,
+		},
+		paths: { defaultRoot: () => ({ id: "R", name: "Neo Quiz", deviceId: "pc" }), contractPath: (root, local) => root + "/" + local },
+	});
+	// The grace timer is the only `setTimeout` of a turn: caught, fired by hand.
+	const realSetTimeout = globalThis.setTimeout;
+	let grace = null;
+	globalThis.setTimeout = (fn, ms, ...a) => (ms === G.STOP_GRACE_MS ? (grace = fn, 0) : realSetTimeout(fn, ms, ...a));
+	const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((ok) => setImmediate(ok)); };
+	const result = (text) => emit({ kind: "line", runId: RUN, seq: ++seq, line: { type: "result", subtype: "success", is_error: false, result: text } });
+	const turnEnd = () => emit({ kind: "turnEnd", runId: RUN });
+	const turn = (key, text) => {
+		let stop = null;
+		const settled = { value: "pending" };
+		const p = G.runLiveTurn({ tool: "claude", chatId: "chat-1", model: "claude-haiku-5-5", mode: "full", text, images: [], key, abortable: (s) => { stop = s; } });
+		p.then((o) => { settled.value = "result:" + o.claudeResult?.result; }, (e) => { settled.value = "error:" + e.name; });
+		return { p, settled, stop: () => stop?.() };
+	};
+	try {
+		const a = turn("k-a", "A");
+		// As the queue does (`solder` then `pomper`): the chat's next request starts as soon as A's promise settles.
+		let b = null;
+		a.p.catch(() => { b = turn("k-b", "B"); });
+		await flush();
+		a.stop();
+		await flush();
+		r.check("Stop sends the interrupt, and the turn still holds the chat until it ends", [sent, a.settled.value, G.liveTurnRunning("k-a")], [["message:A", "interrupt"], "pending", false]);
+		result("interrupted A");
+		await flush();
+		r.check("the interrupted turn's result does not end it before the session says so", a.settled.value, "pending");
+		turnEnd();
+		await flush();
+		r.check("at turnEnd the stopped turn rejects as aborted (the queue frees the chat now)", a.settled.value, "error:aborted");
+		r.check("the next request starts only now", [!!b, sent.at(-1)], [true, "message:B"]);
+		result("quiz B");
+		turnEnd();
+		await flush();
+		r.check("the next request gets its OWN result, not the stopped turn's", b?.settled.value, "result:quiz B");
+		const c = turn("k-c", "C");
+		await flush();
+		c.stop();
+		await flush();
+		const before = [c.settled.value, closed.length, typeof grace];
+		grace?.();
+		await flush();
+		r.check("a stopped turn that never ends: its session is closed after the grace, then it rejects as aborted",
+			[...before, closed, c.settled.value], ["pending", 0, "function", [RUN], "error:aborted"]);
+	} finally {
+		globalThis.setTimeout = realSetTimeout;
+		H.uninstallHost();
+	}
 	r.done();
 });

@@ -50,6 +50,14 @@
      "subcommandResults"`); `echo hi > probe.txt` is. Allow rules of the
      user's settings apply the same way.
    - No `control_cancel_request` was seen; its shape is MonoCode's.
+   - `--replay-user-messages` (2.1.296, measured 2026-10-11): each user line
+     comes back as {"type":"user",…,"isReplay":true} when the CLI TAKES it.
+     A message written mid-turn was taken inside that turn once (echoed
+     before its single `result`) and after it another time (echoed after
+     the first `result`, then its own turn and `result`); after an
+     interrupt (`result` `error_during_execution`, `still_queued: []`), a
+     message still queued was taken and answered. The drivers read the
+     session's busy state from these echoes (`live-drivers.ts`).
 ══════════════════════════════════════════════════════════ */
 
 import type { ModeAgent } from "../../../src/host/claude-outils";
@@ -82,7 +90,7 @@ export function liveClaudeArgs(o: { model: string; effort?: string; mode: ModeAg
 	if (!Object.prototype.hasOwnProperty.call(PERMISSION_MODE, o.mode)) throw new Error("Invalid mode");
 	return [
 		"-p", "--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
-		"--permission-prompt-tool", "stdio", "--include-partial-messages",
+		"--permission-prompt-tool", "stdio", "--include-partial-messages", "--replay-user-messages",
 		"--setting-sources", "user", "--settings", LIVE_SETTINGS,
 		"--model", o.model, ...(o.effort ? ["--effort", o.effort] : []),
 		...PERMISSION_MODE[o.mode],

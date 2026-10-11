@@ -39,6 +39,13 @@ export function emptyOutcome(): TurnOutcome {
 /** Folds one CLI line (received) into the outcome of its turn. */
 export function collectLine(o: TurnOutcome, line: unknown): TurnOutcome {
 	if (!isRec(line)) return o;
+	/* A message written during the turn and taken AFTER its `result`
+	   (`--replay-user-messages` echoes it then): the turn goes on, and its
+	   end is the next `result`, never this one. */
+	if (isEcho(line)) {
+		o.ended = false;
+		return o;
+	}
 	if (line.type === "result") {
 		o.claudeResult = line;
 		o.ended = true;
@@ -67,6 +74,12 @@ export function collectLine(o: TurnOutcome, line: unknown): TurnOutcome {
 		}
 	}
 	return o;
+}
+
+/** A user message Claude Code echoes when it takes it (`isReplay`); a tool
+    result is a `user` line too, without the flag. */
+export function isEcho(l: unknown): boolean {
+	return isRec(l) && l.type === "user" && l.isReplay === true;
 }
 
 /** The line the app wrote to open a turn (the prompt): Claude `user`, Codex

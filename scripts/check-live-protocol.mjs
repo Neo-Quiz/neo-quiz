@@ -42,7 +42,7 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 	const full = liveClaudeArgs({ model: "claude-opus-5-5", mode: "full", sessionId: U, resume: false });
 	r.check("args: full access, new session, exact form", full, [
 		"-p", "--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
-		"--permission-prompt-tool", "stdio", "--include-partial-messages",
+		"--permission-prompt-tool", "stdio", "--include-partial-messages", "--replay-user-messages",
 		"--setting-sources", "user", "--settings", "{\"cleanupPeriodDays\":3650}",
 		"--model", "claude-opus-5-5",
 		"--permission-mode", "bypassPermissions", "--allow-dangerously-skip-permissions",
@@ -89,6 +89,8 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 	r.check("form: an extra --mcp-config in the middle refused",
 		argumentsLiveClaude([...full.slice(0, 4), "--mcp-config", "x", ...full.slice(4)]), false);
 	r.check("form: an extra --add-dir refused", argumentsLiveClaude([...full, "--add-dir", "C:\\"]), false);
+	r.check("form: without --replay-user-messages refused (the busy state is read from its echoes)",
+		argumentsLiveClaude(full.filter(a => a !== "--replay-user-messages")), false);
 	let moved = 0;
 	for (let i = 0; i + 1 < full.length; i++) {
 		if (full[i] === full[i + 1]) continue;

@@ -435,7 +435,9 @@ await withSrcModule([
 
 	await cas(r, "an oversized stdout line is never parsed: a marker only", async () => {
 		const t = setup(M);
-		await t.m.start(1, START());
+		const { runId } = await t.m.start(1, START());
+		// A message first: a `result` ends a turn only when one runs.
+		await t.m.send(1, runId, { kind: "message", text: "x", images: [] });
 		const c = t.children[0];
 		const lineEvents = t.events.filter((e) => e.kind === "line").length;
 		const big = JSON.stringify({ type: "assistant", pad: "x".repeat(8 * 1024 * 1024) });
@@ -734,7 +736,87 @@ await withSrcModule([
 			[afterReattach, t.children[1].killed, t.children.length], [false, true, 2]);
 	});
 
-	await cas(r, "two queued turns: the first result does not park the second turn", async () => {
+	/* BUSY UNTIL EVERY MESSAGE IS ANSWERED (`--replay-user-messages`): Claude
+	   echoes a message when it takes it; one `result` may answer one or two
+	   messages. A counter per message wedged the session busy (never parked,
+	   never evicted) after a folded message, and a separate result let the
+	   page end its request on the wrong `result`. */
+	const echo = (text) => ({ type: "user", message: { role: "user", content: [{ type: "text", text }] }, isReplay: true });
+	const turnEnds = (t) => t.events.filter((e) => e.kind === "turnEnd").length;
+
+	await cas(r, "claude: two messages, ONE result (the second taken mid-turn): one turnEnd, then idle and parked", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "1", images: [] });
+		await t.m.send(1, runId, { kind: "message", text: "2", images: [] });
+		c.send(echo("1"));
+		c.send(echo("2"));
+		c.send({ type: "result", subtype: "success" });
+		await flush();
+		const ends = turnEnds(t);
+		await t.timers.advance(300_000);
+		r.check("claude: two messages, ONE result (the second taken mid-turn): one turnEnd, then idle and parked", [ends, c.killed], [1, true]);
+	});
+
+	await cas(r, "claude: two messages, TWO results: no turnEnd on the first, busy (not parked, not evicted) until the second", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "1", images: [] });
+		await t.m.send(1, runId, { kind: "message", text: "2", images: [] });
+		c.send(echo("1"));
+		c.send({ type: "result", subtype: "success", result: "for 1" });
+		await flush();
+		const afterFirst = turnEnds(t);
+		await t.timers.advance(600_000);
+		const parkedEarly = c.killed;
+		// Six other sessions: the busy one is never the one evicted for the 7th.
+		for (let i = 0; i < 5; i++) await t.m.start(1, START({ chatId: "o" + i }));
+		const seventh = await rejectName(t.m.start(1, START({ chatId: "o5" })));
+		const evicted = c.killed;
+		c.send(echo("2"));
+		c.send({ type: "result", subtype: "success", result: "for 2" });
+		await flush();
+		r.check("claude: two messages, TWO results: no turnEnd on the first, busy (not parked, not evicted) until the second",
+			[afterFirst, parkedEarly, evicted, seventh === null || seventh === "busy", turnEnds(t)], [0, false, false, true, 1]);
+	});
+
+	await cas(r, "claude: Stop with a message still queued interrupts the turn that message starts; one turnEnd", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		const interrupts = () => lines(c).filter((l) => l.request?.subtype === "interrupt").length;
+		await t.m.send(1, runId, { kind: "message", text: "1", images: [] });
+		await t.m.send(1, runId, { kind: "message", text: "2", images: [] });
+		c.send(echo("1"));
+		await flush();
+		await t.m.send(1, runId, { kind: "interrupt" });
+		c.send({ type: "result", subtype: "error_during_execution" });
+		await flush();
+		const [ends1, int1] = [turnEnds(t), interrupts()];
+		c.send(echo("2"));
+		await flush();
+		const int2 = interrupts();
+		c.send({ type: "result", subtype: "error_during_execution" });
+		await flush();
+		r.check("claude: Stop with a message still queued interrupts the turn that message starts; one turnEnd",
+			[ends1, int1, int2, turnEnds(t)], [0, 1, 2, 1]);
+	});
+
+	await cas(r, "claude: a result while idle (nothing sent) ends no turn", async () => {
+		const t = setup(M);
+		const { runId } = await t.m.start(1, START());
+		const c = t.children[0];
+		await t.m.send(1, runId, { kind: "message", text: "1", images: [] });
+		c.send(echo("1"));
+		c.send({ type: "result", subtype: "success" });
+		c.send({ type: "result", subtype: "error_during_execution" });
+		await flush();
+		r.check("claude: a result while idle (nothing sent) ends no turn", turnEnds(t), 1);
+	});
+
+	await cas(r, "two queued turns, a CLI that never echoes: the first result does not park the second turn", async () => {
 		const t = setup(M);
 		const { runId } = await t.m.start(1, START());
 		const c = t.children[0];
@@ -747,7 +829,7 @@ await withSrcModule([
 		c.send({ type: "result", subtype: "success" });
 		await flush();
 		await t.timers.advance(300_000);
-		r.check("two queued turns: the first result does not park the second turn", [during, c.killed], [false, true]);
+		r.check("two queued turns, a CLI that never echoes: the first result does not park the second turn", [during, c.killed], [false, true]);
 	});
 
 	await cas(r, "live cap: a 7th session parks the least recently used idle one", async () => {
