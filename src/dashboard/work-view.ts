@@ -910,7 +910,10 @@ function quizRow(block: string, live: boolean): HTMLElement {
 	};
 	setOpen(wrap, body, false);
 	wrap.appendChild(body);
-	if (block !== "") expandable(head, wrap, body, build);
+	/* Clickable only once written (2026-10-13): while the quiz streams, the row is
+	   rebuilt at every chunk, so a click was lost and the hover flickered — and
+	   there is nothing whole to show yet. "Question N" says where it stands. */
+	if (block !== "" && !live) expandable(head, wrap, body, build);
 	return wrap;
 }
 

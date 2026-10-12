@@ -359,12 +359,17 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("quiz en cours : « Question 3 »", rangee?.querySelector(".qbd-work-summary-text")?.textContent, "Question 3");
 		r.check("quiz en cours : prose avant le bloc gardée", root.textContent.includes("Voici le quiz."), true);
 		r.check("quiz en cours : JSON brut absent avant ouverture", root.textContent.includes("correctIndex"), false);
+		// While it is written the row is NOT clickable (rebuilt at every chunk):
+		// no chevron, a click opens nothing (2026-10-13).
+		r.check("quiz en cours : pas de chevron", rangee.querySelectorAll(".qbd-work-chevron").length, 0);
 		click(rangee.querySelector(".qbd-work-tool-head"));
+		r.check("quiz en cours : un clic n'ouvre rien", root.textContent.includes("correctIndex"), false);
+		renderThread(root, fil([{ kind: "text", text: PARTIEL + "]\n```" }], false), deps);
+		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
+		click(root.querySelector(".qbd-work-quiz .qbd-work-tool-head"));
 		r.check("quiz ouvert : JSON visible", root.textContent.includes("correctIndex"), true);
 		r.check("quiz ouvert : aucun img hostile", root.querySelectorAll("img,script").length, 0);
 		r.check("quiz ouvert : texte hostile visible", root.textContent.includes("<img src=x onerror=alert(1)>"), true);
-		renderThread(root, fil([{ kind: "text", text: PARTIEL + "]\n```" }], false), deps);
-		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
 		// The same quiz in an ordinary ```json5 fence (as models write it, 2026-10-13):
 		// the prose once, then ONE folded quiz row; no raw fence, no second copy.
 		const JSON5_QUIZ = PARTIEL.replace("```quiz-blocks", "```json5") + "]\n```";
