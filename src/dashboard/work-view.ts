@@ -701,6 +701,7 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 	const preview = outputPre(item.preview);
 	box.appendChild(preview);
 	if (item.lines <= PREVIEW_LINES) return box;
+	preview.classList.add("is-capped");
 	const full = monoPre("", "qbd-work-pre qbd-work-full");
 	full.hidden = true;
 	box.appendChild(full);
@@ -855,14 +856,18 @@ function quizRow(block: string, live: boolean): HTMLElement {
 	}
 	const body = el("div", "qbd-work-tool-body");
 	let built = false;
+	/* Shows the preview (first lines, faded at the bottom) or everything. The row
+	   always REopens on the preview (2026-10-13): a long quiz left expanded
+	   meant scrolling to its very end to find "Show less". */
+	let montrer: (tout: boolean) => void = () => {};
 	const build = () => {
-		if (built || block === "") return;
+		if (block === "") return;
+		if (built) { montrer(false); return; }
 		built = true;
 		const lines = block.split("\n");
 		const box = el("div", "qbd-work-diff");
 		lines.forEach((line, i) => {
 			const row = el("div", "qbd-work-diff-row");
-			if (i >= PREVIEW_LINES) row.hidden = true;
 			row.appendChild(el("span", "qbd-work-gutter", String(i + 1)));
 			const code = el("span", "qbd-work-code");
 			appendHighlighted(code, line, "javascript");
@@ -871,18 +876,28 @@ function quizRow(block: string, live: boolean): HTMLElement {
 		});
 		body.appendChild(box);
 		if (lines.length > PREVIEW_LINES) {
-			const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: lines.length }));
+			// While expanded it sticks to the bottom of the view: "Show less" is always at hand.
+			const toggle = el("button", "qbd-work-toggle qbd-work-toggle--collant", t("ai.work.showAll", { n: lines.length }));
 			toggle.type = "button";
 			let shown = false;
-			toggle.addEventListener("click", e => {
-				e.stopPropagation();
-				shown = !shown;
+			montrer = tout => {
+				shown = tout;
 				box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
 					if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
 				});
+				box.classList.toggle("is-capped", !shown);
+				toggle.classList.toggle("is-stuck", shown);
 				toggle.textContent = shown ? t("ai.work.showLess") : t("ai.work.showAll", { n: lines.length });
+			};
+			toggle.addEventListener("click", e => {
+				e.stopPropagation();
+				const fermer = shown;
+				montrer(!shown);
+				// Collapsing from far below: bring the row's head back into view.
+				if (fermer) wrap.scrollIntoView?.({ block: "nearest" });
 			});
 			body.appendChild(toggle);
+			montrer(false);
 		}
 	};
 	setOpen(wrap, body, false);

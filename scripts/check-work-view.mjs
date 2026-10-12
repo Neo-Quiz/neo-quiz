@@ -390,6 +390,21 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			click(piege.querySelector(".qbd-work-quiz .qbd-work-tool-head"));
 			r.check(`\`\`\` dans une chaîne (${lang}) : ouvert, aucun script créé`, piege.querySelectorAll("script").length, 0);
 		}
+		// Show all, fold, reopen: the row comes back on the PREVIEW (faded), never
+		// left expanded with "Show less" far below (2026-10-13).
+		{
+			const rangee = document.createElement("div");
+			renderThread(rangee, fil([{ kind: "text", text: PIEGE.replace("LANG", "json5") }], false), deps);
+			const tete = rangee.querySelector(".qbd-work-quiz .qbd-work-tool-head");
+			click(tete);
+			const bascule = rangee.querySelector(".qbd-work-quiz .qbd-work-toggle");
+			r.check("quiz ouvert : aperçu en fondu", rangee.querySelector(".qbd-work-quiz .qbd-work-diff")?.classList.contains("is-capped"), true);
+			click(bascule);
+			r.check("Show all : tout visible, Show less collé", [rangee.querySelectorAll(".qbd-work-quiz .qbd-work-diff-row[hidden]").length, bascule.classList.contains("is-stuck")], [0, true]);
+			click(tete);
+			click(tete);
+			r.check("réouverture : retour à l'aperçu", [rangee.querySelectorAll(".qbd-work-quiz .qbd-work-diff-row[hidden]").length > 0, bascule.textContent.startsWith("Show all")], [true, true]);
+		}
 		// A ``` in the middle of a line of ordinary prose opens no block.
 		const milieu = document.createElement("div");
 		renderThread(milieu, fil([{ kind: "text", text: "Écris ```js ici``` puis continue.\nLigne deux." }], false), deps);

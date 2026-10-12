@@ -645,3 +645,23 @@
 		animation: none;
 	}
 }
+
+/* A capped preview fades out at the bottom instead of being cut flat
+   (the same fade as the quiz pages, dashboard-fiche.css). */
+.qbd-work-diff.is-capped,
+.qbd-work-text-preview,
+.qbd-work-pre.is-capped {
+	-webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+	mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+}
+
+/* "Show less" of an expanded long block stays at the bottom of the view. */
+.qbd-work-toggle--collant.is-stuck {
+	position: sticky;
+	bottom: 8px;
+	z-index: 1;
+	padding: 4px 10px;
+	border-radius: 6px;
+	background: var(--background-secondary);
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
