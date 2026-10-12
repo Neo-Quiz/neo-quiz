@@ -24,6 +24,16 @@
 
 export type TranscriptTool = "claude" | "codex";
 
+/** The model Claude Code falls back to when its safeguards stop an answer
+    (code.claude.com, model configuration, "Automatic model fallback";
+    measured 2026-10-13 with stop_details {"type":"refusal","category":"cyber"}):
+    Opus 5.5, Opus 5 and Fable answer a cyber topic with Opus 4.8. Only this
+    documented and measured case; any other gives null — no guessed model id. */
+export function modeleDeRepli(libelleDemande: string, categorie: string | undefined): string | null {
+	if (categorie !== "cyber") return null;
+	return /^(opus 5(\.\d+)?|fable)(\s|$)/i.test(libelleDemande.trim()) ? "claude-opus-4-8" : null;
+}
+
 export type TranscriptEvent =
 	| { kind: "start"; model?: string }
 	/** The model that produced one of the MAIN turn's messages (no
@@ -33,6 +43,8 @@ export type TranscriptEvent =
 	/** The CLI's safeguards STOPPED a message of the turn (`message_delta`,
 	    `stop_reason: "refusal"`): the answer was cut, maybe continued after. */
 	| { kind: "refusal" }
+	/** The category the safeguards gave a stop (`stop_details.category`: "cyber", "bio"…). */
+	| { kind: "refusalCategory"; category: string; explanation?: string }
 	| { kind: "thinking"; text: string }
 	/** How many tokens the model has reasoned so far, an ESTIMATE the CLI
 	    sends while it keeps the reasoning itself to itself (Claude Code with
@@ -81,6 +93,10 @@ export interface Transcript {
 	effectiveModel?: string;
 	/** How many messages of the turn the safeguards stopped (0: none). */
 	refusals?: number;
+	/** The category of the last stop ("cyber", "bio"…), when the CLI gave one. */
+	refusalCategory?: string;
+	/** The safeguards' own explanation of the stop (`stop_details.explanation`), bounded. */
+	refusalExplanation?: string;
 	thinking: string;
 	/** Estimated tokens of reasoning so far (0 when the CLI sends none). */
 	thinkingTokens: number;
@@ -133,6 +149,10 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 		case "refusal":
 			t.started = true;
 			t.refusals = (t.refusals ?? 0) + 1;
+			break;
+		case "refusalCategory":
+			t.refusalCategory = ev.category;
+			if (ev.explanation) t.refusalExplanation = ev.explanation;
 			break;
 		case "thinking":
 			t.started = true;
@@ -319,6 +339,11 @@ function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	   already carried it, and taking it twice would double the answer. */
 	if (type === "assistant") {
 		const out: TranscriptEvent[] = [];
+		// A stopped message names its category (measured 2026-10-13: {"type":"refusal","category":"cyber"}).
+		const arret = rec(rec(line.message)?.stop_details);
+		const categorie = str(arret?.type) === "refusal" ? str(arret?.category) : null;
+		const explication = str(arret?.explanation);
+		if (categorie) out.push({ kind: "refusalCategory", category: categorie.slice(0, 40), ...(explication ? { explanation: explication.slice(0, 400) } : {}) });
 		/* The model of a MAIN-turn message (no parent tool call). A sub-agent's
 		   messages carry `parent_tool_use_id` and another model: ignored.
 		   `<synthetic>` is the CLI's own placeholder, not a model. */

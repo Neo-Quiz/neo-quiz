@@ -1733,3 +1733,10 @@
 .qbd-ai-transcript-ligne svg {
 	display: block;
 }
+
+/* A safeguard message is read in full: it wraps, never cut with an ellipsis. */
+.qbd-ai-transcript-ligne--alerte .qbd-ai-transcript-ligne-texte {
+	white-space: normal;
+	overflow: visible;
+	text-align: left;
+}

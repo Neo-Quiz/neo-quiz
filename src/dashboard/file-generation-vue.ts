@@ -46,7 +46,7 @@ import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
 import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
-import { modeleDiffere, quizProgress, tempsRestant } from "./transcript";
+import { modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
@@ -510,6 +510,8 @@ export function creerVueFile(opts: {
 		libelle: string;
 		/** The work line of a turn answered by another model than the one selected. */
 		alerte?: boolean;
+		/** An alert with no Retry under it (the request was already retried on its own). */
+		sansRelance?: boolean;
 		/** A running turn's summary: the clock re-writes it each second from these. */
 		chrono?: { modele: string; activite: string; debut: number };
 		ouvertParDefaut: boolean;
@@ -562,13 +564,23 @@ export function creerVueFile(opts: {
 		/* An answer the safeguards CUT (a stopped message, maybe continued after):
 		   the quiz can be shorter than asked, so it is said in orange too. */
 		const coupe = !vivant && !repli && !!nom && (tr.refusals ?? 0) > 0;
+		/* The fallback the queue retried it on, on its own (file-generation-app,
+		   relancerSurRepli), as Claude Code does: then no Retry button. */
+		const repliAuto = coupe && !l.demande?.repliDe ? modeleDeRepli(nom, tr.refusalCategory) : null;
+		/* The automatic retry itself: answered by the fallback, said in orange. */
+		const relance = !vivant && !repli && !!l.demande?.repliDe;
 		const libelle = repli
 			? t("ai.safeguard.flagged", { requested: nom, effective: repli })
-			: coupe ? t("ai.safeguard.stopped", { model: nom })
+			: coupe ? (repliAuto ? t("ai.safeguard.stoppedRetried", { model: nom, fallback: aiProviders.libelleModele("claude-code", repliAuto) }) : t("ai.safeguard.stopped", { model: nom }))
+			: relance ? t("ai.safeguard.flagged", { requested: aiProviders.libelleModele("claude-code", l.demande?.repliDe ?? ""), effective: nom })
 			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
+		/* As Claude Code shows it: "Details: [cyber]" after a safeguard message. */
+		const details = (repli || coupe || relance) && tr.refusalCategory ? " " + t("ai.safeguard.details", { category: tr.refusalCategory }) : "";
 		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
 		return {
-			cle: "work", icone: repli || coupe ? "alert-triangle" : iconeFournisseur(l), libelle, alerte: !!repli || coupe,
+			cle: "work", icone: repli || coupe || relance ? "alert-triangle" : iconeFournisseur(l), libelle: libelle + details, alerte: !!repli || coupe || relance,
+			// Retry by hand only when nothing was retried on its own.
+			sansRelance: !!repliAuto || relance,
 			chrono: vivant ? { modele: nom, activite, debut } : undefined,
 			// Folded from the start, even while the turn runs: a click opens it. A pending
 				// permission is the one exception: the turn waits for it, so it must show.
@@ -576,7 +588,7 @@ export function creerVueFile(opts: {
 			detail: corps => {
 				/* The summary under the folded line, as MonoCode writes it ("Explored
 				   the project · Ran a tool"), then the input the model read. */
-				const resume = [tr.tools.length ? resumeOutils(tr).libelle : "", vivant ? texteActivite(tr) : ""].filter(Boolean).join(" · ");
+				const resume = [tr.refusalExplanation ?? "", tr.tools.length ? resumeOutils(tr).libelle : "", vivant ? texteActivite(tr) : ""].filter(Boolean).join(" · ");
 				let entete = corps.querySelector<HTMLElement>(":scope > .qbd-ai-transcript-resume");
 				if (!resume) entete?.remove();
 				else {
@@ -746,7 +758,7 @@ export function creerVueFile(opts: {
 		   own, right under the work line (a button cannot sit inside a button), kept
 		   there at each chunk. */
 		const travail = etat.lignes.get("work");
-		const alerte = specs.some(s => s.cle === "work" && s.alerte);
+		const alerte = specs.some(s => s.cle === "work" && s.alerte && !s.sansRelance);
 		if (alerte && travail) {
 			if (!etat.relance) {
 				const b = document.createElement("button");

@@ -635,6 +635,8 @@ export const EN_AI = {
 	"ai.chat.worked": "{model} worked for {time}",
 	"ai.chat.workedNoTime": "{model} worked",
 	"ai.safeguard.stopped": "{model}'s safeguards stopped part of the answer: the quiz may be shorter than asked. Retry, or pick another model in the composer.",
+	"ai.safeguard.stoppedRetried": "{model}'s safeguards stopped part of the answer: retried automatically with {fallback}.",
+	"ai.safeguard.details": "Details: [{category}]",
 	"ai.safeguard.flagged": "{requested}'s safeguards flagged this: answered with {effective}. Pick another model in the composer to change it.",
 	"ai.safeguard.retry": "Retry",
 	"ai.chat.copy": "Copy the answer",

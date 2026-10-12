@@ -40,7 +40,8 @@ import type { DemandeTexte, QuizDuLot } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
 import { t } from "../i18n";
-import { appliquer, transcriptVide } from "./transcript";
+import { appliquer, modeleDeRepli, transcriptVide } from "./transcript";
+import * as aiProvidersRepli from "./ai-providers";
 import { figuresParHote } from "./figures";
 import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
@@ -75,6 +76,9 @@ export interface DemandeFile extends DemandeTexte {
 	/** Chemin du contrat, ou "" pour le dossier par défaut. */
 	destination: string;
 	reglages: ReglagesFiges;
+	/** Set on the automatic retry of a request the safeguards cut: the model
+	    it was first sent with. Never retried again (no loop). */
+	repliDe?: string;
 	/** La catégorie du quiz (categorie-quiz.ts), figée à l'envoi comme le
 	    reste : son complément part dans le prompt système. */
 	categorie: CategorieQuiz;
@@ -347,6 +351,30 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 
 	/** Starts every line the rules allow (`demarrerPrets`), after waking the
 	    paused lines whose limit has reset (reset time + 30 s). */
+	/** The transcript of a line, also for a live turn (read from its thread). */
+	function lireTranscript(id: number): Transcript | null {
+		const deja = transcripts.get(id);
+		if (deja) return deja;
+		const cle = cleDe(id);
+		const vue = cle ? liveTurnView(cle) : null;
+		return vue ? transcriptOfThread(vue.thread) : null;
+	}
+
+	/** As Claude Code does (2026-10-13): when its safeguards cut the answer, the
+	    request goes again, ONCE and on its own, on the fallback model (cyber:
+	    Opus 4.8). The retry line says so in orange (file-generation-vue). */
+	function relancerSurRepli(id: number, d: DemandeFile): void {
+		if (d.repliDe || d.reglages.aiProvider !== "claude-code") return;
+		const tr = lireTranscript(id);
+		if (!tr?.refusals) return;
+		const p = aiProvidersRepli.getProvider("claude-code");
+		const demande = d.reglages.aiModel || p?.defaultModel || "";
+		const repli = modeleDeRepli(aiProvidersRepli.libelleModele("claude-code", demande), tr.refusalCategory);
+		if (!repli) return;
+		file = F.ajouter(file, { ...d, reglages: { ...d.reglages, aiModel: repli }, repliDe: demande, produit: undefined, sentAt: Date.now() }).file;
+		pomper();
+	}
+
 	function pomper(): void {
 		file = F.reprendreEchues(file, Date.now()).file;
 		const { file: suivante, lignes } = F.demarrerPrets(file, Date.now(), REGLES);
@@ -575,6 +603,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 		const titre = entree.title || entree.basename;
 		file = F.terminer(file, id, { titre, chemin: entree.path, ...compterItems(draft.questions), mode: d.mode });
+		relancerSurRepli(id, d);
 		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 

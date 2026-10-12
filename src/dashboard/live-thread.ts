@@ -42,7 +42,19 @@ export type ThreadItem =
 	| { kind: "permission"; requestId: string; tool: string; input: string; state: PermissionState }
 	| { kind: "notice"; text: string };
 
-export interface Thread { items: ThreadItem[]; running: boolean }
+export interface Thread {
+	items: ThreadItem[];
+	running: boolean;
+	/** The model of the MAIN turn's messages (no parent tool call), last one wins:
+	    differs from the one asked when the safeguards switched it. */
+	effectiveModel?: string;
+	/** Messages the safeguards stopped (`message_delta` stop_reason "refusal"). */
+	refusals?: number;
+	/** Their category, when given (`stop_details.category`: "cyber"…). */
+	refusalCategory?: string;
+	/** The safeguards' explanation of the stop, bounded. */
+	refusalExplanation?: string;
+}
 
 /** The shape `threadFromRun` reads: a `RunRead` from the store satisfies it. */
 export interface RunInput {
@@ -164,9 +176,20 @@ function applyClaude(t: Thread, l: Rec, live: boolean, at?: number): void {
 		case "stream_event":
 			streamEvent(t, l.event);
 			return stampThinking(t, at);
-		case "assistant":
+		case "assistant": {
+			const m = isRec(l.message) ? l.message : {};
+			const principal = l.parent_tool_use_id === undefined || l.parent_tool_use_id === null || l.parent_tool_use_id === "";
+			const modele = str(m.model);
+			if (principal && modele && !modele.startsWith("<")) t.effectiveModel = modele;
+			const arret = isRec(m.stop_details) ? m.stop_details : null;
+			if (arret && arret.type === "refusal" && str(arret.category)) {
+				t.refusalCategory = (str(arret.category) ?? "").slice(0, 40);
+				const explication = str(arret.explanation);
+				if (explication) t.refusalExplanation = explication.slice(0, 400);
+			}
 			assistantMessage(t, l.message);
 			return stampThinking(t, at);
+		}
 		case "system":
 			return thinkingTokens(t, l);
 		case "user":
@@ -207,6 +230,8 @@ function stampThinking(t: Thread, at: number | undefined): void {
 /** Partial deltas: a block opens a new item, its deltas fill it. */
 function streamEvent(t: Thread, ev: unknown): void {
 	if (!isRec(ev)) return;
+	// A message the safeguards stopped (2026-10-13: a quiz cut at 26 of 40 questions).
+	if (ev.type === "message_delta" && isRec(ev.delta) && ev.delta.stop_reason === "refusal") { t.refusals = (t.refusals ?? 0) + 1; return; }
 	if (ev.type === "content_block_start" && isRec(ev.content_block)) {
 		const block = ev.content_block;
 		if (block.type === "text") t.items.push({ kind: "text", text: "" });

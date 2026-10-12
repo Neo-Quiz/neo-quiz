@@ -102,6 +102,11 @@ export function transcriptOfThread(t: Thread): Transcript {
 	}
 	tr.started = t.items.length > 0 || t.running;
 	tr.done = !t.running;
+	// What the safeguards did, read from the thread (the flag, the cut answer).
+	if (t.effectiveModel) tr.effectiveModel = t.effectiveModel;
+	if (t.refusals) tr.refusals = t.refusals;
+	if (t.refusalCategory) tr.refusalCategory = t.refusalCategory;
+	if (t.refusalExplanation) tr.refusalExplanation = t.refusalExplanation;
 	return tr;
 }
 

@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere, modeleDeRepli }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -237,6 +237,10 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	].join("");
 	r.check("safeguard: a refused message is counted", fold(createTranscriptDecoder("claude")(coupe)).refusals, 1);
 	const normal = line({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: "end_turn" } } });
+	r.check("fallback: a cyber stop on Opus 5.5 / Opus 5 / Fable goes to Opus 4.8",
+		[modeleDeRepli("Opus 5.5", "cyber"), modeleDeRepli("Opus 5", "cyber"), modeleDeRepli("Fable 5", "cyber")], ["claude-opus-4-8", "claude-opus-4-8", "claude-opus-4-8"]);
+	r.check("fallback: no guessed model elsewhere (bio, Opus 4.8 itself, Sonnet, no category)",
+		[modeleDeRepli("Opus 5.5", "bio"), modeleDeRepli("Opus 4.8", "cyber"), modeleDeRepli("Sonnet 5.5", "cyber"), modeleDeRepli("Opus 5.5", undefined)], [null, null, null, null]);
 	r.check("safeguard: a normal end is not a refusal", fold(createTranscriptDecoder("claude")(normal)).refusals ?? 0, 0);
 	r.done();
 });
