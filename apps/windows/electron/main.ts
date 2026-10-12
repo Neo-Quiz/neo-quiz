@@ -143,6 +143,21 @@ function showMainWindow(): void {
 	fenetre.show();
 	fenetre.focus();
 }
+
+async function traiterCycleMiseAJour(event: "update-ready" | "window-hidden" | "run-ended"): Promise<void> {
+	if (decide(event, lifecycleState()) !== "install-silently" || silentInstallStarting || silentInstall) return;
+	if (!miseAJour?.armerInstallation()) return;
+	silentInstallStarting = true;
+	try {
+		await reglages?.ecrire(RELAUNCH_HIDDEN_KEY, true);
+	} catch (error) {
+		console.warn(LOG_PREFIX, "relaunch-hidden setting failed:", error);
+	}
+	silentInstall = true;
+	quitting = true;
+	fenetre?.close();
+}
+
 function etatFenetre(): EtatFenetre {
 	if (!fenetre || fenetre.isDestroyed()) return { agrandie: false, focus: false, pleinEcran: false };
 	return {
@@ -157,6 +172,8 @@ let tray: ReturnType<typeof createTray> = null;
 let trayAvailable = false;
 let quitting = false;
 let hiddenLaunch = false;
+let silentInstall = false;
+let silentInstallStarting = false;
 let busy = (): boolean => false;
 let onIdle = (_cb: () => void): void => {};
 let reglages: Reglages | null = null;
@@ -514,7 +531,7 @@ function creerFenetre(): void {
 		if (action === "hide") {
 			e.preventDefault();
 			fenetre?.hide();
-			decide("window-hidden", lifecycleState());
+			void traiterCycleMiseAJour("window-hidden");
 			return;
 		}
 		/* Tant que le rendu n'a armé aucun rappel, la fermeture est immédiate :
@@ -847,6 +864,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		servirRessources(perimetre);
 		miseAJour = creerMiseAJour({
 			limitee: () => sondeLimitee.limitee(),
+			surPrete: () => { void traiterCycleMiseAJour("update-ready"); },
 			envoyer: etat => {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);
 			},
@@ -1022,6 +1040,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		});
 		busy = canaux.busy;
 		onIdle = canaux.onIdle;
+		onIdle(() => { void traiterCycleMiseAJour("run-ended"); });
 		arreterAttente = canaux.arreterAttente;
 		arreterLive = canaux.arreterLive;
 		/* Moodle: at most one automatic sync an hour (the service decides), a few
@@ -1088,7 +1107,8 @@ app.on("window-all-closed", () => {
 	/* The version this install must land, read back at the next start (the safety net). */
 	const attendue = armee.etat().version;
 	const note = attendue && reglages ? reglages.ecrire(CLE_MAJ_ATTENDUE, attendue).catch(() => undefined) : Promise.resolve();
-	void Promise.all([lancerFenetreMaj(attendue ?? "", currentLang(), armee.tailles()), arretSync, note]).finally(() => armee.installerArmee());
+	const fenetreMaj = silentInstall ? Promise.resolve() : lancerFenetreMaj(attendue ?? "", currentLang(), armee.tailles());
+	void Promise.all([fenetreMaj, arretSync, note]).finally(() => armee.installerArmee());
 });
 /* Any other way out: stop the embedded Syncthing first (it asks the process to
    shut down, then kills it after a few seconds), THEN quit for real. Without

@@ -73,6 +73,8 @@ export interface MiseAJour {
 
 export function creerMiseAJour(deps: {
 	envoyer(etat: EtatMiseAJour): void;
+	/** Called once whenever the updater enters the ready-to-install phase. */
+	surPrete?: () => void;
 	/** True when Windows says the connection is metered; false when unknown (never rejects). */
 	limitee(): Promise<boolean>;
 }): MiseAJour {
@@ -88,8 +90,10 @@ export function creerMiseAJour(deps: {
 	let tailles: { paquet: number; installe: number | null } = { paquet: 0, installe: null };
 
 	const appliquer = (ev: EvenementMiseAJour): void => {
+		const phasePrecedente = etat.phase;
 		etat = transition(etat, ev);
 		deps.envoyer(etat);
+		if (phasePrecedente !== "prete" && etat.phase === "prete") deps.surPrete?.();
 	};
 
 	autoUpdater.autoDownload = false;
