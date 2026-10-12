@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A generated quiz whose array was missing its opening bracket is now read instead of failing.
+
 ## [1.20.87] - 2026-10-12
 
 ### Added
