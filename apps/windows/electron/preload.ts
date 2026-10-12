@@ -275,6 +275,12 @@ const pont: Pont = {
 		synchroniser: () => ipcRenderer.invoke(CANAUX.moodleSynchroniser),
 		devoirs: () => ipcRenderer.invoke(CANAUX.moodleDevoirs),
 		ouvrirDevoir: cmid => ipcRenderer.invoke(CANAUX.moodleOuvrirDevoir, cmid),
+		pageDemandee: () => ipcRenderer.invoke(CANAUX.moodleLienPageLire),
+		surPageDemandee(rappel) {
+			const ecouteur = (): void => rappel();
+			ipcRenderer.on(CANAUX.moodleLienPage, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.moodleLienPage, ecouteur); };
+		},
 		surEtat(rappel) {
 			const ecouteur = (_e: unknown, etat: EtatMoodle): void => rappel(etat);
 			ipcRenderer.on(CANAUX.moodleSurEtat, ecouteur);

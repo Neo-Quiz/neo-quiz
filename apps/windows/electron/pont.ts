@@ -629,6 +629,10 @@ export interface Pont {
 		deposer(cmid: number): Promise<boolean>;
 		devoirVu(cmid: number): Promise<void>;
 		ignorerDevoir(cmid: number, on: boolean): Promise<number[]>;
+		/** Whether a `neo-quiz://moodle` link is pending; taking it clears it. */
+		pageDemandee(): Promise<boolean>;
+		/** A Moodle page link just arrived; read it with `pageDemandee()`. */
+		surPageDemandee(rappel: () => void): () => void;
 		surEtat(rappel: (etat: EtatMoodle) => void): () => void;
 	};
 
@@ -1189,6 +1193,8 @@ export const CANAUX = {
 	syncDonneesRecues: "neo:sync/donnees-recues",
 	syncLienAppairage: "neo:sync/lien-appairage",
 	syncLienAppairageLire: "neo:sync/lien-appairage-lire",
+	moodleLienPage: "neo:moodle/lien-page",
+	moodleLienPageLire: "neo:moodle/lien-page-lire",
 	moodleVerifierSite: "neo:moodle/verifier-site",
 	moodleEcoles: "neo:moodle/ecoles",
 	moodleEtat: "neo:moodle/etat",

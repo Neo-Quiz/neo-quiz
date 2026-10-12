@@ -284,6 +284,11 @@ export function jetonDansArguments(argv: readonly string[]): string | null {
 	return null;
 }
 
+/** Whether a process argument is exactly the parameter-free Moodle page link. */
+export function estLienPageMoodle(argv: readonly string[]): boolean {
+	return argv.some(a => typeof a === "string" && /^neo-quiz:\/\/moodle\/?$/i.test(a));
+}
+
 /** What an AUTOMATIC run (app start, hourly, right after sign-in) does:
     `off` when the `auto` setting is off, `metered` when Windows says the
     connection is metered (the run is skipped and recorded: "paused, metered

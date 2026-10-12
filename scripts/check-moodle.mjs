@@ -430,6 +430,15 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		assert.equal(pur.launchUrl(ROOT_SITE, "p1", "neo-quiz"), `${ROOT_SITE}/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=p1&urlscheme=neo-quiz`);
 		assert.equal(pur.jetonDansArguments(["x", "neo-quiz://token=QUJD"]), "QUJD");
 		assert.equal(pur.jetonDansArguments(["neo-quiz://pair?device=X"]), null);
+		assert.equal(pur.estLienPageMoodle(["neo-quiz://moodle"]), true);
+		assert.equal(pur.estLienPageMoodle(["neo-quiz://moodle/"]), true);
+		assert.equal(pur.estLienPageMoodle(["NEO-QUIZ://MOODLE/"]), true);
+		for (const bad of ["neo-quiz://moodle?x=1", "neo-quiz://moodle#section", "neo-quiz://moodle/x",
+			"neo-quiz://moodlex", "https://moodle", "neo-quiz://token=QUJD"]) {
+			assert.equal(pur.estLienPageMoodle([bad]), false, bad);
+		}
+		assert.equal(pur.estLienPageMoodle(["neo-quiz://token=QUJD"]), false, "login links are not page links");
+		assert.equal(pur.jetonDansArguments(["neo-quiz://moodle"]), null, "page links do not yield login tokens");
 		// the automatic-run rule (metered connection)
 		assert.deepEqual([pur.decisionAuto(true, false), pur.decisionAuto(true, true), pur.decisionAuto(false, false), pur.decisionAuto(false, true)], ["run", "metered", "off", "off"]);
 	});

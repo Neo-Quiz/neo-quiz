@@ -61,6 +61,7 @@ import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettings } from "../../../src/types/dashboard-ctx";
 import { CLE_REGLAGES_IA } from "../electron/pont";
 import { openQuizPage } from "./ui/quiz-page";
+import { openMoodleModal } from "./ui/moodle-modal";
 import type { DashboardHandle } from "./ui/dashboard-shell";
 import { jouerTransition } from "./ui/transition-quiz";
 import { demander, etatInitial, finir, retourVersGardee, vuesARetirer } from "./ui/transition-etat";
@@ -810,6 +811,12 @@ async function demarrer(): Promise<void> {
 		};
 		pont().sync?.surLienAppairage(() => { void lireLienAppairage(); });
 		void lireLienAppairage();
+		const lireLienPageMoodle = async (): Promise<void> => {
+			const demandee = await pont().moodle?.pageDemandee().catch(() => false);
+			if (demandee) openMoodleModal();
+		};
+		pont().moodle?.surPageDemandee(() => { void lireLienPageMoodle(); });
+		void lireLienPageMoodle();
 		/* VIDER LES TAMPONS D'ÉCRITURE AVANT DE PARTIR. Quatre écrivains différés
 		   vivent ici : `store` (journal de révision, 500 ms, `log-file.ts`),
 		   `stats` (même débounce, `dashboard/stats-store.ts`), la page d'un

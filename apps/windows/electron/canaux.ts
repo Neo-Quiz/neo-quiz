@@ -185,6 +185,8 @@ export interface DependancesCanaux {
 	/** The pairing link Windows handed to the app (`lienAppairageExterne`,
 	    already validated), forgotten once taken; `null` when there is none. */
 	prendreLienAppairage?: () => string | null;
+	/** Whether a Moodle page link is pending; reading it clears the pending flag. */
+	prendreLienPageMoodle?: () => boolean;
 	/** Where the language packs live (`userData/languages`, the same
 	    directory `main.ts` gives the sandbox), fixed by `main.ts`: never a
 	    path from the renderer. */
@@ -681,6 +683,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	});
 	ipcMain.handle(CANAUX.moodleEcoles, () => ECOLES);
 	ipcMain.handle(CANAUX.moodleEtat, () => deps.moodle.etat());
+	ipcMain.handle(CANAUX.moodleLienPageLire, () => deps.prendreLienPageMoodle?.() ?? false);
 	ipcMain.handle(CANAUX.moodleConnecter, () => deps.moodle.connecter());
 	ipcMain.handle(CANAUX.moodleDeconnecter, () => deps.moodle.deconnecter());
 	ipcMain.handle(CANAUX.moodleCours, () => deps.moodle.cours());

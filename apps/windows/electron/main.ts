@@ -56,7 +56,7 @@ import { lienDansArguments, nomSur } from "./syncthing-regles";
 import { creerMoodle } from "./moodle/service";
 import { creerSonde, executerPowerShell } from "./connexion-limitee";
 import type { ServiceMoodle } from "./moodle/service";
-import { jetonDansArguments } from "./moodle/pur";
+import { estLienPageMoodle, jetonDansArguments } from "./moodle/pur";
 import { origineSite } from "./moodle/garde";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
@@ -208,12 +208,19 @@ let fermetureArmee = false;
 /** The last `neo-quiz://pair` link Windows handed over, validated, until the
     page takes it (`prendreLienAppairage`). */
 let lienAppairage: string | null = null;
+/** Whether a `neo-quiz://moodle` link is waiting for the page to read it. */
+let pageMoodleDemandee = false;
 /** Moodle (`./moodle/service.ts`), created once the settings are ready. A
     `neo-quiz://token=` link is routed to it ONLY while a login is pending. */
 let moodle: ServiceMoodle | null = null;
 function recevoirLienMoodle(argv: readonly string[]): void {
 	const jeton = jetonDansArguments(argv);
 	if (jeton && moodle) void moodle.recevoirJeton(jeton).catch(e => console.warn(LOG_PREFIX, "Moodle: lien de connexion:", e instanceof Error ? e.message : e));
+}
+function recevoirLienPageMoodle(argv: readonly string[]): void {
+	if (!estLienPageMoodle(argv)) return;
+	pageMoodleDemandee = true;
+	if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.moodleLienPage, null);
 }
 function recevoirLienAppairage(argv: readonly string[]): void {
 	const lien = lienDansArguments(argv);
@@ -771,10 +778,12 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   lands here. */
 		recevoirLienAppairage(argv);
 		recevoirLienMoodle(argv);
+		recevoirLienPageMoodle(argv);
 		if (decide("second-instance", lifecycleState()) === "show") showMainWindow();
 	});
 	/* A link that launched the app itself. */
 	recevoirLienAppairage(process.argv);
+	recevoirLienPageMoodle(process.argv);
 	/* `neo-quiz://` opens this app (installed only: in development the
 	   registration would point Windows at a bare Electron, and take the links
 	   from the installed app). NSIS writes it at install (`protocols` of
@@ -999,6 +1008,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			miseAJour,
 			sync,
 			prendreLienAppairage: () => { const lien = lienAppairage; lienAppairage = null; return lien; },
+			prendreLienPageMoodle: () => { const demandee = pageMoodleDemandee; pageMoodleDemandee = false; return demandee; },
 			/* A real quit: without `quitting`, the close button rule would HIDE
 			   the window and the armed install would never run. */
 			fermerPourInstaller: () => { quitting = true; fenetre?.close(); },

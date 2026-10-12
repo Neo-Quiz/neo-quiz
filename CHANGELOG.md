@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- The link neo-quiz://moodle opens the app on its Moodle page.
+
 ## [1.20.86] - 2026-10-12
 
 ### Added
