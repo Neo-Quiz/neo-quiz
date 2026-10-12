@@ -140,6 +140,10 @@ function lifecycleState(): LifecycleState {
 function showMainWindow(): void {
 	if (!fenetre || fenetre.isDestroyed()) return;
 	if (fenetre.isMinimized()) fenetre.restore();
+	/* A hidden launch never went through `prete`: the first show opens
+	   MAXIMIZED, like a normal start. */
+	if (!shownOnce) fenetre.maximize();
+	shownOnce = true;
 	fenetre.show();
 	fenetre.focus();
 }
@@ -174,6 +178,8 @@ let quitting = false;
 let hiddenLaunch = false;
 let silentInstall = false;
 let silentInstallStarting = false;
+/** The window was shown at least once (maximized then). */
+let shownOnce = false;
 let busy = (): boolean => false;
 let onIdle = (_cb: () => void): void => {};
 let reglages: Reglages | null = null;
@@ -811,7 +817,6 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		setLanguage(langueReglee === "fr" || langueReglee === "en"
 			? langueReglee
 			: /^fr\b/i.test(app.getLocale()) ? "fr" : "en");
-		tray?.refreshLabels();
 		tray = createTray({
 			iconPath: app.isPackaged ? path.join(process.resourcesPath, "tray.ico") : path.join(__dirname, "..", "icons", "icon.ico"),
 			labels: () => ({ open: t("tray.open"), quit: t("tray.quit"), tooltip: t("tray.tooltip") }),
@@ -994,7 +999,9 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			miseAJour,
 			sync,
 			prendreLienAppairage: () => { const lien = lienAppairage; lienAppairage = null; return lien; },
-			fermerPourInstaller: () => fenetre?.close(),
+			/* A real quit: without `quitting`, the close button rule would HIDE
+			   the window and the armed install would never run. */
+			fermerPourInstaller: () => { quitting = true; fenetre?.close(); },
 			fenetre: {
 				prete: () => {
 					if (decide("startup", lifecycleState()) !== "show") return;
@@ -1004,6 +1011,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 					   the window, which must stay hidden until the renderer
 					   says it is ready. */
 					fenetre.maximize();
+					shownOnce = true;
 					fenetre.show();
 					fenetre.focus();
 				},
