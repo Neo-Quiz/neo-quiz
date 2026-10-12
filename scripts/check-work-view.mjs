@@ -405,6 +405,17 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			click(tete);
 			r.check("réouverture : retour à l'aperçu", [rangee.querySelectorAll(".qbd-work-quiz .qbd-work-diff-row[hidden]").length > 0, bascule.textContent.startsWith("Show all")], [true, true]);
 		}
+		// A Learn being written opens with a reading: no question yet, it is
+		// already the "Writing the quiz" row, never a plain code block (2026-10-13).
+		{
+			const debut = document.createElement("div");
+			renderThread(debut, fil([{ kind: "text", text: "```json\n[\n// title: T\n{\n  \"role\": \"read\",\n  \"slice\": 1,\n  \"title\": \"Lecture\"," }], true), deps);
+			r.check("Learn en cours (lecture seule) : ligne quiz", [debut.querySelectorAll(".qbd-work-quiz").length, debut.querySelectorAll(".qbd-work-codeblock").length], [1, 0]);
+			r.check("Learn en cours : titre « Writing the quiz »", debut.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Writing the quiz");
+			const tableau = document.createElement("div");
+			renderThread(tableau, fil([{ kind: "text", text: "```json\n[\n  {\"name\": \"a\", \"size\": 1}\n]\n```" }], false), deps);
+			r.check("tableau JSON ordinaire : reste un bloc de code", [tableau.querySelectorAll(".qbd-work-quiz").length, tableau.querySelectorAll(".qbd-work-codeblock").length], [0, 1]);
+		}
 		// A ``` in the middle of a line of ordinary prose opens no block.
 		const milieu = document.createElement("div");
 		renderThread(milieu, fil([{ kind: "text", text: "Écris ```js ici``` puis continue.\nLigne deux." }], false), deps);

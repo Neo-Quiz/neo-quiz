@@ -756,6 +756,14 @@ const FENCE_LANGUAGES = new Map<string, string>([
 	["html", "markup"], ["xml", "markup"], ["css", "css"], ["md", "markdown"], ["markdown", "markdown"],
 ]);
 
+/** A quiz being written, recognised by its SHAPE from its first lines: an array
+    whose objects carry quiz keys. Not by its question count — a Learn opens
+    with readings, and while they stream there is no question yet (2026-10-13:
+    the running quiz showed as a plain code block until its first question). */
+function ressembleAUnQuiz(body: string): boolean {
+	return /^\s*\[/.test(body) && /(^|[\s{,"'])(role|prompt|slice|options|correctIndex|questions)["']?\s*:/m.test(body.slice(0, 4000));
+}
+
 /** A text item: the prose stays prose, a fenced block becomes a monospace coloured
     block, and a quiz block (```quiz-blocks, or a bare JSON array that parses as a
     quiz) becomes ONE row like a tool call. */
@@ -774,14 +782,14 @@ function textItem(text: string, live: boolean): HTMLElement {
 		appendProse(block, rest);
 		return block;
 	}
-	if (/^\s*\[/.test(text) && quizProgress(text).question > 0) {
+	if (ressembleAUnQuiz(text)) {
 		block.appendChild(quizRow(text.trim(), live));
 		return block;
 	}
 	/* The quiz in an ordinary fence (```json5, ```json…), as models write it:
 	   the prose around stays prose, the quiz becomes the same folded row. */
 	const fence = FENCE.exec(text);
-	if (fence && /^\s*\[/.test(fence[2]) && quizProgress(fence[2]).question > 0) {
+	if (fence && ressembleAUnQuiz(fence[2])) {
 		appendProse(block, text.slice(0, fence.index));
 		block.appendChild(quizRow(fence[2].replace(/\n$/, ""), live && !fence[0].trimEnd().endsWith("```")));
 		appendProse(block, text.slice(fence.index + fence[0].length));
