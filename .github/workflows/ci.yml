@@ -82,6 +82,7 @@ jobs:
       # sous `.quiz-code-output`, seulement comme texte (`textContent`).
       - name: Python run button output never interpreted
         run: npm run check:code-run
+      - name: AI work view renders text only
         run: npm run check:work-view
 
       - name: Compact HTML indented for display only
