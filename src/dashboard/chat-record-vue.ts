@@ -62,8 +62,8 @@ function dureeTravail(ms: number): string {
 /** The title pieces of a live turn, MonoCode style: a sparkles icon and
     "{model} worked for {time}" (or "{model} worked" while the time is not
     known), inserted before `avant`. `nom` is the full model label ("Opus
-    5.5"); without one, the plain "AI work" title. Returns the nodes it made,
-    so a redraw can drop them. */
+    5.5"); without one, "Worked for {time}" (never "AI work"). Returns the nodes
+    it made, so a redraw can drop them. */
 function morceauxTitre(parent: HTMLElement, avant: HTMLElement | null, ms: number | undefined, nom: string): HTMLElement[] {
 	const make = (tag: string, cls: string, text?: string): HTMLElement => {
 		const e = document.createElement(tag);
@@ -74,10 +74,11 @@ function morceauxTitre(parent: HTMLElement, avant: HTMLElement | null, ms: numbe
 	};
 	const icone = make("span", "qbd-ai-transcript-titre-icone");
 	currentHost().ui.setIcon(icone, "sparkles");
-	if (!nom) return [icone, make("span", "qbd-ai-transcript-ligne-texte", t("ai.work.title"))];
-	const texte = ms === undefined
-		? t("ai.chat.workedNoTime", { model: nom })
-		: t("ai.chat.worked", { model: nom, time: dureeTravail(ms) });
+	const texte = !nom
+		? (ms === undefined ? t("ai.work.worked") : t("ai.work.workedFor", { time: dureeTravail(ms) }))
+		: ms === undefined
+			? t("ai.chat.workedNoTime", { model: nom })
+			: t("ai.chat.worked", { model: nom, time: dureeTravail(ms) });
 	return [icone, make("span", "qbd-ai-transcript-ligne-texte", texte)];
 }
 

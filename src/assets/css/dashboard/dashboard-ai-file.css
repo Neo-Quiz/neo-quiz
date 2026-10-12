@@ -704,6 +704,12 @@
 .qbd-ai-transcript-detail--anime {
 	animation: qbd-ai-deplie 160ms ease-out;
 }
+/* The summary under the folded work line ("Explored the project · Ran a tool"). */
+.qbd-ai-transcript-resume {
+	font-size: 13px;
+	color: var(--text-muted);
+	padding: 2px 0 4px;
+}
 
 @keyframes qbd-ai-deplie {
 	from { opacity: 0; transform: translateY(-3px); }

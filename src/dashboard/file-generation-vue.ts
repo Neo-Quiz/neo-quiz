@@ -70,12 +70,39 @@ function duree(ms: number): string {
 /** How long each word of the working line stays (`ai.queue.verbs`). */
 const MOT_MS = 4000;
 
-/** "Opus 5.5 · Weighing the options…": the word follows the elapsed time, so
+/** The rotating word of the working line: it follows the elapsed time, so
     every repaint and the clock's tick agree on it without any state. */
-function texteTravail(modele: string, ecoule: number): string {
+function verbeCourant(ecoule: number): string {
 	const mots = t("ai.queue.verbs").split("|").map(m => m.trim()).filter(Boolean);
-	const verb = mots.length ? mots[Math.floor(Math.max(0, ecoule) / MOT_MS) % mots.length] : "";
-	return t("ai.queue.workingVerb", { model: modele, verb });
+	return mots.length ? mots[Math.floor(Math.max(0, ecoule) / MOT_MS) % mots.length] : "";
+}
+
+/** "Opus 5.5 · Weighing the options…" (a line with no transcript to show). */
+function texteTravail(modele: string, ecoule: number): string {
+	return t("ai.queue.workingVerb", { model: modele, verb: verbeCourant(ecoule) });
+}
+
+/** The full name of the model the request SELECTED, resolved as the chat header
+    does; the provider's name when no model resolves, "" with no provider. */
+function nomModeleSelectionne(l: LigneGeneration): string {
+	const providerId = l.demande.reglages.aiProvider || "";
+	const fournisseur = providerId ? aiProviders.getProvider(providerId) : null;
+	if (!fournisseur) return "";
+	const id = l.demande.reglages.aiModel || fournisseur.defaultModel || "";
+	return id ? aiProviders.libelleModele(providerId, id) : fournisseur.name;
+}
+
+/** The folded summary of a finished turn: "Opus 5.5 worked for 0:50". */
+function libelleFini(nom: string, ms: number | undefined): string {
+	if (ms === undefined) return nom ? t("ai.chat.workedNoTime", { model: nom }) : t("ai.work.worked");
+	return nom ? t("ai.chat.worked", { model: nom, time: duree(ms) }) : t("ai.work.workedFor", { time: duree(ms) });
+}
+
+/** The summary of a running turn: "Opus 5.5 · Weighing the options… 0:12". */
+function libelleEnCours(nom: string, activite: string, ecoule: number): string {
+	return nom
+		? t("ai.work.workingLine", { model: nom, activity: activite, time: duree(ecoule) })
+		: t("ai.work.workingNoModel", { activity: activite, time: duree(ecoule) });
 }
 
 /** The activity next to the working line: the reasoning's size, while no
@@ -276,6 +303,11 @@ export function creerVueFile(opts: {
 			peindreReponseProse(parent, l);
 			return;
 		}
+		/* A running turn with a transcript has ONE line, the work summary
+		   `peindreTranscript` paints under it (model, activity, time): no second
+		   status line above it (2026-10-12). Without a transcript (a provider
+		   that answers in one piece) the status line below stays alone. */
+		if (l.etat === "cours" && opts.file.transcript(l.id)) return;
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
 		if (l.etat === "cours" || l.etat === "enregistrement") {
 			/* THE WORKING LINE, as MonoCode shows it (2026-09-30): the
@@ -438,6 +470,8 @@ export function creerVueFile(opts: {
 		cle: string;
 		icone: string;
 		libelle: string;
+		/** A running turn's summary: the clock re-writes it each second from these. */
+		chrono?: { modele: string; activite: string; debut: number };
 		ouvertParDefaut: boolean;
 		/** Fills (or refreshes) the detail box of an unfolded line. */
 		detail: (corps: HTMLElement) => void;
@@ -458,24 +492,47 @@ export function creerVueFile(opts: {
 		return { libelle, icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench" };
 	}
 
+	/** What a running turn is doing now, for its summary line: its tools summed
+	    up, else the writing or the thinking, else the rotating word. */
+	function activiteEnCours(l: LigneGeneration, tr: Transcript, lignes: number): string {
+		if (tr.tools.length) return resumeOutils(tr).libelle;
+		if (tr.text) return libelleProgres(l, tr.text, lignes) ?? t("ai.transcript.writingLive");
+		if (tr.thinking) return t("ai.transcript.thinkingLive");
+		return verbeCourant(Date.now() - (l.debut ?? Date.now()));
+	}
+
 	/** A LIVE turn (2026-10-11): ONE summary line — the tools summed up, or
 	    what the model is doing — and under it the FULL work, in order
 	    (`work-view.ts`: every message, tool call with its whole input, output
 	    previews with "Show all", diffs, permission cards). Open while the turn
 	    runs, folded into its summary once it ends (a whole quiz in JSON5 is
 	    long); a click opens it for good. */
-	function specTravail(l: LigneGeneration, tr: Transcript, vue: LiveTurnView, vivant: boolean): SpecLigne {
+	function specTravail(l: LigneGeneration, tr: Transcript, vue: LiveTurnView | null, vivant: boolean): SpecLigne {
+		/* ONE line per turn, MonoCode style (2026-10-12): "Opus 5.5 worked for
+		   0:50" folded, "Opus 5.5 · Weighing the options… 0:12" while it runs. What
+		   the turn did (its summary, then every step) is written under it. */
+		const nom = nomModeleSelectionne(l);
+		const debut = l.debut ?? Date.now();
 		const lignes = tr.text ? tr.text.split("\n").length : 0;
-		const libelle = tr.tools.length ? resumeOutils(tr).libelle
-			: tr.text ? (vivant ? libelleProgres(l, tr.text, lignes) ?? t("ai.transcript.writingLive") : t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes }))
-			: tr.thinking ? t(vivant ? "ai.transcript.thinkingLive" : "ai.transcript.thought")
-			: t("ai.work.title");
-		const enAttente = vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
+		const activite = vivant ? activiteEnCours(l, tr, lignes) : "";
+		const libelle = vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
+		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
 		return {
-			cle: "work", icone: tr.tools.length ? resumeOutils(tr).icone : "sparkles", libelle,
+			cle: "work", icone: "sparkles", libelle,
+			chrono: vivant ? { modele: nom, activite, debut } : undefined,
 			// A pending permission always shows: the turn waits for it.
 			ouvertParDefaut: vivant || enAttente,
 			detail: corps => {
+				/* The summary under the folded line, as MonoCode writes it ("Explored
+				   the project · Ran a tool"), then the input the model read. */
+				const resume = [tr.tools.length ? resumeOutils(tr).libelle : "", vivant ? texteActivite(tr) : ""].filter(Boolean).join(" · ");
+				let entete = corps.querySelector<HTMLElement>(":scope > .qbd-ai-transcript-resume");
+				if (!resume) entete?.remove();
+				else {
+					if (!entete) { entete = document.createElement("div"); entete.className = "qbd-ai-transcript-resume"; corps.prepend(entete); }
+					if (entete.textContent !== resume) entete.textContent = resume;
+				}
+				if (!vue) return;
 				let racine = corps.querySelector<HTMLElement>(":scope > .qbd-work");
 				if (!racine) racine = ajouter(corps, "div", "qbd-work");
 				renderThread(racine, vue.thread, {
@@ -511,7 +568,7 @@ export function creerVueFile(opts: {
 		const specs: SpecLigne[] = [];
 		const vue = opts.file.live(id);
 		if (vue) {
-			if (vue.thread.items.length) specs.push(specTravail(l, tr, vue, vivant));
+			if (vivant || vue.thread.items.length) specs.push(specTravail(l, tr, vue, vivant));
 		} else if (tr.thinking || texte || tr.tools.length > 0 || (tr.thinkingTokens > 0 && !vivant)) {
 			// Nothing said yet: the working line above already shows the model at work.
 			const ecrit = !!texte;
@@ -580,6 +637,8 @@ export function creerVueFile(opts: {
 			}
 		}
 
+		// A running turn with no live view yet still shows its one summary line.
+		if (!vue && vivant && specs.length === 0) specs.push(specTravail(l, tr, null, vivant));
 		const gardees = new Set(specs.map(s => s.cle));
 		for (const [cle, v] of etat.lignes) {
 			if (gardees.has(cle)) continue;
@@ -611,6 +670,17 @@ export function creerVueFile(opts: {
 				});
 			}
 			if (v.libelle.textContent !== s.libelle) v.libelle.textContent = s.libelle;
+			if (s.chrono) {
+				v.libelle.classList.add("qbd-ai-transcript-chrono");
+				v.libelle.dataset.modele = s.chrono.modele;
+				v.libelle.dataset.activite = s.chrono.activite;
+				v.libelle.dataset.debut = String(s.chrono.debut);
+			} else if (v.libelle.classList.contains("qbd-ai-transcript-chrono")) {
+				v.libelle.classList.remove("qbd-ai-transcript-chrono");
+				delete v.libelle.dataset.modele;
+				delete v.libelle.dataset.activite;
+				delete v.libelle.dataset.debut;
+			}
 			if (v.bouton.getAttribute("aria-expanded") !== String(ouvert)) v.bouton.setAttribute("aria-expanded", String(ouvert));
 			const chevronNom = ouvert ? "chevron-down" : "chevron-right";
 			if (v.chevronNom !== chevronNom) { host.ui.setIcon(v.chevron, chevronNom); v.chevronNom = chevronNom; }
@@ -793,6 +863,10 @@ export function creerVueFile(opts: {
 				if (!zone?.isConnected) { liberer(); return; }
 				zone.querySelectorAll<HTMLElement>(".qbd-ai-file-temps").forEach(el => {
 					el.textContent = duree(Date.now() - Number(el.dataset.debut));
+				});
+				zone.querySelectorAll<HTMLElement>(".qbd-ai-transcript-chrono[data-debut]").forEach(el => {
+					const texte = libelleEnCours(el.dataset.modele ?? "", el.dataset.activite ?? "", Date.now() - Number(el.dataset.debut));
+					if (el.textContent !== texte) el.textContent = texte;
 				});
 				zone.querySelectorAll<HTMLElement>(".qbd-ai-reponse-etape[data-modele]").forEach(el => {
 					const texte = texteTravail(el.dataset.modele ?? "", Date.now() - Number(el.dataset.debut));
