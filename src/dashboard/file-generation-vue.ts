@@ -828,6 +828,18 @@ export function creerVueFile(opts: {
 		   the reasoning and the tools, when the model shared any. */
 		const prose = enProse(l);
 		if (prose && !tr.thinking && tr.tools.length === 0) return;
+		/* The SAME block across a full repaint (2026-10-12): `peindre` runs on
+		   queue, chat and remote-generation events, several times during a
+		   generation. A new block each time made a click pressed on one button
+		   end on its replacement (lost), and restarted the hover transition
+		   (flicker). The block keeps its buttons and their state. */
+		const ancien = blocsAReprendre.get(String(l.id));
+		if (ancien) {
+			blocsAReprendre.delete(String(l.id));
+			parent.appendChild(ancien);
+			remplirTranscript(ancien, tr, vivant, l, prose);
+			return;
+		}
 		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
 		bloc.dataset.ligne = String(l.id);
 		if (prose) bloc.dataset.chat = "1";
@@ -860,6 +872,10 @@ export function creerVueFile(opts: {
 		suivre(fil, enBas);
 	}
 
+	/** The transcript blocks of the previous paint, by line id, taken back by
+	    `peindreTranscript` during the next one (see there). */
+	const blocsAReprendre = new Map<string, HTMLElement>();
+
 	/** Le conteneur qui défile (le fil de la page), s'il y en a un. */
 	const defileur = (): HTMLElement | null => zone?.closest<HTMLElement>(".qbd-ai-fil") ?? null;
 
@@ -870,6 +886,8 @@ export function creerVueFile(opts: {
 		if (!zone.isConnected) { liberer(); return; }
 		const fil = defileur();
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
+		blocsAReprendre.clear();
+		zone.querySelectorAll<HTMLElement>(".qbd-ai-transcript[data-ligne]").forEach(b => { if (b.dataset.ligne) blocsAReprendre.set(b.dataset.ligne, b); });
 		zone.replaceChildren();
 		// Always full width (2026-09-30): no chat layout any more.
 		zone.classList.add("qbd-ai-file--full");

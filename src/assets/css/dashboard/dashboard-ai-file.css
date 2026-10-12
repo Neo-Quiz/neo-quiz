@@ -653,9 +653,13 @@
 	border-left: 0;
 }
 
+/* The full row, not the text's width: a running turn's label changes every
+   second (clock) and every 4 s (the rotating word), and a button sized to its
+   text shrank and grew under the pointer, so hover flickered on and off. */
 .qbd-ai-transcript-ligne {
-	align-self: flex-start;
-	display: inline-flex;
+	align-self: stretch;
+	display: flex;
+	font-variant-numeric: tabular-nums;
 	align-items: center;
 	gap: 8px;
 	max-width: 100%;
@@ -667,7 +671,9 @@
 	font: inherit;
 	font-size: 13px;
 	cursor: pointer;
-	transition: color 120ms ease, background-color 120ms ease;
+	/* No transition on the hover background: a repaint during generation must
+	   never replay it (flicker). */
+	transition: color 120ms ease;
 }
 
 .qbd-ai-transcript-ligne:hover {
