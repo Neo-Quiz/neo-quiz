@@ -95,6 +95,10 @@ export interface LiveManager {
 	/** Who holds a run in memory: this window, another one, or nobody. */
 	holder(owner: number, runId: string): "own" | "other" | "none";
 	isLive(runId: string): boolean;
+	/** Whether any session still has an active or starting process. */
+	running(): boolean;
+	/** Called whenever the manager changes from running to idle. */
+	onIdle(cb: () => void): void;
 	pageGone(owner: number, definitive: boolean): void;
 	/** Closes every session of this window (before "Delete all"). */
 	closeOwn(owner: number): Promise<void>;

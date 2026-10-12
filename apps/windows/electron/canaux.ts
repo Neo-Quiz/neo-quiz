@@ -359,10 +359,30 @@ export interface ResultatCanaux {
 	arreterAttente(): void;
 	/** Kills every live AI session, tree included (`before-quit`). */
 	arreterLive(): Promise<void>;
+	busy(): boolean;
+	onIdle(cb: () => void): void;
 }
 
 export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	const { perimetre, reglagesOuErreur, dossierDefaut, poserDossierDefaut } = deps;
+	let activeRuns = 0;
+	let liveIsRunning = (): boolean => false;
+	const idleCallbacks = new Set<() => void>();
+	const busy = (): boolean => activeRuns > 0 || liveIsRunning();
+	const notifyIdle = (): void => {
+		if (busy()) return;
+		for (const cb of idleCallbacks) {
+			try { cb(); } catch (e) { console.warn(LOG_PREFIX, "idle callback failed:", e); }
+		}
+	};
+	const trackRun = async <T>(operation: () => Promise<T>): Promise<T> => {
+		activeRuns++;
+		try { return await operation(); }
+		finally {
+			activeRuns--;
+			notifyIdle();
+		}
+	};
 	/* L'état du DISQUE vu par ce processus : les racines déclarées, l'index et
 	   son surveillant. Il vit ici, pas dans `main.ts` : la fenêtre n'a pas à le
 	   connaître, elle ne fait que recevoir ce que `deps.envoyer` lui pousse. */
@@ -1723,9 +1743,9 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			/* A resumable run streams through the registry, which buffers the
 			   output for a later attach, even when this call asked for no
 			   stream. */
-			return reprenable && cleReprise
-				? await reprises.lancer(expediteur, cleReprise, empreinte, controleur, executer, surStdout ?? null)
-				: await executer(surStdout);
+			return await trackRun(() => reprenable && cleReprise
+				? reprises.lancer(expediteur, cleReprise, empreinte, controleur, executer, surStdout ?? null)
+				: executer(surStdout));
 		} finally {
 			/* Retirée SEULEMENT si c'est encore la sienne : le compteur du rendu
 			   repart à 1 après un `location.reload()`, et le `finally` d'un appel
@@ -1963,7 +1983,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 			return Promise.resolve({ status: "unavailable", stdout: "", error: "job refused" });
 		}
 		const delai = Math.min(10000, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
-		return deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai });
+		return trackRun(() => deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai }));
 	});
 	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never)) deps.code.warm(language as CodeLanguage); });
 
@@ -2037,6 +2057,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		dossierJuge: dossierOutilsJuge,
 		depuisFenetrePrincipale,
 	});
+	liveIsRunning = () => live.running();
+	live.onIdle(notifyIdle);
 
-	return { arreterAttente: () => attente.arreter(), arreterLive: () => live.killAll() };
+	return {
+		arreterAttente: () => attente.arreter(),
+		arreterLive: () => live.killAll(),
+		busy,
+		onIdle: cb => { idleCallbacks.add(cb); },
+	};
 }

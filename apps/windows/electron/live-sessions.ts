@@ -55,6 +55,19 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function createLiveManager(deps: LiveDeps): LiveManager {
 	const sessions = new Map<string, Session>();
+	const idleCallbacks = new Set<() => void>();
+	let wasRunning = false;
+	const running = (): boolean => [...sessions.values()].some(s => !s.closed && (s.proc !== null || s.spawning || s.busy));
+	const reportRunning = (): void => {
+		const nowRunning = running();
+		const becameIdle = wasRunning && !nowRunning;
+		wasRunning = nowRunning;
+		if (becameIdle) {
+			for (const cb of idleCallbacks) {
+				try { cb(); } catch (e) { deps.log("live idle callback failed:", message(e)); }
+			}
+		}
+	};
 	const dying = new Set<Promise<void>>();
 	const t = deps.timers;
 	const emit = (s: Session, e: LiveEvent): void => { try { deps.emit(s.owner, e); } catch { /* a dead window never stops a run */ } };
@@ -86,6 +99,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 	function kill(s: Session, proc: Proc, reason: NonNullable<Proc["reason"]>): Promise<void> {
 		proc.reason ??= reason;
 		if (s.proc === proc) s.proc = null;
+		reportRunning();
 		proc.child.kill();
 		proc.driver.failAll(new Error("The CLI was stopped"));
 		let h: unknown = null;
@@ -99,6 +113,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 	function terminate(s: Session): Promise<void> {
 		s.closed = true;
 		if (sessions.get(s.runId) === s) sessions.delete(s.runId);
+		reportRunning();
 		stop(s.idle); stop(s.detach);
 		s.idle = null; s.detach = null;
 		return s.proc ? kill(s, s.proc, "close") : s.exiting ?? Promise.resolve();
@@ -126,6 +141,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 		if (s.proc === proc) s.proc = null;
 		stop(s.idle); s.idle = null;
 		s.busy = false;
+		reportRunning();
 		for (const id of s.pending.keys()) emit(s, { kind: "permissionGone", runId: s.runId, requestId: id });
 		s.pending.clear();
 		store(s, { end: { code, cancelled: proc.reason !== null } });
@@ -144,6 +160,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			park(idle);
 		}
 		s.spawning = true;
+		reportRunning();
 	}
 
 	async function spawnProc(s: Session): Promise<void> {
@@ -152,6 +169,7 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			await launchProc(s);
 		} finally {
 			s.spawning = false;
+			reportRunning();
 		}
 		armIdle(s);
 	}
@@ -354,6 +372,8 @@ export function createLiveManager(deps: LiveDeps): LiveManager {
 			return !s ? "none" : s.owner === owner ? "own" : "other";
 		},
 		isLive: runId => !!sessions.get(runId)?.proc,
+		running,
+		onIdle: cb => { idleCallbacks.add(cb); },
 
 		pageGone(owner, definitive) {
 			for (const s of [...sessions.values()]) {

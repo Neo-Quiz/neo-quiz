@@ -165,6 +165,16 @@ await withSrcModule([
 ], async (M, R, C, X, G) => {
 	const r = makeReporter("Live sessions");
 
+	await cas(r, "running live sessions clear idle listeners when parked", async () => {
+		const t = setup(M);
+		let idle = 0;
+		t.m.onIdle(() => { idle++; });
+		r.check("no live sessions are running initially", t.m.running(), false);
+		await t.m.start(1, START());
+		r.check("a spawned live session counts as running", t.m.running(), true);
+		await t.timers.advance(300_000);
+		r.check("a parked live session is idle", [t.m.running(), idle], [false, 1]);
+	});
 	await cas(r, "claude start: exact live form, cwd = root, initialize first, header opened", async () => {
 		const t = setup(M);
 		const { runId } = await t.m.start(1, START());
