@@ -58,6 +58,9 @@ export interface WorkViewDeps {
 	root?: string;
 	/** Opens a file with the app that owns it. Only called with an absolute path inside `root`. */
 	openFile?(absPath: string): void;
+	/** A quiz generation: every assistant text is the quiz being written (JSON5 or
+	    HTML), so it is shown as a one-line summary, never as text. */
+	summarizeText?: boolean;
 }
 
 type ToolItem = Extract<ThreadItem, { kind: "tool" }>;
@@ -107,10 +110,11 @@ export function renderThread(root: HTMLElement, thread: Thread, deps: WorkViewDe
 	const awaiting = thread.items.some(i => i.kind === "permission" && i.state === "pending");
 	entries.forEach((entry, i) => {
 		const live = thread.running && i === last;
-		const signature = (live ? "1" : "0") + (awaiting ? "1" : "0") + JSON.stringify(entry.kind === "item" ? entry.item : entry.items);
+		// `running` (not only `live`): a summarised quiz row animates while the turn runs, wherever it sits.
+		const signature = (live ? "1" : "0") + (awaiting ? "1" : "0") + (thread.running ? "1" : "0") + JSON.stringify(entry.kind === "item" ? entry.item : entry.items);
 		const current = root.children.item(i) as HTMLElement | null;
 		if (current && SIGNATURE.get(current) === signature) return;
-		const fresh = buildEntry(entry, current ?? undefined, deps, live, awaiting);
+		const fresh = buildEntry(entry, current ?? undefined, deps, live, awaiting, thread.running);
 		SIGNATURE.set(fresh, signature);
 		if (current) root.replaceChild(fresh, current);
 		else root.appendChild(fresh);
@@ -152,17 +156,17 @@ function familyOf(item: ToolItem): Family | null {
 
 // --- Rows -----------------------------------------------------------------------
 
-function buildEntry(entry: Entry, prev: HTMLElement | undefined, deps: WorkViewDeps, live: boolean, awaiting: boolean): HTMLElement {
+function buildEntry(entry: Entry, prev: HTMLElement | undefined, deps: WorkViewDeps, live: boolean, awaiting: boolean, running: boolean): HTMLElement {
 	if (entry.kind === "group") return groupBlock(entry.family, entry.items, deps, prev);
-	return buildItem(entry.item, deps, live, prev, awaiting);
+	return buildItem(entry.item, deps, live, prev, awaiting, running);
 }
 
-function buildItem(item: ThreadItem, deps: WorkViewDeps, live: boolean, prev: HTMLElement | undefined, awaiting: boolean): HTMLElement {
+function buildItem(item: ThreadItem, deps: WorkViewDeps, live: boolean, prev: HTMLElement | undefined, awaiting: boolean, running: boolean): HTMLElement {
 	switch (item.kind) {
 		case "user":
 			return textBlock("qbd-work-item qbd-work-user", item.text);
 		case "text":
-			return textItem(item.text, live);
+			return deps.summarizeText ? writtenRow(item.text, running) : textItem(item.text, live);
 		case "thinking":
 			return thinkingBlock(item, live, prev);
 		case "notice":
@@ -785,6 +789,27 @@ function quizRow(block: string, live: boolean): HTMLElement {
 	setOpen(wrap, body, false);
 	wrap.appendChild(body);
 	if (block !== "") expandable(head, wrap, body, build);
+	return wrap;
+}
+
+/** A quiz generation's assistant text, summarised: "Wrote the quiz · 214 lines".
+    Only the line count is shown, never the text (JSON5 or HTML): no button, no body.
+    While the turn runs the pen icon pulses (`.is-writing`, work-view.css). */
+function writtenRow(text: string, running: boolean): HTMLElement {
+	const wrap = el("div", "qbd-work-item qbd-work-tool qbd-work-written");
+	const head = el("div", "qbd-work-tool-head");
+	head.appendChild(statusDot(running ? "running" : "ok"));
+	const icon = el("span", running ? "qbd-work-written-icon is-writing" : "qbd-work-written-icon");
+	currentHost().ui.setIcon(icon, "file-pen");
+	head.appendChild(icon);
+	const lines = text.split("\n").length;
+	const title = el("span", "qbd-work-title");
+	const key = running
+		? (lines === 1 ? "ai.work.quizWritingLinesOne" : "ai.work.quizWritingLinesOther")
+		: (lines === 1 ? "ai.work.quizWrittenLinesOne" : "ai.work.quizWrittenLinesOther");
+	title.appendChild(el("span", "qbd-work-tool-name", t(key, { count: lines })));
+	head.appendChild(title);
+	wrap.appendChild(head);
 	return wrap;
 }
 

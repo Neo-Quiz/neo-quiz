@@ -504,9 +504,10 @@ export function creerVueFile(opts: {
 	/** A LIVE turn (2026-10-11): ONE summary line — the tools summed up, or
 	    what the model is doing — and under it the FULL work, in order
 	    (`work-view.ts`: every message, tool call with its whole input, output
-	    previews with "Show all", diffs, permission cards). Open while the turn
-	    runs, folded into its summary once it ends (a whole quiz in JSON5 is
-	    long); a click opens it for good. */
+	    previews with "Show all", diffs, permission cards). Folded from the start,
+	    whether the turn runs or not: a click opens it. The quiz text
+	    the model writes is summarised ("Wrote the quiz · 214 lines"), never shown
+	    raw (`summarizeText` in work-view.ts). */
 	function specTravail(l: LigneGeneration, tr: Transcript, vue: LiveTurnView | null, vivant: boolean): SpecLigne {
 		/* ONE line per turn, MonoCode style (2026-10-12): "Opus 5.5 worked for
 		   0:50" folded, "Opus 5.5 · Weighing the options… 0:12" while it runs. What
@@ -520,8 +521,9 @@ export function creerVueFile(opts: {
 		return {
 			cle: "work", icone: "sparkles", libelle,
 			chrono: vivant ? { modele: nom, activite, debut } : undefined,
-			// A pending permission always shows: the turn waits for it.
-			ouvertParDefaut: vivant || enAttente,
+			// Folded from the start, even while the turn runs: a click opens it. A pending
+				// permission is the one exception: the turn waits for it, so it must show.
+			ouvertParDefaut: enAttente,
 			detail: corps => {
 				/* The summary under the folded line, as MonoCode writes it ("Explored
 				   the project · Ran a tool"), then the input the model read. */
@@ -540,6 +542,8 @@ export function creerVueFile(opts: {
 					answer: (requestId, allow) => opts.file.repondreVivant(l.id, requestId, allow),
 					root: opts.racine?.() ?? undefined,
 					openFile: opts.ouvrirFichier,
+					// The model's text here is the quiz itself: summarised, never shown raw.
+					summarizeText: true,
 				});
 				// Only while no row of the thread is live: a live row carries its own spinner.
 				const busy = vue.thread.running && !threadHasLiveRow(vue.thread);

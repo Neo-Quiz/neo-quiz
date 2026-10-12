@@ -614,3 +614,29 @@
 		animation: none;
 	}
 }
+
+/* The pen of a quiz being written (`writtenRow`): a slow pulse while the turn
+   runs, still once it ends. Reuses `qbd-work-pulse`, already a transient
+   animation for `check-idle-animations`. */
+.qbd-work-written-icon {
+	display: inline-flex;
+	flex: none;
+	width: 14px;
+	height: 14px;
+	color: var(--text-muted);
+}
+
+.qbd-work-written-icon svg {
+	width: 100%;
+	height: 100%;
+}
+
+.qbd-work-written-icon.is-writing {
+	animation: qbd-work-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-work-written-icon.is-writing {
+		animation: none;
+	}
+}

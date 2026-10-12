@@ -365,6 +365,25 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
 	}
 
+		// 17b. A quiz generation (`summarizeText`): the model's text is never shown,
+		//      not even once opened; one summary line with its line count, the pen
+		//      icon pulses only while the turn runs.
+		{
+			const HTML = "<!doctype html>\n<html><body><img src=x onerror=alert(1)></body></html>";
+			const live = document.createElement("div");
+			renderThread(live, fil([{ kind: "text", text: HTML }], true), { ...deps, summarizeText: true });
+			r.check("résumé en cours : HTML brut absent", live.textContent.includes("<!doctype"), false);
+			r.check("résumé en cours : aucun img créé", live.querySelectorAll("img").length, 0);
+			r.check("résumé en cours : aucun bouton d'ouverture", live.querySelectorAll("button").length, 0);
+			r.check("résumé en cours : icône qui pulse", live.querySelectorAll(".qbd-work-written-icon.is-writing").length, 1);
+			r.check("résumé en cours : compte les lignes", live.querySelector(".qbd-work-written .qbd-work-tool-name")?.textContent, "Writing the quiz · 2 lines");
+			const fini = document.createElement("div");
+			renderThread(fini, fil([{ kind: "text", text: HTML }], false), { ...deps, summarizeText: true });
+			r.check("résumé fini : icône figée", fini.querySelectorAll(".qbd-work-written-icon.is-writing").length, 0);
+			r.check("résumé fini : « Wrote the quiz »", fini.querySelector(".qbd-work-written .qbd-work-tool-name")?.textContent, "Wrote the quiz · 2 lines");
+			r.check("résumé fini : HTML brut absent", fini.textContent.includes("<!doctype"), false);
+		}
+
 	// 18. A live row carries its own spinner: the page's "Working" line stays hidden then.
 	{
 		const outil = { kind: "tool", id: "w9", name: "Bash", input: "sleep 9", preview: "", lines: 0, status: "running", diff: null };
