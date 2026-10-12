@@ -92,6 +92,25 @@ function nomModeleSelectionne(l: LigneGeneration): string {
 	return id ? aiProviders.libelleModele(providerId, id) : fournisseur.name;
 }
 
+/** The work line's icon: the provider's brand logo (Claude, Codex...),
+    as the chat header shows it; sparkles when the request names no provider. */
+function iconeFournisseur(l: LigneGeneration): string {
+	const p = l.demande.reglages.aiProvider ? aiProviders.getProvider(l.demande.reglages.aiProvider) : null;
+	return p ? "logo:" + p.logo : "sparkles";
+}
+
+/** Paints an icon name on the work line: "logo:<id>" is a provider's brand
+    logo, anything else a Lucide icon. */
+function poserIcone(el: HTMLElement, nom: string): void {
+	el.replaceChildren();
+	el.className = "qbd-ai-transcript-titre-icone";
+	if (nom.startsWith("logo:")) {
+		const logo = nom.slice(5) as Parameters<typeof aiProviders.setBrandLogo>[1];
+		el.classList.add("qbd-provider-logo", "qbd-provider-logo--" + logo);
+		aiProviders.setBrandLogo(el, logo);
+	} else currentHost().ui.setIcon(el, nom);
+}
+
 /** The folded summary of a finished turn: "Opus 5.5 worked for 0:50". */
 function libelleFini(nom: string, ms: number | undefined): string {
 	if (ms === undefined) return nom ? t("ai.chat.workedNoTime", { model: nom }) : t("ai.work.worked");
@@ -318,7 +337,7 @@ export function creerVueFile(opts: {
 		   `peindreTranscript` paints under it (model, activity, time): no second
 		   status line above it (2026-10-12). Without a transcript (a provider
 		   that answers in one piece) the status line below stays alone. */
-		if (l.etat === "cours" && opts.file.transcript(l.id)) return;
+		if (l.etat === "cours" && opts.file.transcript(l.id) && opts.file.live(l.id)) return;
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
 		if (l.etat === "cours" || l.etat === "enregistrement") {
 			/* THE WORKING LINE, as MonoCode shows it (2026-09-30): the
@@ -541,7 +560,7 @@ export function creerVueFile(opts: {
 			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
 		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
 		return {
-			cle: "work", icone: repli ? "alert-triangle" : "sparkles", libelle, alerte: !!repli,
+			cle: "work", icone: repli ? "alert-triangle" : iconeFournisseur(l), libelle, alerte: !!repli,
 			chrono: vivant ? { modele: nom, activite, debut } : undefined,
 			// Folded from the start, even while the turn runs: a click opens it. A pending
 				// permission is the one exception: the turn waits for it, so it must show.
@@ -564,8 +583,6 @@ export function creerVueFile(opts: {
 					answer: (requestId, allow) => opts.file.repondreVivant(l.id, requestId, allow),
 					root: opts.racine?.() ?? undefined,
 					openFile: opts.ouvrirFichier,
-					// The model's text here is the quiz itself: summarised, never shown raw.
-					summarizeText: true,
 				});
 				// Only while no row of the thread is live: a live row carries its own spinner.
 				const busy = vue.thread.running && !threadHasLiveRow(vue.thread);
@@ -681,7 +698,7 @@ export function creerVueFile(opts: {
 				const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
 				b.type = "button";
 				const icone = ajouter(b, "span", "qbd-ai-transcript-titre-icone");
-				host.ui.setIcon(icone, s.icone);
+				poserIcone(icone, s.icone);
 				const libelle = ajouter(b, "span", "qbd-ai-transcript-ligne-texte");
 				const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
 				const neuve: LigneTranscript = { bouton: b, icone, iconeNom: s.icone, libelle, chevron, detail: null, ouvert, chevronNom: "" };
@@ -696,7 +713,7 @@ export function creerVueFile(opts: {
 					synchroniserTranscript(bloc, courant);
 				});
 			}
-			if (v.iconeNom !== s.icone) { host.ui.setIcon(v.icone, s.icone); v.iconeNom = s.icone; }
+			if (v.iconeNom !== s.icone) { poserIcone(v.icone, s.icone); v.iconeNom = s.icone; }
 			v.bouton.classList.toggle("qbd-ai-transcript-ligne--alerte", !!s.alerte);
 			if (v.libelle.textContent !== s.libelle) v.libelle.textContent = s.libelle;
 			if (s.chrono) {
