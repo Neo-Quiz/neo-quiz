@@ -152,7 +152,6 @@
 
 .qbd-work-title {
 	min-width: 0;
-	font-family: var(--font-monospace);
 	font-size: 13px;
 	line-height: 20px;
 	color: var(--text-muted);
@@ -162,6 +161,12 @@
 .qbd-work-tool-name {
 	font-weight: 600;
 	color: var(--text-normal);
+}
+
+/* Only what the tool was given (path, command, query) stays in monospace. */
+.qbd-work-arg {
+	font-family: var(--font-monospace);
+	font-size: 12px;
 }
 
 .qbd-work-path {

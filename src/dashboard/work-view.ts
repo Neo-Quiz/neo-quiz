@@ -435,12 +435,15 @@ function appendTitle(node: HTMLElement, item: ToolItem, deps: WorkViewDeps): voi
 	const { verb, args } = titleSegments(item, deps);
 	node.appendChild(el("span", "qbd-work-tool-name", verb));
 	if (args.length === 0) return;
-	node.appendChild(document.createTextNode("("));
+	// The arguments in monospace, the tool's name in the UI font (as MonoCode).
+	const arg = el("span", "qbd-work-arg");
+	arg.appendChild(document.createTextNode("("));
 	for (const seg of args) {
-		if (typeof seg === "string") node.appendChild(document.createTextNode(seg));
-		else node.appendChild(pathNode(seg, deps));
+		if (typeof seg === "string") arg.appendChild(document.createTextNode(seg));
+		else arg.appendChild(pathNode(seg, deps));
 	}
-	node.appendChild(document.createTextNode(")"));
+	arg.appendChild(document.createTextNode(")"));
+	node.appendChild(arg);
 }
 
 function joinSegments(paths: Segment[]): Segment[] {
