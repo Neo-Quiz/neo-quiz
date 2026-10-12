@@ -103,7 +103,7 @@ export default async function () {
 			   `resources/syncthing/syncthing.exe`; `check:package` compares its
 			   SHA-256 with the pin. Windows only: Linux builds do not carry it
 			   and the app offers no Sync page there. */
-			extraResources: [{ from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }],
+			extraResources: [{ from: "icons/icon.ico", to: "tray.ico" }, { from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }],
 			// Sans espace : un nom qu'on `curl` sans guillemets depuis la release.
 			artifactName: "neo-quiz-setup-${version}.${ext}",
 			/* `signtoolOptions.publisherName` (lu par electron-updater dans

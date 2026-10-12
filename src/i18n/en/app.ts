@@ -4,6 +4,9 @@
    dictionnaires divergeraient. */
 export const EN_APP = {
 	"app.window.title": "Neo Quiz",
+	"tray.open": "Open Neo Quiz",
+	"tray.quit": "Quit",
+	"tray.tooltip": "Neo Quiz",
 	/* ── Le premier écran, avant tout choix de dossier ──
 	   Un écran vide est une INVITATION, pas un constat : il dit ce qu'il y a
 	   à faire, et pourquoi c'est sans risque. Une application qui demande un

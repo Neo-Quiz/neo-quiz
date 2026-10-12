@@ -2,6 +2,9 @@ import type { EN_APP } from "../en/app";
 
 export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.window.title": "Neo Quiz",
+	"tray.open": "Ouvrir Neo Quiz",
+	"tray.quit": "Quitter",
+	"tray.tooltip": "Neo Quiz",
 	"app.empty.title": "Choisissez un dossier de quiz",
 	"app.empty.body": "Neo Quiz joue les quiz de vos notes, là où elles sont déjà. Rien n'est copié, rien n'est déplacé.",
 	"app.empty.yourVaults": "Vos dossiers de notes",

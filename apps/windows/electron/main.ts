@@ -72,6 +72,9 @@ import { SCHEMA_RESSOURCES, resoudreRessource } from "./ressources";
    keeps the last one), and `creerBacASable` builds the hidden window passed
    to the channels. */
 import { creerBacASable, PRIVILEGES_CODE } from "./code-sandbox";
+import { createTray } from "./tray";
+import { decide, HIDDEN_FLAG, isHiddenLaunch, RELAUNCH_HIDDEN_KEY } from "./tray-lifecycle";
+import type { LifecycleState } from "./tray-lifecycle";
 import type { BacASable } from "./code-sandbox";
 
 /** Le serveur de développement de Vite. Le port vient de `vite.config.ts`
@@ -123,6 +126,23 @@ const DELAI_GARDE_FERMETURE_MS = 1500;
 /** L'état de la fenêtre tel que le pont le POUSSE au rendu — voir `pousserEtat`
     dans `creerFenetre`. `{ agrandie: false, focus: false, pleinEcran: false }`
     quand la fenêtre n'existe pas ou plus. */
+function lifecycleState(): LifecycleState {
+	return {
+		quitting,
+		trayAvailable,
+		windowVisible: !!fenetre && !fenetre.isDestroyed() && fenetre.isVisible(),
+		updateReady: miseAJour?.etat().phase === "prete",
+		busy: busy(),
+		hiddenLaunch,
+	};
+}
+
+function showMainWindow(): void {
+	if (!fenetre || fenetre.isDestroyed()) return;
+	if (fenetre.isMinimized()) fenetre.restore();
+	fenetre.show();
+	fenetre.focus();
+}
 function etatFenetre(): EtatFenetre {
 	if (!fenetre || fenetre.isDestroyed()) return { agrandie: false, focus: false, pleinEcran: false };
 	return {
@@ -133,6 +153,12 @@ function etatFenetre(): EtatFenetre {
 }
 
 let fenetre: BrowserWindow | null = null;
+let tray: ReturnType<typeof createTray> = null;
+let trayAvailable = false;
+let quitting = false;
+let hiddenLaunch = false;
+let busy = (): boolean => false;
+let onIdle = (_cb: () => void): void => {};
 let reglages: Reglages | null = null;
 /** Settings key of the version the last update install expected (the safety net, `expected-update.ts`). */
 const CLE_MAJ_ATTENDUE = "majAttendue";
@@ -482,7 +508,15 @@ function creerFenetre(): void {
 	   garde (3,1 s), un rappel de 600 ms fait fermer à 0,7 s. Rejoué par la
 	   tâche 6 sur une écriture RÉELLE (voir `DELAI_GARDE_FERMETURE_MS`) : 72 à
 	   116 ms du WM_CLOSE à la fenêtre détruite, frappe relue dans la note. */
+	fenetre.on("session-end", () => { quitting = true; });
 	fenetre.on("close", e => {
+		const action = decide("close-button", lifecycleState());
+		if (action === "hide") {
+			e.preventDefault();
+			fenetre?.hide();
+			decide("window-hidden", lifecycleState());
+			return;
+		}
 		/* Tant que le rendu n'a armé aucun rappel, la fermeture est immédiate :
 		   intercepter sans personne pour répondre donnerait une fenêtre qui ne
 		   se ferme plus — le piège exact rencontré côté Tauri.
@@ -714,9 +748,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		   lands here. */
 		recevoirLienAppairage(argv);
 		recevoirLienMoodle(argv);
-		if (!fenetre || fenetre.isDestroyed()) return;
-		if (fenetre.isMinimized()) fenetre.restore();
-		fenetre.focus();
+		if (decide("second-instance", lifecycleState()) === "show") showMainWindow();
 	});
 	/* A link that launched the app itself. */
 	recevoirLienAppairage(process.argv);
@@ -748,10 +780,30 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 
 		const donnees = app.getPath("userData");
 		reglages = creerReglages(path.join(donnees, "settings.json"));
+		const relaunchHidden = await reglages.lire(RELAUNCH_HIDDEN_KEY);
+		await reglages.supprimer(RELAUNCH_HIDDEN_KEY);
+		hiddenLaunch = isHiddenLaunch(process.argv, relaunchHidden);
+		if (app.isPackaged) {
+			try {
+				app.setLoginItemSettings({ openAtLogin: true, name: "Neo Quiz", path: process.execPath, args: [HIDDEN_FLAG] });
+			} catch (error) {
+				console.warn(LOG_PREFIX, "login item settings failed:", error);
+			}
+		}
 		const langueReglee = await reglages.lire(CLE_REGLAGES_LANGUE);
 		setLanguage(langueReglee === "fr" || langueReglee === "en"
 			? langueReglee
 			: /^fr\b/i.test(app.getLocale()) ? "fr" : "en");
+		tray?.refreshLabels();
+		tray = createTray({
+			iconPath: app.isPackaged ? path.join(process.resourcesPath, "tray.ico") : path.join(__dirname, "..", "icons", "icon.ico"),
+			labels: () => ({ open: t("tray.open"), quit: t("tray.quit"), tooltip: t("tray.tooltip") }),
+			onOpen: () => {
+				if (decide("tray-click", lifecycleState()) === "show") showMainWindow();
+			},
+			onQuit: () => app.quit(),
+		});
+		trayAvailable = tray !== null;
 		/* Le dossier de quiz PAR DÉFAUT (tranche 9) : créé AVANT le périmètre,
 		   pour qu'il existe déjà quand `perimetreInitial` l'autorise — sans quoi
 		   la première ouverture d'un fichier dedans (« Nouveau quiz ») tomberait
@@ -927,6 +979,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			fermerPourInstaller: () => fenetre?.close(),
 			fenetre: {
 				prete: () => {
+					if (decide("startup", lifecycleState()) !== "show") return;
 					if (!fenetre || fenetre.isDestroyed() || fenetre.isVisible()) return;
 					/* The app opens MAXIMIZED (2026-09-30), the work area
 					   filled. Here and not at creation: `maximize()` also shows
@@ -967,6 +1020,8 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				outilsDev: () => fenetre?.webContents.toggleDevTools(),
 			},
 		});
+		busy = canaux.busy;
+		onIdle = canaux.onIdle;
 		arreterAttente = canaux.arreterAttente;
 		arreterLive = canaux.arreterLive;
 		/* Moodle: at most one automatic sync an hour (the service decides), a few
@@ -1043,6 +1098,7 @@ app.on("window-all-closed", () => {
 let liveArrete = false;
 let liveEnCours: Promise<void> | null = null;
 app.on("before-quit", e => {
+	quitting = true;
 	if (liveArrete || !arreterLive) return;
 	e.preventDefault();
 	if (liveEnCours) return;
@@ -1054,6 +1110,7 @@ app.on("before-quit", e => {
 });
 let syncArrete = false;
 app.on("before-quit", e => {
+	quitting = true;
 	if (!sync || syncArrete) return;
 	e.preventDefault();
 	syncArrete = true;

@@ -112,9 +112,9 @@ r.check("la fenêtre Linux est associée à son entrée .desktop",
 r.check("files exclut node_modules et les sourcemaps",
 	[config.files.includes("!node_modules/**"), config.files.includes("!dist-electron/**/*.map")],
 	[true, true]);
-r.check("Windows embeds the pinned Syncthing beside the asar, Linux does not",
+r.check("Windows embeds the tray icon and pinned Syncthing beside the asar, Linux does not",
 	[JSON.stringify(config.win?.extraResources), config.linux?.extraResources ?? null, config.extraResources ?? null],
-	[JSON.stringify([{ from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }]), null, null]);
+	[JSON.stringify([{ from: "icons/icon.ico", to: "tray.ico" }, { from: "vendor/syncthing/syncthing.exe", to: "syncthing/syncthing.exe" }]), null, null]);
 r.check("the pin names the version the zip name and URL carry",
 	[SYNCTHING.zipName.includes(SYNCTHING.version), SYNCTHING.zipUrl.includes(`v${SYNCTHING.version}/${SYNCTHING.zipName}`), SYNCTHING.exeEntry.includes(`v${SYNCTHING.version}/`)],
 	[true, true, true]);
