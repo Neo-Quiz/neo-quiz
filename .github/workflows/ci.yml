@@ -486,6 +486,8 @@ jobs:
       - name: Engine review wiring
         run: npm run check:engine-review
 
+      - name: Tray lifecycle decision
+        run: npm run check:tray-lifecycle
       # EVERY check:* SCRIPT RUNS HERE: a check that is not in this file can go red unseen.
       - name: CI covers every check
         run: npm run check:ci-coverage

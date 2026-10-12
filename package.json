@@ -10,6 +10,7 @@
     "android:build": "npm run android:web && cd apps/android && gradlew assembleDebug",
     "check": "tsc --noEmit",
     "check:ci-coverage": "node scripts/check-ci-coverage.mjs",
+    "check:tray-lifecycle": "node scripts/check-tray-lifecycle.mjs",
     "check:watch": "tsc --noEmit --watch",
     "check:app": "npm --prefix apps/windows run build",
     "check:md": "node scripts/check-markdown.mjs",
