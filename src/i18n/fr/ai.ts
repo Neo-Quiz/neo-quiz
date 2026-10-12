@@ -589,6 +589,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.chat.working": "{model} travaille",
 	"ai.chat.worked": "{model} a travaillé {time}",
 	"ai.chat.workedNoTime": "{model} a travaillé",
+	"ai.safeguard.stopped": "Les garde-fous de {model} ont coupé une partie de la réponse : le quiz peut être plus court que demandé. Réessayez, ou changez de modèle dans le composeur.",
 	"ai.safeguard.flagged": "Les garde-fous de {requested} ont signalé cette demande : réponse donnée par {effective}. Changez de modèle dans le composeur pour en changer.",
 	"ai.safeguard.retry": "Réessayer",
 	"ai.chat.copy": "Copier la réponse",

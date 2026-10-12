@@ -30,6 +30,9 @@ export type TranscriptEvent =
 	    `parent_tool_use_id`). Sub-agents and compaction answer with another
 	    model on purpose: they never say what the turn was answered with. */
 	| { kind: "model"; model: string }
+	/** The CLI's safeguards STOPPED a message of the turn (`message_delta`,
+	    `stop_reason: "refusal"`): the answer was cut, maybe continued after. */
+	| { kind: "refusal" }
 	| { kind: "thinking"; text: string }
 	/** How many tokens the model has reasoned so far, an ESTIMATE the CLI
 	    sends while it keeps the reasoning itself to itself (Claude Code with
@@ -76,6 +79,8 @@ export interface Transcript {
 	/** The model that answered the MAIN turn, last one wins. Differs from
 	    `model` (the init line) when the CLI's safeguards switched it. */
 	effectiveModel?: string;
+	/** How many messages of the turn the safeguards stopped (0: none). */
+	refusals?: number;
 	thinking: string;
 	/** Estimated tokens of reasoning so far (0 when the CLI sends none). */
 	thinkingTokens: number;
@@ -124,6 +129,10 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 		case "model":
 			t.started = true;
 			if (ev.model) t.effectiveModel = ev.model;
+			break;
+		case "refusal":
+			t.started = true;
+			t.refusals = (t.refusals ?? 0) + 1;
 			break;
 		case "thinking":
 			t.started = true;
@@ -360,6 +369,9 @@ function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	const event = rec(line.event);
 	if (!event) return [];
 	const eventType = str(event.type);
+	/* A message the safeguards stopped (measured 2026-10-13: the answer was cut
+	   mid-quiz, 26 questions of 40 asked, and nothing said so on screen). */
+	if (eventType === "message_delta" && str(rec(event.delta)?.stop_reason) === "refusal") return [{ kind: "refusal" }];
 	if (eventType === "message_start") {
 		// What the model read: fresh input, plus what the prompt cache served or stored.
 		const usage = rec(rec(event.message)?.usage);

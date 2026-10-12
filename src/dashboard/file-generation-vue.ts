@@ -559,12 +559,16 @@ export function creerVueFile(opts: {
 		/* A turn the safeguards answered with ANOTHER model (2026-10-12): the
 		   finished line says so in orange, with Retry under it (synchroniserTranscript). */
 		const repli = vivant ? null : modeleRepli(l, tr);
+		/* An answer the safeguards CUT (a stopped message, maybe continued after):
+		   the quiz can be shorter than asked, so it is said in orange too. */
+		const coupe = !vivant && !repli && !!nom && (tr.refusals ?? 0) > 0;
 		const libelle = repli
 			? t("ai.safeguard.flagged", { requested: nom, effective: repli })
+			: coupe ? t("ai.safeguard.stopped", { model: nom })
 			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
 		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
 		return {
-			cle: "work", icone: repli ? "alert-triangle" : iconeFournisseur(l), libelle, alerte: !!repli,
+			cle: "work", icone: repli || coupe ? "alert-triangle" : iconeFournisseur(l), libelle, alerte: !!repli || coupe,
 			chrono: vivant ? { modele: nom, activite, debut } : undefined,
 			// Folded from the start, even while the turn runs: a click opens it. A pending
 				// permission is the one exception: the turn waits for it, so it must show.

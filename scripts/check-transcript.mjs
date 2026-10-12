@@ -229,5 +229,14 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("safeguard: Opus 5.5 answered by Opus 4.8 differs", modeleDiffere("Opus 5.5", "Opus 4.8"), true);
 	r.check("safeguard: the same label in another case or spacing does not differ", modeleDiffere("Opus 5.5", "opus  5.5"), false);
 	r.check("safeguard: an empty side never differs", [modeleDiffere("", "Opus 4.8"), modeleDiffere("Opus 5.5", "")], [false, false]);
+	/* A message the safeguards STOPPED (`message_delta`, stop_reason "refusal",
+	   2026-10-13: a quiz cut at 26 questions of 40 with nothing on screen). */
+	const coupe = [
+		line({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: "refusal", stop_sequence: null } } }),
+		line({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null } } }),
+	].join("");
+	r.check("safeguard: a refused message is counted", fold(createTranscriptDecoder("claude")(coupe)).refusals, 1);
+	const normal = line({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: "end_turn" } } });
+	r.check("safeguard: a normal end is not a refusal", fold(createTranscriptDecoder("claude")(normal)).refusals ?? 0, 0);
 	r.done();
 });
