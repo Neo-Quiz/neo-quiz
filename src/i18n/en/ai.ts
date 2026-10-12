@@ -39,7 +39,6 @@ export const EN_AI = {
 	"ai.preview.open": "Open",
 	"ai.preview.openFailed": "Could not open {name}",
 	"ai.preview.props": "Properties",
-	"ai.composer.quizOptions": "Quiz options",
 	"ai.composer.destination": "Output folder: {folder}",
 	"ai.composer.destinationLocked": "The folder of this chat. Start a new chat to work in another folder.",
 	"ai.composer.generate": "Generate quiz",
@@ -171,6 +170,7 @@ export const EN_AI = {
 	/* A quiz's subject (categorie-quiz.ts): its name, its menu section, and
 	   the "detected" notice in the composer's output-folder row. */
 	"ai.categorie.auto": "Automatic",
+	"ai.categorie.choose": "Choose the subject",
 	"ai.categorie.search": "Search subjects…",
 	"ai.categorie.noMatch": "No matching subject",
 	"ai.categorie.python": "Python",
@@ -633,6 +633,7 @@ export const EN_AI = {
 	"ai.chat.thinking": "Thinking…",
 	"ai.chat.working": "{model} is working",
 	"ai.chat.worked": "{model} worked for {time}",
+	"ai.chat.workedNoTime": "{model} worked",
 	"ai.chat.copy": "Copy the answer",
 	"ai.chat.copied": "Answer copied.",
 	"ai.chat.copyFailed": "The answer could not be copied.",
@@ -923,6 +924,8 @@ export const EN_AI = {
 	"ai.work.inPath": " in ",
 	"ai.work.showOutput": "Show output",
 	"ai.work.title": "AI work",
+	"ai.work.detailsOn": "Details on {device}",
+	"ai.work.unavailable": "These details are no longer stored on this device.",
 	"ai.work.running": "Working…",
 	"ai.work.sendFailed": "Your message could not reach the AI: {detail}",
 	/* ── Live sessions of Claude Code and Codex (src/dashboard/live-generation.ts) ── */

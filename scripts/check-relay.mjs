@@ -21,7 +21,11 @@ await withSrcModule(["src/dashboard/relay.ts", "src/dashboard/ai-client.ts", "sr
 	r.check("the PC's system prompt is inside the relay text", built.text.includes(pc.systemPrompt.split("\n")[0]), true);
 	r.check("the documents' content travels in the prompt", built.text.includes("A list is ordered."), true);
 	r.check("the token is in the instruction", built.text.includes("tok123abc9"), true);
-	r.check("a Test is chosen only when the words say so", [RL.buildRelayPrompt({ ...input, mode: undefined, text: "Make a test on lists" }).mode, RL.buildRelayPrompt({ ...input, mode: undefined, text: "teach me lists" }).mode, RL.buildRelayPrompt({ ...input, mode: undefined, text: "lists" }).mode], ["practice", "learn", "learn"]);
+	r.check("missing mode safely defaults to Learn even when request text contains Test keywords", [
+		RL.buildRelayPrompt({ ...input, mode: undefined, text: "Make a test on lists" }).mode,
+		RL.buildRelayPrompt({ ...input, mode: undefined, text: "Projet - Contrôle Ethical Hacking 1/" }).mode,
+	], ["learn", "learn"]);
+	r.check("the clarified mode is used when provided", [RL.buildRelayPrompt({ ...input, mode: "practice" }).mode, RL.buildRelayPrompt({ ...input, mode: "learn", text: "make a test" }).mode], ["practice", "learn"]);
 	r.check("a fresh token each time when none is given", RL.buildRelayPrompt(input).token !== RL.buildRelayPrompt(input).token, true);
 
 	const q = (n) => `{ prompt: "Q${n}", options: ["a","b"], correctIndex: 0, explain: "because" }`;
@@ -91,7 +95,7 @@ await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests
 		};
 		return { deps, saved, shared, chats: () => chats };
 	}
-	const req = { chatId: "chat-1234", text: "Make a test on lists", documents: [{ path: "Python/cm1.md" }], destination: "" };
+	const req = { chatId: "chat-1234", text: "Make a test on lists", mode: "practice", documents: [{ path: "Python/cm1.md" }], destination: "" };
 
 	{ const g = rig({ readDocument: async (rel) => ({ name: "big.md", content: "x".repeat(200_000), bytes: new Uint8Array(3) }) });
 		let key = null; try { await F.startRelay(g.deps, req); } catch (e) { key = e.key; }
@@ -105,8 +109,9 @@ await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests
 		r.check(".markdown is shareable (Kotlin accepts it too)", (await F.startRelay(g.deps, req)) !== null, true);
 	}
 	{ const g = rig();
-		const s = await F.startRelay(g.deps, req);
+		const s = await F.startRelay(g.deps, { ...req, requestId: "clarify-request-1" });
 		r.check("the prompt and the documents are shared; a Test is chosen from the words", [g.shared.length, g.shared[0][1], s.mode], [1, ["cm1.md"], "practice"]);
+		r.check("a clarified request keeps its id through relay", s.requestId, "clarify-request-1");
 		const out = await F.pasteAnswer(g.deps, s);
 		r.check("a valid paste saves one quiz and answers with its title and path", [out.ok, out.title, out.path], [true, "Lists - Practice", "Root/Generated/Lists - Practice.md"]);
 		r.check("it is saved like a generated quiz: the request text and document names, the chosen mode", [g.saved.length, g.saved[0].modeDemande, g.saved[0].demande.notes.map(n => n.name)], [1, "practice", ["cm1.md"]]);

@@ -65,7 +65,7 @@ export async function refreshOwnRequests(): Promise<void> {
 }
 
 /** Writes a request for the PC of the chat (or the last one seen), then shows it as waiting. False, and nothing written, when no PC was ever seen: the typed text stays with the caller. Throws when the validator refuses it or the file cannot be written. */
-export async function enviquerVersPc(input: { chatId: string; text: string; mode: "learn" | "practice"; documents: Array<{ path: string }> }): Promise<boolean> {
+export async function enviquerVersPc(input: { chatId: string; text: string; mode: "learn" | "practice"; documents: Array<{ path: string }>; requestId?: string }): Promise<boolean> {
 	if (!files) throw new Error("request files not ready");
 	const now = Date.now();
 	const chat = getChats().find(c => c.id === input.chatId) ?? null;

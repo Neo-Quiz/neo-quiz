@@ -137,7 +137,7 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	r.check("the default option is read back, a bad one becomes the first", [read([{ ...base, clarify: { questions: qs } }])[0].clarify.questions.map(x => x.default), read([{ ...base, clarify: { questions: [{ ...qs[0], default: 9 }, { ...qs[1], default: "x" }] } }])[0].clarify.questions.map(x => x.default)], [[0, 2], [0, 0]]);
 	r.check("a header over 12 characters is cut on reading", read([{ ...base, clarify: { questions: [{ ...qs[0], header: "x".repeat(30) }, qs[1]] } }])[0].clarify.questions[0].header.length, 12);
 	r.check("answers of the wrong length are ignored, the questions kept", read([{ ...base, clarify: { questions: qs, answers: [["x"]] } }])[0].clarify.answers, undefined);
-	const bad = [["no questions", { questions: [] }], ["three questions", { questions: [...qs, qs[0]] }], ["one option", { questions: [{ question: "q", options: [op("a")] }] }],
+	const bad = [["no questions", { questions: [] }], ["four questions", { questions: [...qs, ...qs] }], ["one option", { questions: [{ question: "q", options: [op("a")] }] }],
 		["five options", { questions: [{ question: "q", options: ["a", "b", "c", "d", "e"].map(op) }] }], ["option as a bare string", { questions: [{ question: "q", options: ["a", "b"] }] }], ["no question text", { questions: [{ options: [op("a"), op("b")] }] }]];
 	for (const [nom, mauvais] of bad) r.check("bad questions are dropped, the request kept: " + nom, [read([{ ...base, clarify: mauvais }]).length, read([{ ...base, clarify: mauvais }])[0].clarify], [1, undefined]);
 
@@ -159,6 +159,10 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	// After a reload of the page the in-memory request is gone: only a request with no document can be rebuilt.
 	const pend = { ...base, clarify: { questions: qs, genre: "both" } };
 	r.check("the kind to generate is read back, `both` included", read([pend])[0].clarify.genre, "both");
+	const routed = { ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [{ ...op("Learn"), kind: "learn" }, { ...op("Test"), kind: "practice" }] }], genre: "learn", action: "remote" } };
+	r.check("type-choice metadata and the continuation route survive chat storage", read([routed])[0].clarify, routed.clarify);
+	const badMetadata = read([{ ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [{ ...op("Learn"), kind: "Test" }, { ...op("Test"), kind: "practice" }] }], action: "invalid" } }])[0].clarify;
+	r.check("malformed type metadata and routes are ignored without losing the question", [badMetadata.questions[0].purpose, badMetadata.questions[0].options.map(o => o.kind), badMetadata.action], [undefined, [undefined, "practice"], undefined]);
 	r.check("an unknown kind is ignored", read([{ ...base, clarify: { questions: qs, genre: "exam" } }])[0].clarify.genre, undefined);
 	r.check("resume: a pending request with no document is rebuilt from the record (text and kind)", Q.resumeSource(read([pend])[0]), { text: "Python", genre: "both" });
 	r.check("resume: without a stored kind, the request's mode", [Q.resumeSource(read([{ ...base, mode: "practice", clarify: { questions: qs } }])[0])?.genre, Q.resumeSource(read([{ ...base, clarify: { questions: qs } }])[0])?.genre], ["practice", "learn"]);
@@ -168,6 +172,12 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	// The queue's record of the same request keeps the questions and their answers.
 	const ligne = { id: 1, etat: "prete", demande: { text: "Python", notes: [], images: [], mode: "learn", requestId: "r1", chatId: "c1", sentAt: 10 }, resultat: { titre: "T", chemin: "t.md" } };
 	const rec = Q.recordRequest({ key: "r1", chatId: "c1", lines: [ligne] }, "d1", 50, ok.chats[0].requests[0]);
+	const practiceLine = { ...ligne, demande: { ...ligne.demande, mode: "practice" } };
+	const recPractice = Q.recordRequest({ key: "r1", chatId: "c1", lines: [practiceLine] }, "d1", 50, ok.chats[0].requests[0]);
+	r.check("a clarified request records the kind actually generated", recPractice.mode, "practice");
+	const completed = Q.completeClarification(ok.chats, "c1", { ...base, mode: "practice", results: [{ kind: "quiz", title: "T", path: "t.md" }] }, "d1", 60);
+	r.check("completeClarification replaces the card and preserves its original request and answers", [completed[0].requests.length, completed[0].requests[0].id, completed[0].requests[0].at, completed[0].requests[0].text, completed[0].requests[0].mode, completed[0].requests[0].clarify.answers, completed[0].requests[0].results], [1, "r1", 10, "Python", "practice", answers, [{ kind: "quiz", title: "T", path: "t.md" }]]);
+	r.check("completeClarification appends when there is no matching clarification", Q.completeClarification([], "c1", { ...base, results: [] }, "d1", 60)[0].requests.length, 1);
 	const frozen = { ...ligne, demande: { ...ligne.demande, reglages: { aiProvider: "codex", aiModel: "gpt-5.5", aiEffort: "high" } } };
 	const recS = Q.recordRequest({ key: "r1", chatId: "c1", lines: [frozen] }, "d1", 50);
 	r.check("the settings frozen at the send are recorded", [recS.provider, recS.model, recS.effort], ["codex", "gpt-5.5", "high"]);

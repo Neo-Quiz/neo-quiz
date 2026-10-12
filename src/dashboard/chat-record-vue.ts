@@ -11,11 +11,14 @@
 
    THE AI WORK OF A RECORDED REQUEST (2026-10-11): a request that ran as a
    live turn keeps where that turn sits in its run (`ChatRequest.runs`).
-   Each one is a folded "AI work" line; opened, the turn is read back from
-   the run store of this PC (page by page) and drawn by `work-view.ts`
-   (`textContent` only), so a chat reopened after a restart still shows
-   everything the AI did. A run deleted meanwhile, or a host without a run
-   store (the phone), shows no line.
+   Each one is a folded line, a sparkles icon and "{model} worked for
+   {time}" (MonoCode style: a sparkles icon, the full model label); opened, the turn is read back from the run store
+   of this PC (page by page) and drawn by `work-view.ts` (`textContent` only),
+   so a chat reopened after a restart still shows everything the AI did. The
+   runs live only on the PC that ran them: a turn run on another device is a
+   plain line naming that device, and a turn gone from this store says so when
+   opened. The line is never removed. A host without a run store (the phone)
+   shows no line.
 ══════════════════════════════════════════════════════════ */
 
 import { peindreCarteQuiz } from "./result-card";
@@ -38,28 +41,87 @@ import { canOpenCard } from "../shared-state/chat-merge";
 import { peindreQuestions } from "./generation-kind-vue";
 import type { PasteOutcome } from "./relay-flow";
 import { recordOrigin } from "../shared-state/request-origin";
-import { originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
+import type { DeviceRef } from "../shared-state/request-origin";
+import { labelOf, originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
 import type { ChatRun } from "./chat-record";
 import type { Thread } from "./live-thread";
-import { recordedToolOutput, recordedTurn } from "./live-generation";
+import { recordedToolOutput, recordedTurn, recordedTurnMs } from "./live-generation";
+import * as aiProviders from "./ai-providers";
 import { renderThread } from "./work-view";
 
-/** One folded "AI work" line per live turn of the request; the turn is read
-    from the store on the first unfolding only. */
-function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[], deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void }): void {
+/** The milliseconds of each live turn once read (keyed by run and seq range),
+    so a re-render does not read the run again. `null`: not knowable. */
+const dureesTravail = new Map<string, number | null>();
+
+/** "m:ss", as the generation line writes a duration (`duree` of file-generation-vue). */
+function dureeTravail(ms: number): string {
+	const s = Math.max(0, Math.floor(ms / 1000));
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** The title pieces of a live turn, MonoCode style: a sparkles icon and
+    "{model} worked for {time}" (or "{model} worked" while the time is not
+    known), inserted before `avant`. `nom` is the full model label ("Opus
+    5.5"); without one, the plain "AI work" title. Returns the nodes it made,
+    so a redraw can drop them. */
+function morceauxTitre(parent: HTMLElement, avant: HTMLElement | null, ms: number | undefined, nom: string): HTMLElement[] {
+	const make = (tag: string, cls: string, text?: string): HTMLElement => {
+		const e = document.createElement(tag);
+		e.className = cls;
+		if (text !== undefined) e.textContent = text;
+		parent.insertBefore(e, avant);
+		return e;
+	};
+	const icone = make("span", "qbd-ai-transcript-titre-icone");
+	currentHost().ui.setIcon(icone, "sparkles");
+	if (!nom) return [icone, make("span", "qbd-ai-transcript-ligne-texte", t("ai.work.title"))];
+	const texte = ms === undefined
+		? t("ai.chat.workedNoTime", { model: nom })
+		: t("ai.chat.worked", { model: nom, time: dureeTravail(ms) });
+	return [icone, make("span", "qbd-ai-transcript-ligne-texte", texte)];
+}
+
+/** One folded line per live turn of the request. A turn run on THIS device is
+    a button: its details are read from the store on the first unfolding, and
+    its time is read lazily to fill the label. A turn run on ANOTHER device has
+    its details in that device's store only: the line is plain text naming the
+    device, never a button. A turn whose details are gone says so when opened;
+    the line is never removed. */
+function peindreTravail(parent: HTMLElement, q: ChatRequest, runner: DeviceRef, deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void }): void {
 	const host = currentHost();
-	if (!host.live) return;
-	for (const run of runs) {
+	if (!host.live || !q.runs) return;
+	const fournisseur = q.provider ?? "";
+	// The full model label, resolved as the generation line does (file-generation-vue.ts).
+	const p = fournisseur ? aiProviders.getProvider(fournisseur) : null;
+	const id = q.model || p?.defaultModel || "";
+	const nom = p ? (id ? aiProviders.libelleModele(fournisseur, id) : p.name) : "";
+	for (const run of q.runs) {
 		const bloc = ajouter(parent, "div", "qbd-ai-transcript");
 		bloc.setAttribute("role", "log");
 		bloc.setAttribute("aria-label", t("ai.transcript.label"));
+		const clef = `${run.runId}:${run.fromSeq}:${run.toSeq}`;
+		if (!runner.self) {
+			const ligne = ajouter(bloc, "div", "qbd-ai-statut");
+			morceauxTitre(ligne, null, undefined, nom);
+			ajouter(ligne, "span", undefined, t("ai.work.detailsOn", { device: labelOf(runner) }));
+			continue;
+		}
 		const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
 		b.type = "button";
 		b.setAttribute("aria-expanded", "false");
-		host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), "sparkles");
-		ajouter(b, "span", "qbd-ai-transcript-ligne-texte", t("ai.work.title"));
 		const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
 		host.ui.setIcon(chevron, "chevron-right");
+		const connu = dureesTravail.get(clef);
+		let morceaux = morceauxTitre(b, chevron, connu ?? undefined, nom);
+		// The time is read once, lazily; the label fills when it is known.
+		if (connu === undefined) {
+			void recordedTurnMs(run).then(ms => {
+				dureesTravail.set(clef, ms);
+				if (ms === null || !b.isConnected) return;
+				morceaux.forEach(m => m.remove());
+				morceaux = morceauxTitre(b, chevron, ms, nom);
+			});
+		}
 		let detail: HTMLElement | null = null;
 		let lu: Promise<Thread | null> | null = null;
 		b.addEventListener("click", () => {
@@ -74,10 +136,11 @@ function peindreTravail(parent: HTMLElement, runs: readonly ChatRun[], deps: { r
 			const racine = ajouter(d, "div", "qbd-work");
 			lu ??= recordedTurn(run).catch(() => null);
 			void lu.then(thread => {
-				// Gone from the store (deleted): the line goes too.
-				if (!thread || !thread.items.length) { bloc.remove(); return; }
+				if (detail !== d) return;
+				// Gone from the store (deleted, or never kept here): say so, keep the line.
+				if (!thread || !thread.items.length) { ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable")); return; }
 				// Read-only: a recorded turn has no permission left to answer.
-				if (detail === d) renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
+				renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
 			});
 		});
 	}
@@ -137,7 +200,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 		const id = q.id;
 		peindreQuestions(tour, q.clarify, deps.repondre && deps.reprenable?.(id) ? (answers) => deps.repondre?.(id, answers) : undefined, id);
 	}
-	if (q.runs?.length) peindreTravail(tour, q.runs, deps);
+	if (q.runs?.length) peindreTravail(tour, q, runner, deps);
 	for (const res of q.results) {
 		if (res.kind === "text") {
 			const rep = ajouter(tour, "div", "qbd-ai-chat-reponse");

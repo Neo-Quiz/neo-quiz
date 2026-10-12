@@ -19,6 +19,7 @@ import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex } from "./generation-ki
 import { NAME_UNSAFE } from "../shared-state/remote-request";
 
 export type ChatMode = "learn" | "practice";
+export type ClarifyAction = "generate" | "web" | "relay" | "remote";
 export interface ChatDocument { name: string; path?: string }
 export type ChatResult = { kind: "quiz"; title: string; path: string } | { kind: "text"; text: string };
 export type RequestState = "done" | "failed" | "stopped";
@@ -32,7 +33,7 @@ export interface ChatRun { runId: string; fromSeq: number; toSeq: number }
     2026-10-07-generate-auto-kind): the questions, and the answers once all are
     given (one list of chosen labels per question, typed text included; an empty list is a skipped question).
     Absent `answers`: nothing generates yet. */
-export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][]; /** The kind to generate once answered (`both` included: `mode` cannot say it). */ genre?: "learn" | "practice" | "both" }
+export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][]; /** The kind to generate once answered (`both` included: `mode` cannot say it). */ genre?: "learn" | "practice" | "both"; action?: ClarifyAction }
 
 export interface ChatRequest {
 	id: string;
@@ -164,12 +165,15 @@ function readClarify(x: unknown): ChatClarify | null {
 		const options: ClarifyOption[] = [];
 		for (const o of q.options) {
 			if (!isObj(o) || !isStr(o.label)) return null;
-			options.push({ label: o.label, description: isStr(o.description) ? o.description : "" });
+			const kind = o.kind === "learn" || o.kind === "practice" || o.kind === "both" ? o.kind : undefined;
+			options.push({ label: o.label, description: isStr(o.description) ? o.description : "", ...(kind ? { kind } : {}) });
 		}
-		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length) });
+		const purpose = q.purpose === "kind" && q.multiple !== true && options.every(option => option.kind) ? "kind" : undefined;
+		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length), ...(purpose ? { purpose } : {}) });
 	}
 	const clarify: ChatClarify = { questions };
 	if (x.genre === "learn" || x.genre === "practice" || x.genre === "both") clarify.genre = x.genre;
+	if (x.action === "generate" || x.action === "web" || x.action === "relay" || x.action === "remote") clarify.action = x.action;
 	// One list per question; an EMPTY list is a skipped question.
 	if (Array.isArray(x.answers) && x.answers.length === questions.length && x.answers.every(a => Array.isArray(a) && a.every(isStr))) clarify.answers = (x.answers as string[][]).map(a => [...a]);
 	return clarify;

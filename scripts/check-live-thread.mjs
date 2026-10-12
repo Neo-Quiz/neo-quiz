@@ -357,3 +357,53 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 	}
 	r.done();
 });
+
+/* THE DURATION OF A RECORDED TURN (2026-10-12, `recordedTurnMs`): a turn's
+   bounds are the `seq` of its first and last line, and a dropped line leaves
+   a gap in `seq`. A run page is addressed by INDEX, so reading the bounds as
+   indexes returned the wrong events after a gap, and the label said "worked"
+   with no time. Driven with a forged in-memory store shaped like the page the
+   main process returns (`pageOf`): no run file is read. */
+await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"], async (G, H) => {
+	const r = makeReporter("Recorded turn duration (seq and index)");
+	const RUN = "00000000-0000-4000-8000-0000000000bb";
+	const GONE = "00000000-0000-4000-8000-0000000000cc";
+	let reads = 0;
+	const forge = (events) => ({
+		start: async () => ({ runId: RUN }),
+		send: async () => {},
+		close: async () => {},
+		onEvent: () => () => {},
+		readRun: async (runId, p = { offset: 0, limit: 2000 }) => {
+			reads++;
+			if (runId !== RUN) return null;
+			return { header: {}, events: events.slice(p.offset, p.offset + p.limit), offset: p.offset, total: events.length, live: false, interrupted: false, truncated: false };
+		},
+		toolOutput: async () => null,
+		removeRuns: async () => {},
+		removeAllRuns: async () => {},
+		storeSize: async () => 0,
+	});
+	// A run with two dropped lines: seq 3, 7 and 8 are missing, so index and seq differ after them.
+	const trou = [0, 1, 2, 4, 5, 6, 9, 10].map(seq => ({ t: 1000 + seq * 100, seq, dir: "out", l: {} }));
+	// A long run with a dropped line every five lines (seq = index + floor(index / 5)).
+	const long = Array.from({ length: 200 }, (_, i) => ({ t: 10 * (i + Math.floor(i / 5)), seq: i + Math.floor(i / 5), dir: "out", l: {} }));
+	const sansTrou = Array.from({ length: 40 }, (_, i) => ({ t: 10 * i, seq: i, dir: "out", l: {} }));
+	const ms = (events, run) => { H.installHost({ live: forge(events), paths: {} }); reads = 0; return G.recordedTurnMs(run).then(v => [v, reads]); };
+	try {
+		const [avecTrou, lectures] = await ms(trou, { runId: RUN, fromSeq: 4, toSeq: 10 });
+		r.check("a turn after a dropped line keeps its duration (seq 4 to seq 10 = 600 ms)", avecTrou, 600);
+		r.check("the duration after a gap costs a few one-event reads, not the run", lectures <= 10, true);
+		r.check("a turn with no gap: its duration from the index", await ms(sansTrou, { runId: RUN, fromSeq: 3, toSeq: 30 }).then(x => x[0]), 270);
+		const debut = long[57].seq, fin = long[143].seq;
+		r.check("a long run with gaps: a turn in its middle, read by seq", await ms(long, { runId: RUN, fromSeq: debut, toSeq: fin }).then(x => x[0]), (fin - debut) * 10);
+		const [, bornes] = await ms(long, { runId: RUN, fromSeq: debut, toSeq: fin });
+		r.check("a long run: bisection reads stay logarithmic (at most 22 for 200 events)", bornes <= 22, true);
+		r.check("a turn whose first seq is not in the run gives no time", await ms(trou, { runId: RUN, fromSeq: 3, toSeq: 10 }).then(x => x[0]), null);
+		r.check("a turn whose last seq is not in the run gives no time", await ms(trou, { runId: RUN, fromSeq: 4, toSeq: 8 }).then(x => x[0]), null);
+		r.check("a run that is gone from the store gives no time", await ms(trou, { runId: GONE, fromSeq: 4, toSeq: 10 }).then(x => x[0]), null);
+	} finally {
+		H.uninstallHost();
+	}
+	r.done();
+});

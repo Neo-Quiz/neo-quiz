@@ -359,6 +359,10 @@ jobs:
       # prompt carries document names, never content.
       - name: Generation kind
         run: npm run check:generation-kind
+      # Composer options menu pruned to Subject only, and no tick/cross badge
+      # on the question beads (color alone conveys the result).
+      - name: UI pruning
+        run: npm run check:ui-pruning
       # THE RELAY: the prompt shared to an AI app is the PC's, and the pasted
       # answer is size-capped, one quiz only, never executed, format-checked.
       - name: Relay

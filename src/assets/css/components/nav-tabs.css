@@ -106,13 +106,10 @@
   --tab-text: #fff;
 }
 
-/* A MARK per verdict, so the meaning never rests on colour alone (red and
-   green blindness): a check, a circling arrow, a cross, in a small disc at
-   the top right of the tab. Plain text glyphs, drawn by the font. */
-.quiz-tab.correct::before,
+/* Retried and partial answers keep their retry mark. Correct and wrong
+   beads use their existing colors without a corner glyph. */
 .quiz-tab.retried::before,
-.quiz-tab.partial::before,
-.quiz-tab.wrong::before{
+.quiz-tab.partial::before{
   position: absolute;
   top: -5px;
   right: -5px;
@@ -129,9 +126,7 @@
   line-height: 1;
   pointer-events: none;
 }
-.quiz-tab.correct::before{ content: "\2713"; }
 .quiz-tab.retried::before{ content: "\21BB"; }
-.quiz-tab.wrong::before{ content: "\2715"; }
 /* A STEP's bead (Learn, `cards.ts` tabEtat): no check or cross, the colour
    says it; the disc shows how many of its questions are still missed. */
 .quiz-tab.step-bead::before{ content: none; }

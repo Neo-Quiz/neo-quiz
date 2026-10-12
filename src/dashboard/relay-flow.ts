@@ -10,7 +10,7 @@ import { brouillonDe } from "./generation-demande";
 import type { enregistrerQuiz } from "./generation-demande";
 import { buildRelayPrompt, extractQuizAnswer } from "./relay";
 import type { RelayRefusal } from "./relay";
-import { appendRequest, newRequestId } from "./chat-requests";
+import { completeClarification, newRequestId } from "./chat-requests";
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { Scanner } from "./scanner";
 
@@ -25,7 +25,7 @@ export interface RelayDeps {
 	reglages(): AiSettings;
 	chats: { get(): ChatRecord[]; set(list: ChatRecord[]): void };
 }
-export interface RelayRequest { chatId: string; text: string; mode?: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }>; destination: string }
+export interface RelayRequest { chatId: string; text: string; mode?: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }>; destination: string; requestId?: string }
 export interface RelaySession { token: string; mode: "learn" | "practice"; requestId: string; request: RelayRequest; /** Set once the quiz is saved: a session is consumed once. */ saved?: boolean }
 export type PasteOutcome = { ok: true; title: string; path: string } | { ok: false; reason: RelayRefusal | "clipboard-empty" | "save-failed" | "already-saved"; detail?: string };
 
@@ -68,7 +68,7 @@ export async function startRelay(deps: RelayDeps, req: RelayRequest): Promise<Re
 	if (docs.some(d => !SHAREABLE_NAME.test(d.name))) throw new RelayRefused("ai.remote.textOnly");
 	if (built.text.length > MAX_SHARE_TEXT) throw new RelayRefused("ai.relay.tooLong");
 	const opened = await deps.share(built.text, docs.map(d => ({ nom: d.name, octets: d.bytes })));
-	return opened ? { token: built.token, mode: built.mode, requestId: newRequestId(), request: req } : null;
+	return opened ? { token: built.token, mode: built.mode, requestId: req.requestId ?? newRequestId(), request: req } : null;
 }
 
 /** Reads the clipboard (explicit tap), extracts, saves like a generated quiz, records the request in OUR chat file. Saves nothing on any refusal. */
@@ -102,5 +102,5 @@ function record(deps: RelayDeps, s: RelaySession, saved: { title: string; path: 
 		}),
 		results: [{ kind: "quiz", title: saved.title, path: saved.path }], state: "done",
 	};
-	deps.chats.set(appendRequest(deps.chats.get(), s.request.chatId, request, deps.device, now));
+	deps.chats.set(completeClarification(deps.chats.get(), s.request.chatId, request, deps.device, now));
 }

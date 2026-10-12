@@ -1952,25 +1952,6 @@ export function openEffortSlider(anchorEl: HTMLElement, opts: OpenEffortSliderOp
 /* ── openOptionsMenu ──────────────────────────────────────── */
 
 export interface OpenOptionsMenuOptions {
-	count: number;
-	type: string;
-	types: string[];
-	onCount?: (n: number) => void;
-	onType?: (t: string) => void;
-	/** « Auto » en tête du nombre et du type : l'IA choisit d'après la
-	    source. `countAuto` / `typeAuto` disent si Auto est l'état courant ;
-	    les rappels `onCountAuto` / `onTypeAuto` le posent. */
-	countAuto?: boolean;
-	onCountAuto?: () => void;
-	typeAuto?: boolean;
-	onTypeAuto?: () => void;
-	/** MULTI-SELECT variant of the Type row: when `onTypes` is given, the
-	    types are checkboxes. `typesActifs` are the checked labels (empty =
-	    Auto, which is exclusive), `onTypes` gets the new checked labels,
-	    `typesResume` writes the grey value of the row. */
-	typesActifs?: string[];
-	onTypes?: (labels: string[]) => void;
-	typesResume?: (labels: string[]) => string;
 	/**
 	 * CATÉGORIE du quiz (retour #7, 2026-09-26) : « Automatique » en tête,
 	 * dont l'indice dit ce qui est détecté, puis la liste. Absente = pas de
@@ -1982,6 +1963,11 @@ export interface OpenOptionsMenuOptions {
 	/** Le libellé de la catégorie détectée, affiché à côté d'« Automatique ». */
 	categorieDetectee?: string;
 	onCategorie?: (value: string | null) => void;
+	/**
+	 * Direct mode (the subject notice, 2026-10-12): no menu is drawn; the
+	 * subject list opens at once beside `anchorEl`, the notice itself.
+	 */
+	directSujet?: boolean;
 }
 
 /** One subject of the options menu: its icon is Lucide (`icon`) or drawn
@@ -1997,9 +1983,8 @@ export interface OptionCategorie {
 }
 
 /*
- * openOptionsMenu(anchorEl, opts) — the generation options, one row each
- * (subject, questions, type; reference: claude.ai's menus): icon, name,
- * current value in grey, chevron. Each row opens its choice in a flyout
+ * openOptionsMenu(anchorEl, opts) — the subject option: icon, name, current
+ * value in grey, chevron. Its choices open in a flyout
  * beside the menu, on hover as on click or right arrow — the same mechanism
  * as the model menu's level flyout. Nothing is nested in the menu: a
  * `createSelect` would call `closeAllSelects()` and close the parent.
@@ -2009,8 +1994,13 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	closeAllSelects();
 	const host = currentHost();
 
-	const menuEl = ajouter(document.body, "div", "qbd-select-menu qbd-action-menu qbd-opts-menu");
+	const menuEl = document.createElement("div");
+	menuEl.className = "qbd-select-menu qbd-action-menu qbd-opts-menu";
 	menuEl.setAttribute("role", "menu");
+	if (!opts.directSujet) document.body.appendChild(menuEl);
+	/* What the flyouts are placed beside: the menu and its row, or in direct
+	   mode the notice alone (the row is never drawn). */
+	const ancrePlacement = opts.directSujet ? anchorEl : menuEl;
 
 	/* ── Le flyout d'UNE ligne à la fois ── */
 	let fly: HTMLDivElement | null = null;
@@ -2144,7 +2134,7 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	/* `filtre`: a search field heads the flyout, for a list too long to
 	   scan (the forty-odd subjects, 2026-09-29) — its placeholder, and the
 	   line shown when nothing matches. */
-	const ligne = (icon: string, titre: string, valeur: () => string, choix: () => Choix[], extra?: (f: HTMLDivElement, maj: () => void) => void, filtre?: { placeholder: string; vide: string }): void => {
+	const ligne = (icon: string, titre: string, valeur: () => string, choix: () => Choix[], extra?: (f: HTMLDivElement, maj: () => void) => void, filtre?: { placeholder: string; vide: string }): (() => void) => {
 		const row = ajouter(menuEl, "button", "qbd-select-option qbd-opts-row");
 		row.type = "button";
 		row.setAttribute("aria-haspopup", "menu");
@@ -2237,7 +2227,7 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 
 			/* Right of the menu, aligned on the row; on the left when the
 			   screen lacks room (the Options button is right of the composer). */
-			placer(f, menuEl, row);
+			placer(f, ancrePlacement, opts.directSujet ? anchorEl : row);
 		};
 
 		row.addEventListener("mouseenter", () => { window.clearTimeout(timer); ouvrir(); });
@@ -2249,59 +2239,12 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 			ouvrir();
 			fly?.querySelector<HTMLElement>("button, input")?.focus();
 		});
-	};
-
-	/* ── The CUSTOM field of the Questions flyout: a ROW like the others — the
-	   label on the left, the typed number INSIDE the row followed by its unit,
-	   and the same check on the right when it is the current value. The
-	   number's frame only shows on hover and while typing: at rest, the row
-	   reads like its neighbours. Enter or losing focus commits, Escape
-	   cancels the typing. ── */
-	const champPerso = (f: HTMLDivElement, c: {
-		unite: (n: number) => string; avant?: string; min: number; max: number;
-		valeur: number; actif: boolean; valider: (n: number) => void; maj: () => void;
-	}): void => {
-		const row = ajouter(f, "label", "qbd-select-option qbd-opts-custom" + (c.actif ? " is-active" : ""));
-		ajouter(row, "span", "qbd-opts-custom-label", t("dashboard.select.optionsCustom"));
-		const saisie = ajouter(row, "span", "qbd-opts-custom-input");
-		if (c.avant) ajouter(saisie, "span", "qbd-opts-custom-unit", c.avant);
-		const field = ajouter(saisie, "input", "qbd-opts-custom-field");
-		field.type = "number";
-		field.min = String(c.min);
-		field.max = String(c.max);
-		field.inputMode = "numeric";
-		field.value = c.actif ? String(c.valeur) : "";
-		field.placeholder = c.actif ? "" : "—";
-		const unite = ajouter(saisie, "span", "qbd-opts-custom-unit", c.unite(c.actif ? c.valeur : 2));
-		const chk = ajouter(row, "span", "qbd-select-check");
-		if (c.actif) currentHost().ui.setIcon(chk, "check");
-		// The width follows the typed number: "5" does not float in a three-digit box.
-		const ajuster = (): void => {
-			// + padding and border: the box is border-box.
-			field.style.width = `calc(${Math.max(2, (field.value || field.placeholder).length) + 0.5}ch + 12px)`;
-			const n = Number(field.value);
-			unite.textContent = c.unite(Number.isFinite(n) && n > 0 ? n : 2);
-		};
-		ajuster();
-		field.addEventListener("input", ajuster);
-		const valider = (): void => {
-			if (!field.value.trim()) return;
-			const n = Math.min(c.max, Math.max(c.min, Math.round(Number(field.value))));
-			if (!Number.isFinite(n)) return;
-			c.valider(n);
-			c.maj();
-		};
-		field.addEventListener("change", valider);
-		field.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") { e.preventDefault(); valider(); }
-			else if (e.key === "Escape") { e.stopPropagation(); field.value = c.actif ? String(c.valeur) : ""; ajuster(); field.blur(); }
-		});
+		return ouvrir;
 	};
 
 	/* ── Subject: Automatic (the detection), or a forced subject ──
-	   FIRST row since 2026-09-29: it shapes the whole quiz, where count and
-	   type only tune it. (The output folder left this menu the same day for
-	   its own row at the top of the composer, ai.ts.) */
+	   It shapes the whole quiz; the output folder has its own row at the top
+	   of the composer (ai.ts). */
 	const categories = opts.categories ?? [];
 	if (categories.length > 0) {
 		// The leaves, groups flattened: what a value can be.
@@ -2317,74 +2260,36 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 				filtreEnfants: { placeholder: t("ai.categorie.searchLanguage"), vide: t("ai.categorie.noMatchLanguage") },
 			} : {}),
 		});
-		ligne("tag", t("dashboard.select.optionsCategory"),
+		const ouvrirSujet = ligne("tag", t("dashboard.select.optionsCategory"),
 			() => categorie === null ? t("ai.categorie.auto") : (feuilles.find(c => c.value === categorie)?.label ?? t("ai.categorie.auto")),
 			() => [
 				{ label: t("ai.categorie.auto"), hint: opts.categorieDetectee, actif: categorie === null, choisir: () => { categorie = null; if (opts.onCategorie) opts.onCategorie(null); } },
 				...categories.map(versChoix),
 			], undefined, { placeholder: t("ai.categorie.search"), vide: t("ai.categorie.noMatch") });
+		if (opts.directSujet) {
+			ouvrirSujet();
+			/* `fly` is set inside the closure above: TypeScript cannot see it. */
+			(fly as HTMLDivElement | null)?.querySelector<HTMLElement>("input, button")?.focus();
+		}
 	}
 
-	/* ── Questions ── */
-	const PRESETS = [5, 10, 15, 20, 30];
-	let count = Math.min(100, Math.max(1, Math.round(Number(opts.count) || 5)));
-	let countAuto = !!opts.countAuto;
-	const countLabel = (n: number): string =>
-		t(n === 1 ? "dashboard.common.questionsOne" : "dashboard.common.questionsOther", { count: n });
-	const choisirCount = (n: number): void => {
-		count = Math.min(100, Math.max(1, Math.round(n)));
-		countAuto = false;
-		if (opts.onCount) opts.onCount(count);
-	};
-	ligne("list-ordered", t("dashboard.select.optionsQuestions"),
-		() => countAuto ? t("ai.options.auto") : countLabel(count),
-		() => [
-			{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: countAuto, choisir: () => { countAuto = true; if (opts.onCountAuto) opts.onCountAuto(); } },
-			...PRESETS.map(n => ({ label: countLabel(n), actif: !countAuto && count === n, choisir: () => choisirCount(n) })),
-		],
-		(f, maj) => champPerso(f, {
-			unite: (n) => t(n === 1 ? "dashboard.common.questionUnitOne" : "dashboard.common.questionUnitOther"), min: 1, max: 100,
-			valeur: count, actif: !countAuto && !PRESETS.includes(count),
-			valider: (n) => choisirCount(n), maj,
-		}));
-
-	/* ── Type ── */
-	let type = opts.type;
-	let typeAuto = !!opts.typeAuto;
-	if (opts.onTypes) {
-		/* Auto is EXCLUSIVE: picking it clears the types, picking a type
-		   clears it, and unchecking the last type falls back to Auto. */
-		let actifs = [...(opts.typesActifs ?? [])];
-		const pousser = (): void => { opts.onTypes?.([...actifs]); };
-		ligne("shapes", t("dashboard.select.optionsType"),
-			() => (opts.typesResume ?? ((l: string[]) => l.join(", ")))(actifs),
-			() => [
-				{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), multi: true, actif: actifs.length === 0, choisir: () => { actifs = []; pousser(); } },
-				...opts.types.map(x => ({
-					label: x, multi: true, actif: actifs.includes(x),
-					choisir: () => { actifs = actifs.includes(x) ? actifs.filter(y => y !== x) : [...actifs, x]; pousser(); },
-				})),
-			]);
-	} else ligne("shapes", t("dashboard.select.optionsType"),
-		() => typeAuto ? t("ai.options.auto") : type,
-		() => [
-			{ label: t("ai.options.auto"), hint: t("ai.options.autoHint"), actif: typeAuto, choisir: () => { typeAuto = true; if (opts.onTypeAuto) opts.onTypeAuto(); } },
-			...opts.types.map(x => ({ label: x, actif: !typeAuto && type === x, choisir: () => { type = x; typeAuto = false; if (opts.onType) opts.onType(x); } })),
-		]);
-
 	// ── Position : sous l'ancre, sinon dessus ; calé sur son bord DROIT ──
-	const rect = anchorEl.getBoundingClientRect();
-	menuEl.style.visibility = "hidden";
-	menuEl.style.top = "0px";
-	menuEl.style.left = "0px";
-	const mr = menuEl.getBoundingClientRect();
-	const left = Math.min(Math.max(8, rect.right - mr.width), window.innerWidth - mr.width - 8);
-	const below = rect.bottom + 4;
-	const top = (below + mr.height <= window.innerHeight - 8 || rect.top - 4 - mr.height < 8)
-		? below : rect.top - 4 - mr.height;
-	menuEl.style.left = left + "px";
-	menuEl.style.top = top + "px";
-	menuEl.style.visibility = "";
+	if (!opts.directSujet) placerMenu();
+
+	function placerMenu(): void {
+		const rect = anchorEl.getBoundingClientRect();
+		menuEl.style.visibility = "hidden";
+		menuEl.style.top = "0px";
+		menuEl.style.left = "0px";
+		const mr = menuEl.getBoundingClientRect();
+		const left = Math.min(Math.max(8, rect.right - mr.width), window.innerWidth - mr.width - 8);
+		const below = rect.bottom + 4;
+		const top = (below + mr.height <= window.innerHeight - 8 || rect.top - 4 - mr.height < 8)
+			? below : rect.top - 4 - mr.height;
+		menuEl.style.left = left + "px";
+		menuEl.style.top = top + "px";
+		menuEl.style.visibility = "";
+	}
 
 	function closeMenu(): void {
 		fermerFly();
@@ -2424,6 +2329,15 @@ export function openOptionsMenu(anchorEl: HTMLElement, opts: OpenOptionsMenuOpti
 	window.addEventListener("resize", closeMenu);
 
 	return { close: closeMenu };
+}
+
+/**
+ * The subject chooser alone, opened beside the subject notice (the Generate
+ * composer): the same list and callbacks as the Subject row of the options
+ * menu, with no menu in front of it.
+ */
+export function openCategoriePicker(anchorEl: HTMLElement, opts: Omit<OpenOptionsMenuOptions, "directSujet">): MenuHandle {
+	return openOptionsMenu(anchorEl, { ...opts, directSujet: true });
 }
 
 /* ── openNotePicker ───────────────────────────────────────── */

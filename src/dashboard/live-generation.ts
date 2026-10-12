@@ -35,7 +35,7 @@
  */
 import { currentHost } from "../host/current";
 import type { ModeAgent } from "../host/claude-outils";
-import type { HostLive, LiveEvent } from "../host/types";
+import type { HostLive, LiveEvent, RunEvent } from "../host/types";
 import { addUserMessage, answerPermission, applyLive, emptyThread } from "./live-thread";
 import type { Thread } from "./live-thread";
 import { collectLine, emptyOutcome } from "./live-turn";
@@ -215,6 +215,54 @@ export async function recordedTurn(run: ChatRun): Promise<Thread | null> {
 	const stored = await readAll(live, run.runId).catch(() => null);
 	if (!stored) return null;
 	return turnFromStore(stored, run, false).thread;
+}
+
+/** One event of a stored run, by its INDEX (a one-event page). */
+async function eventAt(live: HostLive, runId: string, index: number): Promise<RunEvent | null> {
+	const page = await live.readRun(runId, { offset: index, limit: 1 }).catch(() => null);
+	return page?.events[0] ?? null;
+}
+
+/** The index of the first event whose `seq` is at least `target` (`total`
+    when none is). A `seq` is the line's number in the run and a dropped line
+    leaves a gap, so the index of a seq is NOT the seq itself: the seq rises
+    with the index, and a bisection finds it in about log2(total) reads. */
+async function indexAtOrAfter(live: HostLive, runId: string, total: number, target: number): Promise<number | null> {
+	// No gap before `target`: its index is the seq itself (one read).
+	if (target < total) {
+		const guess = await eventAt(live, runId, target);
+		if (!guess) return null;
+		if (guess.seq === target) return target;
+	}
+	let lo = 0;
+	let hi = total;
+	while (lo < hi) {
+		const mid = Math.floor((lo + hi) / 2);
+		const e = await eventAt(live, runId, mid);
+		if (!e) return null;
+		if (e.seq < target) lo = mid + 1;
+		else hi = mid;
+	}
+	return lo;
+}
+
+/** How long a recorded turn took, in ms: from its first event to its last
+    (`fromSeq` to `toSeq`, found by their `seq` and not by their index). The
+    common case, no gap, is one read per end; a gap costs a bisection. `null`
+    when the run is gone, this host has no store, or the turn's bounds are
+    not events of the run: the label then says "worked" without a time. */
+export async function recordedTurnMs(run: ChatRun): Promise<number | null> {
+	const live = currentHost().live;
+	if (!live) return null;
+	const head = await live.readRun(run.runId, { offset: 0, limit: 1 }).catch(() => null);
+	if (!head || head.total === 0) return null;
+	const start = await indexAtOrAfter(live, run.runId, head.total, run.fromSeq);
+	const end = await indexAtOrAfter(live, run.runId, head.total, run.toSeq + 1);
+	if (start === null || end === null || end - 1 < start) return null;
+	const first = await eventAt(live, run.runId, start);
+	const last = await eventAt(live, run.runId, end - 1);
+	if (!first || !last || first.seq !== run.fromSeq || last.seq !== run.toSeq) return null;
+	return last.t >= first.t ? last.t - first.t : null;
 }
 
 /** The full output of one tool call of a recorded turn ("Show all"). */

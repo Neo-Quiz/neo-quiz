@@ -1027,15 +1027,11 @@
 	cursor: not-allowed;
 }
 
-/* `hidden` perd contre le `display: inline-flex` du bouton : masqué ici. */
-.qbd-ai-composer--sans-fournisseur .qbd-ai-composer-opts {
-	display: none;
-}
-
 /* The SUBJECT notice (feedback #7, 2026-09-26): "Python detected", in the
    output-folder row since 2026-09-29, right of the folder with a clear
    gap between the two (they must not read as one label). TEXT with its
-   icon, discreet, no badge or border: metadata, not a button. */
+   icon, discreet, no badge or border. Since 2026-10-12 it is a BUTTON: a
+   click picks the subject, so the reset keeps it looking like the text. */
 .qbd-ai-categorie {
 	display: inline-flex;
 	align-items: center;
@@ -1043,10 +1039,26 @@
 	/* 16px plus the folder button's own 8px of padding: ~24px of air. */
 	margin-left: 16px;
 	min-width: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	font: inherit;
 	color: var(--text-muted);
 	font-size: 13px;
 	white-space: nowrap;
+	cursor: pointer;
+	transition: color 0.14s ease;
 	animation: qbd-ai-categorie-in 200ms ease-out;
+}
+
+.qbd-ai-categorie:hover {
+	color: var(--text-normal);
+}
+
+.qbd-ai-categorie:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
 }
 
 .qbd-ai-categorie[hidden] {
@@ -2807,37 +2819,6 @@
 	}
 }
 
-/* ── Options : bouton du composer + popover (remplacent l'ancienne
-   carte « Options » du formulaire) ── */
-/* Boutons icône du pied de composer (options) : même gabarit que le
-   « + », d'où le groupement — trois copies de la même règle divergeraient. */
-.qbd-ai-composer-opts {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 34px;
-	height: 34px;
-	padding: 0;
-	border-radius: 9px;
-	background: transparent !important;
-	border: none;
-	box-shadow: none !important;
-	color: var(--text-muted);
-	cursor: pointer;
-	flex-shrink: 0;
-	transition: color 0.14s ease, background 0.14s ease;
-}
-
-.qbd-ai-composer-opts:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover) !important;
-}
-
-.qbd-ai-composer-opts svg {
-	width: 18px;
-	height: 18px;
-}
-
 /* ── Menu Options en trois lignes + flyouts (2026-09-23) ──
    Même surface que le menu « + » (.qbd-action-menu) : icône mutée, nom,
    valeur courante en gris à droite, chevron. La ligne dont le flyout est
@@ -2950,112 +2931,6 @@
 
 .qbd-opts-flyout .qbd-select-option {
 	gap: 10px;
-}
-
-/* Le nombre personnalisé : une LIGNE du flyout comme les autres (même
-   hauteur, même coche à droite), séparée des préréglages par un filet. Le
-   nombre se saisit dans la ligne, suivi de son unité ; son cadre n'apparaît
-   qu'au survol et à la saisie. */
-.qbd-opts-custom {
-	margin-top: 4px;
-	border-top: 1px solid var(--background-modifier-border);
-	border-radius: 0 0 6px 6px;
-	cursor: text;
-}
-
-.qbd-opts-custom-label {
-	color: var(--text-muted);
-}
-
-.qbd-opts-custom.is-active .qbd-opts-custom-label {
-	color: var(--text-normal);
-}
-
-.qbd-opts-custom-input {
-	margin-left: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	padding: 0 2px 0 16px;
-	font-size: 12.5px;
-	color: var(--text-normal);
-}
-
-.qbd-opts-custom-unit {
-	color: var(--text-faint);
-	font-size: 12px;
-}
-
-.qbd-opts-custom-field {
-	appearance: none;
-	-webkit-appearance: textfield;
-	-moz-appearance: textfield;
-	min-width: 2.6ch;
-	height: 24px;
-	padding: 0 5px;
-	text-align: right;
-	font: inherit;
-	font-variant-numeric: tabular-nums;
-	font-weight: 600;
-	color: var(--text-normal);
-	background: transparent;
-	border: 1px solid transparent;
-	border-radius: 6px;
-	box-shadow: none !important;
-	outline: none;
-	transition: border-color 0.12s ease, background-color 0.12s ease;
-}
-
-.qbd-opts-custom-field::-webkit-inner-spin-button,
-.qbd-opts-custom-field::-webkit-outer-spin-button {
-	-webkit-appearance: none;
-	margin: 0;
-}
-
-.qbd-opts-custom-field::placeholder {
-	color: var(--text-faint);
-	font-weight: 400;
-}
-
-.qbd-opts-custom:hover .qbd-opts-custom-field {
-	border-color: var(--background-modifier-border);
-	background-color: var(--background-modifier-form-field);
-}
-
-.qbd-opts-custom-field:focus {
-	border-color: var(--interactive-accent);
-	background-color: var(--background-modifier-form-field);
-}
-
-.qbd-options-pop {
-	width: 252px;
-	padding: 12px;
-	/* Le mini-menu du dropdown Questions (absolute) doit pouvoir sortir
-	   du cadre — la base .qbd-select-menu est overflow-y: auto. */
-	overflow: visible;
-}
-
-.qbd-options-pop-row {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 4px 4px 10px;
-}
-
-/* Titres de section (Questions / Type) : même grammaire que les labels
-   de cartes du dashboard. Le 2e porte le séparateur. */
-.qbd-options-pop-title {
-	font-size: 10px;
-	font-weight: 600;
-	color: var(--text-faint);
-	padding: 2px 4px 8px;
-}
-
-.qbd-options-pop-title + .qbd-options-pop-title,
-.qbd-options-pop-row + .qbd-options-pop-title {
-	border-top: 1px solid var(--background-modifier-border);
-	margin-top: 2px;
-	padding-top: 10px;
 }
 
 /* ── Dropdown Questions : presets + « Personnalisé » (référence

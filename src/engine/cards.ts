@@ -39,12 +39,9 @@ const ICON_CERCLE_OK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 
 const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const ICON_ARROW_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
 
-/** THE HINT BADGE (spec 2026-09-29-test-practice-exam-design §2.3): a dot
-    whose question used its hint carries the Hint button's bulb IN ADDITION to
-    its verdict mark (✓, ↻, ✗): `used-hint`, the bulb drawn in `::after` at the
-    top left by nav-tabs.css, the mark staying in `::before` at the top right.
-    Only on a dot that HAS a verdict mark; its colour still follows the result.
-    Test and Learn alike. PURE, so that check:engine-review holds it. */
+/** A question bead whose answer used a hint carries the Hint button's bulb
+    (`used-hint`, drawn in `::after` at the top left by nav-tabs.css). The bead's
+    color continues to show the answer state. Test and Learn alike. */
 export function withHintBadge(etat: string, hintUsed: boolean): string {
 	if (!hintUsed || !/(^|\s)(correct|retried|wrong)(\s|$)/.test(etat)) return etat;
 	return `${etat} used-hint`;

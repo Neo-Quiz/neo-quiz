@@ -27,7 +27,7 @@ import { aiSettingsDefaults, destinationMemorisee } from "./ai-settings-host";
 import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
-import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openOptionsMenu, openNotePicker, openActionMenu } from "./ui-select";
+import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openCategoriePicker, openNotePicker, openActionMenu } from "./ui-select";
 import { MODES_AGENT, lireModeAgent } from "../host/claude-outils";
 import type { ModeAgent } from "../host/claude-outils";
 import { ouvrirMenuPlus } from "./composer-plus";
@@ -41,6 +41,7 @@ import { settingsOnSwitch } from "./chat-settings";
 import { activeChatId, chatDevice, notifyChatsChanged, onChatsChanged, setActiveChat, startNewChat } from "./chat-session";
 import { poserBarreHaute, poserBoutonPc, poserPuceModele } from "./phone-chat";
 import { getChats, setChats } from "./chat-store";
+import type { ClarifyAction } from "./chat-record";
 import { threadItems, toursOfThread } from "./chat-thread";
 import { chosenPc, getDevices, getOwnRequests, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver } from "./remote-generations";
 import { enviquerVersPc } from "./ai-remote";
@@ -54,7 +55,7 @@ import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { rankFolders, suggestFolders } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
-import { decideByKeywords, formatClarifications, parseClarifyAnswer } from "./generation-kind";
+import { formatClarifications, kindFromClarifications, parseClarifyAnswer } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -336,8 +337,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	// Sources texte attachées (PLUSIEURS — maquette 2026-07-11 231626) :
 	// notes du vault (path) et fichiers texte du disque (.md/.txt).
 	let noteAttachments: NoteAttachment[] = []; // [{ name, content, path? }]
-	/** `null` : « Auto », le nombre suit la source (spec §2). */
-	let questionCount: number | null = null;
 	/** The TYPE of quiz to generate: a Learn to learn, or a Test to train
 	    (`"practice"`, the format's name for a Test file). How a Test is taken
 	    (hints, time limit, Exam mode) is chosen when it starts, never here.
@@ -350,7 +349,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The clarifying questions asked and not answered yet, by request id: what the click
 	    needs to generate (the documents' text is only in memory). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean; action: ClarifyAction }>();
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
@@ -370,9 +369,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		oneQuizBtn.setAttribute("aria-pressed", String(oneQuiz));
 		oneQuizBtn.classList.toggle("is-on", oneQuiz);
 	};
-	/** The checked question types (canonical values); `null` = untouched, i.e.
-	    the default of the current mode (`effectiveTypes`). */
-	let questionTypes: string[] | null = null;
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
 	   par défaut. Le CHOIX fait dans les options ou les suggestions est
 	   persisté (`aiComposerDestination`) et relu à chaque arrivée sur la page
@@ -797,34 +793,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	let planLine: UsageLine | null = null;
 	let runningBefore = 0;
 
-	// Le type de questions a DEUX faces, à ne jamais confondre : une VALEUR
-	// canonique, envoyée telle quelle au modèle (ai-client la compare à
-	// « Mixte »/« Choix unique »… pour construire le prompt), et un LIBELLÉ
-	// traduit, seul affiché. Traduire la valeur casserait la génération dès que
-	// l'UI passe en anglais. Les deux listes restent parallèles (même ordre).
-	const TYPE_VALUES = ["Mixte", "Choix unique", "Choix multiple", "Texte libre", "Réponse numérique", "Texte à trous", "Classement", "Association", "Sortie de code", "Compréhension"];
-	const TYPE_KEYS: TransKey[] = ["ai.type.mixed", "ai.type.single", "ai.type.multiple", "ai.type.text", "ai.type.numeric", "ai.type.cloze", "ai.type.ordering", "ai.type.matching", "ai.type.codeOutput", "ai.type.comprehension"];
-	/** What an untouched selection means: a Test is a written MCQ, a Learn
-	    lets its roles pick the types. Choosing Auto explicitly is Auto in both. */
-	const effectiveTypes = (kind: ModeGeneration = modeGeneration): string[] => questionTypes ?? (kind === "learn" ? [TYPE_VALUES[0]] : [TYPE_VALUES[1], TYPE_VALUES[2]]);
-	/** The grey value of the Type row and of the options tip. */
-	const typesResume = (values: string[]): string => {
-		const v = values.length ? values : [TYPE_VALUES[0]];
-		if (v.length === 1) return v[0] === TYPE_VALUES[0] ? t("ai.options.auto") : typeLabel(v[0]);
-		if (v.length === 2 && v.includes(TYPE_VALUES[1]) && v.includes(TYPE_VALUES[2])) return t("ai.type.mcq");
-		return t("ai.type.count", { count: v.length });
-	};
-	// Libellés recalculés à chaque usage (menu, tooltip) : jamais figés dans la
-	// langue du chargement.
-	const typeLabels = (): string[] => TYPE_KEYS.map(k => t(k));
-	const typeLabel = (value: string): string => {
-		const i = TYPE_VALUES.indexOf(value);
-		return i < 0 ? value : t(TYPE_KEYS[i]);
-	};
-	const typeValue = (label: string): string => {
-		const i = typeLabels().indexOf(label);
-		return i < 0 ? TYPE_VALUES[0] : TYPE_VALUES[i];
-	};
+	const TYPE_VALUES = ["Mixte", "Choix unique", "Choix multiple"];
+	/** The format defaults stay mode-specific; the model resolves all other settings. */
+	const effectiveTypes = (kind: ModeGeneration = modeGeneration): string[] => kind === "learn" ? [TYPE_VALUES[0]] : [TYPE_VALUES[1], TYPE_VALUES[2]];
 
 	/** The window of the exam's documents (`exam-documents.ts`): a click
 	    joins one, as "@CM1.pdf" would. */
@@ -1822,17 +1793,35 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		planifierSuggestions();
 		/* The SUBJECT notice (feedback #7), right of the folder since
-		   2026-09-29 — it sat before the Options icon, in the bottom bar:
-		   "Python detected", text and icon, no badge; hidden for `general`.
-		   Where the quiz goes and what it is about read together, before
-		   sending. Repainted on each composer change (`updateGenerateBtn`).
-		   Without a provider the options are hidden: the notice too. */
+		   2026-09-29: "Python detected", text and icon, no badge. It is the
+		   control too (2026-10-12): a click opens the subject list beside it,
+		   so the options icon is gone. Shown whenever a provider is there,
+		   even with nothing detected ("Automatic"). Where the quiz goes and
+		   what it is about read together, before sending. Repainted on each
+		   composer change (`updateGenerateBtn`). Without a provider there is
+		   no composer to choose for: no notice. */
 		avisCategorieEl = null;
 		if (provider) {
-			const avis = ajouter(destRow, "span", "qbd-ai-categorie");
-			avis.hidden = true;
+			const avis = ajouter(destRow, "button", "qbd-ai-categorie");
+			avis.type = "button";
+			avis.setAttribute("aria-label", t("ai.categorie.choose"));
 			avisCategorieEl = avis;
 			majAvisCategorie();
+			avis.addEventListener("click", () => {
+				// The output folder has its own row at the top of the composer.
+				openCategoriePicker(avis, {
+					/* The subject: Automatic says what it detects, otherwise the
+					   choice forces the prompt's (feedback #7). A value that is not
+					   a known subject (a group row) is never kept. */
+					categories: choixCategories(),
+					categorie: categorieChoix,
+					categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
+					onCategorie: (value) => {
+						categorieChoix = estCategorie(value) ? value : null;
+						majAvisCategorie();
+					},
+				});
+			});
 		}
 
 		// Zone de texte : le textarea et la rangée de chips « notes »
@@ -2139,46 +2128,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// Phone: the PC's status, right next to "+".
 		if (host.platform.isMobile) poserBoutonPc(composerBottom, () => chatSurEcran().record);
 
-		/* No Learn | Test selector any more (spec 2026-10-07-generate-auto-kind):
-		   the kind is decided when the request is sent (`decideGenre`). */
-		const optsBtn = ajouter(composerBottom, "button", "qbd-ai-composer-opts");
-		optsBtn.type = "button";
-		host.ui.setIcon(optsBtn, "settings-2");
-		labelIconButton(optsBtn, t("ai.composer.quizOptions"));
-		optsBtn.addEventListener("click", () => {
-			// The menu only knows labels: translate on the way in, and map the
-			// selection back to its canonical value on the way out. The output
-			// folder is not here: it has its own row at the top of the composer.
-			openOptionsMenu(optsBtn, {
-				count: questionCount ?? 10,
-				countAuto: questionCount === null, onCountAuto: () => { questionCount = null; },
-				type: "", types: typeLabels().slice(1),
-				typesActifs: effectiveTypes().filter(v => v !== TYPE_VALUES[0]).map(typeLabel),
-				// An empty selection is Auto, chosen explicitly (not the mode's default).
-				onTypes: (labels) => { questionTypes = labels.length ? labels.map(typeValue) : [TYPE_VALUES[0]]; },
-				typesResume: (labels) => typesResume(labels.map(typeValue)),
-				onCount: (n) => { questionCount = n; },
-				/* The subject: Automatic says what it detects, otherwise the
-				   choice forces the prompt's (feedback #7). A value that is not
-				   a known subject (a group row) is never kept. */
-				categories: choixCategories(),
-				categorie: categorieChoix,
-				categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
-				onCategorie: (value) => {
-					categorieChoix = estCategorie(value) ? value : null;
-					majAvisCategorie();
-				},
-			});
-		});
-		// Hover tooltip: the current state ("5 questions · Mixed"), re-read
-		// on each hover — attachHoverTip pattern. The folder no longer shows
-		// here: the composer's own row always does.
-		attachHoverTip(optsBtn, (tip) => {
-			const nb = questionCount === null ? t("ai.options.auto") : t("dashboard.common.questionsOther", { count: questionCount });
-			const ty = typesResume(effectiveTypes());
-			ajouter(tip, "div", "qbd-hover-tip-title", `${nb} · ${ty}`);
-		});
-
+		/* The clarify call decides Learn or Test from the request's meaning. */
 		/* Plan status line, right under the composer: always visible, no click.
 		   Only for a provider that publishes a plan, on a host that can read it. */
 		planLine?.destroy();
@@ -2201,9 +2151,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			buildProviderControl(composerTools);
 			if (buildModelControl) buildModelControl(composerTools);
 		}
-		// L'icône Options est à droite du modèle (2026-09-23).
-		composerTools.appendChild(optsBtn);
-
 		// Bouton générer dans le composer (façon bouton d'envoi claude.ai) :
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.
 		// Il reste un bouton d'ENVOI pendant une génération : l'arrêt vit sur
@@ -2316,7 +2263,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			composer.classList.add("qbd-ai-composer--sans-fournisseur");
 			composerInput.disabled = true;
 			addBtn.disabled = true;
-			optsBtn.hidden = true;
 			// Posé par buildProviderControl, dans une fermeture : TS ne le voit pas.
 			const bouton = (providerSelect as ProviderControl | null)?.el;
 			if (bouton) {
@@ -3205,17 +3151,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (fileInputRef && fileInputRef.isConnected) fileInputRef.click();
 	}
 
-	/** Fige la demande qui part. Le composer la GARDE, affichée derrière la
-	    modale d'étape et le bouton d'envoi grisé (`updateGenerateBtn`) : il
-	    ne se vide qu'au succès (`resetGeneration`). Il y a quinze jours il
-	    se vidait pour qu'on « sente » l'envoi ; c'est désormais la modale qui
-	    le dit, et un champ vide derrière elle laissait croire la demande
-	    effacée (Ahmed, 2026-09-19). Les tableaux sont COPIÉS : la génération
-	    lit cette copie, jamais l'état du composer. */
+	/** Freeze a request that the composer keeps visible during a web wait. */
 	function takeComposerMessage(jointesVideo: NoteAttachment[] = []): SentMessage {
 		dropSentMessage();
-		/* Les documents des vidéos YouTube prêtes (la tuile, `prets`) partent
-		   comme des notes jointes : mêmes canaux, même bulle — cf. § 5.2. */
 		const msg: SentMessage = { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: [...images] };
 		sentMessage = msg;
 		return msg;
@@ -4016,8 +3954,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return categorieChoisie(categorieChoix ?? "auto", indicesCategorie(noteAttachments, composerText));
 	}
 
-	/** Repeint l'avis près du bouton des options (texte, pièces, dossier
-	    ou choix changé). Rien pour `general`. */
+	/** Repaints the subject notice (text, attachments, folder or choice changed). */
 	function majAvisCategorie(): void {
 		if (!avisCategorieEl) return;
 		peindreAvisCategorie(avisCategorieEl, categorieCourante(), categorieChoix === null);
@@ -4246,7 +4183,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		b.disabled = relaisOccupe;
 	}
 
-	/** Phone relay, share: the composer's request and documents go to an AI app; the composer is cleared once the sheet opened. */
+	/** Share through another AI app after the clarification flow chooses its mode. */
 	async function partagerViaAppli(): Promise<void> {
 		if (!deps.relay || demarrage || relaisOccupe) return;
 		const rootId = host.paths.defaultRoot().id;
@@ -4257,18 +4194,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		demarrage = true;
 		try {
-			const session = await startRelay(deps.relay, {
-				chatId: activeChatId(),
-				text: composerText.trim(),
-				mode: decideByKeywords(composerText) === "practice" ? "practice" : "learn",
-				documents: noteAttachments.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
-				destination,
-			});
-			if (session) { relais = session; relaisErreur = null; viderComposer(); }
-			else host.ui.notice(t("ai.relay.shareFailed"));
+			await clarifier(containerRef, [], "relay");
 		} catch (e) {
-			console.warn(LOG_PREFIX, "relay not shared:", e);
-			host.ui.notice(t(e instanceof RelayRefused ? e.key : "ai.relay.shareFailed"));
+			console.warn(LOG_PREFIX, "relay clarification failed:", e);
+			host.ui.notice(t("ai.relay.shareFailed"));
 		} finally {
 			demarrage = false;
 		}
@@ -4302,7 +4231,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		vueFile.repeindre();
 	}
 
-	/** The phone's send: the request goes to the PC that owns the chat (`ai-remote.ts`); nothing runs here. */
+	/** Send to the PC after clarification resolves Learn or Test. */
 	async function envoyerVersPc(container: HTMLElement | null): Promise<void> {
 		if (demarrage) return;
 		const rootId = host.paths.defaultRoot().id;
@@ -4313,17 +4242,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		demarrage = true;
 		try {
-			const envoye = await enviquerVersPc({
-				chatId: activeChatId(),
-				text: composerText.trim(),
-				mode: decideByKeywords(composerText) === "practice" ? "practice" : "learn",
-				documents: noteAttachments.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
-			});
-			// No PC ever seen: nothing is written, and the typed text stays for the next try.
-			if (envoye) viderComposer();
-			else host.ui.notice(t("ai.remote.firstPc"));
+			await clarifier(container, [], "remote");
 		} catch (e) {
-			console.warn(LOG_PREFIX, "request not sent to the PC:", e);
+			console.warn(LOG_PREFIX, "remote clarification failed:", e);
 			host.ui.notice(t("ai.remote.sendFailed"));
 		} finally {
 			demarrage = false;
@@ -4396,17 +4317,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		arreterAttenteWeb();
 		const web = aiProviders.estCanalWeb(settings().aiProvider || "");
 		const commandeExam = !!examCible || retirerCommandeExam(composerText).commande;
-		/* The kind comes from the words of the request alone (a Learn unless it
-		   says it wants to practise); an "/exam" preparation plans both. */
-		const genre: KindChoice = decideByKeywords(composerText);
-		if (web) { await lancerSurSite(container, jointesVideo, genre); return; }
+		if (web) {
+			demarrage = true;
+			try { await clarifier(container, jointesVideo, "web"); } finally { demarrage = false; }
+			return;
+		}
 		if (!commandeExam && settings().aiProvider) {
 			demarrage = true;
-			let pris = false;
-			try { pris = await clarifier(container, jointesVideo, genre); } finally { demarrage = false; }
-			if (pris) return;
+			try { await clarifier(container, jointesVideo, "generate"); } finally { demarrage = false; }
+			return;
 		}
-		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : genre, { dejaVide: false });
+		/* A missing clarify provider safely means Learn; /exam stays explicit. */
+		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : "learn", { dejaVide: false });
 		render(container);
 	}
 
@@ -4433,11 +4355,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    qu'une demande à la fois : le premier fichier part, les autres attendent
 	    la réponse du précédent (`recevoirReponse`). A site cannot make both
 	    kinds from one request: `both` starts with the Learn. */
-	async function lancerSurSite(container: HTMLElement | null, jointesVideo: NoteAttachment[], genre: KindChoice): Promise<void> {
+	async function lancerSurSite(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean, container: HTMLElement | null): Promise<void> {
 		modeGeneration = genre === "practice" ? "practice" : "learn";
+		const restore = messagePourSite(original);
+		dropSentMessage();
+		sentMessage = restore;
 		/* ONE PASS (2026-10-01): with several documents the site gets ALL of
 		   them in one request and answers with one quiz per document. */
-		const parFichier = decouperParFichier(takeComposerMessage(jointesVideo), oneQuiz, lectureEnUnePasse(settings().aiProvider || ""));
+		const msg: SentMessage = { ...envoi, images: restore.images };
+		const parFichier = decouperParFichier(msg, seulQuiz, lectureEnUnePasse(settings().aiProvider || ""));
 		lotWebRestant = parFichier.slice(1);
 		lotWebPremier = null;
 		lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
@@ -4450,14 +4376,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { text: composerText, notes: [...noteAttachments, ...jointesVideo], images: images.map(i => ({ file: i.file })) };
 	}
 
-	/* ── CLARIFYING QUESTIONS (spec 2026-10-07-generate-auto-kind) ──
-	   ONE short call to the same provider, with the request and the names of
-	   the documents, says whether the request is ready or asks 1 to 3 quick
-	   questions. Any failure or unreadable answer is "ready": generation is
-	   never blocked. Questions are cards in the thread; when all are answered
-	   the generation starts with the answers appended to the request.
-	   Returns true when the request was taken over (sent, or questions put). */
-	async function clarifier(container: HTMLElement | null, jointesVideo: NoteAttachment[], genre: KindChoice): Promise<boolean> {
+	function messagePourSite(envoi: DemandeTexte): SentMessage {
+		return { ...envoi, images: envoi.images.map(image => ({ file: image.file, url: URL.createObjectURL(image.file) })) };
+	}
+
+	/* The clarify call returns the deduced kind or questions; failures keep the
+	   request ready with Learn as the safe fallback. */
+	async function clarifier(container: HTMLElement | null, jointesVideo: NoteAttachment[], action: ClarifyAction): Promise<void> {
 		const envoi = capturerEnvoi(jointesVideo);
 		const pieces = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
 		const seulQuiz = oneQuiz;
@@ -4466,22 +4391,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		render(container);
 		let reponse: ClarifyAnswer = { ready: true };
 		try {
-			reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name)));
+			if (settings().aiProvider) {
+				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name)));
+			}
 		} catch (err) {
-			console.warn(LOG_PREFIX, "clarify call failed, generating right away", err);
+			console.warn(LOG_PREFIX, "clarify call failed, using Learn", err);
 		} finally {
 			attenteGenre = null;
 		}
+		const genre = reponse.kind ?? "learn";
 		if ("questions" in reponse) {
 			const id = newRequestId();
-			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre }));
-			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz });
+			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action }));
+			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action });
 			notifyChatsChanged();
 		} else {
-			envoyerDansLaFile(envoi, genre, { dejaVide: true, oneQuiz: seulQuiz });
+			await continuerApresClarification(envoi, envoi, genre, seulQuiz, action, newRequestId(), Date.now());
 		}
 		render(container);
-		return true;
 	}
 
 	/** Every clarifying card is answered: records the answers and starts the
@@ -4495,7 +4422,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   document). Neither: the card could not have been offered (`reprenable`). */
 		const gardee = questionsEnAttente.get(requestId);
 		const reprise = gardee ? null : resumeSource(requete);
-		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false } : null);
+		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false, action: requete.clarify.action ?? "generate" } : null);
 		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const r = answerClarify(getChats(), chatId, requestId, reponses, Date.now());
 		if (!r.changed) return;
@@ -4504,8 +4431,61 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		notifyChatsChanged();
 		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
 		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
-		envoyerDansLaFile(envoi, attente.genre, { dejaVide: true, oneQuiz: attente.oneQuiz, requestId, sentAt: requete.at });
-		render(containerRef);
+		const genre = kindFromClarifications(requete.clarify.genre ?? attente.genre, requete.clarify.questions, reponses);
+		const action = gardee?.action ?? requete.clarify.action ?? "generate";
+		demarrage = true;
+		void continuerApresClarification(envoi, attente.envoi, genre, attente.oneQuiz, action, requestId, requete.at)
+			.catch(err => { console.warn(LOG_PREFIX, "clarification continuation failed:", err); host.ui.notice(t("ai.error.checkSettings")); })
+			.finally(() => { demarrage = false; render(containerRef); });
+	}
+
+	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean, action: ClarifyAction, requestId: string, sentAt: number): Promise<void> {
+		if (action === "web") { await lancerSurSite(envoi, original, genre, seulQuiz, containerRef); return; }
+		if (action === "relay") { await partagerClarifiee(envoi, original, genre, requestId); return; }
+		if (action === "remote") { await envoyerClarifieeAuPc(envoi, original, genre, requestId); return; }
+		envoyerDansLaFile(envoi, genre, { dejaVide: true, oneQuiz: seulQuiz, requestId, sentAt });
+	}
+
+	async function partagerClarifiee(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, requestId: string): Promise<void> {
+		if (!deps.relay) { restaurerEnvoi(original); host.ui.notice(t("ai.relay.shareFailed")); return; }
+		const rootId = host.paths.defaultRoot().id;
+		try {
+			const session = await startRelay(deps.relay, {
+				chatId: activeChatId(), text: envoi.text.trim(), mode: genre === "practice" ? "practice" : "learn",
+				documents: envoi.notes.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })), destination, requestId,
+			});
+			if (!session) { restaurerEnvoi(original); host.ui.notice(t("ai.relay.shareFailed")); return; }
+			relais = session;
+			relaisErreur = null;
+			viderComposer();
+		} catch (err) {
+			restaurerEnvoi(original);
+			console.warn(LOG_PREFIX, "relay not shared:", err);
+			host.ui.notice(t(err instanceof RelayRefused ? err.key : "ai.relay.shareFailed"));
+		}
+	}
+
+	async function envoyerClarifieeAuPc(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, requestId: string): Promise<void> {
+		const rootId = host.paths.defaultRoot().id;
+		try {
+			const sent = await enviquerVersPc({
+				chatId: activeChatId(), text: envoi.text.trim(), mode: genre === "practice" ? "practice" : "learn", requestId,
+				documents: envoi.notes.map(n => ({ path: relativeToRoot(n.path ?? "", rootId) })),
+			});
+			if (!sent) { restaurerEnvoi(original); host.ui.notice(t("ai.remote.firstPc")); return; }
+			viderComposer();
+		} catch (err) {
+			restaurerEnvoi(original);
+			console.warn(LOG_PREFIX, "request not sent to the PC:", err);
+			host.ui.notice(t("ai.remote.sendFailed"));
+		}
+	}
+
+	function restaurerEnvoi(envoi: DemandeTexte): void {
+		if (!composerIsEmpty()) return;
+		composerText = envoi.text;
+		noteAttachments = [...envoi.notes];
+		images = envoi.images.map(image => ({ file: image.file, url: URL.createObjectURL(image.file) }));
 	}
 
 	/** May the pending card of this request still be answered? True with its
@@ -4596,7 +4576,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
 				   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
 				const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
-				fileGen.envoyer({ ...d, ...identite, mode, count: questionCount, type: effectiveTypes(mode), destination, reglages, categorie });
+				fileGen.envoyer({ ...d, ...identite, mode, count: null, type: effectiveTypes(mode), destination, reglages, categorie });
 			}
 		}
 		vider();
@@ -4675,7 +4655,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				return l.plan || l.note ? l : undefined;
 			}));
 		}
-		const texte = texteWeb(composerPrompts(prompt, { count: questionCount, type: effectiveTypes(), mode: modeGeneration, source, planTranches, categorie, documents, plansParDocument: lotWebLiens?.map(l => l?.plan) }), jeton);
+		const texte = texteWeb(composerPrompts(prompt, { count: null, type: effectiveTypes(), mode: modeGeneration, source, planTranches, categorie, documents, plansParDocument: lotWebLiens?.map(l => l?.plan) }), jeton);
 		const ouverture = preparerOuverture(texte, canal.web);
 		if (ouverture.mode === "presse-papier") {
 			const ok = deps.copyText ? await deps.copyText(ouverture.texte) : false;

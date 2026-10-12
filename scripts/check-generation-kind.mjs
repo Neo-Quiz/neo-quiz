@@ -3,9 +3,8 @@
  * (`src/dashboard/generation-kind.ts`, spec 2026-10-07-generate-auto-kind,
  * amended by the owner the same day), on the real code.
  *
- * What it prevents: a request that does not say it wants to practise being
- * made a Test (the default is a LEARN); a plain "practise" wording, or "both",
- * missed; a broken or oversized answer of the clarify call (0 or 4+ questions,
+ * What it prevents: a model-deduced kind being lost; a filename or pasted path
+ * overriding the request's meaning; a broken or oversized answer of the clarify call (0 or 4+ questions,
  * fewer than 2 or more than 4 options, text around the JSON) blocking a
  * generation instead of meaning "ready"; the answers lost from the request;
  * and a clarify prompt that carries document CONTENT (only names may go).
@@ -18,47 +17,18 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	const r = makeReporter("Generation kind");
 
-	const table = [
-		// Default: a Learn, whatever the words.
-		["Je veux apprendre les pointeurs en C", "learn"],
-		["Explique-moi les listes en Python", "learn"],
-		["Python", "learn"],
-		["Le CM4", "learn"],
-		["Teach me recursion", "learn"],
-		["", "learn"],
-		// Only explicit practice wording switches to a Test.
-		["Un QCM sur le chapitre 3", "practice"],
-		["Entraîne-moi pour l'examen de réseaux", "practice"],
-		["Je veux m'entraîner sur les tris", "practice"],
-		["Je veux m'entrainer sur les tris", "practice"],
-		["S'entraîner sur SQL", "practice"],
-		["Teste-moi sur les jointures", "practice"],
-		["Contrôle de maths, 20 questions", "practice"],
-		["Révise-moi les jointures", "practice"],
-		["Quiz me on the French revolution", "practice"],
-		["A mock exam on Java", "practice"],
-		["practice questions on DNS", "practice"],
-		["EXAMEN BLANC", "practice"],
-		["Un QCM sur mon cours de réseaux", "practice"],
-		// Both, only when it says so.
-		["Les deux sur les pointeurs", "both"],
-		["Both a lesson and a test on DNS", "both"],
-		["Learn puis Test sur Python", "both"],
-		["Learn then test on Python", "both"],
-		["Apprendre puis me tester sur C", "both"],
-		// A keyword inside a longer word is not a match.
-		["Les contestations de Rome", "learn"],
-		["Un examinateur sévère", "learn"],
-	];
-	for (const [text, attendu] of table) r.check(`kind: "${text}"`, K.decideByKeywords(text), attendu);
-	r.check("kind: accents do not matter (\"controle\" = \"contrôle\")", [K.decideByKeywords("controle de physique"), K.decideByKeywords("contrôle de physique")], ["practice", "practice"]);
-	r.check("kind: a combining accent (NFD) does not matter", K.decideByKeywords("Révise les tris"), "practice");
-
 	const READY = { ready: true };
 	const o = (label, description = "") => ({ label, description });
 	const q = (header, question, labels, multiple = false, def = 0) => ({ header, question, multiple, options: labels.map(l => o(l, "d " + l)), default: def });
 	const qs = [q("Niveau", "Quel niveau ?", ["Débutant", "Avancé"]), q("Parties", "Quelles parties ?", ["A", "B", "C"], true)];
+	const kindQuestion = { header: "Type", question: "Quel format voulez-vous ?", multiple: false, options: [
+		{ ...o("Learn"), kind: "learn" }, { ...o("Test"), kind: "practice" }, { ...o("Both"), kind: "both" },
+	], default: 0, purpose: "kind" };
 	r.check("clarify: ready", K.parseClarifyAnswer("{\"ready\":true}"), READY);
+	r.check("clarify: a kind alone is accepted", K.parseClarifyAnswer('{"kind":"practice"}'), { ready: true, kind: "practice" });
+	r.check("clarify: valid kind and type question are retained", K.parseClarifyAnswer(JSON.stringify({ kind: "learn", questions: [kindQuestion] })), { questions: [kindQuestion], kind: "learn" });
+	r.check("clarify: malformed kind is ignored while valid questions survive", K.parseClarifyAnswer(JSON.stringify({ kind: "Test", questions: qs })), { questions: qs });
+	r.check("clarify: a valid kind survives malformed questions", K.parseClarifyAnswer('{"kind":"practice","questions":"broken"}'), { ready: true, kind: "practice" });
 	r.check("clarify: 1 to 3 questions are kept with header, label and description; `multiple` defaults to false",
 		[K.parseClarifyAnswer(JSON.stringify({ questions: qs })), K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [{ label: "a" }, { label: "b", description: "x" }] }] }))],
 		[{ questions: qs }, { questions: [{ header: "", question: "?", multiple: false, options: [o("a"), o("b", "x")], default: 0 }] }]);
@@ -85,9 +55,17 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		["questions not a list", "{\"questions\":\"x\"}"],
 		["malformed JSON", "{\"questions\":["],
 		["no JSON at all", "ready"],
-		["unrelated object", "{\"kind\":\"learn\"}"],
+		["unrelated object", "{\"other\":\"learn\"}"],
 		["empty", ""],
 	]) r.check("clarify: " + nom + " is treated as ready", K.parseClarifyAnswer(brut), READY);
+	r.check("clarify: malformed type metadata is ignored", K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...kindQuestion, purpose: "mode", options: kindQuestion.options.map(x => ({ ...x, kind: "Test" })) }] })).questions, [{ ...kindQuestion, purpose: undefined, options: kindQuestion.options.map(({ kind, ...x }) => x) }]);
+	r.check("clarify: a multi-select type question is not trusted", K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...kindQuestion, multiple: true }] })).questions[0].purpose, undefined);
+	const kindFromAnswers = typeof K.kindFromClarifications === "function" ? K.kindFromClarifications : () => null;
+	r.check("answers: a type choice overrides the safe default, while a skipped choice uses its Learn default", [
+		kindFromAnswers(undefined, [kindQuestion], [["Test"]]),
+		kindFromAnswers(undefined, [kindQuestion], [[]]),
+	], ["practice", "learn"]);
+	r.check("answers: a custom type answer falls back safely", kindFromAnswers(undefined, [kindQuestion], [["Something else"]]), "learn");
 
 	r.check("answers: one line per answered question, under the label",
 		K.formatClarifications("Précisions :", qs, [["Débutant"], ["A", "mes notes"]]), "Précisions :\n- Quel niveau ?\n    Débutant\n- Quelles parties ?\n    A, mes notes");
@@ -103,8 +81,12 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		['Always ask one question about the NUMBER OF QUESTIONS', 'the option labeled exactly "Auto" first', 'set the default to index 0', 'decide freely', 'NO numeric bound', '15, 25, and 40'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
 	r.check("clarify prompt: asks quiz count for multiple documents with the same Auto default",
 		['If two or more attached documents', 'HOW MANY QUIZZES', 'one combined quiz over everything', 'one quiz per document'].map(w => p.system.includes(w)), [true, true, true, true]);
-	r.check("clarify prompt: allows one vague-only question and never exceeds three",
-		['at most ONE additional clarifying question', 'ONLY when the request is genuinely vague', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true, true]);
+	r.check("clarify prompt: allows one optional question and never exceeds three",
+		['at most ONE optional clarifying question', 'ask about kind when it is ambiguous', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true, true]);
+	r.check("clarify prompt: infers kind from meaning and ignores keywords inside paths and filenames",
+		["Deduce the quiz kind from the meaning", "pasted path", "filename", "does NOT express the learner's intent"].map(w => p.system.includes(w)), [true, true, true, true]);
+	r.check("clarify prompt: asks Learn/Test/Both only for genuinely ambiguous intent and links options to canonical kinds",
+		['ONLY when the intended kind is genuinely ambiguous', '"purpose":"kind"', '"kind":"learn"', '"kind":"practice"', '"kind":"both"'].map(w => p.system.includes(w)), [true, true, true, true, true]);
 	r.check("clarify prompt: does not offer ready when the count must always be asked", p.system.includes('{"ready":true}'), false);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
 	r.check("clarify prompt: when the request reveals no language, the app's language is the fallback (French or English)",

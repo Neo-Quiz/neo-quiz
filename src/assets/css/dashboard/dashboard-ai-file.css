@@ -636,10 +636,6 @@
 	margin-top: -2px;
 }
 
-.qbd-ai-composer-opts[hidden] {
-	display: none;
-}
-
 /* Code in a chat answer keeps a code line height: the prose's 1.7 spread
    each line of a program apart. */
 .qbd-ai-chat-prose pre,
@@ -1706,4 +1702,11 @@
 .qbd-ai-relais-detail {
 	color: var(--text-muted);
 	font-size: 0.9em;
+}
+
+/* The icons of a folded AI-work line (sparkles, chevron) sit on the text row:
+   a block SVG has no descender gap under it, so the icon and the text share
+   one centred line. */
+.qbd-ai-transcript-ligne svg {
+	display: block;
 }

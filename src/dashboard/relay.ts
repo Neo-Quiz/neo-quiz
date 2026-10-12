@@ -2,7 +2,6 @@ import { composerPrompts, parseReponseQuiz, NoQuizAnswer } from "./ai-client";
 import { nouveauJeton, texteWeb } from "./ai-web";
 import { composerDemande } from "./generation-demande";
 import type { NoteAttachment } from "./generation-demande";
-import { decideByKeywords } from "./generation-kind";
 import { verifierFormat } from "../quiz-format";
 
 /* ══════════════════════════════════════════════════════════
@@ -24,9 +23,9 @@ export const MAX_ANSWER_CHARS = 1_000_000;
 
 export interface RelayInput { text: string; mode?: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ name: string; content: string }> }
 
-/** The text to share and the token its answer should carry. Same builders as the PC; Learn unless the words say a Test. */
+/** The text to share and the token its answer should carry. Same builders as the PC; Learn is the safe default when no clarified mode is given. */
 export function buildRelayPrompt(input: RelayInput, token: string = nouveauJeton()): { text: string; token: string; mode: "learn" | "practice" } {
-	const mode = input.mode ?? (decideByKeywords(input.text) === "practice" ? "practice" : "learn");
+	const mode = input.mode ?? "learn";
 	const notes: NoteAttachment[] = input.documents.map(d => ({ name: d.name, content: d.content, source: "vault" as const }));
 	const { source, prompt } = composerDemande({ text: input.text, notes, images: [] });
 	const documents = notes.length >= 2 ? notes.map(n => n.name) : undefined;

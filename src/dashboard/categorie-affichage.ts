@@ -309,9 +309,11 @@ export function choixCategories(): OptionCategorie[] {
 }
 
 /**
- * Paints the notice in `el`: icon and text, or nothing. `detectee`: the
+ * Paints the subject notice in `el`: icon and text. `detectee`: the
  * subject comes from the detection ("Python detected"); otherwise it was
- * chosen in the options ("Python").
+ * chosen in the subject list ("Python"). Nothing detected is `general`,
+ * shown as "Automatic" (2026-10-12): the notice is the control that picks a
+ * subject, so it never hides.
  */
 export function peindreAvisCategorie(el: HTMLElement, c: CategorieQuiz, detectee: boolean): void {
 	/* Repainted on every keystroke: nothing changes while the subject stays
@@ -320,9 +322,8 @@ export function peindreAvisCategorie(el: HTMLElement, c: CategorieQuiz, detectee
 	if (el.dataset.cle === cle) return;
 	el.dataset.cle = cle;
 	el.replaceChildren();
-	const visible = c !== "general";
-	el.hidden = !visible;
-	if (!visible) return;
 	peindreIconeCategorie(ajouter(el, "span", "qbd-ai-categorie-icone"), c);
-	ajouter(el, "span", "qbd-ai-categorie-texte", detectee ? libelleDetecte(c) : libelleCategorie(c));
+	const texte = c === "general" && detectee ? t("ai.categorie.auto")
+		: detectee ? libelleDetecte(c) : libelleCategorie(c);
+	ajouter(el, "span", "qbd-ai-categorie-texte", texte);
 }

@@ -13,10 +13,10 @@ import { relativeToRoot } from "../shared-state/chat-merge";
 
 /* The phone's sender core (pure): builds a request the PC's own validator accepts, picks the PC, and says which of our request files can go. */
 
-export interface SendInput { chatId: string; text: string; mode: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }>; model?: string }
+export interface SendInput { chatId: string; text: string; mode: "learn" | "practice"; types?: string[]; count?: number | null; documents: Array<{ path: string }>; model?: string; requestId?: string }
 
 export function buildRequest(input: SendInput, ctx: { device: string; target: string; deviceName?: string; now: number; newId?: () => string }): RemoteRequest {
-	const id = (ctx.newId ?? newRequestId)();
+	const id = input.requestId ?? (ctx.newId ?? newRequestId)();
 	const req: RemoteRequest = { v: 1, id, at: ctx.now, from: ctx.device, target: ctx.target, chatId: input.chatId, text: input.text, mode: input.mode, documents: input.documents.map(d => ({ path: d.path })) };
 	if (ctx.deviceName) req.fromName = ctx.deviceName.slice(0, 64);
 	if (input.types?.length) req.types = [...input.types];

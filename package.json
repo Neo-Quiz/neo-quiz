@@ -46,6 +46,7 @@
     "check:chat-record": "node scripts/check-chat-record.mjs",
     "check:generation-kind": "node scripts/check-generation-kind.mjs",
     "check:relay": "node scripts/check-relay.mjs",
+    "check:ui-pruning": "node scripts/check-ui-pruning.mjs",
     "check:folder-suggest": "node scripts/check-folder-suggest.mjs",
     "check:mention-rank": "node scripts/check-mention-rank.mjs",
     "check:chat-store": "node scripts/check-chat-store.mjs",

@@ -12,6 +12,8 @@ await withSrcModule(["src/dashboard/remote-send.ts", "src/shared-state/remote-re
 	const input = (over = {}) => ({ chatId: "chat-1234", text: "Quiz on lists", mode: "learn", documents: [{ path: "Python/cm1.md" }], ...over });
 	const ctx = { device: PH, target: PC, now: NOW, newId: () => "lq3k2-abc123" };
 	const built = S.buildRequest(input(), { ...ctx, deviceName: "Pixel" });
+	const clarified = S.buildRequest(input({ requestId: "lq3k2-kind123" }), ctx);
+	r.check("a clarified request keeps its id for the chat record", clarified.id, "lq3k2-kind123");
 	r.check("a built request passes the PC's own validator (same schema, no drift)", R.validateRemote(built, { device: PC, fileDevice: PH, fileId: "lq3k2-abc123", now: NOW + 1000 }).ok, true);
 	r.check("count null / no types are left out, not written as null", Object.keys(S.buildRequest(input({ count: null }), ctx)).sort(), ["at", "chatId", "documents", "from", "id", "mode", "target", "text", "v"]);
 	const refuses = (i, c = ctx) => { try { S.buildRequest(i, c); return "built"; } catch { return "refused"; } };

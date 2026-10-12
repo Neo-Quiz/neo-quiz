@@ -99,7 +99,7 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 		// What the user sent is fixed once recorded; the remaining lines may be
 		// only a part of the send.
 		text: old?.text ?? first.text,
-		mode: old?.mode ?? ((first.mode === "learn" ? "learn" : "practice") as ChatMode),
+		mode: old?.clarify ? ((first.mode === "learn" ? "learn" : "practice") as ChatMode) : old?.mode ?? ((first.mode === "learn" ? "learn" : "practice") as ChatMode),
 		documents: unionDocuments(old?.documents ?? [], documentsOf(g)),
 		results: mergeResults(old?.results ?? [], terminal.flatMap(resultsOfLine)),
 		state,
@@ -222,7 +222,33 @@ export function addFailedRequest(chats: readonly ChatRecord[], req: RemoteReques
 		}),
 		results: [], state: "failed", error,
 	};
-	return appendRequest(chats, req.chatId, request, device, now);
+	return completeClarification(chats, req.chatId, request, device, now);
+}
+
+/** Completes an existing clarification card in place, or appends a normal
+    request when this id has no pending card. Keeps the original request text,
+    documents, and answers while adding the completed result. */
+export function completeClarification(chats: readonly ChatRecord[], chatId: string, request: ChatRequest, device: string, now: number): ChatRecord[] {
+	const idx = chats.findIndex(c => c.id === chatId);
+	if (idx < 0 || chats[idx].deleted) return appendRequest(chats, chatId, request, device, now);
+	const chat = chats[idx];
+	const old = chat.requests.find(q => q.id === request.id);
+	if (!old?.clarify) return appendRequest(chats, chatId, request, device, now);
+	const completed: ChatRequest = {
+		...request,
+		at: old.at,
+		from: old.from,
+		...(old.fromName ? { fromName: old.fromName } : {}),
+		text: old.text,
+		documents: old.documents.length ? old.documents : request.documents,
+		clarify: old.clarify,
+	};
+	return chats.map((entry, i) => i === idx ? {
+		...chat,
+		updatedAt: now,
+		title: chat.title ?? (deriveTitle(completed) || undefined),
+		requests: chat.requests.map(q => q === old ? completed : q),
+	} : entry);
 }
 
 /** A request added to a chat, in time order: the one helper under the relay
