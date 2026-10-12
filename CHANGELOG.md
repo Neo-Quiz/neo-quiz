@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.86] - 2026-10-12
+
 ### Added
 
 - Neo Quiz starts with Windows and keeps syncing from the notification area; the close button hides it, Quit is in the icon's menu.
