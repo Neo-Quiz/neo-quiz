@@ -70,18 +70,35 @@ function scoreFolder(words: readonly string[], name: string, titles: readonly st
 	return best;
 }
 
+/** Whether the composer may suggest folders at all: only while the output
+    folder is the default one (`""` or the default path). A specific folder
+    already chosen, or found from an attachment, is the target: no chip. */
+export function suggestionsAllowed(destination: string, defaultFolder: string): boolean {
+	return !destination || destination === defaultFolder;
+}
+
+/** The predicate of the folders of the detected subject. "general" (nothing
+    detected) matches no folder: no subject to check a folder against. */
+export function dossierDuSujet(sujet: string, sujetDuDossier: (f: FolderRef) => string): (f: FolderRef) => boolean {
+	return f => sujet !== "general" && sujetDuDossier(f) === sujet;
+}
+
 /** Up to `limit` folders whose name, then whose file titles, match the words of
     the request: best match first, then most recently changed. `except` (the
-    folder already chosen) is never suggested. Nothing matching gives `[]`. */
-export function suggestFolders(text: string, folders: readonly FolderRef[], files: readonly FileRef[], opts: { limit?: number; except?: string } = {}): RankedFolder[] {
+    folder already chosen) is never suggested. Nothing matching gives `[]`.
+    `matches` restricts the candidates to the folders of the detected subject:
+    with it, a folder is suggested even when the request has no matching word
+    (the words then only order the candidates). */
+export function suggestFolders(text: string, folders: readonly FolderRef[], files: readonly FileRef[], opts: { limit?: number; except?: string; matches?: (f: FolderRef) => boolean } = {}): RankedFolder[] {
 	const words = requestWords(text);
-	if (!words.length) return [];
+	if (!words.length && !opts.matches) return [];
 	const scored: { f: RankedFolder; score: number }[] = [];
 	for (const f of rankFolders(folders, files)) {
 		if (f.path === opts.except) continue;
+		if (opts.matches && !opts.matches(f)) continue;
 		const titles = files.filter(x => x.path.startsWith(f.path + "/")).map(x => x.title);
-		const score = scoreFolder(words, f.name, titles);
-		if (score > 0) scored.push({ f, score });
+		const score = words.length ? scoreFolder(words, f.name, titles) : 0;
+		if (score > 0 || opts.matches) scored.push({ f, score });
 	}
 	// `rankFolders` already ordered by recency: a stable sort keeps it among equal scores.
 	return scored.sort((a, b) => b.score - a.score).slice(0, opts.limit ?? 3).map(x => x.f);

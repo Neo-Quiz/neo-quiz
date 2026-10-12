@@ -31,7 +31,7 @@ import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, ope
 import { MODES_AGENT, lireModeAgent } from "../host/claude-outils";
 import type { ModeAgent } from "../host/claude-outils";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { categorieChoisie, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
+import { categorieChoisie, categorieDuDossier, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
@@ -53,7 +53,7 @@ import { erreurRelais } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
-import { rankFolders, suggestFolders } from "./folder-suggest";
+import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
 import { formatClarifications, kindFromClarifications, parseClarifyAnswer } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
@@ -1765,6 +1765,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			destBtn.classList.toggle("is-locked", verrou);
 			destBtn.title = verrou ? t("ai.composer.destinationLocked") : "";
 			destBtn.setAttribute("aria-label", t("ai.composer.destination", { folder: current.label }));
+			// A specific target hides the suggestions; back on the default, they come back.
+			planifierSuggestions();
 		};
 		paintDestination();
 		destBtn.addEventListener("click", () => {
@@ -1819,6 +1821,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					onCategorie: (value) => {
 						categorieChoix = estCategorie(value) ? value : null;
 						majAvisCategorie();
+						planifierSuggestions();
 					},
 				});
 			});
@@ -3773,10 +3776,14 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			if (!el || !el.isConnected) return;
 			el.replaceChildren();
 			if (examCible || destinationParExam) return;
+			// Only while the output folder is the default one: a specific target is never second-guessed.
+			if (!suggestionsAllowed(destination, defaultDestination())) return;
+			// Only the folders of the subject the quiz would leave with ("general",
+			// nothing detected, suggests none): never a folder of another subject.
+			const memeSujet = dossierDuSujet(categorieCourante(), f => categorieDuDossier(f.path, f.name));
 			const options = destinationOptions().filter(o => o.value !== "");
 			const dossiers: FolderRef[] = options.map(o => ({ path: o.value, name: o.label }));
-			const choisi = destination || defaultDestination();
-			for (const d of suggestFolders(composerText, dossiers, fichiersDesDossiers(), { except: choisi })) {
+			for (const d of suggestFolders(composerText, dossiers, fichiersDesDossiers(), { matches: memeSujet })) {
 				const b = ajouter(el, "button", "qbd-ai-suggest");
 				b.type = "button";
 				host.ui.setIcon(ajouter(b, "span", "qbd-ai-suggest-icone"), "folder-input");

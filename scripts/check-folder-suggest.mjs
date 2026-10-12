@@ -7,13 +7,16 @@
  * ("ecosysteme"), or only as a whole-string match; a folder whose NAME matches
  * ranking below one that only holds a matching file; stop words ("les",
  * "quiz") suggesting every folder; the folder already chosen being suggested
- * again; and an unstable order among equals.
+ * again; an unstable order among equals; a chip shown while a SPECIFIC folder is
+ * the target (only the default "Generated" folder gets suggestions); and a folder
+ * of another subject suggested for the detected subject (Cybersecurity offered
+ * "XTI303 - Software Design" from the words of the request).
  *
  *     npm run check:folder-suggest
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/folder-suggest.ts", (S) => {
+await withSrcModule(["src/dashboard/folder-suggest.ts", "src/dashboard/categorie-quiz.ts"], (S, C) => {
 	const r = makeReporter("Folder suggestions");
 	const F = (path, name = path.split("/").pop()) => ({ path, name });
 	const f = (path, mtime, title = path.split("/").pop()) => ({ path, mtime, title });
@@ -45,5 +48,28 @@ await withSrcModule("src/dashboard/folder-suggest.ts", (S) => {
 	r.check("the folder already chosen is not suggested", sug("python", { except: "Neo Quiz/XTI301 - Écosystème Python" }), ["XTI303 - Architecture"]);
 	r.check("nothing matching gives nothing", sug("kubernetes"), []);
 	r.check("request words: folded, 3+ letters, no duplicates, no stop words", S.requestWords("Python, PYTHON et les Décorateurs de quiz"), ["python", "decorateurs"]);
+	/* The output folder: suggestions only while the default folder is the target. */
+	const DEFAUT = "Neo Quiz/Generated";
+	r.check("target: no suggestion when a specific folder is the target",
+		[S.suggestionsAllowed("Neo Quiz/XTI305 - Ethical Hacking", DEFAUT), S.suggestionsAllowed("Neo Quiz/XTI305 - Ethical Hacking", "")], [false, false]);
+	r.check("target: suggestions while the default folder is the target (\"\" or its path)",
+		[S.suggestionsAllowed("", DEFAUT), S.suggestionsAllowed(DEFAUT, DEFAUT)], [true, true]);
+
+	/* The subject: a folder is suggested only when its own subject (C.categorieDuDossier)
+	   is the detected one. The names are the fixture's: Python, Ethical Hacking (secu),
+	   Architecture (no subject: "general"). */
+	const parSujet = (sujet, texte = "") => S.suggestFolders(texte, folders, files, { matches: S.dossierDuSujet(sujet, f => C.categorieDuDossier(f.path, f.name)) }).map(x => x.name);
+	r.check("subject: detected Cybersecurity suggests the security folder, never the Python one",
+		parSujet("secu", "cybersécurité"), ["XTI305 - Ethical Hacking"]);
+	r.check("subject: a word of another subject does not pull in a folder of the detected one",
+		parSujet("secu", "python"), ["XTI305 - Ethical Hacking"]);
+	r.check("subject: a folder with a matching name but another subject is never suggested",
+		parSujet("secu", "architecture"), ["XTI305 - Ethical Hacking"]);
+	r.check("subject: detected Python suggests the Python folder even without a matching word",
+		parSujet("python", ""), ["XTI301 - Écosystème Python"]);
+	r.check("subject: \"general\" (nothing detected) suggests nothing",
+		parSujet("general", "architecture"), []);
+	r.check("subject: a subject with no folder suggests nothing",
+		parSujet("maths", "python"), []);
 	r.done();
 });
