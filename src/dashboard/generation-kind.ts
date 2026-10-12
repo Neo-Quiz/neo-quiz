@@ -6,8 +6,8 @@
    request alone: a LEARN by default, a Test only when the request says it
    wants to practise, both only when it says so. No AI call is made for the
    kind. A vague request ("Python", "le CM4") gets ONE short AI call that
-   returns either `{"ready":true}` or 1 or 2 clarifying questions; any failure
-   of that call means "ready": generation is never blocked.
+   returns one to three clarifying questions, always including the requested question count and
+   also asking the quiz count for several documents; any failure means "ready": generation is never blocked.
 ══════════════════════════════════════════════════════════ */
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
@@ -38,7 +38,7 @@ export interface ClarifyOption { label: string; description: string }
 export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number }
 export type ClarifyAnswer = { ready: true } | { questions: ClarifyQuestion[] };
 /** The most questions a request is asked, and the longest header chip. */
-export const MAX_CLARIFY_QUESTIONS = 2;
+export const MAX_CLARIFY_QUESTIONS = 3;
 export const MAX_HEADER = 12;
 
 const READY: ClarifyAnswer = { ready: true };
@@ -71,7 +71,7 @@ export function defaultIndex(value: unknown, count: number): number {
 	return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < count ? value : 0;
 }
 
-/** Reads the model's answer. Anything that is not a well-formed list of 1 or 2
+/** Reads the model's answer. Anything that is not a well-formed list of 1 to 3
     questions with 2 to 4 options each ({label, description}) is `{ ready: true }`:
     a broken answer never blocks a generation. A header over 12 characters is
     cut. Text around the JSON is ignored. */
@@ -116,13 +116,16 @@ export function formatClarifications(label: string, questions: readonly ClarifyQ
     request and the NAMES of the attached documents, never their content. */
 export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en"): { system: string; user: string } {
 	const system = [
-		"You are an assistant inside Neo Quiz, a revision app that generates a quiz from a learner's request (Learn: a guided path that teaches a topic step by step; or a Test: questions only). Before generating, you may ask the learner a question or two, the way a coding assistant asks a multiple-choice question.",
-		"Ask FEW questions: prefer none, sometimes one, at most 2. Ask ONLY when the request is vague about something that really changes the quiz: the scope or which parts of the subject, the learner's level, the goal or deadline, the number of questions. Examples of vague requests: \"Python\", \"le CM4\", \"networks\".",
-		"Ask NOTHING when the request is already precise, and NEVER ask what the attached documents already answer (you see only their names: if a name makes the scope clear, ask nothing). When in doubt, ask nothing.",
+		"You are an assistant inside Neo Quiz, a revision app that generates a quiz from a learner's request (Learn: a guided path that teaches a topic step by step; or a Test: questions only). Before generating, ask short multiple-choice clarification questions.",
+		"Always ask one question about the NUMBER OF QUESTIONS to generate, even if the request already names a count. Offer concrete choices such as 15, 25, and 40 questions.",
+		"If two or more attached documents are listed, also ask HOW MANY QUIZZES, offering the concrete choices of one combined quiz over everything and one quiz per document.",
+		"For each mandatory question, put the option labeled exactly \"Auto\" first and set the default to index 0. \"Auto\" means you decide freely; it imposes NO numeric bound. Use the exact label \"Auto\" for both questions.",
+		"You may ask at most ONE additional clarifying question about scope or learner level, ONLY when the request is genuinely vague. Never exceed 3 questions total.",
+		"NEVER ask what the attached documents already answer. You see only their names; if a name makes the scope clear, do not ask about scope.",
 		"You have no tools; you only see the request and the names of the attached documents.",
+		"Always return a questions JSON object because the question-count question is required.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
-		"- {\"ready\":true} when nothing needs to be asked;",
-		`- otherwise {"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with 1 or 2 questions, each with 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question: for a level question the most beginner option, for a scope question "everything in the material", for a goal question "learn from zero". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Do not add an "Other" option: the app adds one.`,
+		`- {"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with 1 to 3 questions, each with 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for both mandatory questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
 	const user = [

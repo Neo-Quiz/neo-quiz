@@ -846,6 +846,7 @@ export const EN_AI = {
 	// Generate asks a few clarifying questions when a request is vague (spec 2026-10-07).
 	"ai.clarify.deciding": "Getting ready…",
 	"ai.clarify.other": "Type something",
+	"ai.clarify.recommended": "(Recommended)",
 	"ai.clarify.otherPlaceholder": "Type your answer, then Enter",
 	"ai.clarify.validate": "Confirm",
 	"ai.clarify.skippedDefault": "Skipped → {answer} (default)",

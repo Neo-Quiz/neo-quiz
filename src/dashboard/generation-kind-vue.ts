@@ -135,7 +135,8 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 		b.type = "button";
 		numero(b, i);
 		const corps = ajouter(b, "span", "qbd-ai-kind-corps");
-		ajouter(corps, "span", "qbd-ai-kind-label", o.label);
+		const lab = ajouter(corps, "span", "qbd-ai-kind-label", o.label);
+		if (i === q.default) ajouter(lab, "span", "qbd-ai-kind-reco", " " + t("ai.clarify.recommended"));
 		if (o.description) ajouter(corps, "span", "qbd-ai-kind-desc", o.description);
 		if (q.multiple) host.ui.setIcon(ajouter(b, "span", "qbd-ai-kind-check"), "check");
 		b.addEventListener("click", () => activer(i));

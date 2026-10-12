@@ -1573,6 +1573,7 @@
 .qbd-ai-kind-corps { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
 .qbd-ai-kind-label { font-weight: 600; overflow-wrap: anywhere; }
 .qbd-ai-kind-option.is-active .qbd-ai-kind-label { color: var(--interactive-accent); }
+.qbd-ai-kind-reco { font-weight: 400; font-size: 12px; color: var(--interactive-accent); }
 .qbd-ai-kind-desc { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 
 .qbd-ai-kind-check { display: none; flex-shrink: 0; color: var(--interactive-accent); }

@@ -5,7 +5,7 @@
  *
  * What it prevents: a request that does not say it wants to practise being
  * made a Test (the default is a LEARN); a plain "practise" wording, or "both",
- * missed; a broken or oversized answer of the clarify call (0 or 3+ questions,
+ * missed; a broken or oversized answer of the clarify call (0 or 4+ questions,
  * fewer than 2 or more than 4 options, text around the JSON) blocking a
  * generation instead of meaning "ready"; the answers lost from the request;
  * and a clarify prompt that carries document CONTENT (only names may go).
@@ -59,7 +59,7 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	const q = (header, question, labels, multiple = false, def = 0) => ({ header, question, multiple, options: labels.map(l => o(l, "d " + l)), default: def });
 	const qs = [q("Niveau", "Quel niveau ?", ["Débutant", "Avancé"]), q("Parties", "Quelles parties ?", ["A", "B", "C"], true)];
 	r.check("clarify: ready", K.parseClarifyAnswer("{\"ready\":true}"), READY);
-	r.check("clarify: 1 or 2 questions are kept with header, label and description; `multiple` defaults to false",
+	r.check("clarify: 1 to 3 questions are kept with header, label and description; `multiple` defaults to false",
 		[K.parseClarifyAnswer(JSON.stringify({ questions: qs })), K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [{ label: "a" }, { label: "b", description: "x" }] }] }))],
 		[{ questions: qs }, { questions: [{ header: "", question: "?", multiple: false, options: [o("a"), o("b", "x")], default: 0 }] }]);
 	const withDefault = (d) => K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: [o("a"), o("b"), o("c")], default: d }] })).questions[0].default;
@@ -74,7 +74,7 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	r.check("clarify: a brace inside a label does not cut the object", K.parseClarifyAnswer(JSON.stringify({ questions: [q("h", "Which {one}?", ["A }", "B"])] })).questions?.length, 1);
 	const opts = n => Array.from({ length: n }, (_, i) => o("o" + i));
 	const many = n => Array.from({ length: n }, () => q("h", "?", ["a", "b"]));
-	r.check("clarify: 1 and 2 questions kept, 0 or 3 treated as ready", [1, 2].map(n => K.parseClarifyAnswer(JSON.stringify({ questions: many(n) })).questions?.length).concat([K.parseClarifyAnswer(JSON.stringify({ questions: many(0) })), K.parseClarifyAnswer(JSON.stringify({ questions: many(3) }))]), [1, 2, READY, READY]);
+	r.check("clarify: 1, 2, and 3 questions kept, 0 or 4 treated as ready", [1, 2, 3].map(n => K.parseClarifyAnswer(JSON.stringify({ questions: many(n) })).questions?.length).concat([K.parseClarifyAnswer(JSON.stringify({ questions: many(0) })), K.parseClarifyAnswer(JSON.stringify({ questions: many(4) }))]), [1, 2, 3, READY, READY]);
 	for (const n of [0, 1, 5, 6]) r.check(`clarify: ${n} option(s) is treated as ready`, K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: opts(n) }] })), READY);
 	r.check("clarify: 2 and 4 options are kept", [2, 4].map(n => K.parseClarifyAnswer(JSON.stringify({ questions: [{ question: "?", options: opts(n) }] })).questions?.[0].options.length), [2, 4]);
 	for (const [nom, brut] of [
@@ -97,8 +97,15 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 
 	const p = K.clarifyPrompt("Python", ["cm1.pdf", "cm2.md"]);
 	r.check("clarify prompt: the request and the document names", [p.user.includes("Python"), p.user.includes("- cm1.pdf"), p.user.includes("- cm2.md")], [true, true, true]);
-	r.check("clarify prompt: ready, header/label/description shape, few questions, limits, vague-only, language",
-		["{\"ready\":true}", "\"questions\"", "\"header\"", "\"description\"", "\"default\"", "most beginner option", "at most 2", "prefer none", "2 to 4 options", "12 characters", "ONLY when the request is vague", "Ask NOTHING when the request is already precise", "NEVER ask what the attached documents already answer", "language of the request"].filter(w => !p.system.includes(w)), []);
+	r.check("clarify prompt: JSON shape, header/label/description, limits, and language",
+		['"questions"', '"header"', '"description"', '"default"', 'most beginner option', '1 to 3 questions', '2 to 4 options', '12 characters', 'NEVER ask what the attached documents already answer', 'language of the request'].filter(w => !p.system.includes(w)), []);
+	r.check("clarify prompt: always asks the question count with Auto first and as the default",
+		['Always ask one question about the NUMBER OF QUESTIONS', 'the option labeled exactly "Auto" first', 'set the default to index 0', 'decide freely', 'NO numeric bound', '15, 25, and 40'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
+	r.check("clarify prompt: asks quiz count for multiple documents with the same Auto default",
+		['If two or more attached documents', 'HOW MANY QUIZZES', 'one combined quiz over everything', 'one quiz per document'].map(w => p.system.includes(w)), [true, true, true, true]);
+	r.check("clarify prompt: allows one vague-only question and never exceeds three",
+		['at most ONE additional clarifying question', 'ONLY when the request is genuinely vague', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true, true]);
+	r.check("clarify prompt: does not offer ready when the count must always be asked", p.system.includes('{"ready":true}'), false);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
 	r.check("clarify prompt: when the request reveals no language, the app's language is the fallback (French or English)",
 		[K.clarifyPrompt("Python", [], "fr").system.includes("write them in French, the language of the app"), K.clarifyPrompt("Python", [], "en").system.includes("write them in English, the language of the app"), K.clarifyPrompt("Python", []).system.includes("write them in English")], [true, true, true]);

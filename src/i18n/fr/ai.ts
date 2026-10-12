@@ -780,6 +780,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	// Generate pose quelques questions quand la demande est vague (spec 2026-10-07).
 	"ai.clarify.deciding": "Préparation…",
 	"ai.clarify.other": "Écrire autre chose…",
+	"ai.clarify.recommended": "(Recommandé)",
 	"ai.clarify.otherPlaceholder": "Écris ta réponse, puis Entrée",
 	"ai.clarify.validate": "Valider",
 	"ai.clarify.skippedDefault": "Ignorée → {answer} (par défaut)",
