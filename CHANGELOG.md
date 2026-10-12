@@ -23,7 +23,7 @@ release notes.
 
 ### Fixed
 
-- The Obsidian configuration of the synced folder is no longer sent to other devices.
+- The configuration folder of a note-taking app opened on the synced folder now stays on each device.
 
 ## [1.20.85] - 2026-10-11
 
