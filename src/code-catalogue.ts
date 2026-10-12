@@ -36,7 +36,7 @@ export interface CodeCatalogueEntry {
 
 export const CODE_CATALOGUE: readonly CodeCatalogueEntry[] = [
 	// Web
-	{ id: "html", name: "HTML", aliases: ["htm", "xhtml"], logo: "seti-html-3", grammar: "markup" },
+	{ id: "html", name: "HTML", aliases: ["htm", "xhtml"], logo: "material-html", grammar: "markup" },
 	{ id: "css", name: "CSS", aliases: [], logo: "seti-css", grammar: "css" },
 	{ id: "scss", name: "SCSS", aliases: [], logo: "seti-sass", grammar: "scss" },
 	{ id: "sass", name: "Sass", aliases: [], logo: "seti-sass", grammar: "sass" },

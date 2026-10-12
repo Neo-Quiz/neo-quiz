@@ -67,6 +67,9 @@ await withSrcModule(
 		['<svg xmlns="http://www.w3.org/2000/svg" onload="x()">', '<svg><script>x()</script>', '<svg><image href="https://x/y.png"/>', '<svg><use xlink:href="https://x#a"/>', '<svg><path fill="url(https://x)"/>'].map(s => INERT.test(s)),
 		[true, true, true, true, true]);
 
+	r.check("PHP keeps the Seti elephant", codeLanguageOf("php").logo, "seti-php");
+	r.check("HTML and aliases use the Material HTML5 shield", ["html", "htm", "xhtml"].map(tag => codeLanguageOf(tag).logo), ["material-html", "material-html", "material-html"]);
+	r.check("JSON keeps its Seti glyph", codeLanguageOf("json5").logo, "seti-json");
 	const srcs = CODE_CATALOGUE.map(e => codeLanguageBadgeSrc(e));
 	r.check("every badge is a data: SVG with no quote, angle bracket nor ampersand",
 		CODE_CATALOGUE.filter((e, i) => !srcs[i].startsWith("data:image/svg+xml,") || /["<>&]/.test(srcs[i])).map(e => e.id), []);

@@ -20,7 +20,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts", "src/code-catalogue.ts", "src/code-logos.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }, { codeLanguageOf, codeLanguageBadgeSrc }, { CODE_LOGOS }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -365,6 +365,15 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("quiz ouvert : texte hostile visible", root.textContent.includes("<img src=x onerror=alert(1)>"), true);
 		renderThread(root, fil([{ kind: "text", text: PARTIEL + "]\n```" }], false), deps);
 		r.check("quiz fini : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
+		// The same quiz in an ordinary ```json5 fence (as models write it, 2026-10-13):
+		// the prose once, then ONE folded quiz row; no raw fence, no second copy.
+		const JSON5_QUIZ = PARTIEL.replace("```quiz-blocks", "```json5") + "]\n```";
+		renderThread(root, fil([{ kind: "text", text: JSON5_QUIZ }], false), deps);
+		r.check("quiz en ```json5 : une seule ligne quiz", root.querySelectorAll(".qbd-work-quiz").length, 1);
+		r.check("quiz en ```json5 : titre « Quiz written »", root.querySelector(".qbd-work-quiz .qbd-work-tool-name")?.textContent, "Quiz written");
+		r.check("quiz en ```json5 : prose une seule fois", root.textContent.split("Voici le quiz.").length - 1, 1);
+		r.check("quiz en ```json5 : aucune balise brute", root.textContent.includes("```"), false);
+		r.check("quiz en ```json5 : JSON replié", root.textContent.includes("correctIndex"), false);
 	}
 
 		// 17b. A quiz generation (`summarizeText`): the model's text is never shown,
@@ -447,6 +456,62 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("retrait : code sans coloration syntaxique", root.querySelectorAll(".qbd-work-diff-del .qbd-work-code span").length, 0);
 		r.check("retrait : marqueur « - »", root.querySelector(".qbd-work-diff-del .qbd-work-marker")?.textContent, "-");
 	}
+	// Fenced code uses the exact catalogue SVG, including aliases and unknown tags.
+	for (const long of [false, true]) {
+		const root = document.createElement("div");
+		const text = "```json5\n" + Array.from({ length: long ? 40 : 1 }, () => "{a: 1}").join("\n") + "\n```";
+		renderThread(root, fil([{ kind: "text", text }]), deps);
+		const logo = root.querySelector(".quiz-code-lang-logo");
+		r.check(`JSON5 ${long ? "preview" : "block"}: JSON badge`, logo?.getAttribute("alt"), "JSON");
+		r.check(`JSON5 ${long ? "preview" : "block"}: Seti glyph`, decodeURIComponent((logo?.getAttribute("src") ?? "").replace("data:image/svg+xml,", "")), CODE_LOGOS["seti-json"]);
+	}
+	{
+		const root = document.createElement("div");
+		renderThread(root, fil([{ kind: "text", text: "```unknown-language\nx\n```" }]), deps);
+		r.check("unknown fence: catalogue fallback icon", root.querySelector(".quiz-code-lang-logo")?.getAttribute("src"), codeLanguageBadgeSrc({ id: "unknown-language", name: "unknown-language", aliases: [], icon: "file-code" }));
+		renderThread(root, fil([{ kind: "tool", id: "fenced-output", name: "Other", input: "", preview: "```json5\n{a: 1}\n```", lines: 3, status: "ok", diff: null }]), deps);
+		click(root.querySelector(".qbd-work-tool-head"));
+		r.check("tool fence: JSON catalogue badge", root.querySelector(".quiz-code-lang-logo")?.getAttribute("src"), codeLanguageBadgeSrc(codeLanguageOf("json5")));
+	}
+	{
+		const root = document.createElement("div");
+		const text = "```json5\n{}\n```\n```html\n<div></div>\n```\n" + "tail\n".repeat(10);
+		renderThread(root, fil([{ kind: "text", text }]), deps);
+		r.check("multiple fences: each preview block has a badge", [...root.querySelectorAll(".quiz-code-lang-logo")].map(img => img.getAttribute("alt")), ["JSON", "HTML"]);
+		r.check("multiple fences: no raw fence in the preview", root.textContent.includes("```"), false);
+		click(root.querySelector(".qbd-work-toggle"));
+		await flush();
+		r.check("multiple fences: Show all replaces the preview (no second copy)", root.querySelector(".qbd-work-text-preview")?.hidden, true);
+		r.check("multiple fences: each expanded block has a badge", root.querySelectorAll(".qbd-work-text-full .quiz-code-lang-logo").length, 2);
+		r.check("multiple fences: no raw fence once expanded", root.querySelector(".qbd-work-text-full")?.textContent.includes("```"), false);
+	}
+	// A long assistant message: an eight-line RENDERED preview, then Show all
+	// swaps it for the whole message (rendered too); fences never show raw.
+	for (const running of [true, false]) {
+		for (const fenced of [false, true]) {
+			const lines = Array.from({ length: 40 }, (_, i) => `line ${i + 1} ${CHARGE}`);
+			const text = fenced ? "```json5\n" + lines.join("\n") + "\n```" : lines.join("\n");
+			const root = document.createElement("div");
+			renderThread(root, fil([{ kind: "text", text }], running), deps);
+			const label = `assistant ${fenced ? "fence" : "prose"} ${running ? "live" : "finished"}`;
+			const preview = root.querySelector(".qbd-work-text-preview");
+			r.check(label + ": eight-line preview", preview?.textContent, (fenced ? lines.slice(0, 7) : lines.slice(0, 8)).join("\n"));
+			r.check(label + ": one text block", root.querySelectorAll(".qbd-work-text").length, 1);
+			const toggle = root.querySelector(".qbd-work-toggle");
+			r.check(label + ": Show all line count", toggle?.textContent, `Show all (${text.split("\n").length} lines)`);
+			r.check(label + ": full text absent initially", root.textContent.includes("line 40"), false);
+			r.check(label + ": no raw fence", root.textContent.includes("```"), false);
+			if (toggle) {
+				click(toggle);
+				await flush();
+				r.check(label + ": Show all reveals everything", root.querySelector(".qbd-work-text-full")?.textContent, lines.join("\n"));
+				r.check(label + ": preview hidden, no duplicate", [root.querySelector(".qbd-work-text-full")?.hidden, preview?.hidden], [false, true]);
+				click(toggle);
+				r.check(label + ": Show less restores the preview", [root.querySelector(".qbd-work-text-full")?.hidden, preview?.hidden], [true, false]);
+			}
+			r.check(label + ": hostile content stays text", root.querySelectorAll("img:not(.quiz-code-lang-logo),script").length, 0);
+		}
+	}
 	// Exercise the actual nested transcript renderer without starting app services or reading runs.
 	{
 		const source = readFileSync("src/dashboard/file-generation-vue.ts", "utf8");
@@ -475,7 +540,10 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			texteActivite: () => "", compterJetons: String, libelleProgres: () => null,
 			resumeOutils: () => ({ libelle: "Tools", icone: "terminal" }), peindreEtapes() {},
 		};
-		const sync = new Function(...Object.keys(context), code + "\nreturn synchroniserTranscript;")(...Object.values(context));
+		const fillStart = source.indexOf("\tfunction remplirTranscript(");
+		const fillEnd = source.indexOf("\n\tinterface SpecLigne", fillStart);
+		const fillCode = transformSync(source.slice(fillStart, fillEnd), { loader: "ts", format: "cjs" }).code;
+		const { sync, fill } = new Function(...Object.keys(context), code + fillCode + "\nreturn { sync: synchroniserTranscript, fill: remplirTranscript };")(...Object.values(context));
 		const output = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n");
 		const root = document.createElement("div");
 		const state = { ligne: { id: 900, resultat: { dureeMs: 50000 } }, vivant: false,
@@ -516,6 +584,27 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		sync(root, state);
 		r.check("finished live generation: repaint stays folded", state.lignes.get("work").bouton.getAttribute("aria-expanded"), "false");
 		r.check("finished live generation: no output rendered while folded", root.querySelector(".qbd-work"), null);
+
+		// Start fresh turns and deliver chunks through the real in-place update entry point.
+		for (const withLiveView of [false, true]) {
+			const turnRoot = document.createElement("div");
+			const line = { id: withLiveView ? 902 : 901, debut: Date.now(), demande: {} };
+			const transcript = { text: "", thinking: "", tools: [], thinkingTokens: 2350 };
+			live = withLiveView ? { thread: { items: [{ kind: "thinking", text: "", tokens: 2350 }], running: true } } : null;
+			const chunks = ["", "[", "\n{ question: 'First',", ...Array.from({ length: 20 }, (_, i) => `\n answer${i}: '${i}',`), "\n}]" ];
+			for (const [index, chunk] of chunks.entries()) {
+				transcript.text += chunk;
+				if (live && transcript.text) live.thread.items = [{ kind: "thinking", text: "", tokens: 2350 }, { kind: "text", text: transcript.text }];
+				fill(turnRoot, transcript, true, line, false);
+				const buttons = [...turnRoot.querySelectorAll(".qbd-ai-transcript-ligne")];
+				r.check(`stream ${withLiveView ? "live view" : "no live view"} chunk ${index}: every line folded`, buttons.length > 0 && buttons.every(b => b.getAttribute("aria-expanded") === "false"), true);
+				r.check(`stream ${withLiveView ? "live view" : "no live view"} chunk ${index}: no detail`, turnRoot.querySelector(".qbd-ai-transcript-detail"), null);
+			}
+			if (live) live.thread.running = false;
+			fill(turnRoot, transcript, false, line, false);
+			r.check(`stream ${withLiveView ? "live view" : "no live view"}: completion stays folded`, [...turnRoot.querySelectorAll(".qbd-ai-transcript-ligne")].every(b => b.getAttribute("aria-expanded") === "false"), true);
+		}
+
 	}
 
 	r.done();

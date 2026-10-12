@@ -29,6 +29,7 @@ import markdown from "refractor/markdown";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { PREVIEW_LINES, type Thread, type ThreadItem } from "./live-thread";
+import { codeLanguageOf, codeLanguageBadgeSrc } from "../code-catalogue";
 import { prettyHtml } from "./pretty-code";
 import { quizProgress } from "./transcript";
 
@@ -657,11 +658,48 @@ export function renderTextOutput(root: HTMLElement, text: string): void {
 	root.replaceChildren(...(output ? [output] : []));
 }
 
+/** Reuse the quiz code badge and its inert catalogue SVG, including the fallback icon. */
+function appendLanguageBadge(pre: HTMLElement, tag: string, prepend = true): void {
+	const entry = codeLanguageOf(tag) ?? { id: tag, name: tag, aliases: [], icon: "file-code" as const };
+	pre.classList.add("quiz-md-code");
+	const badge = el("span", "quiz-code-lang");
+	badge.dataset.langName = entry.name;
+	const logo = el("img", "quiz-code-lang-logo");
+	logo.src = codeLanguageBadgeSrc(entry);
+	logo.alt = entry.name;
+	logo.width = 16;
+	logo.height = 16;
+	logo.draggable = false;
+	badge.appendChild(logo);
+	if (prepend) pre.prepend(badge);
+	else pre.appendChild(badge);
+}
+
+/** Preserve output text exactly while placing a badge before each fenced block. */
+function fillOutputPre(pre: HTMLElement, text: string): void {
+	pre.replaceChildren();
+	let offset = 0;
+	for (const match of text.matchAll(new RegExp(FENCE.source, "g"))) {
+		pre.appendChild(document.createTextNode(text.slice(offset, match.index)));
+		appendLanguageBadge(pre, match[1], false);
+		pre.appendChild(document.createTextNode(match[0]));
+		offset = match.index + match[0].length;
+	}
+	pre.appendChild(document.createTextNode(text.slice(offset)));
+}
+
+function outputPre(text: string): HTMLPreElement {
+	const pre = monoPre("");
+	fillOutputPre(pre, text);
+	return pre;
+}
+
 /** The output: the first lines are already in the model; the rest is fetched on demand. */
 export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, deps: Pick<WorkViewDeps, "loadOutput">): HTMLElement | null {
 	if (!item.preview && item.lines === 0) return null;
 	const box = el("div", "qbd-work-output");
-	box.appendChild(monoPre(item.preview));
+	const preview = outputPre(item.preview);
+	box.appendChild(preview);
 	if (item.lines <= PREVIEW_LINES) return box;
 	const full = monoPre("", "qbd-work-pre qbd-work-full");
 	full.hidden = true;
@@ -675,6 +713,8 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 		if (loaded) {
 			const open = full.hidden;
 			full.hidden = !open;
+			// The full output starts at line 1: the preview would show twice.
+			preview.hidden = open;
 			toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: item.lines });
 			return;
 		}
@@ -684,8 +724,9 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 			loading = false;
 			if (output === null) return;
 			loaded = true;
-			full.textContent = output;
+			fillOutputPre(full, output);
 			full.hidden = false;
+			preview.hidden = true;
 			toggle.textContent = t("ai.work.showLess");
 		}, () => {
 			loading = false;
@@ -729,8 +770,42 @@ function textItem(text: string, live: boolean): HTMLElement {
 		block.appendChild(quizRow(text.trim(), live));
 		return block;
 	}
-	appendProse(block, text);
+	/* The quiz in an ordinary fence (```json5, ```json…), as models write it:
+	   the prose around stays prose, the quiz becomes the same folded row. */
+	const fence = FENCE.exec(text);
+	if (fence && /^\s*\[/.test(fence[2]) && quizProgress(fence[2]).question > 0) {
+		appendProse(block, text.slice(0, fence.index));
+		block.appendChild(quizRow(fence[2].replace(/\n$/, ""), live && !fence[0].trimEnd().endsWith("```")));
+		appendProse(block, text.slice(fence.index + fence[0].length));
+		return block;
+	}
+	cappedProse(block, text);
 	return block;
+}
+
+/** A long message: its first lines, rendered (prose and real code blocks, never
+    the raw fences), then "Show all" which REPLACES the preview with the whole
+    message rendered the same way — never a second copy under the first. */
+function cappedProse(block: HTMLElement, text: string): void {
+	const lines = text.split("\n");
+	if (lines.length <= PREVIEW_LINES) { appendProse(block, text); return; }
+	const preview = el("div", "qbd-work-text-preview");
+	appendProse(preview, lines.slice(0, PREVIEW_LINES).join("\n"));
+	const full = el("div", "qbd-work-text-full");
+	full.hidden = true;
+	block.append(preview, full);
+	const toggle = el("button", "qbd-work-toggle", t("ai.work.showAll", { n: lines.length }));
+	toggle.type = "button";
+	let built = false;
+	toggle.addEventListener("click", e => {
+		e.stopPropagation();
+		if (!built) { appendProse(full, text); built = true; }
+		const open = full.hidden;
+		full.hidden = !open;
+		preview.hidden = open;
+		toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: lines.length });
+	});
+	block.appendChild(toggle);
 }
 
 /** Prose and fenced code, in order. A running fence is shown as code up to now. */
@@ -740,16 +815,17 @@ function appendProse(parent: HTMLElement, text: string): void {
 		const m = FENCE.exec(rest);
 		if (!m) break;
 		if (m.index > 0) parent.appendChild(el("div", "qbd-work-body", rest.slice(0, m.index)));
-		parent.appendChild(codeBlock(m[2], FENCE_LANGUAGES.get(m[1].toLowerCase()) ?? null));
+		parent.appendChild(codeBlock(m[2], m[1]));
 		rest = rest.slice(m.index + m[0].length);
 		if (m[0].length === 0) break;
 	}
 	if (rest !== "") parent.appendChild(el("div", "qbd-work-body", rest));
 }
 
-function codeBlock(code: string, language: string | null): HTMLElement {
+function codeBlock(code: string, language: string): HTMLElement {
 	const pre = el("pre", "qbd-work-pre qbd-work-codeblock");
-	appendHighlighted(pre, code.replace(/\n$/, ""), language);
+	appendLanguageBadge(pre, language);
+	appendHighlighted(pre, code.replace(/\n$/, ""), FENCE_LANGUAGES.get(language.toLowerCase()) ?? null);
 	return pre;
 }
 
