@@ -276,10 +276,6 @@ jobs:
       - name: Model picker
         run: npm run check:model-picker
 
-      # THE PDF SOURCES of a quiz: which documents it cites and which file each name designates.
-      - name: PDF sources
-        run: npm run check:pdf-sources
-
       # THE OVERSCROLL STRETCH: the damped pull, the edge test, and which boxes can stretch.
       - name: Overscroll stretch
         run: npm run check:overscroll
@@ -533,6 +529,11 @@ jobs:
       # écrits par le script : ni fichier binaire au dépôt, ni vault.
       - name: PDF text extraction
         run: npm run check:pdf
+
+      # THE PDF SOURCES of a quiz: which documents it cites and which file each
+      # name designates. Here for the same reason: it reads `pdfjs-dist`.
+      - name: PDF sources
+        run: npm run check:pdf-sources
 
       # A COURSE'S MODES on one card (Learn, Practice, Exam; at most one quiz
       # per mode), the dashboard's module editing and folder axis. Here and
