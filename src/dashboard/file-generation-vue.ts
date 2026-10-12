@@ -48,7 +48,7 @@ import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
 import { modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
-import { renderThread, threadHasLiveRow } from "./work-view";
+import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
 
@@ -607,10 +607,6 @@ export function creerVueFile(opts: {
 		const id = l.id;
 		// A chat answer IS its text, shown as prose: only reasoning and tools here.
 		const texte = etat.prose ? "" : tr.text;
-		// The writing box as it is now, to keep following the end of the text.
-		const ancien = etat.lignes.get("writing")?.detail?.querySelector<HTMLElement>(".qbd-ai-transcript-texte") ?? null;
-		const hautAncien = ancien ? ancien.scrollTop : 0;
-		const suivait = !ancien || ancien.scrollHeight - ancien.scrollTop - ancien.clientHeight < 24;
 
 		const specs: SpecLigne[] = [];
 		const vue = opts.file.live(id);
@@ -636,7 +632,7 @@ export function creerVueFile(opts: {
 			}
 			if (tr.thinking) {
 				specs.push({
-					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), ouvertParDefaut: vivant && !ecrit,
+					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.thinkingLive" : "ai.transcript.thought"), ouvertParDefaut: false,
 					// `textContent` (through `ajouter`): the model's text is never HTML here.
 					detail: corps => {
 						const el = (corps.firstElementChild as HTMLElement | null) ?? ajouter(corps, "div", "qbd-ai-transcript-reflexion");
@@ -652,34 +648,24 @@ export function creerVueFile(opts: {
 				   through `ajouter`): a path or an error is never HTML here. */
 				/* The heading sums the work up by kind, as MonoCode does
 				   ("Explored the project · Ran 6 tools", "Ran a command · Edited
-				   SKILL.md"), and the steps are shown open: the owner wants to see
-				   everything the AI did without a click (2026-10-10). */
+				   SKILL.md"), with the steps folded until the user opens them. */
 				const { libelle, icone } = resumeOutils(tr);
 				specs.push({
-					cle: "tools", icone, libelle, ouvertParDefaut: true,
+					cle: "tools", icone, libelle, ouvertParDefaut: false,
 					detail: corps => peindreEtapes(corps, tr),
 				});
 			}
 			if (ecrit) {
 				const lignes = texte.split("\n").length;
-				/* The WRITING folds by itself past `LIGNES_AVANT_REPLI` lines (a
-				   whole quiz in JSON5 buried the conversation); the heading keeps
-				   counting while it is folded, and a click opens it for good. */
+				/* The heading keeps counting while folded; only a click opens the preview. */
 				const long = lignes > LIGNES_AVANT_REPLI;
 				const progres = vivant ? libelleProgres(l, texte, lignes) : null;
 				const libelle = !vivant
 					? t(lignes === 1 ? "ai.transcript.wroteOne" : "ai.transcript.wroteOther", { count: lignes })
 					: progres ?? (long ? t("ai.transcript.writingLiveCount", { count: lignes }) : t("ai.transcript.writingLive"));
 				specs.push({
-					cle: "writing", icone: "pen-line", libelle, ouvertParDefaut: !long,
-					detail: corps => {
-						let pre = corps.firstElementChild as HTMLElement | null;
-						const premier = !pre;
-						if (!pre) pre = ajouter(corps, "pre", "qbd-ai-transcript-texte");
-						if (pre.textContent !== texte) pre.textContent = texte;
-						// Follows the writing, unless the user scrolled up to read.
-						pre.scrollTop = premier || suivait ? pre.scrollHeight : hautAncien;
-					},
+					cle: "writing", icone: "pen-line", libelle, ouvertParDefaut: false,
+					detail: corps => renderTextOutput(corps, texte),
 				});
 			}
 		}

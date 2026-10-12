@@ -350,7 +350,7 @@ function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undef
 		built = true;
 		if (isRun && item.input) body.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
 		if (item.diff) body.appendChild(diffNode(item, item.diff));
-		const output = outputNode(item, deps);
+		const output = renderOutput(item, deps);
 		if (output) body.appendChild(output);
 	};
 	if (open) build();
@@ -644,8 +644,21 @@ function appendHighlighted(parent: Node, text: string, language: string | null):
 	}
 }
 
+const OUTPUT_TEXT = new WeakMap<HTMLElement, string>();
+
+/** Render model output through the same preview and lazy expansion as tool output. */
+export function renderTextOutput(root: HTMLElement, text: string): void {
+	if (OUTPUT_TEXT.get(root) === text) return;
+	OUTPUT_TEXT.set(root, text);
+	const lines = text.split("\n");
+	const output = renderOutput({ id: "", preview: lines.slice(0, PREVIEW_LINES).join("\n"), lines: lines.length }, {
+		loadOutput: async () => text,
+	});
+	root.replaceChildren(...(output ? [output] : []));
+}
+
 /** The output: the first lines are already in the model; the rest is fetched on demand. */
-function outputNode(item: ToolItem, deps: WorkViewDeps): HTMLElement | null {
+export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, deps: Pick<WorkViewDeps, "loadOutput">): HTMLElement | null {
 	if (!item.preview && item.lines === 0) return null;
 	const box = el("div", "qbd-work-output");
 	box.appendChild(monoPre(item.preview));

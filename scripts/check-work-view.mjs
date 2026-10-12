@@ -10,6 +10,8 @@
  *
  *     npm run check:work-view
  */
+import { readFileSync } from "node:fs";
+import { transformSync } from "esbuild";
 import { parseHTML } from "linkedom";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
@@ -18,7 +20,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread, threadHasLiveRow }, { installHost }, { threadFromRun }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -445,5 +447,76 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("retrait : code sans coloration syntaxique", root.querySelectorAll(".qbd-work-diff-del .qbd-work-code span").length, 0);
 		r.check("retrait : marqueur « - »", root.querySelector(".qbd-work-diff-del .qbd-work-marker")?.textContent, "-");
 	}
+	// Exercise the actual nested transcript renderer without starting app services or reading runs.
+	{
+		const source = readFileSync("src/dashboard/file-generation-vue.ts", "utf8");
+		const start = source.indexOf("\tfunction specTravail(");
+		const end = source.indexOf("\n\t/** The result line under a step", start);
+		const code = transformSync(source.slice(start, end), { loader: "ts", format: "cjs" }).code;
+		const expanded = new Set();
+		const collapsed = new Set();
+		const blocks = new WeakMap();
+		let live = null;
+		const context = {
+			opts: { file: { live: () => live } }, deplies: expanded, replies: collapsed,
+			ouvertures: new Set(), blocs: blocks, host: hote, renderOutput, renderTextOutput, renderThread,
+			threadHasLiveRow, LIGNES_AVANT_REPLI: 15,
+			t: (key, args = {}) => key + " " + Object.values(args).join(" "),
+			ajouter: (parent, tag, className, text) => {
+				const node = document.createElement(tag);
+				if (className) node.className = className;
+				if (text) node.textContent = text;
+				parent.appendChild(node);
+				return node;
+			},
+			poserIcone() {}, nomModeleSelectionne: () => "Opus 5.5", iconeFournisseur: () => "sparkles",
+			modeleRepli: () => null, libelleFini: () => "Opus 5.5 worked for 0:50",
+			activiteEnCours: () => "Thinking", libelleEnCours: () => "Opus 5.5 working",
+			texteActivite: () => "", compterJetons: String, libelleProgres: () => null,
+			resumeOutils: () => ({ libelle: "Tools", icone: "terminal" }), peindreEtapes() {},
+		};
+		const sync = new Function(...Object.keys(context), code + "\nreturn synchroniserTranscript;")(...Object.values(context));
+		const output = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n");
+		const root = document.createElement("div");
+		const state = { ligne: { id: 900, resultat: { dureeMs: 50000 } }, vivant: false,
+			tr: { text: output, thinking: "Reasoning", tools: [{ name: "Read" }], thinkingTokens: 0 }, lignes: new Map() };
+		blocks.set(root, state);
+		sync(root, state);
+		r.check("finished generation: every line starts folded", [...root.querySelectorAll("button")].map(b => b.getAttribute("aria-expanded")), ["false", "false", "false"]);
+		click(state.lignes.get("writing").bouton);
+		const preview = root.querySelector(".qbd-work-output > pre");
+		r.check("generation output: shared eight-line preview", preview?.textContent, output.split("\n").slice(0, 8).join("\n"));
+		const toggle = root.querySelector(".qbd-work-toggle");
+		r.check("generation output: Show all includes line count", toggle?.textContent.includes("40"), true);
+		if (toggle) {
+			click(toggle);
+			await flush();
+			r.check("generation output: Show all reveals full text", root.querySelector(".qbd-work-full")?.textContent, output);
+			sync(root, state);
+			r.check("generation output: repaint preserves preview node", root.querySelector(".qbd-work-output > pre") === preview, true);
+			r.check("generation output: repaint preserves full output", root.querySelector(".qbd-work-full")?.hidden, false);
+		}
+		click(state.lignes.get("writing").bouton);
+		sync(root, state);
+		r.check("generation output: explicit collapse survives repaint", state.lignes.get("writing").bouton.getAttribute("aria-expanded"), "false");
+		r.check("generation output: folded details are removed", root.querySelector(".qbd-work-output"), null);
+		state.vivant = true;
+		state.tr.text = "";
+		sync(root, state);
+		r.check("running generation: thinking stays folded", state.lignes.get("thinking").bouton.getAttribute("aria-expanded"), "false");
+		state.tr.text = "short";
+		expanded.clear();
+		sync(root, state);
+		r.check("running generation: short output stays folded", state.lignes.get("writing").bouton.getAttribute("aria-expanded"), "false");
+		live = { thread: { items: [], running: false } };
+		state.vivant = false;
+		live.thread.items.push({ kind: "text", text: output });
+		sync(root, state);
+		r.check("finished live generation: work line stays folded", state.lignes.get("work").bouton.getAttribute("aria-expanded"), "false");
+		sync(root, state);
+		r.check("finished live generation: repaint stays folded", state.lignes.get("work").bouton.getAttribute("aria-expanded"), "false");
+		r.check("finished live generation: no output rendered while folded", root.querySelector(".qbd-work"), null);
+	}
+
 	r.done();
 });
