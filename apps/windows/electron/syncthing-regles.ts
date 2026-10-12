@@ -60,6 +60,10 @@ export const IGNORES: readonly string[] = [
 	"/.claude",
 	"/.mcp.json",
 	"/.codex",
+	/* The root can be opened as an Obsidian vault. Its plugin main.js files are
+	   code Obsidian runs, so a paired device must not be able to plant one; each
+	   device keeps its own workspace. */
+	"/.obsidian",
 ];
 
 const RELAIS_DYNAMIQUE = "dynamic+https://relays.syncthing.net/endpoint";
