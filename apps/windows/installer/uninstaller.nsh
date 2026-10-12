@@ -200,6 +200,12 @@
 
     !macro customUnInstall
         SetDetailsPrint listonly
+        /* The login entry written by the app (`setLoginItemSettings`, value
+           "Neo Quiz"). Kept during an update: the new version is about to
+           run and writes it again; removed on a real uninstall only. */
+        ${ifNot} ${isUpdated}
+            DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Neo Quiz"
+        ${endIf}
     !macroend
 
     Function un.NeoQuizIgnorerPageFinale
