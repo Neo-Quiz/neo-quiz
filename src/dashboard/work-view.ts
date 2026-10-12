@@ -679,7 +679,7 @@ function appendLanguageBadge(pre: HTMLElement, tag: string, prepend = true): voi
 function fillOutputPre(pre: HTMLElement, text: string): void {
 	pre.replaceChildren();
 	let offset = 0;
-	for (const match of text.matchAll(new RegExp(FENCE.source, "g"))) {
+	for (const match of text.matchAll(new RegExp(FENCE.source, "gm"))) {
 		pre.appendChild(document.createTextNode(text.slice(offset, match.index)));
 		appendLanguageBadge(pre, match[1], false);
 		pre.appendChild(document.createTextNode(match[0]));
@@ -739,9 +739,15 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 // --- Text: prose, fenced code, and the quiz the model writes at the end -------
 
 /** A fence opens a block: ```lang, its code, then the closing fence (or the end
-    while it still streams). */
-const FENCE = /```([A-Za-z0-9_+-]*)[^\n]*\n([\s\S]*?)(?:```|$)/;
-const QUIZ_FENCE = /```quiz-blocks[^\n]*\n?/;
+    while it still streams). As in CommonMark, both fences stand ALONE on their
+    line (up to 3 spaces of indent): a ``` in the MIDDLE of a line — inside a
+    string of the quiz, e.g. an example "```html\n<script>…" — never opens nor
+    closes a block (2026-10-13: such a string cut the quiz block in two and the
+    rest spilled out as prose). */
+const FENCE = /^ {0,3}```([A-Za-z0-9_+-]*)[^\n`]*\n([\s\S]*?)(?:^ {0,3}```+[ \t]*$|(?![\s\S]))/m;
+const QUIZ_FENCE = /^ {0,3}```quiz-blocks[^\n]*\n?/m;
+/** A closing fence: alone on its line. */
+const CLOSING_FENCE = /^ {0,3}```+[ \t]*$/m;
 const FENCE_LANGUAGES = new Map<string, string>([
 	["json", "javascript"], ["json5", "javascript"], ["js", "javascript"], ["javascript", "javascript"],
 	["ts", "typescript"], ["typescript", "typescript"], ["py", "python"], ["python", "python"],
@@ -758,9 +764,10 @@ function textItem(text: string, live: boolean): HTMLElement {
 	if (quiz) {
 		const before = text.slice(0, quiz.index);
 		const after = text.slice(quiz.index + quiz[0].length);
-		const close = after.indexOf("```");
+		const fin = CLOSING_FENCE.exec(after);
+		const close = fin ? fin.index : -1;
 		const body = close < 0 ? after : after.slice(0, close);
-		const rest = close < 0 ? "" : after.slice(close + 3);
+		const rest = fin ? after.slice(fin.index + fin[0].length) : "";
 		appendProse(block, before);
 		block.appendChild(quizRow(body, live && close < 0));
 		appendProse(block, rest);

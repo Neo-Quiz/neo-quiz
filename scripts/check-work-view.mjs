@@ -374,6 +374,26 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("quiz en ```json5 : prose une seule fois", root.textContent.split("Voici le quiz.").length - 1, 1);
 		r.check("quiz en ```json5 : aucune balise brute", root.textContent.includes("```"), false);
 		r.check("quiz en ```json5 : JSON replié", root.textContent.includes("correctIndex"), false);
+		// A ``` INSIDE a string of the quiz (an example "```html\n<script>…```" with
+		// escaped newlines) never closes the block: nothing spills out (2026-10-13).
+		const PIEGE = "Voici le quiz.\n```LANG\n[\n  {\n    title: \"Q\",\n    questions: [\n" +
+			"      {prompt: \"Un\", options: [\"a\", \"b\"], correctIndex: 0},\n" +
+			"      {prompt: \"Preuve :\\n\\n```html\\n<script>alert(1)</script>\\n```\", options: [\"a\", \"b\"], correctIndex: 1},\n" +
+			"      {prompt: \"Trois\", options: [\"a\", \"b\"], correctIndex: 0}\n    ]\n  }\n]\n```\nFin.";
+		for (const lang of ["json5", "quiz-blocks"]) {
+			const piege = document.createElement("div");
+			renderThread(piege, fil([{ kind: "text", text: PIEGE.replace("LANG", lang) }], false), deps);
+			r.check(`\`\`\` dans une chaîne (${lang}) : une seule ligne quiz`, piege.querySelectorAll(".qbd-work-quiz").length, 1);
+			r.check(`\`\`\` dans une chaîne (${lang}) : aucun bloc de code échappé`, piege.querySelectorAll(".qbd-work-codeblock").length, 0);
+			r.check(`\`\`\` dans une chaîne (${lang}) : rien du quiz hors de la ligne`, piege.textContent.includes("alert(1)") || piege.textContent.includes("Trois"), false);
+			r.check(`\`\`\` dans une chaîne (${lang}) : la prose après le bloc reste`, piege.textContent.includes("Fin."), true);
+			click(piege.querySelector(".qbd-work-quiz .qbd-work-tool-head"));
+			r.check(`\`\`\` dans une chaîne (${lang}) : ouvert, aucun script créé`, piege.querySelectorAll("script").length, 0);
+		}
+		// A ``` in the middle of a line of ordinary prose opens no block.
+		const milieu = document.createElement("div");
+		renderThread(milieu, fil([{ kind: "text", text: "Écris ```js ici``` puis continue.\nLigne deux." }], false), deps);
+		r.check("``` au milieu d'une ligne : aucun bloc de code", milieu.querySelectorAll(".qbd-work-codeblock").length, 0);
 	}
 
 		// 17b. A quiz generation (`summarizeText`): the model's text is never shown,
