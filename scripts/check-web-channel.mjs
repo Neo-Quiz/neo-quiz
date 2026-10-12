@@ -100,6 +100,18 @@ await withSrcModule(
 		   "title" appears in it; what must not appear is the "not a quiz" wording. */
 		r.check("un quiz mal formé garde l'erreur du parseur (position), pas « pas un quiz »",
 			typeof e2 === "string" && !/instead of a quiz|au lieu d'un quiz/.test(e2) && /\d+:\d+|JSON5/.test(e2) && e2.includes('[{ title: "Q"'), true);
+
+		/* A resume-from-slice answer drops the opening `[`: a comma-separated run
+		   of complete objects with a trailing `]` but no leading bracket. It must
+		   be read, not reported malformed. */
+		const sansCrochetOuvrant = '// neo-quiz z9q2m7k4t0\n// title: Reprise\n  { "prompt": "Q1", "options": ["a", "b"], "correctIndex": 0 },\n  { "prompt": "Q2", "options": ["c", "d"], "correctIndex": 1 }\n]';
+		const reco = (() => { try { const x = client.parseReponseQuiz(sansCrochetOuvrant); return [x.questions.length, x.titre]; } catch (e) { return String(e.message); } })();
+		r.check("un tableau sans « [ » d'ouverture est réparé (crochet rajouté)", Array.isArray(reco) && reco[0] === 2 && reco[1] === "Reprise", true);
+		/* But a truly truncated answer (last object cut off) stays malformed:
+		   prefixing `[` must not rescue it into a shorter quiz. */
+		const tronque = '  { "prompt": "Q1", "options": ["a", "b"], "correctIndex": 0 },\n  { "prompt": "Q2", "options": ["c",';
+		const tr = (() => { try { client.parseReponseQuiz(tronque); return "lu"; } catch (e) { return /\d+:\d+|JSON5/.test(String(e.message)); } })();
+		r.check("une réponse tronquée en plein objet reste signalée, pas sauvée en quiz plus court", tr, true);
 	}
 
 	r.done();

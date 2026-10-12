@@ -947,6 +947,16 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 			try { parsed = JSON5.parse(repare); lu = true; } catch { /* l'erreur d'origine suit */ }
 		}
 		if (lu && Array.isArray(parsed)) return { questions: inertRemoteImages(sansFauxTitres(parsed)), titre: titreEnCommentaire(cleaned) };
+		/* A MISSING OPENING `[` must not cost a generation (2026-10-12): a model
+		   that "resumes from slice 3" writes the question objects as a
+		   comma-separated run WITHOUT the root array's opening bracket (it still
+		   closes with `]`), and JSON5 then fails on the comma after the first
+		   object ("invalid character ',' at …"). Re-add the bracket and retry.
+		   Only PREFIXING `[` is attempted (never appending `]`): a truncated
+		   answer whose last object is cut off stays malformed and is reported,
+		   rather than silently accepted as a shorter quiz. */
+		const enveloppe = envelopperEnTableau(cleaned) ?? envelopperEnTableau(repare);
+		if (enveloppe && enveloppe.length > 0) return { questions: inertRemoteImages(sansFauxTitres(enveloppe)), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
 		   (ligne, colonne), ce qu'aucune paraphrase ne ferait mieux. Une
 		   réponse qui n'est pas un quiz du tout, elle, mérite qu'on dise ce
@@ -1009,6 +1019,25 @@ export function parseReponseLot(content: string, documents: readonly string[]): 
     qui commence un nouvel élément ou un nouveau champ. Une ligne de
     commentaire n'est jamais touchée. Ne sert qu'en SECONDE lecture, après
     l'échec de la première : une réponse valide ne passe jamais ici. */
+/** Tente de lire un tableau de questions auquel il manque le `[` d'ouverture
+    (un modèle qui « reprend à la slice N » écrit les objets d'un seul tenant,
+    séparés par des virgules, souvent avec un `]` final mais sans le crochet
+    ouvrant). On n'AJOUTE qu'un `[` en tête, jamais un `]` en queue : une
+    réponse tronquée en plein objet reste illisible et sera signalée plutôt
+    qu'acceptée en silence comme un quiz plus court. `undefined` si rien ne se
+    lit en tableau. */
+function envelopperEnTableau(texte: string): unknown[] | undefined {
+	const t = texte.trim();
+	if (!t || t.startsWith("[")) return undefined;
+	for (const cand of ["[" + texte, "[" + texte + "\n]"]) {
+		try {
+			const p = JSON5.parse(cand);
+			if (Array.isArray(p)) return p;
+		} catch { /* candidat suivant */ }
+	}
+	return undefined;
+}
+
 export function reparerVirgulesManquantes(source: string): string {
 	const lignes = source.split("\n");
 	const finDeValeur = /(["'\d\]}]|\btrue|\bfalse|\bnull)\s*$/;
