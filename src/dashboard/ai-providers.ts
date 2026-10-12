@@ -1337,7 +1337,10 @@ export function libelleModele(providerId: string, model: string): string {
 		if (connu) return connu.def.label;
 		const parse = parseClaudeModelId(model);
 		if (parse) return libelleFamille(parse.family, parse.version);
-		// Un ALIAS (« sonnet ») : la famille seule, sans numéro inventé.
+		// An ALIAS ("opus"): the label learned from what the CLI served ("Opus 5.5"),
+		// as the composer's model pill shows it; else the family alone, no invented number.
+		const appris = readClaudeCliInfo().labels[model];
+		if (appris) return appris;
 		return CLAUDE_CODE_MODELS.some(m => m.value === model) ? model.charAt(0).toUpperCase() + model.slice(1) : model;
 	}
 	if (providerId === "codex") return getCodexModels().find(m => m.value === model)?.label ?? model;

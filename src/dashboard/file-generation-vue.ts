@@ -337,7 +337,11 @@ export function creerVueFile(opts: {
 		   `peindreTranscript` paints under it (model, activity, time): no second
 		   status line above it (2026-10-12). Without a transcript (a provider
 		   that answers in one piece) the status line below stays alone. */
-		if (l.etat === "cours" && opts.file.transcript(l.id) && opts.file.live(l.id)) return;
+		{
+			// Hidden whenever peindreTranscript paints the clickable work line under it.
+			const trEnCours = l.etat === "cours" ? opts.file.transcript(l.id) : null;
+			if (trEnCours && !(enProse(l) && !trEnCours.thinking && trEnCours.tools.length === 0)) return;
+		}
 		const rep = ajouter(parent, "div", "qbd-ai-reponse qbd-ai-reponse--" + l.etat);
 		if (l.etat === "cours" || l.etat === "enregistrement") {
 			/* THE WORKING LINE, as MonoCode shows it (2026-09-30): the
