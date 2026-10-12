@@ -369,6 +369,9 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
 - `npm run check:live-session` — le gestionnaire de sessions live (`live-sessions.ts`,
   `live-drivers.ts`) : une charge de la fenêtre qui atteint un CLI sans contrôle, une
   permission répondue sans l'utilisateur, une session jamais mise en veille. Dans la CI.
+- `npm run check:tray-lifecycle` — le cycle de vie de l'icône de notification :
+  une croix qui cache l'app sans icône pour la rouvrir, une mise à jour installée
+  pendant une génération, un « relancer caché » resté collé.
 - `npm run check:live-thread` — le fil complet du travail de l'IA
   (`src/dashboard/live-thread.ts`) : une sortie d'outil gardée entière en mémoire, une
   commande Bash coupée au point de ne plus se lire, une permission restée « en attente »
@@ -1057,8 +1060,9 @@ introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
 elles chargent les réglages, hooks, skills et serveurs MCP PROPRES À L'UTILISATEUR —
 Claude Code avec `--setting-sources user`, Codex avec `~/.codex` partagé par un dossier
 privé `userData/codex-home/` (`codex-home.ts`). Elles ne chargent JAMAIS la configuration
-projet de la racine Neo Quiz, synchronisée (`.claude/`, `.mcp.json`, `.codex/`, exclus par
-`syncthing-regles.ts`) : un hook planté par un autre appareil ne tourne pas sur ce PC.
+projet de la racine Neo Quiz : le `.stignore` racine exclut `.claude/`, `.mcp.json`,
+`.codex/` et `/.obsidian` (`syncthing-regles.ts`), pour qu'un hook planté par un autre
+appareil ne tourne pas sur ce PC et que chaque appareil garde son espace de travail.
 Pour Codex, la racine est en plus déclarée NON FIABLE au lancement (`-c projects=…
 trust_level="untrusted"`, `argsLiveCodex`) : sans elle, un `thread/start` en Accès complet
 (ou Modifications auto, Auto) inscrit lui-même la racine comme fiable dans

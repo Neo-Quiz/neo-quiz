@@ -13,6 +13,18 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Neo Quiz starts with Windows and keeps syncing from the notification area; the close button hides it, Quit is in the icon's menu.
+
+### Changed
+
+- Updates install silently while the window is hidden.
+
+### Fixed
+
+- The Obsidian configuration of the synced folder is no longer sent to other devices.
+
 ## [1.20.85] - 2026-10-11
 
 ### Changed
