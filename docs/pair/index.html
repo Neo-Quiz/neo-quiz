@@ -129,7 +129,7 @@
 		(function () {
 			var p = new URLSearchParams(location.hash.slice(1));
 			var id = (p.get("device") || "").trim().toUpperCase();
-			var nom = (p.get("name") || "").replace(/[\u0000-\u001f\u007f-\u009f  ‪-‮⁦-⁩]/g, "").trim().slice(0, 64);
+			var nom = (p.get("name") || "").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 64);
 			if (!/^[A-Z2-7]{7}(-[A-Z2-7]{7}){7}$/.test(id)) {
 				document.getElementById("invalide").hidden = false;
 				return;
