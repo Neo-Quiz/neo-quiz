@@ -26,6 +26,10 @@ export type TranscriptTool = "claude" | "codex";
 
 export type TranscriptEvent =
 	| { kind: "start"; model?: string }
+	/** The model that produced one of the MAIN turn's messages (no
+	    `parent_tool_use_id`). Sub-agents and compaction answer with another
+	    model on purpose: they never say what the turn was answered with. */
+	| { kind: "model"; model: string }
 	| { kind: "thinking"; text: string }
 	/** How many tokens the model has reasoned so far, an ESTIMATE the CLI
 	    sends while it keeps the reasoning itself to itself (Claude Code with
@@ -69,6 +73,9 @@ export interface ToolStep {
 export interface Transcript {
 	started: boolean;
 	model?: string;
+	/** The model that answered the MAIN turn, last one wins. Differs from
+	    `model` (the init line) when the CLI's safeguards switched it. */
+	effectiveModel?: string;
 	thinking: string;
 	/** Estimated tokens of reasoning so far (0 when the CLI sends none). */
 	thinkingTokens: number;
@@ -113,6 +120,10 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 		case "start":
 			t.started = true;
 			if (ev.model) t.model = ev.model;
+			break;
+		case "model":
+			t.started = true;
+			if (ev.model) t.effectiveModel = ev.model;
 			break;
 		case "thinking":
 			t.started = true;
@@ -298,9 +309,16 @@ function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	   complete only here. Its text is NOT taken: the partial chunks below
 	   already carried it, and taking it twice would double the answer. */
 	if (type === "assistant") {
-		const contenu = rec(line.message)?.content;
-		if (!Array.isArray(contenu)) return [];
 		const out: TranscriptEvent[] = [];
+		/* The model of a MAIN-turn message (no parent tool call). A sub-agent's
+		   messages carry `parent_tool_use_id` and another model: ignored.
+		   `<synthetic>` is the CLI's own placeholder, not a model. */
+		const parent = line.parent_tool_use_id;
+		const principal = parent === undefined || parent === null || parent === "";
+		const modele = str(rec(line.message)?.model);
+		if (principal && modele && !modele.startsWith("<")) out.push({ kind: "model", model: modele });
+		const contenu = rec(line.message)?.content;
+		if (!Array.isArray(contenu)) return out;
 		for (const c of contenu.slice(0, 50)) {
 			const b = rec(c);
 			if (!b || (str(b.type) !== "tool_use" && str(b.type) !== "server_tool_use")) continue;
@@ -566,6 +584,15 @@ export function tempsRestant(question: number, total: number | null | undefined,
 	const parQuestion = Math.max(0, now - writingSince) / faites;
 	return Math.round(parQuestion * (total - faites));
 }
+/** Are two model labels the same model, ignoring case and spacing? Labels
+    (what the app shows, "Opus 5.5"), never raw ids: an alias is resolved to
+    its label before it gets here. An empty side never differs. */
+export function modeleDiffere(demande: string, effectif: string): boolean {
+	const normaliser = (m: string): string => m.toLowerCase().replace(/\s+/g, "");
+	const a = normaliser(demande), b = normaliser(effectif);
+	return a !== "" && b !== "" && a !== b;
+}
+
 /** The AI's work summed up by kind, as MonoCode titles it ("Explored the
     project · Ran 6 tools", "Ran a command · Edited SKILL.md"): what was
     explored, run and edited, and the file when only one was edited. */

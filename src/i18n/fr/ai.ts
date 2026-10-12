@@ -589,6 +589,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.chat.working": "{model} travaille",
 	"ai.chat.worked": "{model} a travaillé {time}",
 	"ai.chat.workedNoTime": "{model} a travaillé",
+	"ai.safeguard.flagged": "Les garde-fous de {requested} ont signalé cette demande : réponse donnée par {effective}. Changez de modèle dans le composeur pour en changer.",
+	"ai.safeguard.retry": "Réessayer",
 	"ai.chat.copy": "Copier la réponse",
 	"ai.chat.copied": "Réponse copiée.",
 	"ai.chat.copyFailed": "La réponse n'a pas pu être copiée.",

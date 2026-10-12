@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant, MAX_STEPS, resumeEntree }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -195,5 +195,39 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("time left: none before two finished questions, nor without a total, nor past it",
 		[tempsRestant(2, 10, 0, 60_000), tempsRestant(5, undefined, 0, 60_000), tempsRestant(12, 10, 0, 60_000), tempsRestant(5, 10, undefined, 60_000)], [null, null, null, null]);
 	r.check("time left: 4 done in 2 min, 6 to go = 3 min", tempsRestant(5, 10, 0, 120_000), 180_000);
+
+	/* SAFEGUARD FALLBACK (2026-10-12): the CLI answers the MAIN turn with another
+	   model than the one it started with when its safeguards switch it. Only the
+	   main turn's assistant messages (no parent_tool_use_id) say so: a sub-agent
+	   (Task tool) or a compaction answers with another model on purpose. */
+	const fallback = [
+		line({ type: "system", subtype: "init", model: "claude-opus-5-5" }),
+		line({ type: "assistant", message: { model: "claude-opus-4-8", content: [] } }),
+	].join("");
+	const fb = fold(createTranscriptDecoder("claude")(fallback));
+	r.check("safeguard: a main-turn model that differs from init is the effective model",
+		[fb.model, fb.effectiveModel], ["claude-opus-5-5", "claude-opus-4-8"]);
+	const sousAgent = [
+		line({ type: "system", subtype: "init", model: "claude-opus-5-5" }),
+		line({ type: "assistant", parent_tool_use_id: "toolu_1", message: { model: "sonnet", content: [] } }),
+	].join("");
+	r.check("safeguard: a sub-agent on another model is NOT an effective model",
+		fold(createTranscriptDecoder("claude")(sousAgent)).effectiveModel, undefined);
+	const sousAgentVide = line({ type: "assistant", parent_tool_use_id: "", message: { model: "haiku", content: [] } });
+	r.check("safeguard: an empty parent_tool_use_id still counts as the main turn",
+		fold(createTranscriptDecoder("claude")(sousAgentVide)).effectiveModel, "haiku");
+	r.check("safeguard: the CLI's <synthetic> placeholder is not a model",
+		fold(createTranscriptDecoder("claude")(line({ type: "assistant", message: { model: "<synthetic>", content: [] } }))).effectiveModel, undefined);
+	const deuxTours = [
+		line({ type: "assistant", message: { model: "claude-opus-5-5", content: [] } }),
+		line({ type: "assistant", message: { model: "claude-opus-4-8", content: [] } }),
+	].join("");
+	r.check("safeguard: the last main-turn model wins", fold(createTranscriptDecoder("claude")(deuxTours)).effectiveModel, "claude-opus-4-8");
+	r.check("safeguard: a fresh transcript has no effective model", transcriptVide().effectiveModel, undefined);
+	/* The comparison, on labels (what the app shows): ignore case and spacing,
+	   never flag on an empty side. */
+	r.check("safeguard: Opus 5.5 answered by Opus 4.8 differs", modeleDiffere("Opus 5.5", "Opus 4.8"), true);
+	r.check("safeguard: the same label in another case or spacing does not differ", modeleDiffere("Opus 5.5", "opus  5.5"), false);
+	r.check("safeguard: an empty side never differs", [modeleDiffere("", "Opus 4.8"), modeleDiffere("Opus 5.5", "")], [false, false]);
 	r.done();
 });

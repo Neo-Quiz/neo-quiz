@@ -634,6 +634,8 @@ export const EN_AI = {
 	"ai.chat.working": "{model} is working",
 	"ai.chat.worked": "{model} worked for {time}",
 	"ai.chat.workedNoTime": "{model} worked",
+	"ai.safeguard.flagged": "{requested}'s safeguards flagged this: answered with {effective}. Pick another model in the composer to change it.",
+	"ai.safeguard.retry": "Retry",
 	"ai.chat.copy": "Copy the answer",
 	"ai.chat.copied": "Answer copied.",
 	"ai.chat.copyFailed": "The answer could not be copied.",

@@ -749,6 +749,16 @@
 	color: var(--text-error);
 }
 
+/* A turn the CLI's safeguards answered with ANOTHER model (2026-10-12): the work
+   line turns orange, not red (red is an error), with Retry right under it. */
+.qbd-ai-transcript-ligne--alerte .qbd-ai-transcript-titre-icone,
+.qbd-ai-transcript-ligne--alerte .qbd-ai-transcript-ligne-texte {
+	color: var(--color-orange, #fb923c);
+}
+.qbd-ai-transcript-relance {
+	margin: 4px 0 8px;
+}
+
 /* "Scroll to the latest message": a round button that floats above the
    composer, centred over the thread. Rest face = three dots (the typing
    indicator animates only while a generation runs); hover or focus = arrow. */

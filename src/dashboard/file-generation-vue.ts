@@ -46,7 +46,7 @@ import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
 import type { ToolStep, Transcript } from "./transcript";
 import { resumeTravail } from "./transcript";
-import { quizProgress, tempsRestant } from "./transcript";
+import { modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { renderThread, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
@@ -96,6 +96,17 @@ function nomModeleSelectionne(l: LigneGeneration): string {
 function libelleFini(nom: string, ms: number | undefined): string {
 	if (ms === undefined) return nom ? t("ai.chat.workedNoTime", { model: nom }) : t("ai.work.worked");
 	return nom ? t("ai.chat.worked", { model: nom, time: duree(ms) }) : t("ai.work.workedFor", { time: duree(ms) });
+}
+
+/** The model the CLI answered with, when its safeguards switched it off the
+    one the request selected (Claude Code only): its label, else null. Both
+    sides are labels (`libelleModele`), so the alias `opus` is compared with
+    the version it stands for. A sub-agent's model never gets here
+    (transcript.ts). */
+function modeleRepli(l: LigneGeneration, tr: Transcript | null | undefined): string | null {
+	if (!tr?.effectiveModel || l.demande.reglages.aiProvider !== "claude-code") return null;
+	const effectif = aiProviders.libelleModele("claude-code", tr.effectiveModel);
+	return modeleDiffere(nomModeleSelectionne(l), effectif) ? effectif : null;
 }
 
 /** The summary of a running turn: "Opus 5.5 · Weighing the options… 0:12". */
@@ -413,6 +424,8 @@ export function creerVueFile(opts: {
 	    created ONCE and then updated in place (see `remplirTranscript`). */
 	interface LigneTranscript {
 		bouton: HTMLElement;
+		icone: HTMLElement;
+		iconeNom: string;
 		libelle: HTMLElement;
 		chevron: HTMLElement;
 		detail: HTMLElement | null;
@@ -423,6 +436,8 @@ export function creerVueFile(opts: {
 	    the transcript object, the live flag and the request change at every chunk. */
 	interface BlocTranscript {
 		lignes: Map<string, LigneTranscript>;
+		/** The Retry under a flagged work line; null while there is none. */
+		relance: HTMLElement | null;
 		tr: Transcript;
 		vivant: boolean;
 		ligne: LigneGeneration;
@@ -461,7 +476,7 @@ export function creerVueFile(opts: {
 	 */
 	function remplirTranscript(bloc: HTMLElement, tr: Transcript, vivant: boolean, l: LigneGeneration, prose: boolean): void {
 		let etat = blocs.get(bloc);
-		if (!etat) { etat = { lignes: new Map(), tr, vivant, ligne: l, prose }; blocs.set(bloc, etat); }
+		if (!etat) { etat = { lignes: new Map(), relance: null, tr, vivant, ligne: l, prose }; blocs.set(bloc, etat); }
 		else { etat.tr = tr; etat.vivant = vivant; etat.ligne = l; etat.prose = prose; }
 		synchroniserTranscript(bloc, etat);
 	}
@@ -470,6 +485,8 @@ export function creerVueFile(opts: {
 		cle: string;
 		icone: string;
 		libelle: string;
+		/** The work line of a turn answered by another model than the one selected. */
+		alerte?: boolean;
 		/** A running turn's summary: the clock re-writes it each second from these. */
 		chrono?: { modele: string; activite: string; debut: number };
 		ouvertParDefaut: boolean;
@@ -516,10 +533,15 @@ export function creerVueFile(opts: {
 		const debut = l.debut ?? Date.now();
 		const lignes = tr.text ? tr.text.split("\n").length : 0;
 		const activite = vivant ? activiteEnCours(l, tr, lignes) : "";
-		const libelle = vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
+		/* A turn the safeguards answered with ANOTHER model (2026-10-12): the
+		   finished line says so in orange, with Retry under it (synchroniserTranscript). */
+		const repli = vivant ? null : modeleRepli(l, tr);
+		const libelle = repli
+			? t("ai.safeguard.flagged", { requested: nom, effective: repli })
+			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
 		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
 		return {
-			cle: "work", icone: "sparkles", libelle,
+			cle: "work", icone: repli ? "alert-triangle" : "sparkles", libelle, alerte: !!repli,
 			chrono: vivant ? { modele: nom, activite, debut } : undefined,
 			// Folded from the start, even while the turn runs: a click opens it. A pending
 				// permission is the one exception: the turn waits for it, so it must show.
@@ -658,10 +680,11 @@ export function creerVueFile(opts: {
 			if (!v) {
 				const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
 				b.type = "button";
-				host.ui.setIcon(ajouter(b, "span", "qbd-ai-transcript-titre-icone"), s.icone);
+				const icone = ajouter(b, "span", "qbd-ai-transcript-titre-icone");
+				host.ui.setIcon(icone, s.icone);
 				const libelle = ajouter(b, "span", "qbd-ai-transcript-ligne-texte");
 				const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
-				const neuve: LigneTranscript = { bouton: b, libelle, chevron, detail: null, ouvert, chevronNom: "" };
+				const neuve: LigneTranscript = { bouton: b, icone, iconeNom: s.icone, libelle, chevron, detail: null, ouvert, chevronNom: "" };
 				v = neuve;
 				etat.lignes.set(s.cle, neuve);
 				// Reads the CURRENT state of the block: a click toggles what is shown now.
@@ -673,6 +696,8 @@ export function creerVueFile(opts: {
 					synchroniserTranscript(bloc, courant);
 				});
 			}
+			if (v.iconeNom !== s.icone) { host.ui.setIcon(v.icone, s.icone); v.iconeNom = s.icone; }
+			v.bouton.classList.toggle("qbd-ai-transcript-ligne--alerte", !!s.alerte);
 			if (v.libelle.textContent !== s.libelle) v.libelle.textContent = s.libelle;
 			if (s.chrono) {
 				v.libelle.classList.add("qbd-ai-transcript-chrono");
@@ -706,6 +731,31 @@ export function creerVueFile(opts: {
 				rang++;
 			}
 		}
+		/* The Retry of a turn the safeguards answered with another model: a button of its
+		   own, right under the work line (a button cannot sit inside a button), kept
+		   there at each chunk. */
+		const travail = etat.lignes.get("work");
+		const alerte = specs.some(s => s.cle === "work" && s.alerte);
+		if (alerte && travail) {
+			if (!etat.relance) {
+				const b = document.createElement("button");
+				b.type = "button";
+				b.className = "qbd-ai-reponse-action qbd-ai-transcript-relance";
+				b.textContent = t("ai.safeguard.retry");
+				b.addEventListener("click", () => { const courant = blocs.get(bloc); if (courant) relancer(courant.ligne); });
+				etat.relance = b;
+			}
+			if (etat.relance.previousElementSibling !== travail.bouton) travail.bouton.after(etat.relance);
+		} else if (etat.relance) {
+			etat.relance.remove();
+			etat.relance = null;
+		}
+	}
+
+	/** Sends the same request again: a new line at the end of the queue (the
+	    model's answer of this one, `produit`, is not carried over). */
+	function relancer(l: LigneGeneration): void {
+		opts.file.envoyer({ ...l.demande, produit: undefined, sentAt: Date.now() });
 	}
 
 	/** The result line under a step: `└ 120 lines`, `└ Refused: …`. */
