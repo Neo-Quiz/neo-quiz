@@ -26,6 +26,7 @@
 }
 
 .qbd-ai-fil {
+	--fondu: 28px;
 	flex: 1 1 auto;
 	min-height: 0;
 	width: 100%;

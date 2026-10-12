@@ -55,6 +55,7 @@ import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
+import { suivreDebord } from "./detail-fiche";
 import { formatClarifications, kindFromClarifications, parseClarifyAnswer } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
@@ -1148,7 +1149,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
 		if (conversation) {
-			vueFile.rendre(ajouter(stage, "div", "qbd-ai-fil"));
+			const fil = ajouter(stage, "div", "qbd-ai-fil");
+			// Faded edges instead of a flat cut against the composer (same fade as the quiz pages).
+			suivreDebord(fil);
+			vueFile.rendre(fil);
+			// A repaint replaces the thread's children: re-read the fade once per frame.
+			let relire = 0;
+			new MutationObserver(() => { if (!relire) relire = requestAnimationFrame(() => { relire = 0; fil.dispatchEvent(new Event("scroll")); }); }).observe(fil, { childList: true });
 		}
 
 		// ── Page header ──
