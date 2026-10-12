@@ -13,6 +13,24 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Generate asks how many questions you want (and how many quizzes for several documents), with Auto recommended.
+- When Claude's safeguards cut an answer, the request is retried on its own with the fallback model (Opus 4.8 for a cyber topic), shown in orange with the safeguard details.
+
+### Changed
+
+- The AI decides between a Learn and a Test from your request, and only asks when it is unclear.
+- The subject is chosen by clicking the detected-subject badge; the composer options button is gone.
+- The AI work line reads "Opus 5.5 worked for 0:50" with the provider logo, stays folded until clicked, and shows the tool rows and a faded preview of long output.
+- Folder suggestions follow the detected subject and only appear when no folder is chosen yet.
+- Question beads show the result by their color alone, without tick or cross marks.
+
+### Fixed
+
+- A quiz containing a code example in one of its texts no longer spills out of its block in the AI work.
+- The AI work line no longer flickers and can be clicked while a quiz is being written.
+
 ## [1.20.88] - 2026-10-12
 
 ### Fixed
