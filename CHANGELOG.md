@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.89] - 2026-10-12
+
 ### Added
 
 - Generate asks how many questions you want (and how many quizzes for several documents), with Auto recommended.
