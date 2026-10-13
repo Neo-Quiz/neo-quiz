@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.90] - 2026-10-13
+
 ### Changed
 
 - Every generated question gets a short title naming the notion it tests.
