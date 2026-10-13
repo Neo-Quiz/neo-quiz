@@ -90,42 +90,11 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		return ctx.quizState?.practiceMode === "text";
 	}
 
-	/* Décision PAR QUESTION : absorbe la mécanique de l'ancien bouton « Practice
-	   mode » dans le rôle "recall" du mode Leçon (Task 5, 2026-08-31) — une
-	   question de restitution s'affiche toujours en réponse libre + auto-
-	   évaluation, sans réglage utilisateur, alors que ses voisines "pre"/"test"
-	   du même quiz restent en QCM. Le chemin historique (`practiceMode ===
-	   "text"`) reste une clause OU : un bloc hors Leçon qui active encore ce
-	   mode par sa configuration (démarrage « Entraînement ») continue de tout
-	   afficher en réponse libre, question par question.
-	   CORRECTIF (2026-09-26) : un "recall" ne force la réponse libre que pour
-	   les types à CHOIX (single/multiple) — voir la question, ce serait donner
-	   la réponse. Pour tout autre type (matching, ordering, cloze, numérique,
-	   text, terminal…), la vraie interaction force déjà le rappel : forcer en
-	   plus la réponse libre ne fait que masquer une correction réelle derrière
-	   une auto-évaluation. */
-	/* …EXCEPT when the choices ARE the question (2026-09-29): "Among these
-	   statements, which ones are true?" turned into a free answer showed a
-	   prompt pointing at statements that were no longer there — a question
-	   nobody could answer (a generated CM1 Learn). A multiple-choice recall
-	   (judging several statements is the recall itself) and a prompt that
-	   refers to its options keep their choices. */
-	const REFERS_TO_OPTIONS = /\b(parmi|lesquel|laquelle|lequel|ci-dessous|suivantes?\b|which (?:of|one)|among|the following)/i;
-	function choicesAreTheQuestion(q: QuizQuestion): boolean {
-		const r = q as { multiSelect?: unknown; prompt?: unknown; title?: unknown };
-		if (r.multiSelect === true) return true;
-		return REFERS_TO_OPTIONS.test(`${String(r.prompt ?? "")} ${String(r.title ?? "")}`);
-	}
-
-	function isRecallForcedTextOnly(q: QuizQuestion): boolean {
-		return !choicesAreTheQuestion(q)
-			&& !ctx.isOrderingQuestion(q)
-			&& !ctx.isMatchingQuestion(q)
-			&& !ctx.isClozeQuestion(q)
-			&& !ctx.isTextQuestion(q)
-			&& !ctx.isFlashcardQuestion(q);
-	}
-
+	/* A Learn is answered by tapping (2026-10-14): a "recall" MCQ keeps its
+	   choices. From 2026-08-31 a recall of a choice type was forced into a free
+	   answer + self-rating (seeing the options would give the answer away); with
+	   Learns made of exam-style MCQs and flashcards, that rule turned whole step
+	   pages into "Show the answer" cards, so it is gone. */
 	/* An `explain` question ("in your own words", 2026-09-29) is a few
 	   sentences: it can never match its model answer word for word, and was
 	   marked wrong every time by the text comparison. In a Learn it is
@@ -155,8 +124,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		// tap is a REVEAL card, self-rated like a flashcard (engine/step-page.ts).
 		if (ctx.stepSlides && !ctx.isReadingCard(qi) && !isTapType(q)) return true;
 		if (isTextOnlyMode()) return true;
-		if (isExplainWritten(qi, q)) return true;
-		return ctx.isLessonMode() && ctx.roleOfQuestion(qi) === "recall" && isRecallForcedTextOnly(q);
+		return isExplainWritten(qi, q);
 	}
 
 	/* Décision GLOBALE DÉRIVÉE : au moins une question du quiz est actuellement

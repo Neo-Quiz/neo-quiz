@@ -15,7 +15,7 @@ release notes.
 
 ### Fixed
 
-- A Learn no longer shows "Show the answer" questions: a bare question and answer plays as a flashcard.
+- A Learn shows its review questions as multiple choice again, never as "Show the answer" cards.
 
 ## [1.20.89] - 2026-10-12
 

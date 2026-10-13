@@ -643,7 +643,7 @@ await withSrcModule(
 	   rôle, jamais le type de la question).
 	   ──────────────────────────────────────────────────────────── */
 	{
-		const r = makeReporter("text-only.ts — un recall matching garde sa vraie interaction, un recall single reste en réponse libre");
+		const r = makeReporter("text-only.ts — un recall matching garde sa vraie interaction, un recall single garde ses choix (Learn au tap, 2026-10-14)");
 		const single = { id: "q1", title: "Choix", role: "recall", options: ["a", "b"], correctIndex: 0 };
 		const matching = { id: "q2", title: "Association", role: "recall", matching: true, rows: ["x"], choices: ["y"], correctMap: [0] };
 		const quiz = [single, matching];
@@ -654,7 +654,7 @@ await withSrcModule(
 		ctx.isMatchingQuestion = (q) => !!q && (q.matching === true || typeof q.matching === "object");
 		ctx.textOnly = createTextOnlyHandlers(ctx);
 
-		r.check("recall à choix (single) : réponse libre", ctx.textOnly.isTextOnlyFor(0), true);
+		r.check("recall à choix (single) : garde ses choix, jamais de réponse libre", ctx.textOnly.isTextOnlyFor(0), false);
 		r.check("recall matching : vraie interaction, jamais de réponse libre", ctx.textOnly.isTextOnlyFor(1), false);
 		r.done();
 	}
@@ -669,7 +669,7 @@ await withSrcModule(
 	   ──────────────────────────────────────────────────────────── */
 	{
 		const r = makeReporter("retour #14 — une réponse écrite non notée compte comme répondue (isComplete)");
-		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", language: "python" }];
 		const { ctx } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
 		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
 		ctx.quizState.textOnlyChecked = [false];
@@ -688,7 +688,7 @@ await withSrcModule(
 		const r = makeReporter("retour #17 — le score exclut une réponse écrite pas encore évaluée, puis la compte une fois notée");
 		const quiz = [
 			{ id: "q1", title: "QCM", options: ["a", "b"], correctIndex: 0 },
-			{ id: "q2", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+			{ id: "q2", title: "Restitution", role: "recall", language: "python" },
 		];
 		const { ctx } = makeCtx({ quiz, selections: [0, null], isLessonMode: true, roles: [undefined, "recall"] });
 		ctx.quizState.textOnlyAnswers = ["", "une réponse écrite"];
@@ -718,7 +718,7 @@ await withSrcModule(
 	   ──────────────────────────────────────────────────────────── */
 	{
 		const r = makeReporter("goToResults — retour C1 : une réponse écrite pas encore jugée n'est pas journalisée à sa place du vrai verdict");
-		const quiz = [{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 }];
+		const quiz = [{ id: "q1", title: "Restitution", role: "recall", language: "python" }];
 		const { ctx, appels } = makeCtx({ quiz, selections: [null], isLessonMode: true, roles: ["recall"] });
 		ctx.quizState.textOnlyAnswers = ["une réponse écrite"];
 		ctx.quizState.textOnlyChecked = [false];
@@ -747,7 +747,7 @@ await withSrcModule(
 		const r = makeReporter("goToResults — retour I1 : la progression exclut une réponse écrite pas encore jugée");
 		const quiz = [
 			{ id: "read1", title: "Support", role: "read" },
-			{ id: "q1", title: "Restitution", role: "recall", options: ["a", "b"], correctIndex: 0 },
+			{ id: "q1", title: "Restitution", role: "recall", language: "python" },
 		];
 		const updates = [];
 		const statsStore = { updateRecord(_path, rec) { updates.push(rec); } };
