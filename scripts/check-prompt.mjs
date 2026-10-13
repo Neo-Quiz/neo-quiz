@@ -84,12 +84,14 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 		[dflt === learnP, dflt.includes("MCQ questions and flashcards"), /free-text questions|"ordering": true/.test(dflt)], [true, true, false]);
 	r.check("Learn with an explicit type list: exactly those types, with their fields",
 		[expl.includes("ONLY these question types"), expl.includes("free-text questions"), expl.includes('"ordering": true)'), expl.includes("- ordering / slots"), expl.includes("MCQ questions and flashcards")], [true, true, true, true, false]);
-	/* The Test prompt is byte-identical to its text before this change
-	   (SHA-256 of system + user prompt, four option sets). */
+	/* The Test prompt is pinned byte for byte (SHA-256 of system + user prompt,
+	   four option sets): re-pinned on 2026-10-14 for the required question title. */
 	const sha = (o) => { const p = composerPrompts("x", { mode: "practice", ...o }); return createHash("sha256").update(p.systemPrompt + " " + p.userPrompt).digest("hex"); };
-	r.check("Test prompt: byte-identical to the one before the tap-only Learn",
+	r.check("Test prompt: pinned byte for byte",
 		[{}, { count: 12 }, { type: ["Choix unique", "Choix multiple"] }, { categorie: "python" }].map(sha),
-		["cf8c9fa23288e9f9ec54424d194111ae0f27f90e7f289ec59a252d87f804254a", "91ff26b2d3221afea6ca7ea90998b4583c4f37830c93edf01c52c885ef584b50", "165321256f66c083c4c768fcfe6968cd74de3ab354fd833cf702a7957662b2f4", "a1187a80d6333b98a7389c257c0170b2d6726f6dec74ebbb3f120472f137b20e"]);
+		["5e0c175a59790c4bab2e0e0086bf2e21dead384ae895c6598da78816c53f6dc6", "8587d6e0cb5078f6cc5cf124fe073ce76d7a2d4d36a2d66050bc2fa9bdebdd04", "93faa5b023fc559f443d4938a0811fc96ba4a6093fa69d78fff2d3320b633ad5", "477415a42d1a988654818d129fcc273e3399db409f22843e4d9fcbe1bbfd14b1"]);
+	r.check("Learn and Test: every question has a title naming its notion, never a question",
+		[learnP, composerPrompts("x", { mode: "practice" }).systemPrompt].map(p => /title: REQUIRED on every question: the notion it tests/.test(p) && p.includes("never a question")), [true, true]);
 	r.check("Learn : « À retenir », cartes pour des termes, récapitulatif pour des faits",
 		['"forme": "cartes"', "for TERMS to memorize", '"forme": "recap"', "for FACTS to keep"].filter(p => !learnP.includes(p)), []);
 	/* Retours du 2026-09-26 (lot B) : indices, mots clés, idiomes, cartes,

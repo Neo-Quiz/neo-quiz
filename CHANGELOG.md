@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Every generated question gets a short title naming the notion it tests.
+
 ### Fixed
 
 - A Learn shows its review questions as multiple choice again, never as "Show the answer" cards.

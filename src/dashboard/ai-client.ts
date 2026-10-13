@@ -695,7 +695,7 @@ ${documents.map((d, i) => `\t${i + 1}. ${d}`).join("\n")}
 	` : "";
 
 	/* The question fields. A Learn is answered by TAPPING (single choice, flashcards): its list names no typed, ordered, matched or computed answer. The Test keeps the full list, unchanged. */
-	const learnFields = `	- title: short question title
+	const learnFields = `	- title: REQUIRED on every question: the notion it tests, as a short noun phrase of 2 to 6 words in the quiz language, shown as "Question N: <title>" above the prompt (e.g. "La requête préparée", "Le nombre de colonnes", "La SQLi en aveugle"); never a question, never the prompt repeated, never the answer, never a number such as "Question 3"
 	- prompt: full question text
 	- options: array of 3 to 5 options
 	- correctIndex: index of the correct answer (one correct answer)
@@ -705,7 +705,7 @@ ${documents.map((d, i) => `\t${i + 1}. ${d}`).join("\n")}
 	- explain: the explanation shown after the answer
 	- hint: a nudge shown on demand — a string
 `;
-	const champs = learn && auto ? learnFields : `	- title: short question title
+	const champs = learn && auto ? learnFields : `	- title: REQUIRED on every question: the notion it tests, as a short noun phrase of 2 to 6 words in the quiz language, shown as "Question N: <title>" above the prompt (e.g. "La requête préparée", "Le nombre de colonnes", "La SQLi en aveugle"); never a question, never the prompt repeated, never the answer, never a number such as "Question 3"
 	- prompt: full question text
 	- options: array of options (for single/multiple choice, 3-5 options)
 	- correctIndex: index of the correct answer (single choice)
