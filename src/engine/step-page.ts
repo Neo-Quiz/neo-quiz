@@ -76,6 +76,24 @@ export function isTapType(q: QuizQuestion): boolean {
 }
 
 /**
+ * A recall the model wrote as a bare prompt + answer, with no `flashcard: true`,
+ * no options and no field of another type. A Learn is answered by tapping only,
+ * yet such items showed up as "Show the answer" reveal cards (2026-10-14): in a
+ * Learn the engine plays them as the flashcard they were meant to be. An
+ * explicit `type: "text"` (a type the request asked for) is left alone.
+ */
+export function isBareRecall(q: QuizQuestion): boolean {
+	const r = q as unknown as Record<string, unknown> | null | undefined;
+	if (!r || r.flashcard === true || r.role === "read") return false;
+	if (typeof r.answer !== "string" || r.answer.trim().length === 0) return false;
+	if (Array.isArray(r.options) && r.options.length > 0) return false;
+	for (const key of ["type", "text", "cloze", "language", "ordering", "matching", "numeric", "mathInput"]) {
+		if (r[key] !== undefined && r[key] !== false) return false;
+	}
+	return true;
+}
+
+/**
  * The state class of a step's bead, from the verdicts of its graded
  * questions: all right first time = `correct`; misses still standing = `wrong`
  * only when they are more than a third of the step, else `partial` (amber: one

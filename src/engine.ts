@@ -23,7 +23,7 @@ import { createPassageHandlers } from "./engine/passage";
 import { createClozeHandlers } from "./engine/cloze";
 import { buildLessonModel, createLessonHandlers } from "./engine/lesson";
 import { createLearnHandlers } from "./engine/learn";
-import { buildStepSlides, scrollNextOpenIntoView, stepHolding, stepMembers } from "./engine/step-page";
+import { buildStepSlides, isBareRecall, scrollNextOpenIntoView, stepHolding, stepMembers } from "./engine/step-page";
 import { createHandInHandlers } from "./engine/hand-in";
 import { installCodeLangBubble } from "./engine/code-lang-bubble";
 import { installImageZoom } from "./engine/image-zoom";
@@ -121,6 +121,9 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		if (q && legacy.correctIndices == null && Array.isArray(legacy.correctIndexes)) {
 			legacy.correctIndices = legacy.correctIndexes;
 		}
+		// A Learn is tap-only: a bare prompt + answer recall plays as a flashcard
+		// (step-page.ts, isBareRecall), in memory, without rewriting the note.
+		if (quizMode === "lesson" && isBareRecall(q)) (q as { flashcard?: boolean }).flashcard = true;
 	}
 
 	/* A Test played with a host setup learns its hints and time limit only when

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A Learn no longer shows "Show the answer" questions: a bare question and answer plays as a flashcard.
+
 ## [1.20.89] - 2026-10-12
 
 ### Added
