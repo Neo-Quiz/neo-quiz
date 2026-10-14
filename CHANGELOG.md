@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.97] - 2026-10-14
+
 ### Fixed
 
 - While the AI prepares its questions, the attached PDFs keep their thumbnails instead of a bare "PDF" tag.
