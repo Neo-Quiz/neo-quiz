@@ -50,6 +50,15 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("run ids: a tombstone keeps none", "runIds" in M.mergeChats([[chat("a", 9, "ph", [], { deleted: true })], [chat("a", 5, "ph", [], { runIds: [u1] })]])[0], false);
 	r.check("run ids survive the path conversion of a file", M.chatsFromFile(M.chatsToFile([chat("a", 1, "pc", [], { runIds: [u1] })], ""), "")[0].runIds, [u1]);
 
+	/* The Explain mark (2026-10-14): a newer copy written by a device that
+	   does not know the field must not drop it; a tombstone carries none. */
+	const marked = chat("e1", 5, "pc", [], { explain: { path: "r/q.md", quiz: "Q" } });
+	const newerPlain = chat("e1", 9, "pc");
+	r.check("explain mark kept from an older copy", M.mergeChats([[marked], [newerPlain]]).find(c => c.id === "e1").explain, { path: "r/q.md", quiz: "Q" });
+	r.check("explain mark: no copy has one, no field", "explain" in M.mergeChats([[newerPlain], [chat("e1", 5, "pc")]])[0], false);
+	const dead = M.mergeChats([[marked], [{ ...newerPlain, deleted: true }]]).find(c => c.id === "e1");
+	r.check("tombstone wins over a marked copy, without the mark", [dead.deleted, dead.requests.length, "explain" in dead], [true, 0, false]);
+
 	// What a device may write.
 	const mine = chat("m", 5, "ph"), foreign = chat("f", 5, "pc", [rq("r", 1)]);
 	r.check("own file: own chats only, a live foreign chat is never copied",

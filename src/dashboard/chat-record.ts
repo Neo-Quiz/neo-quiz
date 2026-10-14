@@ -84,6 +84,8 @@ export interface ChatRecord {
 	    a path. Read from a synced file: lowercase UUIDs only, each once, at
 	    most `MAX_RUN_IDS`. Absent on a chat stored before live sessions. */
 	runIds?: string[];
+	/** The quiz this chat explains (an Explain chat). */
+	explain?: ChatExplain;
 }
 
 /** The chat that holds queue lines saved before chats existed. */
@@ -187,6 +189,25 @@ export function readFolder(x: unknown): string | undefined {
 	return x;
 }
 
+/** The quiz an Explain chat is about (2026-10-14, one chat per quiz): the
+    quiz note (a contract path) and its title shown in the chat list. Read
+    from a synced file: hostile. */
+export interface ChatExplain { path: string; quiz: string }
+
+/** A stored Explain mark: a clean contract path ending in `.md` (no drive,
+    no backslash, no `..`, not absolute) and a bounded label; anything else
+    drops the mark (the chat stays a plain chat). Only the two fields are
+    copied. */
+export function readExplain(x: unknown): ChatExplain | undefined {
+	if (!isObj(x) || !isStr(x.path) || !isStr(x.quiz)) return undefined;
+	const p = x.path;
+	if (p.length > 500 || !p.toLowerCase().endsWith(".md") || p.includes("\\") || p.includes("\0") || p.startsWith("/") || /^[A-Za-z]:/.test(p)) return undefined;
+	if (!p.split("/").every(s => s !== "" && s !== "." && s !== "..")) return undefined;
+	const quiz = readLabel(x.quiz);
+	if (!quiz) return undefined;
+	return { path: p, quiz };
+}
+
 /** A stored label: a non-empty string without control characters, at most `MAX_LABEL` long; anything else is dropped. */
 export function readLabel(x: unknown): string | undefined {
 	if (!isStr(x) || x.length < 1 || x.length > MAX_LABEL || /[\u0000-\u001f\u007f]/.test(x)) return undefined;
@@ -229,6 +250,8 @@ function readChat(x: unknown): ChatRecord | null {
 	if (x.deleted === true) chat.deleted = true;
 	const runIds = readRunIds(x.runIds);
 	if (runIds) chat.runIds = runIds;
+	const explain = readExplain(x.explain);
+	if (explain) chat.explain = explain;
 	return chat;
 }
 

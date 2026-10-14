@@ -118,6 +118,31 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	const sansRuns = C.withoutRuns([chat("a", 1, { runIds: [uuid(1)], requests: [reqR({ runs: [{ runId: uuid(1), fromSeq: 0, toSeq: 3 }] })] })]);
 	r.check("Delete all: no run id and no request run left, the rest untouched", [sansRuns[0].runIds, sansRuns[0].requests[0].runs, sansRuns[0].requests[0].text, sansRuns[0].updatedAt], [undefined, undefined, "t", 1]);
 	r.check("runIdsOf: a chat's runs, none for an unknown or deleted chat", [C.runIdsOf(avecRun, "a"), C.runIdsOf(avecRun, "zz"), C.runIdsOf([{ ...chat("a", 1), deleted: true, requests: [], runIds: [uuid(1)] }], "a")], [[uuid(7)], [], []]);
+
+	/* 2026-10-14, Explain chats: a chat marks the quiz it explains (its note
+	   path and title). Read from a synced file: a clean contract path ending
+	   in ".md" and a bounded label, only those two fields; anything else drops
+	   the mark and keeps the chat. */
+	const okFile = { v: 1, chats: [{ id: "c1", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], explain: { path: "root/Cours/Quiz.md", quiz: "Quiz intro" } }] };
+	const ok = C.readChats(okFile)[0];
+	r.check("explain mark kept", ok.explain, { path: "root/Cours/Quiz.md", quiz: "Quiz intro" });
+	r.check("a chat without the mark stays valid, without the field", "explain" in C.readChats({ v: 1, chats: [chat("a", 1)] })[0], false);
+	for (const bad of [
+		{ path: "C:/x.md", quiz: "b" },
+		{ path: "/etc/x.md", quiz: "b" },
+		{ path: "root/../x.md", quiz: "b" },
+		{ path: "root\\x.md", quiz: "b" },
+		{ path: "root/x.txt", quiz: "b" },
+		{ path: "root/x.md", quiz: "b".repeat(101) },
+		{ path: "root/x.md", quiz: "" },
+		{ path: 5, quiz: "b" },
+		"root/x.md",
+	]) {
+		const c = C.readChats({ v: 1, chats: [{ id: "c2", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], explain: bad }] })[0];
+		r.check("hostile explain mark dropped, chat kept: " + JSON.stringify(bad).slice(0, 40), [c && c.id, c && "explain" in c], ["c2", false]);
+	}
+	const proto = C.readChats({ v: 1, chats: [{ id: "c3", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], explain: JSON.parse('{"__proto__":{"polluted":1},"path":"root/x.md","quiz":"b"}') }] })[0];
+	r.check("only the two fields are copied", [Object.keys(proto.explain).join(), ({}).polluted, Object.getPrototypeOf(proto.explain) === Object.prototype], ["path,quiz", undefined, true]);
 	r.done();
 });
 
