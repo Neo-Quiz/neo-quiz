@@ -70,6 +70,7 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	const hostile = buildSrcdoc("<p>a</p>", { ...FRAME_DEFAULT_THEME, accent: "red;}</style><script>x()</script>", font: "a</style>" });
 	r.check("a hostile theme value cannot close the style block", [hostile.srcdoc.includes("<script>x()"), hostile.srcdoc.includes("red;}")], [false, false]);
 	r.check("theme variables are exposed to the page", ["--nq-bg", "--nq-fg", "--nq-accent", "--nq-font"].filter(v => !sd.includes(v)), []);
+	r.check("syntax and pairing colours are exposed to the page", ["--nq-code-keyword", "--nq-code-string", "--nq-code-number", "--nq-mono", "--nq-c1", "--nq-c6"].filter(v => !sd.includes(v)), []);
 
 	// --- height message filter ----------------------------------------
 	const ok = { type: "nq-height", h: 300 };

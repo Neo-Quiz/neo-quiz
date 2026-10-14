@@ -62,11 +62,18 @@ function valeurCss(v: string, repli: string): string {
 	return nette && /^[\w\s#%.,()'"\-/]+$/.test(nette) && nette.length <= 200 ? nette : repli;
 }
 
+/* COLOURS A PAGE CAN USE (2026-10-14): the syntax colours of the app's code
+   blocks (--nq-code-*) and six hues to colour-code what belongs together, an
+   index and its box, a key and its value (--nq-c1 to --nq-c6). Without them
+   a page had only greys and one accent, and code read as plain text. */
+const FRAME_COLOURS_DARK = "--nq-code-keyword:#bb9af7;--nq-code-string:#9ece6a;--nq-code-number:#ff9e64;--nq-code-comment:#565f89;--nq-code-function:#7aa2f7;--nq-code-operator:#89ddff;--nq-mono:ui-monospace,'Cascadia Code',Consolas,monospace;--nq-c1:#7aa2f7;--nq-c2:#9ece6a;--nq-c3:#ff9e64;--nq-c4:#bb9af7;--nq-c5:#f7768e;--nq-c6:#2ac3de";
+const FRAME_COLOURS_LIGHT = "--nq-code-keyword:#7c3aed;--nq-code-string:#15803d;--nq-code-number:#c2410c;--nq-code-comment:#6b7280;--nq-code-function:#1d4ed8;--nq-code-operator:#0e7490;--nq-mono:ui-monospace,'Cascadia Code',Consolas,monospace;--nq-c1:#2563eb;--nq-c2:#16a34a;--nq-c3:#ea580c;--nq-c4:#7c3aed;--nq-c5:#e11d48;--nq-c6:#0891b2";
+
 function themeCss(th: FrameTheme): string {
 	const d = FRAME_DEFAULT_THEME;
 	const bg = valeurCss(th.bg, d.bg), fg = valeurCss(th.fg, d.fg), muted = valeurCss(th.muted, d.muted);
 	const accent = valeurCss(th.accent, d.accent), border = valeurCss(th.border, d.border), font = valeurCss(th.font, d.font);
-	return `:root{--nq-bg:${bg};--nq-fg:${fg};--nq-muted:${muted};--nq-accent:${accent};--nq-border:${border};--nq-font:${font};color-scheme:${th.dark ? "dark" : "light"}}`
+	return `:root{--nq-bg:${bg};--nq-fg:${fg};--nq-muted:${muted};--nq-accent:${accent};--nq-border:${border};--nq-font:${font};color-scheme:${th.dark ? "dark" : "light"};${th.dark ? FRAME_COLOURS_DARK : FRAME_COLOURS_LIGHT}}`
 		+ `html,body{margin:0;padding:0;overflow:hidden;background:transparent;color:var(--nq-fg);font-family:var(--nq-font);font-size:15px;line-height:1.5}`
 		+ `body{padding:4px}*{box-sizing:border-box}svg{max-width:100%;height:auto}img,video,canvas{max-width:100%}`
 		+ `button{font:inherit;color:inherit}`
