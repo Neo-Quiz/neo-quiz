@@ -108,8 +108,11 @@
 
 /* Retried and partial answers keep their retry mark. Correct and wrong
    beads use their existing colors without a corner glyph. */
+/* A step's miss count too (2026-10-14): without this base it was laid out
+   in the flow of the bead, over its number, instead of in the corner. */
 .quiz-tab.retried::before,
-.quiz-tab.partial::before{
+.quiz-tab.partial::before,
+.quiz-tab.step-bead[class*="miss-"]::before{
   position: absolute;
   top: -5px;
   right: -5px;

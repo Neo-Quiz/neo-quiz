@@ -26,6 +26,7 @@ release notes.
 ### Fixed
 
 - The Explain window no longer pulls you back down while you scroll up during an answer, and earlier answers no longer jump.
+- The number of missed questions on a Learn step bead sits in its corner again, instead of over the step number.
 - Answering "how many quizzes" before a generation over several documents is no longer ignored: "Auto" made one quiz per document and the answer was refused.
 
 ## [1.20.111] - 2026-10-14
