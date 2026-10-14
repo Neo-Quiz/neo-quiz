@@ -79,6 +79,11 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		['"questions"', '"header"', '"description"', '"default"', 'most beginner option', '1 to 3 questions', '2 to 4 options', '12 characters', 'NEVER ask what the attached documents already answer', 'language of the request'].filter(w => !p.system.includes(w)), []);
 	r.check("clarify prompt: always asks the question count with Auto first and as the default",
 		['Always ask one question about the NUMBER OF QUESTIONS', 'the option labeled exactly "Auto" first', 'set the default to index 0', 'decide freely', 'NO numeric bound', '15, 25, and 40'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
+	/* The answers appended for the model are cut from the request shown (2026-10-14). */
+	const block = K.formatClarifications("Précisions :", [{ question: "Combien de quiz ?", options: [{ label: "1" }], default: 0 }], [["1"]]);
+	r.check("shown request: the answers block is cut, the text kept, a lookalike line kept",
+		[K.sansPrecisions("Fais un quiz\n\n" + block), K.sansPrecisions("Fais un quiz"), K.sansPrecisions("Fais un quiz\n\nPrécisions :\n- a\nautre ligne"), K.sansPrecisions("Do it\n\n" + K.formatClarifications("Details:", [{ question: "How many?", options: [{ label: "2" }], default: 0 }], [[]]))],
+		["Fais un quiz", "Fais un quiz", "Fais un quiz\n\nPrécisions :\n- a\nautre ligne", "Do it"]);
 	r.check("clarify prompt: asks how many quizzes for several documents, as a number with Auto first",
 		['If two or more attached documents', 'HOW MANY QUIZZES', '"purpose":"quizzes"', '{"quizzes":"auto"}', '{"quizzes":2}', 'split by theme', 'never describe them as one quiz per document'].map(w => p.system.includes(w)), [true, true, true, true, true, true, true]);
 	/* The composer's "one quiz" toggle is gone (2026-10-14): the AI asks how

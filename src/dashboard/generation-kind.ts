@@ -143,6 +143,24 @@ export function formatClarifications(label: string, questions: readonly ClarifyQ
 	return lines.length ? label + "\n" + lines.map(l => `- ${l.q}\n    ${l.a.join(", ")}`).join("\n") : "";
 }
 
+/** The labels `formatClarifications` has opened its block with ("Details:",
+    "Précisions :"): a request keeps the language it was sent in. */
+const DETAILS_LABELS = ["Details:", "Précisions :"];
+
+/** A request as the user wrote it: its text without the block of answers
+    `formatClarifications` appended for the model (2026-10-14). The answers
+    already show in the question card; shown again under the request they
+    doubled. Only a trailing block of that exact shape is cut. */
+export function sansPrecisions(text: string): string {
+	for (const label of DETAILS_LABELS) {
+		const at = text.lastIndexOf("\n\n" + label + "\n- ");
+		if (at < 0) continue;
+		const block = text.slice(at + 2 + label.length + 1).split("\n");
+		if (block.every(l => l.startsWith("- ") || l.startsWith("    "))) return text.slice(0, at);
+	}
+	return text;
+}
+
 /** The instruction of the clarify call: English like every instruction to the
     model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */

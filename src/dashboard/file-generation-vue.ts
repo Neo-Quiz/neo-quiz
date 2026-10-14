@@ -38,6 +38,7 @@ import { chatDevice } from "./chat-session";
 import { getOwnRequests, getPeerConnected, getRemoteGenerations, onRemoteGenerations, refreshRemoteGenerations } from "./remote-generations";
 import { pcReachable } from "./remote-send";
 import { peindreQuestions } from "./generation-kind-vue";
+import { sansPrecisions } from "./generation-kind";
 import { onChatsChanged } from "./chat-session";
 import type { EtapeGeneration, FileGenerationApp, LigneGeneration } from "./file-generation-app";
 import type { TransKey } from "../i18n";
@@ -280,7 +281,7 @@ export function creerVueFile(opts: {
 			}
 			peindrePieces(pieces, notes, opts.ouvrirPiece);
 		}
-		const affiche = (d.texteAffiche ?? d.text).trim();
+		const affiche = (d.texteAffiche ?? sansPrecisions(d.text)).trim();
 		if (affiche) ajouter(message, "div", "qbd-ai-bulle", affiche);
 		/* No "Learn · Opus 5.5" under the request any more (2026-09-30): the
 		   working line and the result already name the model and the type. */

@@ -39,6 +39,7 @@ import type { ChatRequest } from "./chat-record";
 import type { RunningEntry } from "../shared-state/generations";
 import { canOpenCard } from "../shared-state/chat-merge";
 import { peindreQuestions } from "./generation-kind-vue";
+import { sansPrecisions } from "./generation-kind";
 import type { PasteOutcome } from "./relay-flow";
 import { recordOrigin } from "../shared-state/request-origin";
 import type { DeviceRef } from "../shared-state/request-origin";
@@ -192,7 +193,7 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 	if (q.documents.length || q.text.trim()) {
 		const message = ajouter(tour, "div", "qbd-ai-message");
 		if (q.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), q.documents, deps.ouvrirPiece);
-		if (q.text.trim()) ajouter(message, "div", "qbd-ai-bulle", q.text.trim());
+		if (sansPrecisions(q.text).trim()) ajouter(message, "div", "qbd-ai-bulle", sansPrecisions(q.text).trim());
 	}
 	// Who sent it and where it ran (a record always has both).
 	const { sender, runner } = recordOrigin(q, deps.chatOrigin, originContext());
@@ -273,7 +274,7 @@ export function peindreEnAttente(parent: HTMLElement, item: { key: string; targe
 		const notes = item.request.documents.map(d => ({ name: d.path.slice(d.path.lastIndexOf("/") + 1), path: d.path }));
 		peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), notes, ouvrirPiece);
 	}
-	if (item.request.text.trim()) ajouter(message, "div", "qbd-ai-bulle", item.request.text.trim());
+	if (sansPrecisions(item.request.text).trim()) ajouter(message, "div", "qbd-ai-bulle", sansPrecisions(item.request.text).trim());
 	const refs = refsOf(item.from, item.fromName, item.target);
 	peindreOrigine(tour, refs.sender, refs.runner);
 	const rep = ajouter(tour, "div", item.state === "expired" ? "qbd-ai-reponse qbd-ai-reponse--echouee" : "qbd-ai-reponse qbd-ai-reponse--cours");
@@ -329,7 +330,7 @@ export function peindreRelais(parent: HTMLElement, r: RelaisVue, ouvrirPiece?: (
 	tour.dataset.relais = "1";
 	const message = ajouter(tour, "div", "qbd-ai-message");
 	if (r.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), r.documents, ouvrirPiece);
-	if (r.text.trim()) ajouter(message, "div", "qbd-ai-bulle", r.text.trim());
+	if (sansPrecisions(r.text).trim()) ajouter(message, "div", "qbd-ai-bulle", sansPrecisions(r.text).trim());
 	const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-relais");
 	host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "share-2");
 	const corps = ajouter(rep, "div", "qbd-ai-remote-corps");
