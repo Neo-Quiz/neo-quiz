@@ -124,14 +124,14 @@ export function consigneExplication(lecture: boolean): string {
 	];
 	if (lecture) {
 		return "HOW TO EXPLAIN (this is a reading card):\n" + [
-			"1. Rephrase the card more simply, in plain words, defining each term the first time.",
-			"2. Then give one concrete example.",
+			"1. Start from ONE concrete example on real values (for code: a short runnable snippet with what it prints written as a comment under the line that prints it), then, when there is one, the same example WITHOUT the notion and what changes.",
+			"2. Then rephrase the card more simply, in plain words, defining each term the first time, and never through a notion the learner has not seen yet.",
 			...commun,
 		].join("\n");
 	}
 	return "HOW TO EXPLAIN (this is a question):\n" + [
 		"1. First spot the likely reasoning error behind the learner's WRONG answer, in one or two sentences (skip if they were right).",
-		"2. Explain the notion step by step, starting from zero.",
+		"2. Explain the notion step by step, starting from zero and from a concrete example (for code: a short runnable snippet with what it prints, then the contrast without the notion), never through a notion the learner has not seen yet.",
 		"3. Say why the right answer is right AND why each option the learner chose wrongly is wrong.",
 		"4. Give one concrete example or an analogy.",
 		"5. End with ONE short check question the learner can answer in their head, without giving its answer.",

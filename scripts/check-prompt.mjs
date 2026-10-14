@@ -50,7 +50,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	/* Spec 2026-10-07-learn-scroll §5: a generated Learn is tap-only. */
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	r.check("Learn: per step one etapes reading with a worked example (code and what it prints), 2 MCQ questions (first may be pre), at most 1 flashcard",
-		['"lecture" is "etapes"', '"etapes" lists 3 to 5 SHORT steps', "fully WORKED EXAMPLE", "then WHAT IT PRINTS", '"retenir"',
+		['"lecture" is "etapes"', '"etapes" lists 2 to 4 SHORT paragraphs', "fully WORKED EXAMPLE", "WHAT IT PRINTS (or its result) written right under the line that prints it", '"retenir"',
 			"2 MCQ questions per slice in all, the optional \"pre\" one counted", "ONE OR SEVERAL correct answers", "3 to 5 options", "The first question of the slice is easy", "at most ONE FLASHCARD per slice",
 			"ONLY when the slice brings a genuinely NEW idea"].filter(p => !learnP.includes(p)), []);
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
@@ -85,11 +85,11 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	r.check("Learn with an explicit type list: exactly those types, with their fields",
 		[expl.includes("ONLY these question types"), expl.includes("free-text questions"), expl.includes('"ordering": true)'), expl.includes("- ordering / slots"), expl.includes("MCQ questions and flashcards")], [true, true, true, true, false]);
 	/* The Test prompt is pinned byte for byte (SHA-256 of system + user prompt,
-	   four option sets): re-pinned on 2026-10-14 for the required question title. */
+	   four option sets): re-pinned on 2026-10-14 for the required question title, then for the Python idiom taught by example first. */
 	const sha = (o) => { const p = composerPrompts("x", { mode: "practice", ...o }); return createHash("sha256").update(p.systemPrompt + " " + p.userPrompt).digest("hex"); };
 	r.check("Test prompt: pinned byte for byte",
 		[{}, { count: 12 }, { type: ["Choix unique", "Choix multiple"] }, { categorie: "python" }].map(sha),
-		["5e0c175a59790c4bab2e0e0086bf2e21dead384ae895c6598da78816c53f6dc6", "8587d6e0cb5078f6cc5cf124fe073ce76d7a2d4d36a2d66050bc2fa9bdebdd04", "93faa5b023fc559f443d4938a0811fc96ba4a6093fa69d78fff2d3320b633ad5", "477415a42d1a988654818d129fcc273e3399db409f22843e4d9fcbe1bbfd14b1"]);
+		["5e0c175a59790c4bab2e0e0086bf2e21dead384ae895c6598da78816c53f6dc6", "8587d6e0cb5078f6cc5cf124fe073ce76d7a2d4d36a2d66050bc2fa9bdebdd04", "93faa5b023fc559f443d4938a0811fc96ba4a6093fa69d78fff2d3320b633ad5", "5687d03bb7325a362640be8dff35df176f8d4b305a05ef164cb2c09d14839e1d"]);
 	r.check("Learn and Test: every question has a title naming its notion, never a question",
 		[learnP, composerPrompts("x", { mode: "practice" }).systemPrompt].map(p => /title: REQUIRED on every question: the notion it tests/.test(p) && p.includes("never a question")), [true, true]);
 	r.check("Learn: every reading has a hook whose form varies", /"accroche"[\s\S]*analogie[\s\S]*histoire[\s\S]*image[\s\S]*mnemo/.test(learnP) && /never the same form twice in a row/i.test(learnP), true);
@@ -111,8 +111,13 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	}
 	r.check("Learn: every single-choice question has a hint",
 		learnP.includes("EVERY MCQ question of the path has \"hint\", pre and recall alike"), true);
-	r.check("Learn : un idiome d'une lecture est expliqué en entier (forme compacte, résultat, équivalent)",
-		learnP.includes("Every idiom or compact line of the example is explained IN FULL") && learnP.includes("the compact form, its result, then the developed equivalent"), true);
+	/* 2026-10-14: a notion explained through notions not yet taught (an f-string
+	   as `+` with `str()`) left the learner lost; the example comes first, then
+	   the contrast, never a numbered row of definitions. */
+	r.check("Learn: a reading teaches by example first, then the contrast, never through notions not taught, never numbered",
+		["TEACH BY EXAMPLE FIRST", "the FIRST paragraph is a fully WORKED EXAMPLE", "shows the CONTRAST", "NEVER explain a notion through another one the path has not taught yet", "NEVER as a numbered list", "explained by its result on the example's values"].filter(p => !learnP.includes(p)), []);
+	r.check("Learn: the old rule that defined an idiom by its developed equivalent is gone",
+		learnP.includes("the compact form, its result, then the developed equivalent"), false);
 	r.check("Learn : une étape qui introduit des termes a au moins une carte mémoire",
 		learnP.includes("a slice that introduces TERMS, DEFINITIONS or FACTS to memorize has one."), true);
 	r.check("Practice : les consignes propres au Learn restent absentes",
@@ -213,8 +218,8 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prom
 		r.check(`${cat} : aucun autre complément`, CATEGORIES.filter(c => c !== "general" && c !== cat && composerPrompts("x", { categorie: cat }).systemPrompt.includes(complementCategorie(c))), []);
 	}
 	const py = complementCategorie("python");
-	r.check("python : blocs ```python, sortie de print, idiome compact puis boucle, exemples exécutables",
-		["```python", "`print`", "the compact form, its result, then its equivalent with a plain loop", "RUNNABLE"].filter(s => !py.includes(s)), []);
+	r.check("python: ```python blocks, print output, an idiom taught by a runnable example then its contrast, the loop only once taught",
+		["```python", "`print`", "teach it by a RUNNABLE example on concrete values with what it prints", "only when every piece of it", "never explain an idiom through notions the learner has not seen", "RUNNABLE"].filter(s => !py.includes(s)), []);
 	r.done();
 });
 

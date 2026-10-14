@@ -182,8 +182,8 @@ await withSrcModule(["src/explain-prompt.ts", "src/explain-images.ts", "src/mark
 		[/WRONG answer/.test(q), /step by step, starting from zero/.test(q), /why each option the learner chose wrongly is wrong/.test(q), /example or an analogy/.test(q), /ONE short check question/.test(q), /CM2.pdf, p. 7/.test(q), /[p. N]/.test(q), /SHOW it/.test(q), q.includes("![[exact name]]"), /"tu"/.test(q)],
 		[true, true, true, true, true, true, true, true, true, true]);
 	const c = consigneExplication(true);
-	r.check("a reading card is rephrased more simply then given an example, without the question steps",
-		[/Rephrase the card more simply/.test(c), /concrete example/.test(c), /WRONG answer/.test(c), /check question/.test(c), c.includes("![[exact name]]")], [true, true, false, false, true]);
+	r.check("a reading card starts from a concrete example and its contrast, then is rephrased more simply, without the question steps",
+		[/rephrase the card more simply/.test(c) && /Start from ONE concrete example/.test(c) && /WITHOUT the notion/.test(c), /concrete example/.test(c), /WRONG answer/.test(c), /check question/.test(c), c.includes("![[exact name]]")], [true, true, false, false, true]);
 
 	// ── the history of the question on screen
 	const single = { title: "A", prompt: "?", options: ["x", "y"], correctIndex: 0 };
