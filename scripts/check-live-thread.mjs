@@ -407,3 +407,64 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 	}
 	r.done();
 });
+
+/* THE TEXT OF A TURN THAT STARTS A NEW RUN (2026-10-14, `freshText`): a chat
+   turn on a session that already holds the conversation sends only the short
+   follow-up (`text`); a turn that STARTS a run (no run yet, or the stored run
+   was deleted and a new one began) sends the whole text, or the model would
+   answer a follow-up with no conversation behind it. Driven with a fake
+   `HostLive` that records what `send` receives. */
+await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"], async (G, H) => {
+	const r = makeReporter("Live turn text: follow-up or whole text");
+	const R1 = "00000000-0000-4000-8000-0000000000d1";
+	const R2 = "00000000-0000-4000-8000-0000000000d2";
+	const sent = [];
+	const deleted = new Set();
+	let next = R1;
+	let emit = () => {};
+	let seq = 0;
+	H.installHost({
+		live: {
+			start: async (o) => {
+				if (o.runId !== undefined) {
+					if (deleted.has(o.runId)) throw Object.assign(new Error("run gone"), { name: "refused" });
+					return { runId: o.runId };
+				}
+				const id = next;
+				next = R2;
+				return { runId: id };
+			},
+			send: async (runId, input) => { if (input.kind === "message") sent.push(runId.slice(-2) + ":" + input.text); },
+			close: async () => {},
+			onEvent: (cb) => { emit = cb; return () => {}; },
+			readRun: async () => null,
+			toolOutput: async () => null,
+			removeRuns: async () => {},
+			storeSize: async () => 0,
+		},
+		paths: { defaultRoot: () => ({ id: "R", name: "Neo Quiz", deviceId: "pc" }), contractPath: (root, local) => root + "/" + local },
+	});
+	const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((ok) => setImmediate(ok)); };
+	const turn = async (key, runOf, spec) => {
+		const p = G.runLiveTurn({ tool: "claude", chatId: "chat-f", model: "claude-haiku-5-5", mode: "full", images: [], key, abortable: () => {}, ...spec });
+		await flush();
+		const runId = runOf();
+		emit({ kind: "line", runId, seq: ++seq, line: { type: "result", subtype: "success", is_error: false, result: "ok" } });
+		emit({ kind: "turnEnd", runId });
+		await p;
+	};
+	try {
+		await turn("k-f1", () => R1, { text: "SHORT", freshText: "FULL" });
+		r.check("a chat with no run: the turn starts a run and sends the whole text", sent.at(-1), "d1:FULL");
+		await turn("k-f2", () => R1, { text: "SHORT", freshText: "FULL" });
+		r.check("the next turn of the same chat (its run bound): the follow-up only", sent.at(-1), "d1:SHORT");
+		deleted.add(R1);
+		await turn("k-f3", () => R2, { text: "SHORT", freshText: "FULL" });
+		r.check("the chat's run was deleted: a new run, which gets the whole text", sent.at(-1), "d2:FULL");
+		await turn("k-f4", () => R2, { text: "ONLY" });
+		r.check("no `freshText` (a generation): `text` is sent, as before", sent.at(-1), "d2:ONLY");
+	} finally {
+		H.uninstallHost();
+	}
+	r.done();
+});

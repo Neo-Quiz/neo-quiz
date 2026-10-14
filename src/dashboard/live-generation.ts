@@ -60,6 +60,10 @@ export interface LiveTurnSpec {
 	mode: ModeAgent;
 	/** The whole message of the turn (system prompt and request). */
 	text: string;
+	/** The text sent instead of `text` when this turn STARTS a new run (no
+	    run resumed): a short follow-up in `text` would reach a session that
+	    holds no conversation (2026-10-14). */
+	freshText?: string;
 	images: readonly LiveImage[];
 	/** The resume key of the generation: the same after a reload. */
 	key: string;
@@ -371,8 +375,10 @@ async function storedRun(live: HostLive, chatId: string, tool: LiveTool): Promis
 
 const settingsOf = (spec: LiveTurnSpec) => ({ tool: spec.tool, chatId: spec.chatId, model: spec.model, mode: spec.mode, ...(spec.effort ? { effort: spec.effort } : {}) });
 
-/** The chat's session for this tool, started or resumed. */
-async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<Session> {
+/** The chat's session for this tool, started or resumed. `fresh`: the run
+    was started by this call (the deleted-run fallback included), so it holds
+    none of the chat's earlier turns. */
+async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<{ session: Session; fresh: boolean }> {
 	const mapKey = spec.chatId + "|" + spec.tool;
 	let known = bound.get(mapKey) ?? await storedRun(live, spec.chatId, spec.tool);
 	let runId: string;
@@ -385,11 +391,12 @@ async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<Sessio
 		runId = await startTrusted(live, settingsOf(spec));
 	}
 	bound.set(mapKey, runId);
-	if (runId !== known) {
+	const fresh = runId !== known;
+	if (fresh) {
 		setChats(addRunId(getChats(), spec.chatId, runId, chatDevice(), Date.now()));
 		notifyChatsChanged();
 	}
-	return session(runId);
+	return { session: session(runId), fresh };
 }
 
 /** The `seq` the next line of the run will have at least. */
@@ -480,7 +487,7 @@ export async function runLiveTurn(spec: LiveTurnSpec): Promise<TurnOutcome> {
 		const back = await reattach(live, spec, saved);
 		if (back) return back;
 	}
-	const s = await ensureSession(live, spec);
+	const { session: s, fresh } = await ensureSession(live, spec);
 	if (s.current) throw Object.assign(new Error("A turn is already running"), { name: "busy" });
 	const fromSeq = await nextSeq(live, s);
 	const turn: Turn = { runId: s.runId, thread: emptyThread(), outcome: emptyOutcome(), fromSeq, toSeq: null, settle: null };
@@ -492,7 +499,7 @@ export async function runLiveTurn(spec: LiveTurnSpec): Promise<TurnOutcome> {
 	notify(turn);
 	const done = waitFor(live, s, turn, spec);
 	try {
-		await live.send(s.runId, { kind: "message", text: spec.text, images: spec.images.map(i => ({ mediaType: i.mediaType as LiveMediaType, base64: i.base64 })) });
+		await live.send(s.runId, { kind: "message", text: fresh && spec.freshText ? spec.freshText : spec.text, images: spec.images.map(i => ({ mediaType: i.mediaType as LiveMediaType, base64: i.base64 })) });
 	} catch (e) {
 		turn.settle = null;
 		if (s.current === turn) s.current = null;

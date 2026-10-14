@@ -284,6 +284,10 @@ export interface ChatOptions {
 	    `GenerateOptions.dossier`: once the user trusts it, Claude Code and
 	    Codex run in it as agents, with the composer's agent mode. */
 	dossier?: string;
+	/** A turn of the chat's live session (2026-10-14), as a generation:
+	    `followUp` is sent when the session already holds the conversation;
+	    a new session gets the whole text. */
+	live?: LiveOptions & { followUp?: string };
 }
 
 /** Client IA — retour de createAiClient(plugin). */
@@ -291,12 +295,15 @@ export interface AiClient {
 	/** With `options.documents`, resolves with `lot` (one quiz per document, in
 	    the documents' order) and an empty `questions`; otherwise one quiz. */
 	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz & { lot?: ReponseDocument[] }>;
-	/** A CONVERSATION with Claude Code or Codex (2026-09-29): the whole
-	    history goes with each message — the CLI stays stateless, launched
-	    with the same forms as a one-shot generation: as an agent in
-	    `options.dossier` once trusted, otherwise without tools — and the
-	    answer comes back as prose. `context` is attached text (notes read by
-	    the page). Any other provider rejects with a message saying so. */
+	/** A CONVERSATION with Claude Code or Codex (2026-09-29), answered as
+	    prose. With `options.live` and a trusted `options.dossier`, a turn of
+	    the chat's live session (2026-10-14): `live.followUp` when the session
+	    already holds the conversation, the whole history when it starts.
+	    Otherwise one call per message with the whole history — the CLI
+	    stateless, launched with the same forms as a one-shot generation: as
+	    an agent in `options.dossier` once trusted, otherwise without tools.
+	    `context` is attached text (notes read by the page). Any other
+	    provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
 	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions }): Promise<EtapePlan[]>;
@@ -1204,6 +1211,10 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	let dossierOutils: string | null = null;
 	/** The live session of the running generation or plan (`GenerateOptions.live`). */
 	let liveCtx: LiveOptions | null = null;
+	/** The short follow-up of a live chat turn (`ChatOptions.live.followUp`),
+	    sent when the session already holds the conversation. Never set by a
+	    generation or a plan. */
+	let texteSuite: string | null = null;
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -1283,7 +1294,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		abortCurrent = () => { aborted = true; arreter?.(); };
 		try {
 			return await runLiveTurn({
-				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texte,
+				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texteSuite ?? texte,
+				...(texteSuite ? { freshText: texte } : {}),
 				...(effort ? { effort } : {}),
 				images: images.map(i => ({ mediaType: i.mediaType || "image/png", base64: i.base64 })),
 				abortable: stop => { arreter = stop; if (aborted) stop(); },
@@ -2284,9 +2296,11 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		/* The quiz's folder (2026-10-14): Claude Code and Codex answer as the
 		   generation runs, as agents IN it once it is trusted, with the agent
 		   mode of the composer; no folder, or not trusted, the call without
-		   tools (the pictures only). Never a live session: one call per message. */
+		   tools (the pictures only). One live turn per message when the queue
+		   gives `live`; otherwise one call per message. */
 		dossierOutils = options.dossier ?? null;
-		liveCtx = null;
+		liveCtx = options.live ? { chatId: options.live.chatId, key: options.live.key } : null;
+		texteSuite = options.live?.followUp || null;
 		await refreshCliCaches();
 		try {
 			const provider = settings.get().aiProvider || "";
@@ -2343,6 +2357,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			dossierOutils = null;
+			liveCtx = null;
+			texteSuite = null;
 		}
 	}
 
