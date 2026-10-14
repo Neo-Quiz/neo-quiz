@@ -75,10 +75,12 @@
 	min-width: 0;
 }
 
+/* The request as claude.ai shows it (2026-10-14): on the right, sized to its
+   text, no border, a tint just lighter than the page (on the wallpaper too). */
 .qbd-ai-bulle {
-	padding: 12px 16px;
-	border-radius: 12px;
-	background: var(--background-secondary);
+	padding: 10px 16px;
+	border-radius: 18px;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	color: var(--text-normal);
 	font-size: 15px;
 	line-height: 20px;
@@ -468,26 +470,11 @@
    THE LIVE TRANSCRIPT and THE FULL-WIDTH LAYOUT (2026-09-29, after
    MonoCode's full-width transcript)
 
-   `full` (the default, `aiTranscriptLayout`): every turn runs across the
-   column — the request as a full-width card, its attachments and meta on
-   the left — so the transcript under it has the room to be read. `chat`
-   keeps the requests on the right, as before.
+   `full` (the default, `aiTranscriptLayout`): the transcript runs across the
+   column so it has the room to be read. The request itself stays on the
+   right as a compact bubble in both layouts (2026-10-14, claude.ai style:
+   the full-width bordered card was judged heavy).
    ══════════════════════════════════════════════════════════ */
-.qbd-ai-file--full .qbd-ai-message {
-	align-self: stretch;
-	max-width: none;
-	align-items: stretch;
-}
-
-.qbd-ai-file--full .qbd-ai-message-pieces,
-.qbd-ai-file--full .qbd-ai-message-meta {
-	justify-content: flex-start;
-}
-
-.qbd-ai-file--full .qbd-ai-bulle {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 12px;
-}
 
 /* The transcript: the CLI's work under its request. No tile of its own
    (it belongs to the turn): a thin rule on its left, like a quoted log. */

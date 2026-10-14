@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Your requests on the Generate page show as compact bubbles on the right, without a border, in a tint close to the background.
+
 ## [1.20.101] - 2026-10-14
 
 ### Fixed
