@@ -30,7 +30,7 @@ export const MAX_HEADER = 12;
 
 const READY: ClarifyAnswer = { ready: true };
 
-function isQuizzesChoice(value: unknown): value is QuizzesChoice {
+export function isQuizzesChoice(value: unknown): value is QuizzesChoice {
 	return value === "auto" || (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_QUIZZES);
 }
 

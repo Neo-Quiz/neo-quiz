@@ -15,7 +15,7 @@
 
 import type { ArchivedChat } from "./chat-archives";
 import type { ClarifyOption, ClarifyQuestion } from "./generation-kind";
-import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex } from "./generation-kind";
+import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex, isQuizzesChoice } from "./generation-kind";
 import { NAME_UNSAFE } from "../shared-state/remote-request";
 
 export type ChatMode = "learn" | "practice";
@@ -168,9 +168,15 @@ function readClarify(x: unknown): ChatClarify | null {
 		for (const o of q.options) {
 			if (!isObj(o) || !isStr(o.label)) return null;
 			const kind = o.kind === "learn" || o.kind === "practice" || o.kind === "both" ? o.kind : undefined;
-			options.push({ label: o.label, description: isStr(o.description) ? o.description : "", ...(kind ? { kind } : {}) });
+			options.push({ label: o.label, description: isStr(o.description) ? o.description : "", ...(kind ? { kind } : {}), ...(isQuizzesChoice(o.quizzes) ? { quizzes: o.quizzes } : {}) });
 		}
-		const purpose = q.purpose === "kind" && q.multiple !== true && options.every(option => option.kind) ? "kind" : undefined;
+		/* Both marks are kept: the answer is read back from this record, and a
+		   lost "quizzes" mark turned "Auto" into one quiz per document while the
+		   model had been told to split by theme (2026-10-14). */
+		const purpose = q.multiple === true ? undefined
+			: q.purpose === "kind" && options.every(option => option.kind) ? "kind" as const
+			: q.purpose === "quizzes" && options.every(option => option.quizzes !== undefined) ? "quizzes" as const
+			: undefined;
 		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length), ...(purpose ? { purpose } : {}) });
 	}
 	const clarify: ChatClarify = { questions };
