@@ -567,7 +567,11 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 	{
 		const source = readFileSync("src/dashboard/file-generation-vue.ts", "utf8");
 		const start = source.indexOf("\tfunction specTravail(");
-		const end = source.indexOf("\n\t/** The result line under a step", start);
+		/* The nested renderer ends where `relancer` begins (the step painters moved
+		   to transcript-steps.ts, with the comment this used to stop at). An absent
+		   marker would slice to the end of the file: fail loudly instead. */
+		const end = source.indexOf("\n\t/** Sends the same request again", start);
+		if (start < 0 || end < 0) throw new Error("check-work-view: extraction markers not found in file-generation-vue.ts");
 		const code = transformSync(source.slice(start, end), { loader: "ts", format: "cjs" }).code;
 		const expanded = new Set();
 		const collapsed = new Set();
