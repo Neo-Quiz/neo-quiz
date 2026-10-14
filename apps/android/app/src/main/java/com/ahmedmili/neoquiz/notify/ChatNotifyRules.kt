@@ -28,11 +28,15 @@ object ChatNotifyRules {
     private val INVISIBLE = Regex("[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]")
     private val SPACES = Regex("\\s+")
 
+    // No control character at all, as isCleanRelativePath of src/dashboard/chat-record.ts.
+    private val PATH_CONTROL = Regex("[\u0000-\u001f\u007f]")
+
     fun isCleanRelativePath(p: String): Boolean {
-        if (p.isEmpty() || p.length > 500 || p.contains('\\') || p.contains('\u0000') || p.startsWith("/") || DRIVE.containsMatchIn(p)) return false
+        if (p.isEmpty() || p.length > 500 || p.contains('\\') || PATH_CONTROL.containsMatchIn(p) || p.startsWith("/") || DRIVE.containsMatchIn(p)) return false
         val parts = p.split("/")
         if (parts.any { it.isEmpty() || it == "." || it == ".." }) return false
-        return parts[0] != INTERNAL
+        // Case-insensitive: ".Neo-Quiz" is the same folder on Windows.
+        return !parts[0].equals(INTERNAL, ignoreCase = true)
     }
 
     fun readable(fileName: String, ownId: String): Boolean =

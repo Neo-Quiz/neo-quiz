@@ -102,7 +102,7 @@ class ChatNotifyRulesTest {
 
     @Test fun `clean relative paths`() {
         assertTrue(ChatNotifyRules.isCleanRelativePath("a/b c.md"))
-        for (bad in listOf("", "..", "a/../b", "/a", "a//b", "a/./b", "C:x", "a\\b", ".neo-quiz/x")) assertFalse(bad, ChatNotifyRules.isCleanRelativePath(bad))
+        for (bad in listOf("", "..", "a/../b", "/a", "a//b", "a/./b", "C:x", "a\\b", ".neo-quiz/x", ".Neo-Quiz/x", "a\u0001b.md", "a\nb.md", "a\tb.md", "a\u001fb.md", "a\u007fb.md")) assertFalse(bad, ChatNotifyRules.isCleanRelativePath(bad))
     }
 
     @Test fun `owner id is compared case-insensitively`() {
