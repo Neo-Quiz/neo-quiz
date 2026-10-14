@@ -15,6 +15,8 @@ const mode = process.env.FAKE_MODE || "normal";
 log({ ev: "start", pid: process.pid, argv: process.argv.slice(2) });
 
 const send = (o) => process.stdout.write(JSON.stringify(o) + "\n");
+/** serverreq: the read's answer, held until the client answers request 900. */
+let heldAnswer = null;
 const READ = {
 	rateLimits: { primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: 1900000000 } },
 	rateLimitResetCredits: {
@@ -31,7 +33,13 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 	let m;
 	try { m = JSON.parse(line); } catch { return; }
 	log({ ev: "recv", method: m.method, id: m.id, params: m.params, keys: Object.keys(m) });
-	if (m.method === undefined && m.id !== undefined) { log({ ev: "response-to-server", msg: m }); return; }
+	if (m.method === undefined && m.id !== undefined) {
+		log({ ev: "response-to-server", msg: m });
+		// serverreq: the read is answered only now, so the client never kills
+		// this process before its answer to request 900 is logged (a race seen on CI).
+		if (heldAnswer) { const f = heldAnswer; heldAnswer = null; f(); }
+		return;
+	}
 	if (m.method === "initialize") return send({ id: m.id, result: { userAgent: "fake" } });
 	if (m.method === "initialized") return;
 	if (mode === "hang") return;
@@ -46,6 +54,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 	const answer = (result) => { log({ ev: "answer", method: m.method }); send({ id: m.id, result }); };
 	const reply = (result) => (mode === "slow" ? setTimeout(() => answer(result), 300) : answer(result));
 	if (mode === "serverreq") send({ id: 900, method: "item/commandExecution/requestApproval", params: { command: "calc" } });
+	if (mode === "serverreq" && m.method === "account/rateLimits/read") { heldAnswer = () => reply(READ); return; }
 	if (m.method === "account/rateLimits/read") return reply(READ);
 	if (m.method === "account/rateLimitResetCredit/consume") return reply({ outcome: process.env.FAKE_OUTCOME || "reset" });
 	send({ id: m.id, error: { code: -32601, message: "Method not found" } });
