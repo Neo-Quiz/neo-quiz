@@ -265,6 +265,8 @@ for (const avecImage of [false, true]) {
 		attachPromptPaths: async () => {}, couperSondeConnexion: () => {},
 		// Helpers added to startGeneration later (inherited documents, a send during a live turn): no-ops here.
 		rattacherDocumentsHerites: async () => {}, envoyerPendantLeTour: async () => false, fournisseurAgent: () => false,
+		// An Explain chat on screen sends a tutor turn instead (2026-10-14): none here.
+		marqueExplain: () => null,
 		/* Un identifiant qui n'est PAS dans le registre : les trois sites du
 		   registre sont câblés depuis le 2026-09-20, et nommer l'un d'eux ici
 		   laisserait croire que ce cas les décrit. Ce qui est éprouvé, c'est le
