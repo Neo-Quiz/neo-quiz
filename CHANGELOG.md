@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.109] - 2026-10-14
+
 ### Changed
 
 - Code between backticks is coloured everywhere in a quiz, whatever its language.
