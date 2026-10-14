@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- New interactive pages colour their buttons like code and keep pairing colours only to link two places on screen.
+
 ## [1.20.110] - 2026-10-14
 
 ### Changed
