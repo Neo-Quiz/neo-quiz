@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.92] - 2026-10-14
+
 ### Changed
 
 - Most Learn readings now come with an interactive page to act on the course, and step pages no longer change colour.
