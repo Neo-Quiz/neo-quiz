@@ -4881,6 +4881,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			resultatFige = null;
 			if (generatedQuestions.length === 0) throw new Error(t("ai.err.notAnArray"));
 		} catch (err) {
+			/* The pasted answer is kept in the host's diagnostic file, as a CLI
+			   answer that cannot be read (2026-10-14): without it, a refused
+			   answer left no trace to find out what the model wrote. */
+			const proc = host.process;
+			if (proc?.diagnosticReponse) void proc.diagnosticReponse(texte).catch(() => { /* best effort */ });
 			errorMessage = (err as Error).message || t("ai.error.checkSettings");
 			errorLogin = null;
 			errorAction = "reopen";
@@ -4941,6 +4946,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				return { ...q, questions: mode === "learn" ? completerConfigLearn(brut) : brut };
 			});
 		} catch (err) {
+			/* The pasted answer is kept in the host's diagnostic file, as a CLI
+			   answer that cannot be read (2026-10-14): without it, a refused
+			   answer left no trace to find out what the model wrote. */
+			const proc = host.process;
+			if (proc?.diagnosticReponse) void proc.diagnosticReponse(texte).catch(() => { /* best effort */ });
 			errorMessage = (err as Error).message || t("ai.error.checkSettings");
 			errorLogin = null;
 			errorAction = "reopen";
