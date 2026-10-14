@@ -54,6 +54,8 @@ import { explainMarkOf } from "./explain-chat";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
+import { brancherCadres, htmlFrameMarkup } from "../engine/html-frame";
+import { splitHtmlBlocks } from "../engine/html-frame-core";
 
 export interface VueFile {
 	/** Pose la zone des tours dans `parent` (à chaque rendu de la page). */
@@ -314,7 +316,25 @@ export function creerVueFile(opts: {
 
 	function remplirProse(prose: HTMLElement, l: LigneGeneration): void {
 		const texte = texteMontre(l);
-		prose.innerHTML = renderMarkdownPreview(texte);
+		/* A fenced ```html block is an interactive page in a sandboxed frame,
+		   as in the Explain window (engine/html-frame-core.ts), never its source
+		   as code. Each block goes through the markdown renderer as a plain token,
+		   then its paragraph is replaced by the frame; a block still being written
+		   is a placeholder (a half page would reload at every chunk). */
+		const cadres: string[] = [];
+		const seul = splitHtmlBlocks(texte).map(seg => {
+			if (seg.kind === "text") return seg.value;
+			cadres.push(seg.kind === "html" ? htmlFrameMarkup(seg.value) : `<div class="nq-html-frame nq-html-frame--pending">${t("engine.htmlFrame.drawing")}</div>`);
+			return `
+
+NQFRAME${cadres.length - 1}END
+
+`;
+		}).join("");
+		let rendu = renderMarkdownPreview(seul);
+		cadres.forEach((c, i) => { rendu = rendu.replace(new RegExp("<p>[^<]*NQFRAME" + i + "END[^<]*</p>|NQFRAME" + i + "END"), () => c); });
+		prose.innerHTML = rendu;
+		if (cadres.length) brancherCadres(prose);
 		// $…$ and $…$ are typeset after each repaint (the answer rewrites the HTML as it grows).
 		if (texte.includes("$")) void mathifyElement(prose);
 	}
