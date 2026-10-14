@@ -390,6 +390,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// isQuestionSlideIndex garantit la variante « question » de slideMap[next].
 		if (ctx.isQuestionSlideIndex(next)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[next] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
+		ctx.quizState.isSliding = true;
+		ctx.setSlidingClass(true);
+		if (forceRender) ctx.render();
 		/* A pause after 25 minutes of a Learn (step-page.ts shouldSuggestPause):
 		   a dismissible note at the top of the step page being reached. */
 		if (ctx.learn.isActive() && ctx.stepSlides && ctx.isQuestionSlideIndex(next)) {
@@ -413,9 +416,6 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 				}
 			}
 		}
-		ctx.quizState.isSliding = true;
-		ctx.setSlidingClass(true);
-		if (forceRender) ctx.render();
 		await Promise.allSettled([
 			ctx.warmSlideForAccurateHeight(ctx.quizState.prevCurrent),
 			ctx.warmSlideForAccurateHeight(ctx.quizState.current)
