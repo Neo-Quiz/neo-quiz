@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.108] - 2026-10-14
+
 ### Changed
 
 - A Learn reading uses the whole width of its card instead of a narrow column.
