@@ -264,7 +264,7 @@ for (const avecImage of [false, true]) {
 		arrets: 0, retraits: 0, rendus: [],
 		attachPromptPaths: async () => {}, couperSondeConnexion: () => {},
 		// Helpers added to startGeneration later (inherited documents, a send during a live turn): no-ops here.
-		rattacherDocumentsHerites: async () => {}, envoyerPendantLeTour: async () => false, fournisseurAgent: () => false,
+		rattacherDocumentsHerites: async () => {}, envoyerPendantLeTour: async () => false, envoyerCommandeCli: async () => false, fournisseurAgent: () => false,
 		// An Explain chat on screen sends a tutor turn instead (2026-10-14): none here.
 		marqueExplain: () => null,
 		// The "/" menu (slash-commands.ts): no command typed here.

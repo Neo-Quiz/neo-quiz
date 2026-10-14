@@ -521,6 +521,8 @@ export const EN_AI = {
 	"ai.slash.model": "Pick the model",
 	"ai.slash.resume": "Find a past conversation",
 	"ai.slash.exam": "Prepare for an upcoming exam",
+	"ai.commands.needsLive": "This command needs a live Claude Code session: turn on live mode and try again.",
+	"ai.commands.noOutput": "The command ran and printed nothing.",
 	"ai.search.placeholder": "Search",
 	"ai.search.all": "All",
 	"ai.search.quizzes": "Quizzes",

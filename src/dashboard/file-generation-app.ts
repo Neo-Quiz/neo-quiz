@@ -113,6 +113,10 @@ export interface DemandeFile extends DemandeTexte {
 	fromName?: string;
 	/** An Explain turn (2026-10-14): set on a line that runs the Explain chat. */
 	explication?: DemandeExplication;
+	/** A command of Claude Code typed in the composer ("/review foo"): `text`
+	    is sent as it is, as a turn of the chat's live session, and the line
+	    ends with its answer as text. Never set on a request from another device. */
+	commandeCli?: boolean;
 }
 
 /** An Explain turn (2026-10-14): the line runs `AiClient.chat` as a tutor,
@@ -387,7 +391,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	    Opus 4.8). The retry line says so in orange (file-generation-vue). */
 	function relancerSurRepli(id: number, d: DemandeFile): void {
 		// An Explain turn is a chat, never retried as a generation.
-		if (d.explication || d.repliDe || d.reglages.aiProvider !== "claude-code") return;
+		if (d.explication || d.commandeCli || d.repliDe || d.reglages.aiProvider !== "claude-code") return;
 		const tr = lireTranscript(id);
 		if (!tr?.refusals) return;
 		const p = aiProvidersRepli.getProvider("claude-code");
@@ -428,6 +432,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const client = createAiClient(figes);
 		clients.set(ligne.id, client);
 		if (d.explication) { await expliquer(ligne, client); return; }
+		if (d.commandeCli) { await commandeBrute(ligne, client); return; }
 		if (d.planifier) { await planifier(ligne, client); return; }
 		try {
 			// « Lecture du document… » quand la demande en porte un.
@@ -582,6 +587,42 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				dossier: d.fromDevice ? undefined : x.folder,
 				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne), followUp },
 				// After a reload, attach to the one-shot call still running instead of launching it again.
+				reprise: cleReprise(ligne),
+				onTranscript: (ev) => {
+					if (transcripts.get(ligne.id) !== transcript) return;
+					appliquer(transcript, ev);
+					transcriptChange(ligne.id);
+				},
+			});
+			if (tourne(ligne.id)) file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte: reponse, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
+		} catch (err) {
+			if (err instanceof UsageLimitError && tourne(ligne.id)) { await pauserSurLimite(ligne, err); return; }
+			const e = err as Error & { aborted?: boolean };
+			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
+		} finally {
+			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
+			etapes.delete(ligne.id);
+			file = F.solder(file, ligne.id);
+			pomper();
+		}
+	}
+
+	/** A COMMAND OF CLAUDE CODE (2026-10-15): the text goes to the chat's live
+	    session as typed, with no system prompt, and the line ends with the
+	    answer as text, never parsed as a quiz and never written to a note.
+	    Without a live session the client refuses (`ai.commands.needsLive`). */
+	async function commandeBrute(ligne: LigneGeneration, client: AiClient): Promise<void> {
+		const d = ligne.demande;
+		try {
+			// Nobody at this PC asked for a command from another device.
+			if (d.fromDevice) throw new Error(t("ai.remote.providerNotAllowed"));
+			etapeDe(ligne.id, "redaction");
+			const transcript = transcriptVide();
+			transcripts.set(ligne.id, transcript);
+			const reponse = await client.chat([{ role: "user", text: d.text }], {
+				raw: true,
+				dossier: dossierParDefaut(d.reglages.aiOutputFolder),
+				live: { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;

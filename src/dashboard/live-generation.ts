@@ -46,6 +46,7 @@ import { addRunId, runIdsOf } from "./chat-record";
 import type { ChatRun } from "./chat-record";
 import { getChats, setChats } from "./chat-store";
 import { chatDevice, notifyChatsChanged } from "./chat-session";
+import { commandsFromLine, setCliCommands } from "./cli-commands";
 
 export type LiveTool = "claude" | "codex";
 export interface LiveImage { mediaType: string; base64: string }
@@ -142,6 +143,12 @@ function keep(key: string, turn: Turn): void {
 function subscribe(live: HostLive): void {
 	if (unsubscribe) return;
 	unsubscribe = live.onEvent(e => {
+		/* The answer to `initialize` lists Claude Code's commands; it arrives
+		   before the session is registered here, so it is read first. */
+		if (e.kind === "line") {
+			const commands = commandsFromLine(e.line);
+			if (commands) setCliCommands(commands);
+		}
 		const s = sessions.get(e.runId);
 		if (!s) return;
 		if (s.buffer) s.buffer.push(e);

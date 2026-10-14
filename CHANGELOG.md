@@ -16,6 +16,7 @@ release notes.
 ### Added
 
 - Typing / in the AI page lists commands: /clear starts a new conversation, /model picks the model, /resume finds a past conversation.
+- With Claude Code, the / menu also lists its commands and skills; one sent from the AI page runs as is in the conversation.
 
 ### Fixed
 

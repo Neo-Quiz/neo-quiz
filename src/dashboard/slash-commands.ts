@@ -13,6 +13,8 @@ import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import { dateCourte, trouverCommandeExam } from "./exam-command";
 import type { ExamCible } from "./exam-command";
+import { listCliCommands } from "./cli-commands";
+import type { CliCommand } from "./cli-commands";
 import { openMentionMenu } from "./ui-select";
 import type { MentionMenuHandle, MentionMenuItem } from "./ui-select";
 
@@ -37,15 +39,17 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     name begins with what was typed. `exam` is true once "/exam" is complete
     (the exam list is then shown, filtered by what follows). `null` when
     nothing matches, or the text is not at the start of the field. */
-export function findSlashCommand(texte: string, caret: number): { fin: number; commandes: SlashCommand[]; exam: boolean } | null {
+export function findSlashCommand(texte: string, caret: number, cli: readonly CliCommand[] = []): { fin: number; commandes: SlashCommand[]; cli: CliCommand[]; exam: boolean } | null {
 	const m = texte.slice(0, caret).match(/^\/([a-z-]*)(?:[ \t]+([^\n]*))?$/i);
 	if (!m) return null;
 	const prefixe = m[1].toLowerCase();
 	// Text after a space only belongs to /exam (its subject or filter).
 	if (m[2] !== undefined && prefixe !== "exam") return null;
 	const commandes = SLASH_COMMANDS.filter(c => c.name.startsWith(prefixe));
-	if (!commandes.length) return null;
-	return { fin: caret, commandes, exam: prefixe === "exam" };
+	// Claude Code's own commands (only given with that provider), after the app's.
+	const siens = listCliCommands(cli, prefixe);
+	if (!commandes.length && !siens.length) return null;
+	return { fin: caret, commandes, cli: siens, exam: prefixe === "exam" };
 }
 
 /** The app command the field holds and nothing else ("/clear", spaces
@@ -71,6 +75,8 @@ export function attachSlashCommands(textarea: HTMLTextAreaElement, ancre: HTMLEl
 	onTextReplaced(valeur: string): void;
 	/** Runs /clear, /model or /resume, the command text already removed. */
 	onCommand(nom: AppCommand): void;
+	/** Claude Code's commands to list after the app's: empty with any other provider. */
+	cliCommands(): readonly CliCommand[];
 }): SlashCommandHandle {
 	let menu: MentionMenuHandle | null = null;
 	/** Entries listed: with none, Enter goes on to the composer (it sends). */
@@ -114,7 +120,7 @@ export function attachSlashCommands(textarea: HTMLTextAreaElement, ancre: HTMLEl
 
 	function rafraichir(): void {
 		const caret = textarea.selectionStart ?? 0;
-		const trouve = findSlashCommand(textarea.value, caret);
+		const trouve = findSlashCommand(textarea.value, caret, opts.cliCommands());
 		if (!trouve || textarea.selectionStart !== textarea.selectionEnd) { fermer(); return; }
 		if (trouve.exam) {
 			const jeton = trouverCommandeExam(textarea.value, caret);
@@ -127,6 +133,14 @@ export function attachSlashCommands(textarea: HTMLTextAreaElement, ancre: HTMLEl
 			onChoose: () => {
 				if (c.name === "exam") { poser("/exam "); rafraichir(); } else lancer(c.name);
 			},
+		}));
+		// Picking a Claude Code command writes "/name " and sends nothing.
+		trouve.cli.forEach((c, i) => items.push({
+			label: "/" + c.name,
+			sub: c.argumentHint ? `${c.description} ${c.argumentHint}`.trim() : c.description,
+			icon: "terminal",
+			...(i === 0 && items.length ? { separatorBefore: true } : {}),
+			onChoose: () => poser("/" + c.name + " "),
 		}));
 		nombre = items.length;
 		if (!menu) menu = openMentionMenu(ancre, () => { menu = null; });

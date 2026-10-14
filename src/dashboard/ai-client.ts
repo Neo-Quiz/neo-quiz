@@ -293,6 +293,11 @@ export interface ChatOptions {
 	    queue restored after it attaches to the CLI still running instead of
 	    launching the same call again. Each CLI call gets its own key from it. */
 	reprise?: string;
+	/** A command of Claude Code (2026-10-15): the last user turn is sent AS IT
+	    IS to the chat's live session, with no system prompt and no context.
+	    Without a live session (or with another provider) it rejects with
+	    `ai.commands.needsLive`: nothing is sent. */
+	raw?: boolean;
 }
 
 /** The AI client, returned by `createAiClient`. */
@@ -2297,6 +2302,18 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 	}
 
+	/** A command of Claude Code, sent as typed to the chat's live session. */
+	async function commandeClaude(provider: string, model: string, texte: string): Promise<string> {
+		if (provider !== "claude-code") throw userError(t("ai.commands.needsLive"));
+		const effort = effortClaude();
+		const vivant = await tourVivant("claude", model, effort ?? undefined, lireModeAgent(settings.get().aiAgentMode), texte, []);
+		if (!vivant) throw userError(t("ai.commands.needsLive"));
+		const r = vivant.claudeResult as ClaudeResult | null;
+		// A command may print nothing (a setting changed): not an error.
+		if (r && !r.is_error && !(r.result || "").trim()) return t("ai.commands.noOutput");
+		return lireResultatClaude(r, model).trim();
+	}
+
 	async function chat(history: ChatTurn[], options: ChatOptions = {}): Promise<string> {
 		aborted = false;
 		pendingUsage = null;
@@ -2319,6 +2336,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			const turns = history.filter(h => h.text.trim());
 			const last = turns[turns.length - 1];
 			if (!last || last.role !== "user") throw new Error(t("ai.chat.empty"));
+			if (options.raw) return await commandeClaude(provider, provider === "claude-code" ? resolveClaudeModel(model) : model, last.text.trim());
 			const earlier = turns.slice(0, -1).map(h => (h.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + h.text.trim()).join("\n\n");
 			const userPrompt = [
 				options.context?.trim() ? "CONTEXT (quiz and course material):\n" + options.context.trim() : "",

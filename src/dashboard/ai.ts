@@ -68,6 +68,7 @@ import { ouvrirDocumentsExam } from "./exam-documents";
 import { PALIERS_TEST, promptPreparation, retirerCommandeExam } from "./exam-command";
 import type { ExamCible } from "./exam-command";
 import { attachSlashCommands } from "./slash-commands";
+import { findCliCommand, getCliCommands } from "./cli-commands";
 import type { SlashCommandHandle } from "./slash-commands";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
@@ -2123,6 +2124,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				autoGrow();
 				updateGenerateBtn(generateBtnRef);
 			},
+			cliCommands: () => (settings().aiProvider === "claude-code" ? getCliCommands() : []),
 			onCommand: (nom) => {
 				if (nom === "clear") { viderComposer(); if (chatAContenu()) startNewChat(); else void render(containerRef); }
 				else if (nom === "resume") ouvrirRechercheChats();
@@ -4304,6 +4306,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		} finally {
 			demarrage = false;
 		}
+		/* A COMMAND OF CLAUDE CODE ("/review foo", listed by its session) goes
+		   to the chat's live session as typed: no clarifying question, no
+		   generation prompt, and its answer is text. */
+		if (await envoyerCommandeCli(container)) return;
 		demarrage = true;
 		/* Les documents des vidéos YouTube prêtes partent avec la demande
 		   (spec « Vidéos YouTube » § 5.2). L'attente vit DANS le verrou :
@@ -4431,6 +4437,34 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			demarrage = false;
 		}
 		render(container);
+	}
+
+	/** A message that starts with a command Claude Code listed, with that
+	    provider and nothing attached: one line of the queue that sends the
+	    text as it is (`DemandeFile.commandeCli`). True when it was taken. */
+	async function envoyerCommandeCli(container: HTMLElement | null): Promise<boolean> {
+		const texte = composerText.trim();
+		if (settings().aiProvider !== "claude-code" || images.length || noteAttachments.length || examCible) return false;
+		if (!findCliCommand(texte, getCliCommands())) return false;
+		const demande: DemandeFile = {
+			text: texte,
+			notes: [],
+			images: [],
+			mode: "learn",
+			count: null,
+			type: ["Mixte"],
+			destination: "",
+			reglages: figerReglages(settings()),
+			categorie: "general",
+			chatId: activeChatId(),
+			requestId: newRequestId(),
+			sentAt: Date.now(),
+			commandeCli: true,
+		};
+		viderComposer();
+		fileGen.envoyer(demande);
+		render(container);
+		return true;
 	}
 
 	/** A plain message sent to the chat's running live turn (see

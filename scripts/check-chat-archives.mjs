@@ -90,6 +90,46 @@ await withSrcModule("src/dashboard/slash-commands.ts", ({ findSlashCommand, exac
 	r.done();
 });
 
+/* CLAUDE CODE'S COMMANDS in the "/" menu (`src/dashboard/cli-commands.ts`):
+   the list is untrusted (a process, a file on disk), so it is parsed as
+   hostile input; a typed command is a raw command turn only when Claude
+   listed it and the app does not own the name. */
+import { readFileSync } from "node:fs";
+await withSrcModule("src/dashboard/cli-commands.ts", ({ parseCliCommands, commandsFromLine, findCliCommand, listCliCommands, getCliCommands, setCliCommands }) => {
+	const r = makeReporter("Claude Code commands");
+	const ligne = readFileSync("scripts/fixtures/live/claude-session.jsonl", "utf8").split("\n").map(l => { try { return JSON.parse(l); } catch { return null; } }).map(x => x?.l).find(l => l?.type === "control_response" && l.response?.response?.commands);
+	r.check("the real init line has its commands", Array.isArray(ligne?.response?.response?.commands), true);
+	// The fixture is redacted ("<skill>"): its name is not a valid one, so it is dropped.
+	r.check("a redacted name is dropped, not thrown on", commandsFromLine(ligne), []);
+	const vrai = JSON.parse(JSON.stringify(ligne));
+	vrai.response.response.commands[0].name = "review";
+	r.check("the init line parses to its commands", commandsFromLine(vrai), [{ name: "review", description: "<description> (user)" }]);
+	r.check("another line is null", [commandsFromLine({ type: "assistant" }), commandsFromLine(null), commandsFromLine("x"), commandsFromLine({ type: "control_response", response: { response: {} } })], [null, null, null, null]);
+	for (const v of [null, undefined, 3, "x", {}, { commands: [] }]) r.check("a non-array gives []: " + JSON.stringify(v), parseCliCommands(v), []);
+	const beaucoup = Array.from({ length: 301 }, (_, i) => ({ name: "c" + i, description: "d" }));
+	r.check("301 items are cut to 300", parseCliCommands(beaucoup).length, 300);
+	const mauvais = ["../x", "a b", "", "x".repeat(65), 5, null, "-a", "a/b"].map(name => ({ name, description: "d" }));
+	r.check("bad names are dropped", parseCliCommands([...mauvais, null, 7, "s", [1]]), []);
+	r.check("a 64-char name is kept", parseCliCommands([{ name: "x".repeat(64) }]).length, 1);
+	r.check("control characters are cleaned", parseCliCommands([{ name: "a", description: "x\u0000y\nz", argumentHint: "[a]\u0007" }]), [{ name: "a", description: "x y z", argumentHint: "[a]" }]);
+	r.check("descriptions are cut to 200 code points, hints to 100", [[...parseCliCommands([{ name: "a", description: "\u{1F600}".repeat(250) }])[0].description].length, [...parseCliCommands([{ name: "a", description: "", argumentHint: "h".repeat(150) }])[0].argumentHint].length], [200, 100]);
+	r.check("a number in place of a string", parseCliCommands([{ name: "a", description: 5, argumentHint: 6 }]), [{ name: "a", description: "" }]);
+	r.check("__proto__ keys never throw nor pollute", [parseCliCommands(JSON.parse('[{"__proto__":{"x":1},"name":"a","description":"d"}]')), ({}).x], [[{ name: "a", description: "d" }], undefined]);
+	const connues = parseCliCommands([{ name: "review", description: "Review" }, { name: "clear", description: "x" }, { name: "model" }, { name: "compact", description: "c", argumentHint: "[focus]" }]);
+	r.check("\"/review foo\" is a command turn", findCliCommand("/review foo", connues), "review");
+	r.check("trimmed", findCliCommand("  /review ", connues), "review");
+	r.check("an app command is not", [findCliCommand("/clear", connues), findCliCommand("/model", connues), findCliCommand("/exam", connues)], [null, null, null]);
+	r.check("an unknown name is a normal request", findCliCommand("/unknown", connues), null);
+	r.check("\"x /review\" is a normal request", findCliCommand("x /review", connues), null);
+	r.check("a longer name is not a prefix match", findCliCommand("/reviewer", connues), null);
+	r.check("the menu hides names the app owns and filters by prefix", [listCliCommands(connues, "").map(c => c.name), listCliCommands(connues, "co").map(c => c.name), listCliCommands(connues, "cl")], [["review", "compact"], ["compact"], []]);
+	// No localStorage under Node: memory only, and a read never throws.
+	r.check("no storage: empty list, no throw", getCliCommands(), []);
+	setCliCommands(connues);
+	r.check("the last list is kept in memory", getCliCommands().length, 4);
+	r.done();
+});
+
 /* THE PREPARATION PROMPT (`composerPrompts`): each step says what it is,
    the exam is named, the quantity has no cap, and a Learn cites its pages. */
 await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {

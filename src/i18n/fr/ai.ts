@@ -476,6 +476,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.slash.model": "Choisir le modèle",
 	"ai.slash.resume": "Retrouver une conversation passée",
 	"ai.slash.exam": "Préparer un examen à venir",
+	"ai.commands.needsLive": "Cette commande demande une session Claude Code en direct : active le mode direct puis réessaie.",
+	"ai.commands.noOutput": "La commande s'est exécutée sans rien afficher.",
 	"ai.search.placeholder": "Rechercher",
 	"ai.search.all": "Tous",
 	"ai.search.quizzes": "Quiz",
