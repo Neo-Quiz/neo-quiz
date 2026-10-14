@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- An Explain answer no longer says which model worked twice.
+
 ## [1.20.112] - 2026-10-14
 
 ### Changed

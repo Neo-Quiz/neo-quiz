@@ -1168,6 +1168,20 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				};
 				/** A new node for `msg`, put in the thread by `placer` BEFORE it is filled
 				    (the maths and the interactive pages render in a connected element). */
+				/** The model that wrote an answer: the one Claude Code's safeguards
+				    really ran when it differs from the one chosen (as the AI page says
+				    it), never the chosen name on an answer another model wrote. */
+				const nomModele = (msg: Message): string => {
+					const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
+					const effectif = msg.lineId === undefined ? undefined : q.live(msg.lineId)?.thread.effectiveModel ?? q.transcript(msg.lineId)?.effectiveModel;
+					const effectifNom = effectif && p.id === "claude-code" ? aiProviders.libelleModele("claude-code", effectif) : "";
+					return effectifNom && modeleDiffere(msg.modele || p.name, effectifNom) ? effectifNom : msg.modele || p.name;
+				};
+				/** "{model} is working", "{model} worked for {time}" or "{model} worked". */
+				const statutTravail = (msg: Message, nom: string): string =>
+					msg.enCours ? t("ai.chat.working", { model: nom })
+					: msg.duree !== undefined ? t("ai.chat.worked", { model: nom, time: duree(msg.duree) })
+					: t("ai.chat.workedNoTime", { model: nom });
 				const peindreMessage = (msg: Message, placer: (el: HTMLElement) => void): HTMLElement => {
 					if (msg.role === "user") {
 						const bloc = document.createElement("div");
@@ -1198,18 +1212,16 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
 					const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
 					aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
-					/* The model that really answered, when Claude Code's safeguards
-					   switched off the one chosen (as the AI page says it): never the
-					   chosen name on an answer another model wrote. */
-					const effectif = msg.lineId === undefined ? undefined : q.live(msg.lineId)?.thread.effectiveModel ?? q.transcript(msg.lineId)?.effectiveModel;
-					const effectifNom = effectif && p.id === "claude-code" ? aiProviders.libelleModele("claude-code", effectif) : "";
-					const nom = effectifNom && modeleDiffere(msg.modele || p.name, effectifNom) ? effectifNom : msg.modele || p.name;
+					const nom = nomModele(msg);
+					/* A work line painted under the head (a live turn, or a recorded
+					   one's runs) already says "{model} worked for {time}": the head
+					   then names the model only, never the same status twice. */
+					const ligneTravail = msg.lineId !== undefined ? q.live(msg.lineId) !== undefined : !!(msg.requete?.runs?.length && host.live);
 					ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse")
 						: msg.pause ? nom
-						: msg.enCours ? t("ai.chat.working", { model: nom })
 						: msg.arrete ? t("ai.explain.stop")
-						: msg.duree !== undefined ? t("ai.chat.worked", { model: nom, time: duree(msg.duree) })
-						: t("ai.chat.workedNoTime", { model: nom }));
+						: ligneTravail ? nom
+						: statutTravail(msg, nom));
 					if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - msg.debut));
 					// A recorded answer: its live turns read back from the run store, as the AI page shows them.
 					if (msg.lineId === undefined && msg.requete) peindreTravailEnregistre(rep, msg.requete, { chatOrigin: origineChat });
@@ -1294,7 +1306,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 							answer: (requestId, allow) => q.repondreVivant(id, requestId, allow),
 						});
 						const resume = vivant.querySelector<HTMLElement>(":scope > summary");
-						const v = t(vue.thread.running ? "ai.work.running" : "ai.work.worked");
+						const v = statutTravail(msg, nomModele(msg));
 						if (resume && resume.textContent !== v) resume.textContent = v;
 						// A permission waiting for the learner: the turn waits for it, so it must show.
 						if (vue.thread.items.some(i => i.kind === "permission" && i.state === "pending")) vivant.open = true;
