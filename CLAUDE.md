@@ -1048,9 +1048,13 @@ WebFetch, WebSearch, `mcp__*`…), `--permission-mode dontAsk`,
 `--settings {"disableAllHooks":true}`, `--strict-mcp-config` avec un
 `--mcp-config` vide, et `--add-dir` du seul dossier des pièces jointes. Chaque
 appel d'outil et son résultat (refus compris) s'affichent dans le bloc replié
-« Travail de l'IA » (`transcript.ts`). Antigravity, Ollama, le chat
-« Expliquer », la clarification et toute demande venue d'un autre appareil
-restent sans outil. Sinon, le modèle ne peut ouvrir aucun fichier. C'est
+« Travail de l'IA » (`transcript.ts`). Le chat « Expliquer » tourne de la
+même façon depuis le 2026-10-14 (décision d'Ahmed : « il ne doit plus être
+lancé sans tools ») : agent dans le DOSSIER DU QUIZ une fois approuvé, mode
+de la pastille, et son travail (réflexion, outils) affiché au-dessus de la
+réponse (`transcript-steps.ts`, partagé avec la file de Générer) ; un appel
+par message, jamais une session live. Antigravity, Ollama, la clarification
+et toute demande venue d'un autre appareil restent sans outil. Sinon, le modèle ne peut ouvrir aucun fichier. C'est
 l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
 dans le composer (vault, chemin absolu, racine externe configurée) et
 `startGeneration` les attache via les mêmes fonctions que le picker « @ ». Un chemin

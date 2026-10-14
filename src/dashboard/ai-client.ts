@@ -280,6 +280,10 @@ export interface ChatOptions {
 	imageNames?: string[];
 	/** The longest answer wanted, in characters (the model is asked for it). */
 	maxChars?: number;
+	/** The quiz's folder, a CONTRACT path (2026-10-14), as
+	    `GenerateOptions.dossier`: once the user trusts it, Claude Code and
+	    Codex run in it as agents, with the composer's agent mode. */
+	dossier?: string;
 }
 
 /** Client IA — retour de createAiClient(plugin). */
@@ -289,7 +293,8 @@ export interface AiClient {
 	generate(prompt: string, options?: GenerateOptions): Promise<ReponseQuiz & { lot?: ReponseDocument[] }>;
 	/** A CONVERSATION with Claude Code or Codex (2026-09-29): the whole
 	    history goes with each message — the CLI stays stateless, launched
-	    with the same fixed options and no tool as a generation — and the
+	    with the same forms as a one-shot generation: as an agent in
+	    `options.dossier` once trusted, otherwise without tools — and the
 	    answer comes back as prose. `context` is attached text (notes read by
 	    the page). Any other provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
@@ -586,17 +591,42 @@ function avecAgentGeneration(mode: Exclude<ModeAgent, "supervised">): string {
 	return `TOOLS, IN THE QUIZ'S FOLDER — READ THIS BEFORE ANYTHING ELSE: you are running as an agent inside the folder of this quiz. You MAY ${POUVOIRS_AGENT[mode]} whenever it helps you write a better and more faithful quiz: open a course, a note, a picture, extract the text, the tables or the figures of a PDF, compare with an earlier quiz of the folder. Every source the user request names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers: read it again only for what that text lost (a figure, the layout of a table). The APPLICATION writes the quiz: never create, modify or save the quiz note yourself, never touch the ".neo-quiz" folder, and never delete or move a file. Never invoke a skill or a slash command: this prompt already defines the whole task and its output format, and a skill written for another use (notes, courses) would change them. Your ONLY final output is the JSON5 array.`;
 }
 
+/* The chat's "no tools" sentences (the Explain window, the chat of a
+   question): the call without tools keeps them; in the quiz's trusted
+   folder `remplacementsOutils` turns them into the tools note. */
+const CHAT_NO_TOOLS = "You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.";
+/* With pictures attached (the Explain window), the ONE thing the model may
+   open is those pictures, with the read tool the call grants for them. */
+const CHAT_PICTURES = "You cannot open files, except the course pictures listed in the context: read the ones the question needs with the Read tool before answering, and never read anything else. Everything else you know about the course is in this conversation. If something is missing, say what you would need.";
+
+/** The chat's paragraph when Claude Code or Codex runs IN the quiz's folder
+    (2026-10-14, as the generation does): the model looks for what the
+    conversation does not give in the course itself. The quiz note is only
+    changed through the app's proposals, never by the model. */
+function chatAvecOutils(pouvoirs: string): string {
+	return `TOOLS, IN THE QUIZ'S FOLDER: you run inside the folder of this quiz and its course. You may ${pouvoirs} whenever it helps you answer: the course notes, PDFs and pictures, the other quizzes of the folder. The quiz and the course the app already read are in this conversation: open a file again only for what that text lost (a figure, a table, a part not included), and read the course pictures listed in the context when the question needs them. Never edit, create or save a quiz note yourself (a change of a card or a question goes in your answer, as asked), never touch the ".neo-quiz" folder, and never delete or move a file. Never invoke a skill or a slash command.`;
+}
+
 /** The "no tools" sentences of the prompts, and what each says instead when
-    the CLI runs in a trusted folder, per mode. */
+    the CLI runs in a trusted folder, per mode. The SECOND pair is the generic
+    note `consigneAvecOutils` appends to a prompt without such a sentence. */
 function remplacementsOutils(mode: ModeAgent): ReadonlyArray<readonly [string, string]> {
-	if (mode === "supervised") return [
-		[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
-		["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
-	];
+	if (mode === "supervised") {
+		const chat = chatAvecOutils("list, read and search the files of this folder and its sub-folders (Read, Grep and Glob: no tool to write, edit or run anything, and nothing outside this folder can be read)");
+		return [
+			[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
+			["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
+			[CHAT_NO_TOOLS, chat],
+			[CHAT_PICTURES, chat],
+		];
+	}
 	const note = `TOOLS: you run as an agent inside the folder of the user's documents. You may ${POUVOIRS_AGENT[mode]} when it helps. Never delete or move a file, and never touch the ".neo-quiz" folder. Never invoke a skill or a slash command: this prompt already defines the whole task and its output format, and a skill written for another use (notes, courses) would change them.`;
+	const chat = chatAvecOutils(POUVOIRS_AGENT[mode]);
 	return [
 		[SANS_OUTILS_GENERATION, avecAgentGeneration(mode)],
 		["You have no tools: the documents are in the message.", "The documents are in the message. " + note],
+		[CHAT_NO_TOOLS, chat],
+		[CHAT_PICTURES, chat],
 	];
 }
 
@@ -2135,11 +2165,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	}
 
 	/* The chat's system prompt: in English, as every instruction to the
-	   model; the answer follows the language of the conversation. */
-	const CHAT_NO_TOOLS = "You have no tools and cannot open files: everything you know about the course is in this conversation. If something is missing, say what you would need.";
-	/* With pictures attached (the Explain window), the ONE thing the model may
-	   open is those pictures, with the read tool the call grants for them. */
-	const CHAT_PICTURES = "You cannot open files, except the course pictures listed in the context: read the ones the question needs with the Read tool before answering, and never read anything else. Everything else you know about the course is in this conversation. If something is missing, say what you would need.";
+	   model; the answer follows the language of the conversation. Its "no
+	   tools" sentence (`CHAT_NO_TOOLS`) becomes the tools note in a trusted
+	   folder (`remplacementsOutils`). */
 	const CHAT_SYSTEM = [
 		"You are a patient tutor inside Neo Quiz, a revision app. The learner is studying for an exam and asks you questions about their course, a quiz question, or anything they did not understand.",
 		"Answer in the language the learner writes in; in French, ALWAYS address the learner as « tu » (tu, ton, ta, tes), never « vous ». Be clear and concrete: start with the direct answer, then explain WHY and HOW (the reason behind a fact is what makes it stick), ground every abstract idea in a concrete example, and when a procedure is involved work one example through step by step. When you use an analogy, say where it stops holding. Do not pad: precise beats long. When it helps the learner, end with one short question that lets them check their own understanding, without giving its answer. Use Markdown (short paragraphs, lists, **bold** for the key idea, fenced code blocks naming their language for any code, $…$ for math).",
@@ -2253,8 +2281,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
-		// The Explain chat keeps its call without tools (its pictures only).
-		dossierOutils = null;
+		/* The quiz's folder (2026-10-14): Claude Code and Codex answer as the
+		   generation runs, as agents IN it once it is trusted, with the agent
+		   mode of the composer; no folder, or not trusted, the call without
+		   tools (the pictures only). Never a live session: one call per message. */
+		dossierOutils = options.dossier ?? null;
+		liveCtx = null;
 		await refreshCliCaches();
 		try {
 			const provider = settings.get().aiProvider || "";
@@ -2310,6 +2342,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		} finally {
 			abortCurrent = null;
 			transcriptSink = null;
+			dossierOutils = null;
 		}
 	}
 

@@ -60,6 +60,11 @@ import type { Cours } from "./explain-cours";
 import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 import type { HostModalHandle } from "../../../../src/host/types";
+import { appliquer as appliquerTranscript, transcriptVide } from "../../../../src/dashboard/transcript";
+import type { Transcript } from "../../../../src/dashboard/transcript";
+import { creerBlocTravail } from "../../../../src/dashboard/transcript-steps";
+import { suivreLeBas } from "./suivi-bas";
+import type { BlocTravail } from "../../../../src/dashboard/transcript-steps";
 
 /* THE SPLIT VIEW (2026-10-09). The Explain window is a second card, on the
    LEFT of the quiz card, with the same glass, border and radius. The modal host
@@ -360,6 +365,8 @@ interface Message {
 	arrete?: boolean;
 	/** A new version of the reading card, or a change of the question, proposed by this answer. */
 	edit?: CardProposal;
+	/** The AI's work for this answer (reasoning, tools), as the Generate page shows it. */
+	tr?: Transcript;
 }
 
 /** The proposal of a new version of a reading card, or of a change of a
@@ -617,6 +624,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		peindreLogoBouton();
 	};
 
+	/** The quiz's folder, a contract path: where Claude Code and Codex work. */
+	const dossierQuiz = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")) : undefined;
 	/* The quiz with the question of the clicked button marked, and the learner's
 	   answer to THAT question (read on its own slide). */
 	const contexteDe = (slide: HTMLElement | null, qi: number): string | null => {
@@ -1004,21 +1013,27 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					boutonProposition(boite, edit, "ai.explain.cardApply");
 				};
 
-				/* THE HISTORY, painted from the conversation. Only the last answer
-				   changes while it is written; every message is repainted with it,
-				   which is cheap at the length of these conversations. */
+				/* THE HISTORY, painted from the conversation. Only a message that
+				   CHANGED is painted again (2026-10-14): repainting every message at
+				   each chunk re-ran the maths and reloaded the interactive pages of
+				   the earlier answers, whose heights then moved under the reader. */
 				/* The bubbles' pictures, kept from one repaint to the next: the history is
 				   repainted at every chunk of an answer, a new <img> each time would flicker. */
 				const vignettes = new Map<string, HTMLImageElement>();
-				const enBas = (): boolean => fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
-				const peindreFil = (): void => {
-					// No message yet: the composer sits in the middle of the window, and drops to the bottom at the first one.
-					m.contentEl.classList.toggle("nq-explain-vide", conv.messages.length === 0);
-					const bas = enBas() || fil.childElementCount === 0;
-					fil.replaceChildren();
-					for (const msg of conv.messages) {
+				/* The work block of each answer, kept across repaints for the same reason:
+				   a fold button rebuilt between mouse-down and mouse-up never clicks. */
+				const travaux = new Map<Message, BlocTravail>();
+				/** Each message's node and what it showed, to repaint only what changed. */
+				const noeuds = new Map<Message, { el: HTMLElement; cle: string }>();
+				/* What a message shows (its running time aside, updated in place). */
+				const cleDe = (msg: Message): string => JSON.stringify([msg.role, msg.text, msg.enCours, msg.lecture, msg.erreur, msg.arrete, msg.duree, msg.modele, msg.fournisseur, conv.lecture, msg.edit ? [msg.edit.etat, msg.edit.occupe, msg.edit.message] : null]);
+				/** A new node for `msg`, put in the thread by `placer` BEFORE it is filled
+				    (the maths and the interactive pages render in a connected element). */
+				const peindreMessage = (msg: Message, placer: (el: HTMLElement) => void): HTMLElement => {
 						if (msg.role === "user") {
-							const bloc = ajouter(fil, "div", "nq-explain-msg-user");
+							const bloc = document.createElement("div");
+							bloc.className = "nq-explain-msg-user";
+							placer(bloc);
 							if (msg.images?.length || msg.documents?.length) {
 								const pj = ajouter(bloc, "div", "nq-explain-msg-pieces");
 								for (const url of msg.images ?? []) {
@@ -1036,15 +1051,22 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 								for (const nom of msg.documents ?? []) ajouter(pj, "span", "nq-explain-msg-doc", nom);
 							}
 							if (msg.text) ajouter(bloc, "div", "qbd-ai-bulle nq-explain-demande", msg.text);
-							continue;
+							return bloc;
 						}
-						const rep = ajouter(fil, "div", "qbd-ai-chat-reponse");
+						const rep = document.createElement("div");
+						rep.className = "qbd-ai-chat-reponse";
+						placer(rep);
 						const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
 						const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
 						aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
 						const nom = msg.modele ?? "";
 						ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse") : msg.enCours ? t("ai.chat.working", { model: nom }) : msg.arrete ? t("ai.explain.stop") : t("ai.chat.worked", { model: nom, time: duree(msg.duree ?? 0) }));
 						if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - (msg.debut ?? Date.now())));
+						if (msg.tr) {
+							let travail = travaux.get(msg);
+							if (!travail) { travail = creerBlocTravail(); travaux.set(msg, travail); }
+							rep.append(travail.el);
+						}
 						const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
 						/* The `<card-edit>` block (a reading rewritten, a question improved) is
 						   not text for the learner: it is cut out (even half written) and
@@ -1083,8 +1105,32 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 							};
 							peindreProposition(rep, msg.edit);
 						}
+						return rep;
+				};
+				const suivi = suivreLeBas(fil);
+				const peindreFil = (): void => {
+					// No message yet: the composer sits in the middle of the window, and drops to the bottom at the first one.
+					m.contentEl.classList.toggle("nq-explain-vide", conv.messages.length === 0);
+					const gardes = new Set<Element>();
+					for (const msg of conv.messages) {
+						const ancien = noeuds.get(msg);
+						const cle = cleDe(msg);
+						let el = ancien && ancien.cle === cle ? ancien.el : null;
+						if (!el) {
+							el = peindreMessage(msg, neuf => { if (ancien?.el.isConnected) ancien.el.replaceWith(neuf); else fil.append(neuf); });
+							noeuds.set(msg, { el, cle });
+						} else if (!el.isConnected) fil.append(el);
+						gardes.add(el);
+						// The running time and the AI's work change in place, without repainting the answer.
+						if (msg.enCours) {
+							const temps = el.querySelector<HTMLElement>(".qbd-ai-file-temps");
+							const v = duree(Date.now() - (msg.debut ?? Date.now()));
+							if (temps && temps.textContent !== v) temps.textContent = v;
+						}
+						if (msg.tr) travaux.get(msg)?.maj(msg.tr, !!msg.enCours);
 					}
-					if (bas) fil.scrollTop = fil.scrollHeight;
+					for (const enfant of [...fil.children]) if (!gardes.has(enfant)) enfant.remove();
+					suivi.coller();
 				};
 				let image = 0;
 				conv.repeindre = () => {
@@ -1117,6 +1163,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						+ (prises.texte ? "\n\n=== DOCUMENTS I ATTACHED ===\n" + prises.texte : "");
 					conv.historique.push({ role: "user", text: pourModele });
 					conv.messages.push({ role: "user", text: perso, images: prises.urls, documents: prises.nomsDocuments });
+					// Sending is the one thing that brings the thread back to its bottom.
+					suivi.reprendre();
 					const rep: Message = { role: "assistant", text: "", modele: libelleModele(), fournisseur: courant, debut: Date.now(), enCours: true, lecture: !coursPret };
 					conv.messages.push(rep);
 					conv.enCours = true;
@@ -1134,16 +1182,20 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						const images = nomsTous.length
 						? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + nomsTous.map((n, i) => `${i + 1}. ${n}`).join("; ")
 						: "";
+						rep.tr = transcriptVide();
 						const reponse = await conv.client.chat(conv.historique, {
 							style: "explain",
+							/* The quiz's folder (2026-10-14): Claude Code and Codex answer as
+							   agents in it, as a generation runs, once the user trusts it. */
+							dossier: dossierQuiz,
 							context: conv.contexte + (lu.texte ? "\n\n=== COURSE ===\n" + lu.texte : "") + images,
 							images: [...lu.images, ...conv.imagesEleve.map(i => i.payload)],
 							imageNames: nomsTous,
 							/* A reading card may come back whole in a `<card-edit>` block, on top of the explanation. */
 							maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (conv.lecture ? CARD_EDIT_MAX_CHARS + 400 : deps.recharger ? QUESTION_EDIT_ROOM : 0),
 							onTranscript: (ev) => {
-								if (ev.kind !== "text") return;
-								rep.text += ev.text;
+								rep.tr = appliquerTranscript(rep.tr ?? transcriptVide(), ev);
+								if (ev.kind === "text") rep.text += ev.text;
 								conv.repeindre?.();
 							},
 						});

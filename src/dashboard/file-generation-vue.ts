@@ -45,8 +45,8 @@ import type { TransKey } from "../i18n";
 import { currentLang, t } from "../i18n";
 import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
-import type { ToolStep, Transcript } from "./transcript";
-import { resumeTravail } from "./transcript";
+import type { Transcript } from "./transcript";
+import { peindreEtapes, resumeOutils } from "./transcript-steps";
 import { modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
@@ -530,21 +530,6 @@ export function creerVueFile(opts: {
 		detail: (corps: HTMLElement) => void;
 	}
 
-	/** The heading of the tools, summed up by kind, as MonoCode titles it
-	    ("Explored the project · Ran 6 tools", "Ran a command · Edited SKILL.md"). */
-	function resumeOutils(tr: Transcript): { libelle: string; icone: string } {
-		const r = resumeTravail(tr.tools, tr.toolsHidden);
-		const refusees = tr.tools.filter(s => s.status === "refused").length;
-		const parts: string[] = [];
-		if (r.explore) parts.push(t("ai.transcript.explored"));
-		if (r.commandes) parts.push(t(r.commandes === 1 ? "ai.transcript.ranCommandOne" : "ai.transcript.ranCommandOther", { count: r.commandes }));
-		if (r.modifs) parts.push(r.fichier ? t("ai.transcript.editedOne", { name: r.fichier }) : t("ai.transcript.editedOther", { count: r.modifs }));
-		if (r.autres || (r.explore && !r.commandes && !r.modifs)) parts.push(t(r.total === 1 ? "ai.transcript.ranToolsOne" : "ai.transcript.ranToolsOther", { count: r.total }));
-		const libelle = parts.join(" · ")
-			+ (refusees ? t(refusees === 1 ? "ai.transcript.workRefusedOne" : "ai.transcript.workRefusedOther", { count: refusees }) : "");
-		return { libelle, icone: r.modifs ? "pencil" : r.commandes ? "terminal" : "wrench" };
-	}
-
 	/** What a running turn is doing now, for its summary line: its tools summed
 	    up, else the writing or the thinking, else the rotating word. */
 	function activiteEnCours(l: LigneGeneration, tr: Transcript, lignes: number): string {
@@ -793,50 +778,6 @@ export function creerVueFile(opts: {
 	    model's answer of this one, `produit`, is not carried over). */
 	function relancer(l: LigneGeneration): void {
 		opts.file.envoyer({ ...l.demande, produit: undefined, sentAt: Date.now() });
-	}
-
-	/** The result line under a step: `└ 120 lines`, `└ Refused: …`. */
-	function resultatEtape(s: ToolStep): string {
-		if (s.status === "running") return t("ai.transcript.stepRunning");
-		if (s.status === "refused") return s.detail ? t("ai.transcript.stepRefused", { detail: s.detail }) : t("ai.transcript.stepRefusedBare");
-		if (s.status === "error") return s.detail ? t("ai.transcript.stepError", { detail: s.detail }) : t("ai.transcript.stepErrorBare");
-		if (s.unit === "image") return t("ai.transcript.stepImage");
-		const n = s.count ?? 0;
-		if (s.unit === "files") return t(n === 1 ? "ai.transcript.stepFilesOne" : "ai.transcript.stepFilesOther", { count: n });
-		return t(n === 1 ? "ai.transcript.stepLinesOne" : "ai.transcript.stepLinesOther", { count: n });
-	}
-
-	/** Paints the steps IN PLACE: a chunk only changes the lines that moved. */
-	function peindreEtapes(corps: HTMLElement, tr: Transcript): void {
-		tr.tools.forEach((s, i) => {
-			let el = corps.children[i] as HTMLElement | undefined;
-			if (!el || !el.classList.contains("qbd-ai-transcript-etape")) {
-				el = document.createElement("div");
-				el.className = "qbd-ai-transcript-etape";
-				const appel = ajouter(el, "div", "qbd-ai-transcript-etape-appel");
-				ajouter(appel, "span", "qbd-ai-transcript-etape-nom");
-				ajouter(appel, "span", "qbd-ai-transcript-etape-entree");
-				ajouter(el, "div", "qbd-ai-transcript-etape-resultat");
-				corps.insertBefore(el, corps.children[i] ?? null);
-			}
-			if (el.dataset.statut !== s.status) el.dataset.statut = s.status;
-			const nom = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-nom");
-			const entree = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-entree");
-			const res = el.querySelector<HTMLElement>(".qbd-ai-transcript-etape-resultat");
-			if (nom && nom.textContent !== s.name) nom.textContent = s.name;
-			const e = "(" + s.input + ")";
-			if (entree && entree.textContent !== e) entree.textContent = e;
-			const r = "└ " + resultatEtape(s);
-			if (res && res.textContent !== r) res.textContent = r;
-		});
-		// The steps past the cap: one line that says how many.
-		let fin = corps.children[tr.tools.length] as HTMLElement | undefined;
-		if (tr.toolsHidden > 0) {
-			if (!fin) fin = ajouter(corps, "div", "qbd-ai-transcript-outil");
-			const v = t("ai.transcript.stepsHidden", { count: tr.toolsHidden });
-			if (fin.textContent !== v) fin.textContent = v;
-		}
-		while (corps.children.length > tr.tools.length + (tr.toolsHidden > 0 ? 1 : 0)) corps.lastElementChild?.remove();
 	}
 
 	function peindreTranscript(parent: HTMLElement, l: LigneGeneration): void {

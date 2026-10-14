@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Explain now runs Claude Code and Codex as agents in the quiz's folder, like generation, and shows their reasoning and tools above the answer.
+
+### Fixed
+
+- The Explain window no longer pulls you back down while you scroll up during an answer, and earlier answers no longer jump.
+
 ## [1.20.111] - 2026-10-14
 
 ### Changed
