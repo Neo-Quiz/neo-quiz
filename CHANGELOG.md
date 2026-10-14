@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.105] - 2026-10-14
+
 ### Fixed
 
 - A generation on the "Opus" model no longer reports a false safeguard fallback when Claude Code answers with Opus 5.5.
