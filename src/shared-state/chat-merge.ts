@@ -107,10 +107,18 @@ function convertResult(x: ChatResult, f: Convert): ChatResult {
 }
 
 function convertChats(chats: ReadonlyArray<ChatRecord>, f: Convert): ChatRecord[] {
-	return chats.map(c => ({
-		...c,
-		requests: c.requests.map(q => ({ ...q, documents: q.documents.map(d => convertDocument(d, f)), results: q.results.map(x => convertResult(x, f)) })),
-	}));
+	return chats.map(c => {
+		const out: ChatRecord = {
+			...c,
+			requests: c.requests.map(q => ({ ...q, documents: q.documents.map(d => convertDocument(d, f)), results: q.results.map(x => convertResult(x, f)) })),
+		};
+		// The Explain mark's quiz path, like a result path; outside the root the mark is dropped, the chat kept.
+		if (c.explain) {
+			const path = f(c.explain.path);
+			if (path) out.explain = { path, quiz: c.explain.quiz }; else delete out.explain;
+		}
+		return out;
+	});
 }
 
 export const chatsToFile = (chats: ReadonlyArray<ChatRecord>, rootId: string): ChatRecord[] => convertChats(chats, p => relativeToRoot(p, rootId));

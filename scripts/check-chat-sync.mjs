@@ -58,6 +58,15 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("explain mark: no copy has one, no field", "explain" in M.mergeChats([[newerPlain], [chat("e1", 5, "pc")]])[0], false);
 	const dead = M.mergeChats([[marked], [{ ...newerPlain, deleted: true }]]).find(c => c.id === "e1");
 	r.check("tombstone wins over a marked copy, without the mark", [dead.deleted, dead.requests.length, "explain" in dead], [true, 0, false]);
+	// The mark's path is converted like a result path between devices whose root ids differ.
+	const inFile = M.chatsToFile([chat("e2", 1, "pc", [], { explain: { path: "rootA/Cours/Quiz.md", quiz: "Q" } })], "rootA");
+	r.check("explain mark: to file, path relative to the root", inFile[0].explain, { path: "Cours/Quiz.md", quiz: "Q" });
+	r.check("explain mark: from file under another root id, path re-anchored", M.chatsFromFile(inFile, "rootB")[0].explain, { path: "rootB/Cours/Quiz.md", quiz: "Q" });
+	const outside = M.chatsToFile([chat("e3", 1, "pc", [], { explain: { path: "Elsewhere/q.md", quiz: "Q" } })], "rootA");
+	r.check("explain mark: a path outside the root drops the mark, the chat stays", [outside.length, outside[0].id, "explain" in outside[0]], [1, "e3", false]);
+	const hidden = M.chatsFromFile([chat("e4", 1, "pc", [], { explain: { path: ".neo-quiz/x.md", quiz: "Q" } })], "rootB");
+	r.check("explain mark: a stored path into the internal folder is dropped, the chat stays", [hidden[0].id, "explain" in hidden[0]], ["e4", false]);
+	r.check("explain mark: a chat without one gets no field from the conversion", "explain" in M.chatsFromFile(M.chatsToFile([chat("e5", 1, "pc")], "rootA"), "rootB")[0], false);
 
 	// What a device may write.
 	const mine = chat("m", 5, "ph"), foreign = chat("f", 5, "pc", [rq("r", 1)]);
