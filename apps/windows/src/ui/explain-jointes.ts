@@ -41,6 +41,8 @@ export interface PiecesMessage {
 	texte: string;
 	/** The documents themselves, for the request's `notes` (the record keeps their names). */
 	notes: NoteAttachment[];
+	/** Gives everything back to the composer (a message stopped before it left). */
+	remettre(): void;
 }
 
 export interface JointesExplain {
@@ -165,7 +167,12 @@ export function creerJointesExplain(deps: { rendre(): void }): JointesExplain {
 			const corps = n.content.length > DOCUMENT_MAX_CHARS ? n.content.slice(0, DOCUMENT_MAX_CHARS) + "\n[cut]" : n.content;
 			return `--- ${n.name} ---\n${corps}`;
 		}).join("\n\n");
-		return { images: payloads, nomsImages, urls: prises.map(p => p.url), nomsDocuments: docs.map(n => n.name), texte, notes: docs };
+		const remettre = (): void => {
+			images = [...prises, ...images];
+			notes = [...docs, ...notes.filter(n => !docs.some(d => attachmentKey(d) === attachmentKey(n)))];
+			deps.rendre();
+		};
+		return { images: payloads, nomsImages, urls: prises.map(p => p.url), nomsDocuments: docs.map(n => n.name), texte, notes: docs, remettre };
 	}
 
 	function liberer(): void {

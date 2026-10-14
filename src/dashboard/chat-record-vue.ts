@@ -34,6 +34,7 @@ export function compterJetons(n: number): string {
 }
 import { mathifyElement } from "../engine/mathjax";
 import { renderMarkdownPreview } from "../markdown-preview";
+import { splitCardEdit } from "../explain-edit";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import type { ChatRequest } from "./chat-record";
 import type { RunningEntry } from "../shared-state/generations";
@@ -192,7 +193,7 @@ function rendreOuvrable(p: HTMLElement, action: () => void): void {
 	});
 }
 
-export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void; chatOrigin: string; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
+export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps: { racine?(): string | null; ouvrirFichier?(absolu: string): void; chatOrigin: string; /** An Explain chat: its answers are shown without their `<card-edit>` block. */ explain?: boolean; ouvrir(path: string): void; ouvrirPiece?(n: { name: string; path?: string }): void; copier?(text: string): Promise<boolean>; repondre?(requestId: string, answers: string[][]): void; reprenable?(requestId: string): boolean }): void {
 	const host = currentHost();
 	const tour = ajouter(parent, "div", "qbd-ai-tour");
 	tour.setAttribute("role", "listitem");
@@ -213,17 +214,18 @@ export function peindreTourEnregistre(parent: HTMLElement, q: ChatRequest, deps:
 	if (q.runs?.length) peindreTravail(tour, q, runner, deps);
 	for (const res of q.results) {
 		if (res.kind === "text") {
+			const texte = deps.explain ? splitCardEdit(res.text).shown : res.text;
 			const rep = ajouter(tour, "div", "qbd-ai-chat-reponse");
 			const prose = ajouter(rep, "div", "qbd-ai-preview-md markdown-preview-view qbd-ai-chat-prose");
-			prose.innerHTML = renderMarkdownPreview(res.text);
-			if (res.text.includes("$")) void mathifyElement(prose);
+			prose.innerHTML = renderMarkdownPreview(texte);
+			if (texte.includes("$")) void mathifyElement(prose);
 			if (deps.copier) {
 				const pied = ajouter(rep, "div", "qbd-ai-chat-pied");
 				const b = ajouter(pied, "button", "qbd-ai-file-btn");
 				b.type = "button";
 				host.ui.setIcon(b, "copy");
 				b.setAttribute("aria-label", t("ai.chat.copy"));
-				b.addEventListener("click", () => { void deps.copier?.(res.text).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed"))); });
+				b.addEventListener("click", () => { void deps.copier?.(texte).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed"))); });
 			}
 			continue;
 		}

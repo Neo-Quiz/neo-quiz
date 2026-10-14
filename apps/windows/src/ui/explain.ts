@@ -28,7 +28,8 @@
 
 import { ajouter } from "../../../../src/dom";
 import { currentHost, requireHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
+import { currentLang, t } from "../../../../src/i18n";
+import { formatResume } from "../../../../src/dashboard/usage-limit";
 import { LOG_PREFIX } from "../../../../src/branding";
 import { ouvrirMenuPlus } from "../../../../src/dashboard/composer-plus";
 import { attachMentionPicker } from "../../../../src/dashboard/mention-picker";
@@ -66,7 +67,7 @@ import { suivreLeBas } from "./suivi-bas";
 import type { BlocTravail } from "../../../../src/dashboard/transcript-steps";
 import { fileDeGeneration, figerReglages, onQueueCreated } from "../../../../src/dashboard/file-generation-app";
 import type { DemandeFile, FileGenerationApp, LigneGeneration } from "../../../../src/dashboard/file-generation-app";
-import { chatForQuiz, explainMessages } from "../../../../src/dashboard/explain-chat";
+import { explainChatIdForQuiz, explainMessages } from "../../../../src/dashboard/explain-chat";
 import { EXPLAIN_MAX_CHARS_DEFAULT } from "../../../../src/dashboard/explain-demand";
 import type { ExplainMessage } from "../../../../src/dashboard/explain-chat";
 import type { ChatRecord, ChatRequest } from "../../../../src/dashboard/chat-record";
@@ -367,6 +368,8 @@ interface Message {
 	lecture: boolean;
 	erreur?: string;
 	arrete: boolean;
+	/** Paused on a usage limit (not finished): its reset time, null when unknown. */
+	pause?: { reprise: number | null };
 	/** The queue line of a turn still in the queue (its AI work, its Stop). */
 	lineId?: number;
 	/** A recorded answer that ran as a live turn: its request, whose `runs` give its AI work. */
@@ -753,7 +756,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	/* The window's generation queue: the AI page's, or created here when the
 	   AI page never mounted in this window. */
 	let file: FileGenerationApp | null = null;
-	onQueueCreated(q => { file = q; });
+	// Removed when the page goes: one hook per mount would otherwise pile up.
+	const arretFile = onQueueCreated(q => { file = q; });
 	const laFile = (): FileGenerationApp => {
 		file ??= fileDeGeneration({ settings: deps.settings, scanner: deps.scanner });
 		// The record follows the queue even when the AI page never mounted (idempotent).
@@ -761,12 +765,13 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		return file;
 	};
 	/** The chat on screen: the one this page already uses unless it was
-	    deleted meanwhile, else the quiz's saved Explain chat, else a new id
-	    (the chat is recorded at its first answer). */
+	    deleted meanwhile, else the quiz's Explain chat (saved, or only in the
+	    queue while its first answer runs), else a new id (the chat is
+	    recorded at its first answer). */
 	const chatCourant = (): string => {
 		const chats = getChats();
 		if (etat.chatId && !chats.find(c => c.id === etat.chatId)?.deleted) return etat.chatId;
-		etat.chatId = chatForQuiz(chats, deps.chemin)?.id ?? newChatId();
+		etat.chatId = explainChatIdForQuiz(chats, file?.lignes() ?? [], deps.chemin) ?? newChatId();
 		return etat.chatId;
 	};
 	/** The request id of a message key (`<request id>:u` or `:a`). */
@@ -796,6 +801,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			lecture: false,
 			erreur: m.error !== undefined ? (m.error || t("ai.error.checkSettings")) : undefined,
 			arrete: !!m.stopped,
+			...(m.paused ? { pause: { reprise: m.resumeAt ?? null } } : {}),
 			lineId: m.lineId,
 			// A recorded answer that ran live: its request, to read its AI work back.
 			...(!user && m.runs && q ? { requete: q } : {}),
@@ -843,7 +849,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const q = laFile();
 				/* The thread as last painted: the composer reads whether an answer runs. */
 				let derniers: Message[] = messages();
-				const enCours = (): boolean => !!etat.envoi || derniers.some(x => x.enCours);
+				/* A turn paused on a usage limit is not finished: the composer waits
+				   for it as for a running one (its Stop cancels it). */
+				const enCours = (): boolean => !!etat.envoi || derniers.some(x => x.enCours || !!x.pause);
 				/* The Generate page's composer, as is (dashboard-ai.css): same frame,
 				   same bottom row, same send button, same "+" and attachment cards
 				   (explain-jointes.ts). No folder row here. */
@@ -1148,7 +1156,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				/* What a message shows (its running time and its AI work aside, updated in place). */
 				const cleDe = (msg: Message): string => {
 					const p = etat.propositions.get(msg.key);
-					return JSON.stringify([msg.role, msg.text, msg.images, msg.documents, msg.enCours, msg.lecture, msg.erreur, msg.arrete, msg.duree, msg.modele, msg.fournisseur, msg.lineId !== undefined, msg.requete?.runs ?? null, p ? [p.etat, p.occupe, p.message] : null]);
+					return JSON.stringify([msg.role, msg.text, msg.images, msg.documents, msg.enCours, msg.lecture, msg.erreur, msg.arrete, msg.pause ?? null, msg.duree, msg.modele, msg.fournisseur, msg.lineId !== undefined, msg.requete?.runs ?? null, p ? [p.etat, p.occupe, p.message] : null]);
 				};
 				/** A new node for `msg`, put in the thread by `placer` BEFORE it is filled
 				    (the maths and the interactive pages render in a connected element). */
@@ -1184,6 +1192,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
 					const nom = msg.modele || p.name;
 					ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse")
+						: msg.pause ? nom
 						: msg.enCours ? t("ai.chat.working", { model: nom })
 						: msg.arrete ? t("ai.explain.stop")
 						: msg.duree !== undefined ? t("ai.chat.worked", { model: nom, time: duree(msg.duree) })
@@ -1216,7 +1225,24 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					   not text for the learner: it is cut out (even half written) and
 					   shown as a proposal. */
 					const decoupe = deps.recharger ? splitCardEdit(msg.text) : { shown: msg.text, raw: null, pending: false };
-					if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
+					if (msg.pause && msg.lineId !== undefined) {
+						/* PAUSED ON A USAGE LIMIT, as the AI page shows it: the clock
+						   resumes it (reset time + 30 s), or the learner does now. */
+						const id = msg.lineId;
+						const pause = ajouter(rep, "div", "qbd-ai-reponse qbd-ai-reponse--pause");
+						host.ui.setIcon(ajouter(pause, "span", "qbd-ai-reponse-icone"), "pause");
+						const corps = ajouter(pause, "div", "qbd-ai-reponse-corps");
+						const reprise = msg.pause.reprise;
+						ajouter(corps, "div", "qbd-ai-reponse-texte", reprise !== null ? t("ai.queue.limitPaused", { when: formatResume(reprise, Date.now(), currentLang()) }) : t("ai.queue.limitPausedManual"));
+						const actions = ajouter(corps, "div", "qbd-ai-reponse-actions");
+						const actionsPause: ReadonlyArray<readonly ["ai.queue.limitResumeNow" | "ai.queue.limitCancelResume", () => void]> = [["ai.queue.limitResumeNow", () => q.reprendre(id)], ["ai.queue.limitCancelResume", () => q.annulerReprise(id)]];
+						for (const [cle, agir] of actionsPause) {
+							const b = ajouter(actions, "button", "qbd-ai-reponse-action", t(cle));
+							b.type = "button";
+							b.addEventListener("click", agir);
+						}
+					}
+					else if (msg.erreur) ajouter(prose, "div", "qbd-ai-reponse-erreur", msg.erreur);
 					else if (decoupe.shown) {
 						/* A fenced ```html block is shown as an interactive page in a
 						   sandboxed frame (engine/html-frame-core.ts), not as code. Each
@@ -1319,7 +1345,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				   written, a chat deleted) repaint the thread. */
 				const ligneDuChat = (id: number): boolean => q.lignes().some(l => l.id === id && l.demande.chatId === etat.chatId);
 				const arrets = [
-					q.abonner(() => etat.repeindre?.(), () => fenetre !== null),
+					/* `false`: this window shows no generation, so the "ready" notice
+					   of a quiz generated meanwhile still shows (an Explain line has none). */
+					q.abonner(() => etat.repeindre?.(), () => false),
 					q.abonnerTranscript(id => { if (ligneDuChat(id)) etat.repeindre?.(); }),
 					onChatsChanged(() => etat.repeindre?.()),
 				];
@@ -1334,8 +1362,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (saisieVerrouillee()) return;
 					if (!etat.jointes.pret()) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
-					/* The unit on screen when the message leaves: what "this" means in it. */
-					const qi = (uniteAffichee() ?? uniteCourante)?.qi ?? 0;
+					/* The unit on screen when the message leaves: what "this" means in it.
+					   None (an intro or end screen): no position, no method for a question,
+					   no edit instruction, never a guessed question. */
+					const qi = (uniteAffichee() ?? uniteCourante)?.qi;
 					champ.value = "";
 					champ.style.height = "auto";
 					const chatId = chatCourant();
@@ -1348,13 +1378,14 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					const prises = await etat.jointes.prendre(etat.imagesEnvoyees);
 					etat.imagesEnvoyees += prises.images.length;
 					if (prises.urls.length) etat.vignettes.set(requestId, { urls: prises.urls, noms: prises.nomsImages });
-					etat.questionDe.set(requestId, qi);
+					if (qi !== undefined) etat.questionDe.set(requestId, qi);
 					/* Read NOW, while the page shows what the learner sees (the course may take a while). */
 					/* The position, then the tutor's instruction for the question on screen
 					   (its kind read now), then the edit instruction. */
-					const consigne = consigneEditionDe(qi);
-					const explication = questions[qi] ? consigneExplication(questions[qi].role === "read") : "";
-					const position = [positionDe(qi), explication, consigne].filter(Boolean).join("\n\n");
+					const question = qi === undefined ? undefined : questions[qi];
+					const consigne = qi === undefined ? "" : consigneEditionDe(qi);
+					const explication = question ? consigneExplication(question.role === "read") : "";
+					const position = qi === undefined ? "" : [positionDe(qi), explication, consigne].filter(Boolean).join("\n\n");
 					const contexte = contexteDe();
 					const envoi: NonNullable<EtatFenetre["envoi"]> = { cle: requestId, texte: perso, documents: prises.nomsDocuments, fournisseur, modele: libelleModele(), debut: sentAt, annule: false };
 					etat.envoi = envoi;
@@ -1363,7 +1394,16 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					etat.repeindre?.();
 					try {
 						const lu = await coursDuQuiz();
-						if (envoi.annule) return;
+						if (envoi.annule) {
+							/* Stopped while the course was read: nothing left, so the
+							   attachments (and the text, into an empty field) go back. */
+							prises.remettre();
+							etat.imagesEnvoyees -= prises.images.length;
+							etat.vignettes.delete(requestId);
+							etat.questionDe.delete(requestId);
+							if (!champ.value) { champ.value = perso; majEnvoi(); }
+							return;
+						}
 						/* The earlier turns, for a provider that cannot keep a live session:
 						   the one call then carries the whole conversation. */
 						const avant = explainMessages(getChats().find(c => c.id === chatId && !c.deleted) ?? null, q.lignes(), chatId)
@@ -1371,7 +1411,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 							.filter(x => x.error === undefined && x.text)
 							.map(x => (x.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + x.text)
 							.join("\n\n");
-						const lecture = questions[qi]?.role === "read";
+						const lecture = question?.role === "read";
 						/* What the model reads (never shown): the learner's text, a word
 						   when a question changed, the pictures just attached, the documents' text. */
 						const pourModele = (perso || PAR_DEFAUT)
@@ -1403,7 +1443,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 								course: lu.texte,
 								position,
 								/* A reading card may come back whole in a `<card-edit>` block, on top of the explanation. */
-								maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (lecture ? CARD_EDIT_MAX_CHARS + 400 : deps.recharger ? QUESTION_EDIT_ROOM : 0),
+								maxChars: (deps.settings.get().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAUT) + (qi === undefined ? 0 : lecture ? CARD_EDIT_MAX_CHARS + 400 : deps.recharger ? QUESTION_EDIT_ROOM : 0),
 								/* The quiz's folder (2026-10-14): Claude Code and Codex answer as
 								   agents in it, as a generation runs, once the user trusts it. */
 								folder: dossierQuiz,
@@ -1455,7 +1495,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					/* Stop: the message still being prepared is dropped; a line in
 					   the queue is stopped there (its live session stays). */
 					if (etat.envoi) { etat.envoi.annule = true; etat.envoi = null; etat.repeindre?.(); return; }
-					const enCoursLa = derniers.find(x => x.enCours && x.lineId !== undefined);
+					const enCoursLa = derniers.find(x => (x.enCours || !!x.pause) && x.lineId !== undefined);
 					if (enCoursLa?.lineId !== undefined) { q.annuler(enCoursLa.lineId); return; }
 					void envoyer();
 				});
@@ -1483,6 +1523,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	return () => {
 		if (fenetre) fermerSansMouvement(fenetre);
 		observateur.disconnect();
+		arretFile();
 		/* Leaving the quiz page stops nothing: the answers go on in the queue
 		   and are recorded in the chat. Only this page's pictures are let go. */
 		etat.repeindre = null;

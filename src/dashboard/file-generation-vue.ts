@@ -49,6 +49,8 @@ import type { Transcript } from "./transcript";
 import { peindreEtapes, resumeOutils } from "./transcript-steps";
 import { modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { renderMarkdownPreview } from "../markdown-preview";
+import { splitCardEdit } from "../explain-edit";
+import { explainMarkOf } from "./explain-chat";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
 import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
@@ -303,8 +305,15 @@ export function creerVueFile(opts: {
 		return l.etat === "prete" && l.resultat?.texte !== undefined;
 	}
 
-	function remplirProse(prose: HTMLElement, l: LigneGeneration): void {
+	/** The answer's text as the learner reads it: an Explain answer without its
+	    `<card-edit>` block (a proposal, applied from the Explain window only). */
+	function texteMontre(l: LigneGeneration): string {
 		const texte = l.resultat?.texte ?? "";
+		return l.demande.explication ? splitCardEdit(texte).shown : texte;
+	}
+
+	function remplirProse(prose: HTMLElement, l: LigneGeneration): void {
+		const texte = texteMontre(l);
 		prose.innerHTML = renderMarkdownPreview(texte);
 		// $…$ and $…$ are typeset after each repaint (the answer rewrites the HTML as it grows).
 		if (texte.includes("$")) void mathifyElement(prose);
@@ -326,7 +335,7 @@ export function creerVueFile(opts: {
 		remplirProse(prose, l);
 		if (l.resultat?.texte) {
 			const pied = ajouter(rep, "div", "qbd-ai-chat-pied");
-			const texte = l.resultat.texte;
+			const texte = texteMontre(l);
 			if (opts.copier) {
 				boutonIcone(pied, "copy", t("ai.chat.copy"), () => {
 					void opts.copier?.(texte).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed")));
@@ -855,10 +864,11 @@ export function creerVueFile(opts: {
 		const { id: chatId, record } = opts.chat();
 		const remote = getRemoteGenerations();
 		const items = threadItems(record, opts.file.lignes(), chatId, remote, Date.now(), getOwnRequests());
+		const explainChat = !!explainMarkOf(record, opts.file.lignes(), chatId);
 		for (const item of items) {
 			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected()), opts.ouvrirPiece); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
-			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", racine: opts.racine, ouvrirFichier: opts.ouvrirFichier, ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
+			if (item.kind === "record") { peindreTourEnregistre(zone, item.request, { chatOrigin: record?.origin ?? "", explain: explainChat, racine: opts.racine, ouvrirFichier: opts.ouvrirFichier, ouvrir: opts.ouvrir, ouvrirPiece: opts.ouvrirPiece, copier: opts.copier, repondre: opts.repondre, reprenable: opts.reprenable }); continue; }
 			// The `arret` state is not shown (for the user the line is cancelled); the
 			// quizzes of a plan live in the sidebar, not in the conversation.
 			const lignes = item.lines.filter(l => l.etat !== "arret");

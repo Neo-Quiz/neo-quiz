@@ -2327,7 +2327,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			].filter(Boolean).join("\n\n---\n\n");
 			const systeme = [
 				(options.images?.length ? CHAT_SYSTEM.replace(CHAT_NO_TOOLS, CHAT_PICTURES) : CHAT_SYSTEM),
-				options.style === "explain" ? "The learner opened this chat from a question of the quiz below; that question is marked in it. \"This question\", \"the answer\", \"explain it to me\" and the like refer to the marked question unless the learner says otherwise. Answer what they ask, using the quiz and the course; when they ask for an explanation, assume they know nothing and build it step by step (define every term the first time, say what each wrong choice gets wrong, use a concrete everyday example)." : "",
+				options.style === "explain" ? "The learner is studying the quiz below. When their position on it is known, it is given at the END of their message (\"WHERE THE LEARNER IS NOW\"): \"this question\", \"the answer\", \"explain it to me\" and the like refer to that question unless the learner says otherwise; without it, ask which question they mean when it is not clear. Answer what they ask, using the quiz and the course; when they ask for an explanation, assume they know nothing and build it step by step (define every term the first time, say what each wrong choice gets wrong, use a concrete everyday example)." : "",
 				options.maxChars && options.maxChars > 0 ? `Your whole answer must stay under ${Math.round(options.maxChars)} characters: keep only what helps understanding. The text of a fenced html page does not count in that limit.` : "",
 			].filter(Boolean).join("\n\n");
 			if (provider === "claude-code") {
