@@ -733,7 +733,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const items = `<ul>${list.map(o => `<li>${mark}<span>${ctx.sanitize.renderInlineText(o)}</span></li>`).join("")}</ul>`;
 		/* On the first page, a callout folded by default (2026-10-14): the list
 		   took the top of the page from the reading. The summary keeps it open. */
-		if (!done) return `<details class="quiz-learn-objectives is-folded"><summary>${t(titleKey)}</summary>${items}</details>`;
+		/* Lucide `target` before the title and `chevron-right` at its end, as an Obsidian callout draws them. */
+		const cible = `<svg class="quiz-co-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`;
+		const chevron = `<svg class="quiz-co-fold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>`;
+		if (!done) return `<details class="quiz-learn-objectives is-folded"><summary>${cible}<span>${t(titleKey)}</span>${chevron}</summary>${items}</details>`;
 		return `<section class="quiz-learn-objectives is-done"><h3>${t(titleKey)}</h3>${items}</section>`;
 	}
 

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The folded objectives of a Learn look like a callout: tinted fill, thin outline, coloured bar and bold coloured title with its icon.
+
 ## [1.20.106] - 2026-10-14
 
 ### Changed

@@ -305,30 +305,37 @@
 }
 
 /* The objectives on the first page: a callout folded by default (2026-10-14),
-   in the hook's look (bar on the left, light tint), opened by its title. */
+   drawn with the owner's Obsidian callout template (vault snippet
+   callout-gabarit.css): flat tinted fill, thin outline all round, 4 px bar on
+   the left, 8 px corners, bold title in the callout colour after its icon,
+   the fold chevron at the end of the title, a soft glow on hover only. */
 .quiz-learn-objectives.is-folded {
-  padding: 8px 14px;
-  border-left: 3px solid var(--interactive-accent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  --co-c: var(--interactive-accent);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--co-c) 45%, transparent);
+  border-left: 4px solid var(--co-c);
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--co-c) 14%, color-mix(in srgb, var(--background-secondary) 55%, transparent));
+  transition: box-shadow 0.25s ease;
+}
+.quiz-learn-objectives.is-folded:hover {
+  border-color: color-mix(in srgb, var(--co-c) 70%, transparent);
+  border-left-color: var(--co-c);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--co-c) 22%, transparent);
 }
 .quiz-learn-objectives.is-folded > summary {
-  cursor: pointer;
-  font-weight: 700;
-  list-style: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 10px 14px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--co-c);
+  font-weight: 700;
 }
+.quiz-learn-objectives.is-folded[open] > summary { padding-bottom: 4px; }
 .quiz-learn-objectives.is-folded > summary::-webkit-details-marker { display: none; }
-.quiz-learn-objectives.is-folded > summary::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-.quiz-learn-objectives.is-folded[open] > summary::before { transform: rotate(45deg); }
-.quiz-learn-objectives.is-folded > ul { margin-top: 8px; }
+.quiz-co-icon { width: 16px; height: 16px; flex: none; }
+.quiz-co-fold { width: 16px; height: 16px; flex: none; margin-left: auto; opacity: 0.8; transition: transform 120ms ease; }
+.quiz-learn-objectives.is-folded[open] .quiz-co-fold { transform: rotate(90deg); }
+.quiz-learn-objectives.is-folded > ul { margin: 0; padding: 0 14px 10px 38px; color: var(--text-normal); }
