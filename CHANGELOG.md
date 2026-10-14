@@ -16,6 +16,9 @@ release notes.
 ### Added
 
 - Learn readings open on a hook (an analogy, a story, a picture or a memory trick), and their key points are cards to recall before flipping.
+- Each Learn step has its own colour, and a Learn's objectives open it and close its summary.
+- A Learn's summary ends on a mind map of its steps, whose key points stay hidden until you recall them.
+- After 25 minutes of a Learn, a short pause is suggested.
 
 ## [1.20.90] - 2026-10-13
 

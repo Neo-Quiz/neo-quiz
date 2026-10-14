@@ -15,6 +15,7 @@ import { figureDeLecture } from "./lecture-rendu";
 import { t, type TransKey } from "../i18n";
 import { drawOrder, formatElapsed, learnFigures, stepHue, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 import { mindMapHtml, mindMapModel } from "./mind-map";
+import { titreSansMode } from "../quiz-format";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -629,7 +630,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const fig = learnFigures(sum, gradedTotal);
 		const seg = (cls: string, n: number) => n > 0 ? `<span class="quiz-learn-gauge-seg ${cls}" style="flex-grow:${n}"></span>` : "";
 		const rest = Math.max(0, fig.total - sum.first - sum.retried - sum.missed);
-		const centre = (ctx.sourcePath.split(/[\\/]/).pop() ?? "").replace(/\.md$/i, "");
+		const centre = titreSansMode((ctx.sourcePath.split(/[\\/]/).pop() ?? "").replace(/\.md$/i, ""), "learn");
 		const mindMap = ctx.stepSlides ? mindMapHtml(mindMapModel(ctx.stepSlides, ctx.quiz), centre, s => ctx.sanitize.renderInlineText(s), {
 			title: t("engine.learn.mindMapTitle"), hint: t("engine.learn.mindMapHint"), showAll: t("engine.learn.mindMapShowAll"), leafAria: t("engine.learn.mindMapLeafAria"),
 		}) : "";
