@@ -744,6 +744,13 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "aria-pressed", "aria-hidden"] });
 	majVisibilite();
+	/* Scrolling a step page and the end of a slide move change no DOM: the
+	   unit on screen (and so the lock) is measured again then, once a frame.
+	   Without it, the composer stayed open on an unanswered question, or closed
+	   on a corrected one, until something else touched the page. */
+	let mesure = 0;
+	const remesurer = (): void => { if (!mesure) mesure = requestAnimationFrame(() => { mesure = 0; majVisibilite(); }); };
+	for (const ev of ["scroll", "transitionend", "animationend"]) hote.addEventListener(ev, remesurer, { capture: true, passive: true });
 
 	/* The window's state for the whole quiz page: ONE chat per quiz, kept
 	   while the learner moves through it. */
@@ -1523,6 +1530,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	return () => {
 		if (fenetre) fermerSansMouvement(fenetre);
 		observateur.disconnect();
+		for (const ev of ["scroll", "transitionend", "animationend"]) hote.removeEventListener(ev, remesurer, { capture: true });
+		if (mesure) cancelAnimationFrame(mesure);
 		arretFile();
 		/* Leaving the quiz page stops nothing: the answers go on in the queue
 		   and are recorded in the chat. Only this page's pictures are let go. */
