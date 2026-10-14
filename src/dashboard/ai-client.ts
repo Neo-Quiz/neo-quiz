@@ -583,7 +583,7 @@ const POUVOIRS_AGENT: Record<Exclude<ModeAgent, "supervised">, string> = {
 /** The generation paragraph when Claude Code or Codex runs as an AGENT in
     the quiz's folder (2026-10-10, the owner's decision). */
 function avecAgentGeneration(mode: Exclude<ModeAgent, "supervised">): string {
-	return `TOOLS, IN THE QUIZ'S FOLDER — READ THIS BEFORE ANYTHING ELSE: you are running as an agent inside the folder of this quiz. You MAY ${POUVOIRS_AGENT[mode]} whenever it helps you write a better and more faithful quiz: open a course, a note, a picture, extract the text, the tables or the figures of a PDF, compare with an earlier quiz of the folder. Every source the user request names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers: read it again only for what that text lost (a figure, the layout of a table). The APPLICATION writes the quiz: never create, modify or save the quiz note yourself, never touch the ".neo-quiz" folder, and never delete or move a file. Your ONLY final output is the JSON5 array.`;
+	return `TOOLS, IN THE QUIZ'S FOLDER — READ THIS BEFORE ANYTHING ELSE: you are running as an agent inside the folder of this quiz. You MAY ${POUVOIRS_AGENT[mode]} whenever it helps you write a better and more faithful quiz: open a course, a note, a picture, extract the text, the tables or the figures of a PDF, compare with an earlier quiz of the folder. Every source the user request names that actually exists has ALREADY been read for you and its full content is inlined below, between "--- <file name> ---" markers: read it again only for what that text lost (a figure, the layout of a table). The APPLICATION writes the quiz: never create, modify or save the quiz note yourself, never touch the ".neo-quiz" folder, and never delete or move a file. Never invoke a skill or a slash command: this prompt already defines the whole task and its output format, and a skill written for another use (notes, courses) would change them. Your ONLY final output is the JSON5 array.`;
 }
 
 /** The "no tools" sentences of the prompts, and what each says instead when
@@ -593,7 +593,7 @@ function remplacementsOutils(mode: ModeAgent): ReadonlyArray<readonly [string, s
 		[SANS_OUTILS_GENERATION, AVEC_OUTILS_GENERATION],
 		["You have no tools: the documents are in the message.", "The documents are in the message. " + NOTE_OUTILS],
 	];
-	const note = `TOOLS: you run as an agent inside the folder of the user's documents. You may ${POUVOIRS_AGENT[mode]} when it helps. Never delete or move a file, and never touch the ".neo-quiz" folder.`;
+	const note = `TOOLS: you run as an agent inside the folder of the user's documents. You may ${POUVOIRS_AGENT[mode]} when it helps. Never delete or move a file, and never touch the ".neo-quiz" folder. Never invoke a skill or a slash command: this prompt already defines the whole task and its output format, and a skill written for another use (notes, courses) would change them.`;
 	return [
 		[SANS_OUTILS_GENERATION, avecAgentGeneration(mode)],
 		["You have no tools: the documents are in the message.", "The documents are in the message. " + note],

@@ -271,7 +271,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ assemblerQuestionsOllama, p
    writes one quiz per document. The prompt names the documents in order and
    asks for one wrapped quiz per document; every forbidden word of each type
    stays absent; the single-quiz prompt is untouched. */
-await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, parseReponseQuiz, parseReponseLot, parseReponseParties }, { MOTS_INTERDITS }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, parseReponseQuiz, parseReponseLot, parseReponseParties, consigneAvecOutils }, { MOTS_INTERDITS }) => {
 	const r = makeReporter("One pass over N documents - prompt and parser");
 	const docs = ["CM1 - RÃ©seaux.pdf", "CM2 - Routage.pdf", "CM3 - SÃ©curitÃ©.pdf"];
 	for (const mode of ["learn", "practice"]) {
@@ -327,6 +327,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.check("parts: a count that differs from the one asked is refused", (() => { try { parseReponseParties(reponse(partie(1, "A")), 2); return "accepted"; } catch { return "refused"; } })(), "refused");
 	r.check("parts: auto accepts the count the model chose", parseReponseParties(reponse(partie(1, "A"), partie(2, "B"), partie(3, "C")), "auto").length, 3);
 	r.check("parts: two equal titles get distinct keys", (() => { const x = parseReponseParties(reponse(partie(1, "Même"), partie(2, "Même")), 2); return x[0].document !== x[1].document; })(), true);
+	/* 2026-10-14: in agent modes Claude Code loads the user's own skills; one
+	   written for course notes kept running at every generation. */
+	r.check("agent modes: the generation forbids invoking a skill", ["full", "auto", "acceptEdits"].map(m => consigneAvecOutils(composerPrompts("x", { mode: "learn" }).systemPrompt, m).includes("Never invoke a skill")), [true, true, true]);
 	r.done();
 });
 

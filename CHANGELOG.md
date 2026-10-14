@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A generation no longer runs a personal Claude Code skill of yours (such as a course-notes skill) on top of its own instructions.
+
 ## [1.20.99] - 2026-10-14
 
 ### Changed
