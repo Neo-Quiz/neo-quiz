@@ -63,6 +63,9 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		}
 		// A chat recorded before its first request (it only holds the id of its live run, 2026-10-11) is named by that request.
 		if (!item.title) item.title = firstLineOf(l.demande.text) || l.demande.notes[0]?.name || "";
+		// An Explain chat whose first answer is not recorded yet: its line carries the mark.
+		const mark = l.demande.explication?.mark;
+		if (mark && !item.explain) item.explain = { quiz: mark.quiz };
 		if (isLive(l)) item.running = true;
 		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
 	}

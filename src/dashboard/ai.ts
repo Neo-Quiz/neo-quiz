@@ -9,7 +9,7 @@ import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enr
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
 import type { DemandeFile, FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
-import { explainMessages } from "./explain-chat";
+import { explainMarkOf, explainMessages } from "./explain-chat";
 import { EXPLAIN_MAX_CHARS_DEFAULT, explainDemandFromNote } from "./explain-demand";
 import type { ChatExplain } from "./chat-record";
 import { creerVueFile } from "./file-generation-vue";
@@ -400,10 +400,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
 	const nomDuChemin = (p: string): string => p.slice(p.lastIndexOf("/") + 1);
-	/** The chat on screen is an Explain chat (the tutor chat of a quiz): its mark, else null. */
+	/** The chat on screen is an Explain chat (the tutor chat of a quiz): its
+	    mark, else null. Read from its queue lines too: before its first answer
+	    is recorded, a message typed here would otherwise leave as a generation. */
 	const marqueExplain = (): ChatExplain | null => {
-		const c = chatSurEcran().record;
-		return c && !c.deleted && c.explain ? c.explain : null;
+		const c = chatSurEcran();
+		return explainMarkOf(c.record, fileGen.lignes(), c.id);
 	};
 	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations(), Date.now(), getOwnRequests()); };
 	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null || relaisAffiche() !== null;
@@ -4354,11 +4356,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const perso = composerText.trim();
 		if (!perso && !images.length && !noteAttachments.length) return;
 		if (noteAttachments.some(n => n.lecture)) return;
+		/* Only a quiz of the catalogue: the stored mark may come from another
+		   device, and its path and folder (where an agent works) are then
+		   taken from the catalogue's entry, never from the mark. */
+		const quiz = deps.scanner.getQuiz(marque.path);
+		if (!quiz) { host.ui.notice(t("ai.explain.quizGone")); return; }
 		demarrage = true;
 		try {
 			let note: string | null = null;
-			try { note = await host.fs.read(marque.path); } catch { note = null; }
-			const explication = note === null ? null : explainDemandFromNote(note, marque);
+			try { note = await host.fs.read(quiz.path); } catch { note = null; }
+			const explication = note === null ? null : explainDemandFromNote(note, { ...marque, path: quiz.path });
 			if (!explication) { host.ui.notice(t("ai.explain.quizGone")); return; }
 			const chatId = activeChatId();
 			/* The earlier turns, for a provider that cannot keep a live session:

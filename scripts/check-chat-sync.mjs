@@ -74,7 +74,7 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("explain mark: a quiz of another root is written as a foreign full path", foreignFile[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
 	r.check("explain mark: a foreign path is read back verbatim", M.chatsFromFile(foreignFile, "rootA")[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
 	r.check("explain mark: a foreign mark written again stays the same", M.chatsToFile(M.chatsFromFile(foreignFile, "rootA"), "rootA")[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
-	for (const bad of ["../x.md", "rootB/../x.md", "/abs.md", "C:/x.md", "rootB\\x.md", ".neo-quiz/x.md", ".NEO-QUIZ/x.md", "rootB/a\u0001.md"]) {
+	for (const bad of ["../x.md", "rootB/../x.md", "/abs.md", "C:/x.md", "rootB\\x.md", ".neo-quiz/x.md", ".NEO-QUIZ/x.md", "rootB/a\u0001.md", "rootB/.neo-quiz/x.md", "rootB/.NEO-QUIZ./chats/x.md"]) {
 		const w = M.chatsToFile([chat("e7", 1, "pc", [], { explain: { path: bad, quiz: "Q" } })], "rootA");
 		const rd = M.chatsFromFile([chat("e7", 1, "pc", [], { explain: { path: bad, quiz: "Q", foreign: true } })], "rootA");
 		r.check("explain mark: an unclean foreign path drops the mark, the chat stays: " + JSON.stringify(bad), [w[0].id, "explain" in w[0], rd[0].id, "explain" in rd[0]], ["e7", false, "e7", false]);
@@ -84,6 +84,8 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 		r.check("internal folder refused whatever its case or trailing dots: " + JSON.stringify(bad), [M.relativeToRoot("Root/" + bad, "Root"), M.absoluteInRoot(bad, "Root")], ["", ""]);
 	}
 	r.check("a folder that only starts like the internal one is not refused", M.relativeToRoot("Root/.neo-quizzes/x.md", "Root"), ".neo-quizzes/x.md");
+	r.check("explain mark: a foreign quiz under a deeper folder named like the internal one is kept",
+		M.chatsToFile([chat("e9", 1, "pc", [], { explain: { path: "rootB/Cours/.neo-quiz/x.md", quiz: "Q" } })], "rootA")[0].explain, { path: "rootB/Cours/.neo-quiz/x.md", quiz: "Q", foreign: true });
 	r.check("explain mark: the merge fallback skips a tombstone's mark",
 		"explain" in M.mergeChats([[chat("e8", 9, "pc")], [chat("e8", 7, "pc", [], { deleted: true, explain: { path: "r/q.md", quiz: "Q" } })]])[0], false);
 

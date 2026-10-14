@@ -7,7 +7,9 @@
  * line of another chat showing in this thread, a failed line without its
  * error, a turn whose position is not the LAST thing sent (so "this" points
  * to the wrong slide), a position naming another question, and a recorded
- * answer that lost the place of its AI work (`runs`).
+ * answer that lost the place of its AI work (`runs`), a chat taken for a
+ * plain one (or a second chat started) while its first answer runs, and a
+ * line paused on a usage limit shown as a finished empty answer.
  *
  *     npm run check:explain-chat
  */
@@ -15,7 +17,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "src/explain-follow.ts", "src/dashboard/explain-demand.ts"], (C, P, F, D) => {
 	const r = makeReporter("Explain chats, pure core");
-	const { chatForQuiz, explainMessages, explainTurnTexts } = C;
+	const { chatForQuiz, explainMessages, explainTurnTexts, explainMarkOf, explainChatIdForQuiz } = C;
 	const { positionCourante } = P;
 
 	const mk = (id, updatedAt, explain, extra = {}) => ({ id, origin: "pc", createdAt: 1, updatedAt, requests: [], ...(explain ? { explain } : {}), ...extra });
@@ -42,6 +44,24 @@ await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "
 	r.check("a recorded answer without a live turn has no runs", "runs" in msgs[1], false);
 	const failed = explainMessages(null, [line(10, "b", "r3", "echouee", { erreur: "boom" })], "b");
 	r.check("a failed line shows its error", [failed[1].error, failed[1].running], ["boom", false]);
+	const paused = explainMessages(null, [line(11, "b", "r4", "pause", { pause: { fournisseur: "claude-code", reprise: 5000 } })], "b");
+	r.check("a paused line is paused with its reset time, not finished", [paused[1].paused, paused[1].resumeAt, paused[1].running, paused[1].error, paused[1].lineId], [true, 5000, false, undefined, 11]);
+	const pausedManual = explainMessages(null, [line(12, "b", "r5", "pause", { pause: { fournisseur: "codex", reprise: null } })], "b");
+	r.check("a paused line without a reset time: manual resume", [pausedManual[1].paused, pausedManual[1].resumeAt], [true, null]);
+	r.check("a running line is not paused", "paused" in msgs[3], false);
+
+	// Before its first answer is recorded, a chat is an Explain chat by its queue lines.
+	const first = [line(20, "n", "r20", "cours")];
+	r.check("mark from the record", explainMarkOf(rec, [], "b"), E());
+	r.check("mark from a queue line while the first answer runs", explainMarkOf(null, first, "n"), E());
+	r.check("no mark from a line of another chat", explainMarkOf(null, first, "x"), null);
+	r.check("no mark for a deleted chat, even with a line", explainMarkOf(mk("n", 5, null, { deleted: true }), first, "n"), null);
+	r.check("a plain chat without lines has no mark", explainMarkOf(mk("p", 5, null), [], "p"), null);
+	r.check("reopening the quiz during the first answer finds that chat", explainChatIdForQuiz([], first, "r/q.md"), "n");
+	r.check("a recorded chat is found as before", explainChatIdForQuiz(chats, [], "r/q.md"), "b");
+	r.check("a newer unrecorded chat of the quiz wins over an older record", explainChatIdForQuiz(chats, [line(21, "n2", "r21", "cours", { demande: { ...line(0, "n2", "r21", "cours").demande, sentAt: 100 } })], "r/q.md"), "n2");
+	r.check("a line of a deleted chat never revives it", explainChatIdForQuiz([mk("n", 5, E(), { deleted: true })], first, "r/q.md"), null);
+	r.check("a line of another quiz is not this quiz's chat", explainChatIdForQuiz([], first, "r/other.md"), null);
 
 	const tt = explainTurnTexts({ context: "CTX", course: "COURSE", message: "MSG", position: "POS" });
 	r.check("full turn: context, course, message, then the position LAST", [tt.full.includes("CTX"), tt.full.includes("COURSE"), tt.full.indexOf("MSG") < tt.full.indexOf("POS"), tt.full.trimEnd().endsWith("POS")], [true, true, true, true]);

@@ -69,11 +69,11 @@ export function ownToWrite(list: ReadonlyArray<ChatRecord>, device: string, othe
 
 const INTERNAL = ".neo-quiz";
 
-/** Whether the first segment of a clean path is the internal folder, as
-    Windows reads a name: case-insensitive, trailing dots and spaces ignored
+/** Whether segment `at` of a clean path is the internal folder, as Windows
+    reads a name: case-insensitive, trailing dots and spaces ignored
     (".NEO-QUIZ" and ".neo-quiz." open the same folder). */
-function inInternal(p: string): boolean {
-	return p.split("/")[0].replace(/[. ]+$/, "").toLowerCase() === INTERNAL;
+function inInternal(p: string, at = 0): boolean {
+	return (p.split("/")[at] ?? "").replace(/[. ]+$/, "").toLowerCase() === INTERNAL;
 }
 
 export function relativeToRoot(path: string, rootId: string): string {
@@ -108,8 +108,11 @@ function convertResult(x: ChatResult, f: Convert): ChatResult {
 	return x.kind === "quiz" ? { ...x, path: f(x.path) } : x;
 }
 
-/** A full contract path kept as is: clean, and not into the internal folder. */
-const asForeign = (p: string): string => (isCleanRelativePath(p) && !inInternal(p) ? p : "");
+/** A full contract path kept as is: clean, and not into the internal folder.
+    Its first segment is the root id, so the internal folder is the SECOND
+    one ("<root>/.neo-quiz/x.md"); a first segment named like it is refused
+    too. */
+const asForeign = (p: string): string => (isCleanRelativePath(p) && !inInternal(p) && !inInternal(p, 1) ? p : "");
 
 /** The Explain mark's quiz path. To the file: relative to the chats root, or,
     for a quiz of another open root (a declared vault), the full contract path

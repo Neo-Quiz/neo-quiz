@@ -201,6 +201,8 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 	// An Explain chat is listed with the quiz it is about; a plain chat has no such mark.
 	const marked = L.chatListItems([rec("x", 50, [req("r", 1, { text: "Why?" })], { explain: { path: "r/q.md", quiz: "Q" } }), rec("p", 40, [req("r", 1)])], [], now);
 	r.check("an Explain chat carries its quiz, a plain chat none", marked.map(i => [i.id, i.explain ?? null]), [["x", { quiz: "Q" }], ["p", null]]);
+	const firstTurn = L.chatListItems([], [line(1, "cours", { chatId: "e", explication: { mark: { path: "r/q.md", quiz: "Q" }, context: "", course: "", position: "" } })], now);
+	r.check("an Explain chat whose first answer runs carries its quiz from its line", firstTurn.map(i => [i.id, i.explain ?? null]), [["e", { quiz: "Q" }]]);
 	r.check("a finished line is not running", L.chatListItems([], [line(1, "prete", { chatId: "w" }, quiz("A", "a.md"))], now)[0].running, false);
 	r.check("newest first", L.chatListItems([rec("a", 10, [req("r", 1)]), rec("b", 30, [req("r", 1)]), rec("c", 20, [req("r", 1)])], [], now).map(i => i.id), ["b", "c", "a"]);
 
