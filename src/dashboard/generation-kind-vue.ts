@@ -24,7 +24,7 @@ import type { ClarifyQuestion } from "./generation-kind";
 
 /** The progress of a card still waiting, by request id: the thread repaints
     as the queue moves, and a repaint must not send the user back to step 1. */
-const progres = new Map<string, { index: number; reponses: string[][]; envoye: boolean }>();
+const progres = new Map<string, { index: number; reponses: string[][]; envoye: boolean; autre?: string }>();
 
 export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repondre?: (answers: string[][]) => void, cle?: string): void {
 	const host = currentHost();
@@ -65,7 +65,8 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 			}
 			return;
 		}
-		peindreEtape(carte, questions[etat.index], etat.index, questions.length, (reponse) => {
+		peindreEtape(carte, questions[etat.index], etat.index, questions.length, etat, (reponse) => {
+			etat.autre = undefined;
 			etat.reponses[etat.index] = reponse;
 			etat.index++;
 			peindre();
@@ -76,7 +77,11 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 
 /** One step: the question and its rows, with the keyboard. `fini` receives the
     answer (an empty list when skipped). */
-function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, total: number, fini: (reponse: string[]) => void): void {
+/* `memo.autre` is the text of the open "Type something" field, kept across
+   repaints (2026-10-14): the thread repaints as the queue moves, which used to
+   drop the open field mid-typing and hand the focus back to an option, where
+   the next space or digit typed picked that option, as if Enter was pressed. */
+function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, total: number, memo: { autre?: string }, fini: (reponse: string[]) => void): void {
 	const host = currentHost();
 	const tete = ajouter(carte, "div", "qbd-ai-kind-tete");
 	if (q.header) ajouter(tete, "span", "qbd-ai-kind-chip", q.header);
@@ -129,14 +134,14 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 		finir([label]);
 	};
 
-	const numero = (ligne: HTMLElement, i: number): void => { ajouter(ligne, "span", "qbd-ai-kind-num", `${i + 1}.`); };
+	const numero = (ligne: HTMLElement, i: number): void => { ajouter(ligne, "span", "qbd-ai-kind-num", String(i + 1)); };
 	q.options.forEach((o, i) => {
 		const b = ajouter(liste, "button", "qbd-ai-kind-option");
 		b.type = "button";
 		numero(b, i);
 		const corps = ajouter(b, "span", "qbd-ai-kind-corps");
 		const lab = ajouter(corps, "span", "qbd-ai-kind-label", o.label);
-		if (i === q.default) ajouter(lab, "span", "qbd-ai-kind-reco", " " + t("ai.clarify.recommended"));
+		if (i === q.default) ajouter(lab, "span", "qbd-ai-kind-reco", t("ai.clarify.recommended"));
 		if (o.description) ajouter(corps, "span", "qbd-ai-kind-desc", o.description);
 		if (q.multiple) host.ui.setIcon(ajouter(b, "span", "qbd-ai-kind-check"), "check");
 		b.addEventListener("click", () => activer(i));
@@ -167,6 +172,9 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 		champ.type = "text";
 		champ.placeholder = t("ai.clarify.otherPlaceholder");
 		champ.setAttribute("aria-label", t("ai.clarify.other"));
+		champ.value = memo.autre ?? "";
+		memo.autre = champ.value;
+		champ.addEventListener("input", () => { memo.autre = champ?.value ?? ""; });
 		// A row holding a field: clicks go to the field, not back to the row.
 		autre.addEventListener("click", (e) => { if (e.target === champ) e.stopPropagation(); }, true);
 		champ.addEventListener("keydown", (e) => {
@@ -181,6 +189,7 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 				e.preventDefault();
 				e.stopPropagation();
 				autreOuvert = false;
+				memo.autre = undefined;
 				autre.replaceChildren();
 				numero(autre, iAutre);
 				ajouter(ajouter(autre, "span", "qbd-ai-kind-corps"), "span", "qbd-ai-kind-label", t("ai.clarify.other"));
@@ -189,6 +198,7 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 			} else e.stopPropagation();
 		});
 		champ.focus({ preventScroll: true });
+		champ.setSelectionRange(champ.value.length, champ.value.length);
 		marquer();
 	};
 
@@ -216,9 +226,11 @@ function peindreEtape(carte: HTMLElement, q: ClarifyQuestion, index: number, tot
 		}
 	});
 	marquer();
+	// A field that was open before the repaint opens again, with its text and the focus.
+	if (memo.autre !== undefined) { actif = iAutre; ouvrirAutre(); }
 	// Focus goes to the first option when the card appears.
 	// The page may hand the focus back to the composer as it is redrawn: ask again a moment later.
-	const focus = (): void => { if (carte.isConnected && !termine && !carte.contains(document.activeElement)) lignes[actif]?.focus({ preventScroll: true }); };
+	const focus = (): void => { if (carte.isConnected && !termine && !carte.contains(document.activeElement)) (champ ?? lignes[actif])?.focus({ preventScroll: true }); };
 	requestAnimationFrame(focus);
 	window.setTimeout(focus, 150);
 }

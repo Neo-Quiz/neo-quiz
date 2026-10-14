@@ -162,9 +162,6 @@ export const EN_AI = {
 	"ai.mode.learnTip": "Learn a course step by step: a question before each passage, instant feedback, until it sticks.",
 	"ai.mode.practiceTip": "Train on exercises to prepare for your exam, with every mistake explained. When you start it, you can play it as a timed exam.",
 	/* "N quizzes <-> 1 quiz" toggle, under the attached documents */
-	"ai.oneQuiz.label": "One quiz",
-	"ai.oneQuiz.tipOne": "The {count} documents go into a single quiz. Click for one quiz per document.",
-	"ai.oneQuiz.tipMany": "One quiz per document: {count} quizzes. Click to put all the documents into a single quiz.",
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
 	/* A quiz's subject (categorie-quiz.ts): its name, its menu section, and
@@ -852,7 +849,7 @@ export const EN_AI = {
 	// Generate asks a few clarifying questions when a request is vague (spec 2026-10-07).
 	"ai.clarify.deciding": "Getting ready…",
 	"ai.clarify.other": "Type something",
-	"ai.clarify.recommended": "(Recommended)",
+	"ai.clarify.recommended": "Recommended",
 	"ai.clarify.otherPlaceholder": "Type your answer, then Enter",
 	"ai.clarify.validate": "Confirm",
 	"ai.clarify.skippedDefault": "Skipped → {answer} (default)",
