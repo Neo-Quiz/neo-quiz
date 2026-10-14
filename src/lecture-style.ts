@@ -9,6 +9,7 @@
      etapes:  ["idée 1", "idée 2", …]
      tableau: { colonnes: [...], lignes: [[...], …] }
      retenir: { forme: "cartes" | "recap", items: [...] }
+     accroche: { forme: "analogie" | "histoire" | "image" | "mnemo", texte }
 
    Ce module est la SEULE lecture de ces champs : le moteur (rendu), l'aperçu
    de l'éditeur et `check:quiz-format` la partagent. Il ne lève jamais : une
@@ -34,6 +35,13 @@ export type Retenir =
 	| { forme: "cartes"; items: CarteRetenir[] }
 	| { forme: "recap"; items: string[] };
 
+/** The HOOK of a reading (2026-10-14, spec 2026-10-14-learn-active-memory):
+    an analogy, a story, a mental picture or a mnemonic that makes the notion
+    stick. Persisted keys, never translated. */
+export const FORMES_ACCROCHE = ["analogie", "histoire", "image", "mnemo"] as const;
+export type FormeAccroche = typeof FORMES_ACCROCHE[number];
+export interface Accroche { forme: FormeAccroche; texte: string }
+
 export interface TableauLecture { colonnes: string[]; lignes: string[][] }
 
 export interface LectureStylee {
@@ -44,6 +52,8 @@ export interface LectureStylee {
 	tableau: TableauLecture | null;
 	/** « À retenir » valide et non vide ; null sinon. */
 	retenir: Retenir | null;
+	/** The reading's hook (`accroche`), or null when absent or malformed. */
+	accroche: Accroche | null;
 }
 
 type Brut = Record<string, unknown>;
@@ -128,13 +138,24 @@ export function retenirDeLecture(item: unknown): Retenir | null {
 	return null;
 }
 
-/** Les quatre champs d'une lecture, normalisés. */
+/** The reading's hook, or `null` when absent or malformed (unknown form,
+    empty text, not an object): the reading then shows without one. */
+export function accrocheDeLecture(item: unknown): Accroche | null {
+	const v = champ(item, "accroche");
+	if (!objet(v)) return null;
+	const forme = FORMES_ACCROCHE.find(f => f === v.forme);
+	const texte = cellule(v.texte);
+	return forme && texte.trim() !== "" ? { forme, texte } : null;
+}
+
+/** Les quatre champs d'une lecture, normalisés (cinq avec l'accroche). */
 export function lireLecture(item: unknown): LectureStylee {
 	return {
 		style: styleDeLecture(item),
 		etapes: etapesDeLecture(item),
 		tableau: tableauDeLecture(item),
 		retenir: retenirDeLecture(item),
+		accroche: accrocheDeLecture(item),
 	};
 }
 

@@ -557,5 +557,12 @@ await withSrcModule(["src/engine/lecture-rendu.ts", "src/engine/sanitizer.ts"], 
 		/aria-label="[^"]*\*\*/.test(html({ prompt: "", retenir: { forme: "cartes", items: [{ recto: md, verso: md }] } })), false);
 	r.check("récapitulatif : markdown rendu", html({ prompt: "", retenir: { forme: "recap", items: [md] } }).includes(attendu), true);
 	r.check("aucun marqueur brut ne reste", /\*\*gras\*\*|`code`/.test(html({ lecture: "tableau", prompt: md, tableau: { colonnes: [md], lignes: [[md]] }, retenir: { forme: "recap", items: [md] } })), false);
+	r.check("accroche: rendered under the title with its form",
+		/quiz-lecture-accroche is-analogie[\s\S]*Comme une/.test(html({ prompt: "x", accroche: { forme: "analogie", texte: "Comme une **boîte**" } })), true);
+	r.check("accroche: markdown rendered", html({ prompt: "x", accroche: { forme: "mnemo", texte: md } }).includes(attendu), true);
+	r.check("accroche: unknown form, empty text or a string = no hook",
+		[{ forme: "poeme", texte: "a" }, { forme: "image", texte: "  " }, "texte"].map(a => html({ prompt: "x", accroche: a }).includes("quiz-lecture-accroche")), [false, false, false]);
+	r.check("accroche: HTML in the text is never an element",
+		/<img/i.test(html({ prompt: "x", accroche: { forme: "image", texte: "<img src=x onerror=alert(1)>" } })), false);
 	r.done();
 });

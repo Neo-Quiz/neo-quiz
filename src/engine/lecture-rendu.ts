@@ -1,9 +1,10 @@
 import { t } from "../i18n";
+import type { TransKey } from "../i18n";
 import { lireLecture, paragraphes } from "../lecture-style";
 import { lireCitations } from "../pdf-sources";
 import { brancherCadres, htmlFrameMarkup } from "./html-frame";
 import { htmlDeLecture } from "./html-frame-core";
-import type { LectureStylee, Retenir, TableauLecture } from "../lecture-style";
+import type { Accroche, FormeAccroche, LectureStylee, Retenir, TableauLecture } from "../lecture-style";
 
 /* ══════════════════════════════════════════════════════════
    LE CORPS D'UNE LECTURE, SELON SON STYLE (2026-09-26)
@@ -58,6 +59,28 @@ function tableauHtml(tab: TableauLecture, p: PortesLecture): string {
 	const corps = `<tbody>${tab.lignes.map(l => `<tr>${l.map(c => `<td>${p.inline(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 	// L'enveloppe défile à l'horizontale si le tableau est trop large : jamais la carte.
 	return `<div class="quiz-lecture-tableau-wrap"><table class="quiz-lecture-tableau">${tete}${corps}</table></div>`;
+}
+
+/* Lucide icons of the hook forms, inline like the recap's check mark. */
+const ICONES_ACCROCHE: Record<FormeAccroche, string> = {
+	analogie: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+	histoire: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+	image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+	mnemo: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+};
+
+/* The translation key of each hook form, written out so `t()` is typed. */
+const CLES_ACCROCHE: Record<FormeAccroche, TransKey> = {
+	analogie: "engine.lecture.hook.analogie",
+	histoire: "engine.lecture.hook.histoire",
+	image: "engine.lecture.hook.image",
+	mnemo: "engine.lecture.hook.mnemo",
+};
+
+/** The hook block: icon, label of its form, text through the inline door. */
+function accrocheHtml(a: Accroche, p: PortesLecture): string {
+	const icone = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES_ACCROCHE[a.forme]}</svg>`;
+	return `<div class="quiz-lecture-accroche is-${a.forme}"><div class="quiz-lecture-accroche-tete">${icone}<span>${p.inline(t(CLES_ACCROCHE[a.forme]))}</span></div><div class="quiz-lecture-accroche-texte">${p.inline(a.texte)}</div></div>`;
 }
 
 function retenirHtml(r: Retenir, p: PortesLecture): string {
@@ -124,13 +147,14 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	}
 	const retenir = l.retenir ? retenirHtml(l.retenir, p) : "";
 	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${p.inline(titre)}</h3>` : "";
+	const accroche = !courte && l.accroche ? accrocheHtml(l.accroche, p) : "";
 	/* Where the reading comes from ("cite", 2026-09-30): the document and its
 	   pages, written by the generator — the original to read again. */
 	const cite = (item as { cite?: unknown } | null)?.cite;
 	const source = typeof cite === "string" && cite.trim()
 		? `<div class="quiz-lecture-source"${citeOuvrable(cite) ? ` data-cite="${p.attribut(cite.trim())}" role="button" tabindex="0"` : ""}>${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
 		: "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${courte ? "" : figureHtml(item, p)}${corps}${courte ? "" : pageInteractive(item, titre)}${retenir}${source}</div>` };
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${accroche}${courte ? "" : figureHtml(item, p)}${corps}${courte ? "" : pageInteractive(item, titre)}${retenir}${source}</div>` };
 }
 
 /** The reading's interactive page (`html`, 2026-10-09): a complete HTML page in

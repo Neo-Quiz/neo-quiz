@@ -414,3 +414,22 @@
   padding: 8px 6px;
   overflow-wrap: anywhere;
 }
+
+/* ── The hook of a reading (2026-10-14): a coloured block under the title ── */
+.quiz-lecture-accroche{
+  margin: 10px 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--quiz-step-accent, var(--interactive-accent));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--quiz-step-accent, var(--interactive-accent)) 10%, transparent);
+}
+.quiz-lecture-accroche-tete{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--quiz-step-accent, var(--interactive-accent));
+}
+.quiz-lecture-accroche-tete svg{ width: 16px; height: 16px; flex: none; }
+.quiz-lecture-accroche-texte{ margin-top: 4px; line-height: 1.5; }

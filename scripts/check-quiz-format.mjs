@@ -236,7 +236,7 @@ await withSrcModule("src/lecture-style.ts", ({ lireLecture, styleDeLecture, tabl
 			.map(v => retenirDeLecture({ retenir: v })),
 		[null, null, null, null, null, null, null]);
 	r.check("lecture ancienne (aucun champ) : page, rien d'autre",
-		lireLecture({ role: "read", prompt: "Texte." }), { style: "page", etapes: [], tableau: null, retenir: null });
+		lireLecture({ role: "read", prompt: "Texte." }), { style: "page", etapes: [], tableau: null, retenir: null, accroche: null });
 	r.check("paragraphes : coupés sur la ligne vide, jamais dans un bloc de code",
 		paragraphes("Un.\n\nDeux\nsuite.\n\n```python\na = 1\n\nb = 2\n```\n\n\nTrois."),
 		["Un.", "Deux\nsuite.", "```python\na = 1\n\nb = 2\n```", "Trois."]);
