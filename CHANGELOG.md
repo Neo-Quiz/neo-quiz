@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.113] - 2026-10-14
+
 ### Added
 
 - Typing / in the AI page lists commands: /clear starts a new conversation, /model picks the model, /resume finds a past conversation.
