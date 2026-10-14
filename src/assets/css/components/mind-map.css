@@ -4,7 +4,7 @@
    its key points as chips hidden until tapped. The branch colour comes
    from --quiz-step-h, set inline from STEP_HUES. Fluid from 320 px.
    ========================================================= */
-.quiz-mindmap{ margin: 24px 0; text-align: left; }
+.quiz-mindmap{ --quiz-step-h: 215; margin: 24px 0; text-align: left; }
 .quiz-mindmap h3{ margin: 0 0 4px; font-size: 1.05em; font-weight: 700; }
 .quiz-mindmap-hint{ margin: 0 0 12px; color: var(--text-muted); font-size: 0.9em; }
 .quiz-mindmap-centre{
