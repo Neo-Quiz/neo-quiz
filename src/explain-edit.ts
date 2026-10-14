@@ -14,7 +14,7 @@
    - `prompt` or `promptHtml`, whichever the card already uses, never both;
    - every HTML field goes through the sanitizer handed in (the app passes
      `sanitizeQuizHtml`, the first of the four gates of engine/sanitizer.ts);
-   - the whole card stays under `READING_MAX_CHARS` + 25 %;
+   - the whole card stays under three times `READING_MAX_CHARS` (that number is a recommended maximum since 2026-10-14, the ceiling only stops a runaway answer);
    - the card does not lose more than 30 % of its length.
 
    PURE: no DOM, no host. `npm run check:explain` holds it.
@@ -26,7 +26,7 @@ import { READING_MAX_CHARS, retenirDeLecture } from "./lecture-style";
 export const CARD_EDIT_FIELDS = ["title", "prompt", "promptHtml", "etapes", "retenir"] as const;
 
 /** A proposal may grow the card by this much beyond the reading limit. */
-export const CARD_EDIT_GROWTH = 1.25;
+export const CARD_EDIT_GROWTH = 3;
 /** A proposal may not shorten the card by more than this. */
 export const CARD_EDIT_MAX_LOSS = 0.3;
 /** At most this many steps. */
@@ -148,7 +148,7 @@ export function consigneEditionCarte(card: Record<string, unknown>): string {
 		"<card-edit>{ ...JSON... }</card-edit>",
 		`The JSON holds ONLY these text fields, each as in the current card below: ${CARD_EDIT_FIELDS.filter(f => f !== (usesHtml ? "prompt" : "promptHtml")).join(", ")} (the text goes in ${texte}). Leave out a field you do not change. No other key, never the id, the source, the figure or another question.`,
 		"Keep EVERY piece of information of the current card (you may add some, never remove one), the same language, and the same writing conventions (Markdown, LaTeX between $, fenced code).",
-		`The whole card must stay under ${READING_MAX_CHARS} characters (title, text, steps and key points together; ${CARD_EDIT_MAX_CHARS} at the very most) and must not become much shorter.`,
+		`The whole card should stay under ${READING_MAX_CHARS} characters (title, text, steps and key points together), a recommended maximum it may exceed when the change truly needs it (${CARD_EDIT_MAX_CHARS} at the very most), and must not become much shorter.`,
 		"The learner sees a preview with an Apply button: nothing is written before they click. Do not write the block when they only ask a question.",
 		"Current text fields of the card (JSON): " + JSON.stringify(cardFieldsOf(card)),
 	].join("\n") + "\n";

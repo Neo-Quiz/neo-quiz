@@ -97,8 +97,9 @@ await withSrcModule(["src/explain-edit.ts", "src/explain-prompt.ts", "src/lectur
 	const juge = (o, json) => validateCardEdit(o, typeof json === "string" ? json : JSON.stringify(json), sanitize);
 	const motif = (o, json) => { const v = juge(o, json); return v.ok ? "ok" : v.reason; };
 
-	r.check("the limits: 1800 characters for a reading (it was about 1200), +25 % at most for a rewrite",
-		[READING_MAX_CHARS, CARD_EDIT_GROWTH, CARD_EDIT_MAX_CHARS], [1800, 1.25, 2250]);
+	/* 2026-10-14: 1800 is a recommended maximum; a rewrite may go past it, with a ceiling of three times that against a runaway answer. */
+	r.check("the limits: 1800 characters recommended for a reading, three times that at the very most for a rewrite",
+		[READING_MAX_CHARS, CARD_EDIT_GROWTH, CARD_EDIT_MAX_CHARS], [1800, 3, 5400]);
 
 	// ── reading the block out of the answer
 	const bloc = (j) => "<card-edit>" + j + "</card-edit>";
@@ -168,7 +169,7 @@ await withSrcModule(["src/explain-edit.ts", "src/explain-prompt.ts", "src/lectur
 	r.check("a reading that is not on screen does not carry the source", contexteQuiz([lecture, q2], { quiz: "", courant: 1 }).includes("Source:"), false);
 	const consigne = consigneEditionCarte(lecture);
 	r.check("the instruction: the tag, the limit, every piece of information kept, the card's current fields, nothing written before the click",
-		[consigne.includes("<card-edit>"), consigne.includes("under 1800 characters"), consigne.includes("2250"), consigne.includes("EVERY piece of information"), consigne.includes("promptHtml"), consigne.includes('"etapes":["Do this","Then that"]'), consigne.includes("nothing is written before they click"), consigne.includes("CM1.pdf")],
+		[consigne.includes("<card-edit>"), consigne.includes("under 1800 characters"), consigne.includes("5400"), consigne.includes("EVERY piece of information"), consigne.includes("promptHtml"), consigne.includes('"etapes":["Do this","Then that"]'), consigne.includes("nothing is written before they click"), consigne.includes("CM1.pdf")],
 		[true, true, true, true, true, true, true, false]);
 	r.done();
 });

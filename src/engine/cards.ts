@@ -936,7 +936,9 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		   (`corpsLecture`, engine/passage.ts). Son titre est écrit DANS la
 		   page (serif, maquette B) : le `<h2>` de la carte n'est alors pas posé. */
 		const promptHtml = renderQuizPromptHtml(q);
-		const lecture = isRead ? corpsLecture(ctx, q, String(q.prompt ?? ""), promptHtml, String(q.title ?? "")) : null;
+		// In a step-page Learn, the reading carries its step's number (its bead's).
+		const numeroEtape = isRead ? ctx.stepSlides?.find(p => stepMembers(p).includes(qi))?.step : undefined;
+		const lecture = isRead ? corpsLecture(ctx, q, String(q.prompt ?? ""), promptHtml, String(q.title ?? ""), numeroEtape) : null;
 
 		/* Une lecture COURTE n'a pas d'écran : elle se lit ouverte, en version
 		   légère, sans cadre, au-dessus de sa question hôte, et nulle part

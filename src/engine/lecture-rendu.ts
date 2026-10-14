@@ -114,8 +114,8 @@ function retenirHtml(r: Retenir, p: PortesLecture): string {
  *   d'une question, maquette B) ; absent pour une lecture autonome, dont la
  *   carte porte déjà le titre.
  */
-export function corpsLectureHtml(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture): CorpsLecture {
-	return rendre(item, brut, texteHtml, titre, p, false);
+export function corpsLectureHtml(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture, numero?: number): CorpsLecture {
+	return rendre(item, brut, texteHtml, titre, p, false, numero);
 }
 
 /**
@@ -128,7 +128,7 @@ export function corpsLectureCourteHtml(item: unknown, brut: string, texteHtml: s
 	return rendre(item, brut, texteHtml, undefined, p, true);
 }
 
-function rendre(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture, courte: boolean): CorpsLecture {
+function rendre(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture, courte: boolean, numero?: number): CorpsLecture {
 	const l = lireLecture(item);
 	let corps: string;
 	let pageApres = "";
@@ -157,7 +157,11 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 		corps = `<div class="quiz-lecture-texte">${texteHtml}</div>`;
 	}
 	const retenir = l.retenir ? retenirHtml(l.retenir, p) : "";
-	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${p.inline(titre)}</h3>` : "";
+	/* The reading opens with the number of its step, the one on its bead in
+	   the row above (2026-10-14): the course reads as numbered parts, and the
+	   bead and the page say the same number. */
+	const num = numero !== undefined && Number.isInteger(numero) && numero > 0 ? `<span class="quiz-lecture-numero" aria-hidden="true">${numero}</span>` : "";
+	const tete = titre && titre.trim() ? `<h3 class="quiz-lecture-titre">${num}${p.inline(titre)}</h3>` : "";
 	const accroche = !courte && l.accroche ? accrocheHtml(l.accroche, p) : "";
 	/* Where the reading comes from ("cite", 2026-09-30): the document and its
 	   pages, written by the generator — the original to read again. */

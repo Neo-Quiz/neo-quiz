@@ -402,3 +402,20 @@
 }
 .quiz-lecture-accroche-tete svg{ width: 16px; height: 16px; flex: none; }
 .quiz-lecture-accroche-texte{ margin-top: 4px; line-height: 1.5; }
+
+/* The step number before a reading's title: the same number as its bead in
+   the row above, so the course reads as numbered parts (2026-10-14). */
+.quiz-lecture-numero{
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  padding: 0 0.35em;
+  margin-right: 0.5em;
+  border-radius: 999px;
+  background: var(--quiz-primary);
+  color: #fff;
+  font-size: 0.8em;
+  font-weight: 700;
+  vertical-align: 0.12em;
+}

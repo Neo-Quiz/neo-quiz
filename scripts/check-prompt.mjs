@@ -54,8 +54,11 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 			"2 MCQ questions per slice in all, the optional \"pre\" one counted", "ONE OR SEVERAL correct answers", "3 to 5 options", "The first question of the slice is easy", "at most ONE FLASHCARD per slice",
 			"ONLY when the slice brings a genuinely NEW idea"].filter(p => !learnP.includes(p)), []);
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
-	r.check("Learn: a reading stays under 1800 characters, written in the prompt",
-		[learnP.includes("stays under 1800 characters"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("stays under 1800 characters")], [true, false]);
+	/* 2026-10-14: a recommended maximum, no longer a wall: a reading may go past it when its notion needs it. */
+	r.check("Learn: a reading aims under 1800 characters, a recommended maximum it may exceed, written in the prompt",
+		[learnP.includes("aims to stay under 1800 characters: a RECOMMENDED maximum"), learnP.includes("never to pad"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("under 1800 characters")], [true, true, false]);
+	r.check("Learn: several notions in a slice become bold, unnumbered parts",
+		learnP.includes("opened by a **bold** subheading (never numbered"), true);
 	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram. */
 	r.check("Learn: interactive pages name the explorable, structured-course and annotated-diagram styles",
 		["EXPLORABLE", "STRUCTURED COURSE", "ANNOTATED DIAGRAM", "MIXED"].map(m => learnP.includes(m)), [true, true, true, true]);

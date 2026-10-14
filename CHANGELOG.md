@@ -21,6 +21,8 @@ release notes.
 - Explain keeps one conversation per quiz and always knows which slide you are on.
 - Explain conversations are listed in the AI page, where they can be continued.
 - Readings in a Learn read as flowing paragraphs, without a numbered list.
+- Each reading of a Learn opens with its step number, the same as its bead.
+- A reading may now go past its usual length when its notion needs it; several notions in one step become separate parts.
 - New Learns and Explain answers teach each notion from a runnable example and what it prints, then what changes without it, and never through a notion not yet seen.
 
 ### Fixed

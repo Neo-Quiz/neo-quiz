@@ -98,8 +98,8 @@ function portesMoteur(ctx: EngineCtx): PortesLecture {
  * Le corps STYLÉ d'une lecture sur son ÉCRAN (engine/cards.ts), par les
  * portes du sanitizer du moteur.
  */
-export function corpsLecture(ctx: EngineCtx, item: unknown, brut: string, texteHtml: string, titre?: string): CorpsLecture {
-	return corpsLectureHtml(item, brut, texteHtml, titre, portesMoteur(ctx));
+export function corpsLecture(ctx: EngineCtx, item: unknown, brut: string, texteHtml: string, titre?: string, numero?: number): CorpsLecture {
+	return corpsLectureHtml(item, brut, texteHtml, titre, portesMoteur(ctx), numero);
 }
 
 /** La version LÉGÈRE d'une lecture courte, au-dessus de sa question hôte
