@@ -627,7 +627,12 @@ export function tempsRestant(question: number, total: number | null | undefined,
 export function modeleDiffere(demande: string, effectif: string): boolean {
 	const normaliser = (m: string): string => m.toLowerCase().replace(/\s+/g, "");
 	const a = normaliser(demande), b = normaliser(effectif);
-	return a !== "" && b !== "" && a !== b;
+	if (a === "" || b === "") return false;
+	/* An ALIAS (no version: "Opus", "Sonnet") is whatever model of its family
+	   the CLI resolves it to (2026-10-14: "Opus" answered by "Opus 5.5" was
+	   reported as a safeguard fallback). */
+	if (!/\d/.test(a)) return !b.startsWith(a);
+	return a !== b;
 }
 
 /** The AI's work summed up by kind, as MonoCode titles it ("Explored the

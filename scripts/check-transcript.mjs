@@ -229,6 +229,7 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("safeguard: Opus 5.5 answered by Opus 4.8 differs", modeleDiffere("Opus 5.5", "Opus 4.8"), true);
 	r.check("safeguard: the same label in another case or spacing does not differ", modeleDiffere("Opus 5.5", "opus  5.5"), false);
 	r.check("safeguard: an empty side never differs", [modeleDiffere("", "Opus 4.8"), modeleDiffere("Opus 5.5", "")], [false, false]);
+	r.check("safeguard: an alias matches its family, not another family", [modeleDiffere("Opus", "Opus 5.5"), modeleDiffere("Opus", "Sonnet 5.5"), modeleDiffere("opus", "Opus 4.8"), modeleDiffere("Model d", "Model x")], [false, true, false, true]);
 	/* A message the safeguards STOPPED (`message_delta`, stop_reason "refusal",
 	   2026-10-13: a quiz cut at 26 questions of 40 with nothing on screen). */
 	const coupe = [

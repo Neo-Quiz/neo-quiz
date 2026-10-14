@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A generation on the "Opus" model no longer reports a false safeguard fallback when Claude Code answers with Opus 5.5.
+
+### Changed
+
+- Interactive Learn pages colour their code like the course's code blocks, colour-code what belongs together, and show a list one element per line.
+
 ## [1.20.104] - 2026-10-14
 
 ### Fixed

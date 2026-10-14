@@ -126,7 +126,13 @@ function libelleFini(nom: string, ms: number | undefined): string {
 function modeleRepli(l: LigneGeneration, tr: Transcript | null | undefined): string | null {
 	if (!tr?.effectiveModel || l.demande.reglages.aiProvider !== "claude-code") return null;
 	const effectif = aiProviders.libelleModele("claude-code", tr.effectiveModel);
-	return modeleDiffere(nomModeleSelectionne(l), effectif) ? effectif : null;
+	return modeleDiffere(modeleDemande(l, tr), effectif) ? effectif : null;
+}
+
+/** The model the turn was STARTED with: the one Claude Code's init line names
+    (an alias already resolved, "Opus" → "Opus 5.5"), else the one chosen. */
+function modeleDemande(l: LigneGeneration, tr: Transcript | null | undefined): string {
+	return tr?.model ? aiProviders.libelleModele("claude-code", tr.model) : nomModeleSelectionne(l);
 }
 
 /** The summary of a running turn: "Opus 5.5 · Weighing the options… 0:12". */
@@ -575,7 +581,7 @@ export function creerVueFile(opts: {
 		/* The automatic retry itself: answered by the fallback, said in orange. */
 		const relance = !vivant && !repli && !!l.demande?.repliDe;
 		const libelle = repli
-			? t("ai.safeguard.flagged", { requested: nom, effective: repli })
+			? t("ai.safeguard.flagged", { requested: modeleDemande(l, tr), effective: repli })
 			: coupe ? (repliAuto ? t("ai.safeguard.stoppedRetried", { model: nom, fallback: aiProviders.libelleModele("claude-code", repliAuto) }) : t("ai.safeguard.stopped", { model: nom }))
 			: relance ? t("ai.safeguard.flagged", { requested: aiProviders.libelleModele("claude-code", l.demande?.repliDe ?? ""), effective: nom })
 			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
