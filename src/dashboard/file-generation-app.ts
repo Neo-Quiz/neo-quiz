@@ -579,6 +579,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				// Never the agent folder for a request from another device: nobody at this PC asked for it.
 				dossier: d.fromDevice ? undefined : x.folder,
 				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne), followUp },
+				// After a reload, attach to the one-shot call still running instead of launching it again.
+				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
 					appliquer(transcript, ev);

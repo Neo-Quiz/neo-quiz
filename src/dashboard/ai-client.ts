@@ -288,6 +288,11 @@ export interface ChatOptions {
 	    `followUp` is sent when the session already holds the conversation;
 	    a new session gets the whole text. */
 	live?: LiveOptions & { followUp?: string };
+	/** The resume key of this call (2026-10-14, `HostProcess.run`), as
+	    `GenerateOptions.reprise`: stable across a reload of the page, so the
+	    queue restored after it attaches to the CLI still running instead of
+	    launching the same call again. Each CLI call gets its own key from it. */
+	reprise?: string;
 }
 
 /** The AI client, returned by `createAiClient`. */
@@ -2306,6 +2311,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		texteSuite = options.live?.followUp || null;
 		try {
 			// Inside the `try`: should it throw, `finally` still resets the live state above.
+			repriseBase = options.reprise ?? null;
+			appelsCli = 0;
 			await refreshCliCaches();
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
@@ -2363,6 +2370,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			dossierOutils = null;
 			liveCtx = null;
 			texteSuite = null;
+			repriseBase = null;
 		}
 	}
 

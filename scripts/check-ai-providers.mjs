@@ -680,3 +680,28 @@ await withSrcModule(
 		r.done();
 	},
 );
+
+/* A ONE-SHOT CHAT CALL RESUMES AFTER A RELOAD (2026-10-14): `chat()` passes
+   its resume key to `process.run`, as a generation does, so the queue
+   restored after a reload attaches to the CLI still running instead of
+   launching the same Explain call a second time. The next call without a
+   key gets none (the key never leaks into a later call). */
+await withSrcModule(
+	["src/host/current.ts", "src/dashboard/ai-client.ts"],
+	async ({ installHost }, client) => {
+		const r = makeReporter("One-shot chat resume key");
+		const { hote } = fauxHote();
+		const cles = [];
+		hote.process.run = async (spec) => {
+			cles.push(spec.reprise ?? null);
+			const e = new Error("no CLI here"); e.name = "indisponible"; throw e;
+		};
+		installHost(hote);
+		const settings = { get: () => ({ aiProvider: "claude-code", aiModel: "" }), save: async () => {} };
+		const c = client.createAiClient(settings);
+		await c.chat([{ role: "user", text: "Explain this" }], { style: "explain", reprise: "line-7" }).catch(() => {});
+		await c.chat([{ role: "user", text: "Again" }], { style: "explain" }).catch(() => {});
+		r.check("chat passes its resume key to the CLI call, and the next call without one gets none", cles, ["line-7-0", null]);
+		r.done();
+	},
+);
