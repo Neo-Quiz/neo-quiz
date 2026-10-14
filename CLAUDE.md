@@ -562,6 +562,7 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   `pcReachable` : un fichier de génération frais dit « en cours », mais un PC
   OISIF n'écrit rien (Syncthing réplique chaque écriture), donc une connexion
   Syncthing d'un appareil appairé suffit à le dire joignable. Dans la CI.
+- `npm run check:explain-chat` — le noyau pur des chats « Expliquer » (`src/dashboard/explain-chat.ts`, `src/explain-follow.ts`, `positionCourante` de `src/explain-prompt.ts`) : un quiz qui rouvrirait le chat d'un autre quiz (ou un chat sans marque), une réponse en cours affichée dans le mauvais chat ou doublée par sa ligne une fois enregistrée, un tour de relance qui partirait sans le contexte vers une session neuve, un message envoyé sans la slide d'où il part (la position est TOUJOURS en dernier), et le composer ouvert sur une question pas encore corrigée (ce serait donner la réponse). Dans la CI.
 - `npm run check:chat-archives` — l'ancien lecteur d'archives de chats
   (`chat-archives.ts`) et la recherche : une conversation sans réponse n'est pas
   enregistrée, une conversation continuée n'apparaît pas deux fois, la liste est
@@ -1048,12 +1049,7 @@ WebFetch, WebSearch, `mcp__*`…), `--permission-mode dontAsk`,
 `--settings {"disableAllHooks":true}`, `--strict-mcp-config` avec un
 `--mcp-config` vide, et `--add-dir` du seul dossier des pièces jointes. Chaque
 appel d'outil et son résultat (refus compris) s'affichent dans le bloc replié
-« Travail de l'IA » (`transcript.ts`). Le chat « Expliquer » tourne de la
-même façon depuis le 2026-10-14 (décision d'Ahmed : « il ne doit plus être
-lancé sans tools ») : agent dans le DOSSIER DU QUIZ une fois approuvé, mode
-de la pastille, et son travail (réflexion, outils) affiché au-dessus de la
-réponse (`transcript-steps.ts`, partagé avec la file de Générer) ; un appel
-par message, jamais une session live. Antigravity, Ollama, la clarification
+« Travail de l'IA » (`transcript.ts`). Le chat « Expliquer » tourne de la même façon depuis le 2026-10-14 (décision d'Ahmed : « il ne doit plus être lancé sans tools ») : UN chat par quiz, enregistré comme les chats de la page « IA » (ex-« Générer », renommée le même jour) avec une marque `explain` (`chat-record.ts`, relue comme hostile depuis les fichiers synchronisés, `foreign` pour un quiz hors de la racine des chats) ; chaque message est une ligne de la file de génération marquée `explication` (`file-generation-app.ts`, `expliquer`), tour de la session live du chat dans la racine (une session neuve reçoit tout le texte tant qu'elle n'a pas reçu un tour : `Session.primed`), sinon un appel ponctuel avec tout l'historique ; chaque message porte À LA FIN la slide où l'élève se trouve (`positionCourante`), la méthode d'explication et la consigne d'édition de cette question ; le composer est fermé sur une question pas encore corrigée (`composerOpen`, `src/explain-follow.ts`) ; le travail de l'IA reste visible (`peindreTravailEnregistre`). Noyau pur : `src/dashboard/explain-chat.ts`. Antigravity, Ollama, la clarification
 et toute demande venue d'un autre appareil restent sans outil. Sinon, le modèle ne peut ouvrir aucun fichier. C'est
 l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
 dans le composer (vault, chemin absolu, racine externe configurée) et
