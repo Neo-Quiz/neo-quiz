@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.95] - 2026-10-14
+
 ### Changed
 
 - The "One quiz" button under attached documents is gone: with several documents, the AI asks whether to make one quiz per document or a single one.
