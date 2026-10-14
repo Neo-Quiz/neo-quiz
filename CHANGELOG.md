@@ -15,6 +15,11 @@ release notes.
 
 ### Changed
 
+- The quiz player shows its source files as one pill next to the title, listing them on hover with their file-type icons, which leaves more room for the quiz.
+- A Learn's objectives open folded on its first page.
+
+### Changed
+
 - Interactive pages colour every piece of code they hold, in any language, and new Learns lay them out without an outer frame, one list element per line.
 
 ## [1.20.105] - 2026-10-14

@@ -730,7 +730,11 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const list = ctx.objectifs ?? [];
 		if (list.length === 0) return "";
 		const mark = done ? `<span class="quiz-learn-objective-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>` : "";
-		return `<section class="quiz-learn-objectives${done ? " is-done" : ""}"><h3>${t(titleKey)}</h3><ul>${list.map(o => `<li>${mark}<span>${ctx.sanitize.renderInlineText(o)}</span></li>`).join("")}</ul></section>`;
+		const items = `<ul>${list.map(o => `<li>${mark}<span>${ctx.sanitize.renderInlineText(o)}</span></li>`).join("")}</ul>`;
+		/* On the first page, a callout folded by default (2026-10-14): the list
+		   took the top of the page from the reading. The summary keeps it open. */
+		if (!done) return `<details class="quiz-learn-objectives is-folded"><summary>${t(titleKey)}</summary>${items}</details>`;
+		return `<section class="quiz-learn-objectives is-done"><h3>${t(titleKey)}</h3>${items}</section>`;
 	}
 
 	/** One slide per STEP (engine/step-page.ts): the step's readings, then its

@@ -2,6 +2,8 @@ export const EN_PDF = {
 	"pdf.chip.open": "Open {name}",
 	"pdf.chip.missing": "Not found: {name}",
 	"pdf.chip.list": "Sources",
+	"pdf.sources.countOne": "{count} file",
+	"pdf.sources.countOther": "{count} files",
 	"pdf.cite.open": "Open the source",
 	"pdf.viewer.page": "Page {page} / {total}",
 	"pdf.viewer.zoomIn": "Zoom in",

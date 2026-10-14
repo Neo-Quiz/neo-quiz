@@ -4,6 +4,8 @@ export const FR_PDF: Record<keyof typeof EN_PDF, string> = {
 	"pdf.chip.open": "Ouvrir {name}",
 	"pdf.chip.missing": "Introuvable : {name}",
 	"pdf.chip.list": "Sources",
+	"pdf.sources.countOne": "{count} fichier",
+	"pdf.sources.countOther": "{count} fichiers",
 	"pdf.cite.open": "Ouvrir la source",
 	"pdf.viewer.page": "Page {page} / {total}",
 	"pdf.viewer.zoomIn": "Agrandir",

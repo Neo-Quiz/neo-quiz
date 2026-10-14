@@ -303,3 +303,32 @@
   padding-top: 12px;
   border-top: 0;
 }
+
+/* The objectives on the first page: a callout folded by default (2026-10-14),
+   in the hook's look (bar on the left, light tint), opened by its title. */
+.quiz-learn-objectives.is-folded {
+  padding: 8px 14px;
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+.quiz-learn-objectives.is-folded > summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.quiz-learn-objectives.is-folded > summary::-webkit-details-marker { display: none; }
+.quiz-learn-objectives.is-folded > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+.quiz-learn-objectives.is-folded[open] > summary::before { transform: rotate(45deg); }
+.quiz-learn-objectives.is-folded > ul { margin-top: 8px; }

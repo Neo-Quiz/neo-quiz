@@ -42,7 +42,7 @@ import type { SessionsApp } from "../review/sessions";
 import { testSetups } from "../review/test-setups";
 import { createTestSetupPage, type TestSetupPage } from "./test-setup-host";
 import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
-import { brancherCitations, monterSources } from "../../../../src/pdf-sources-view";
+import { brancherCitations, monterPastilleSources } from "../../../../src/pdf-sources-view";
 
 /** The questions of a parsed block AS THE NOTE WRITES THEM, in a copy: the
     engine normalises the objects it is given (`correctIndexes` gains a
@@ -161,8 +161,9 @@ export async function openQuizPage(
 	const libelle = ajouter(mode, "span", "qbd-qz-mode-label", quizModeLabel(entry.mode));
 	mode.setAttribute("aria-label", libelle.textContent ?? "");
 	ajouter(titrage, "h2", "qbd-qz-title", entry.title);
-	/* The PDFs the quiz cites, as chips under the title (filled once the cards are read). */
-	const puces = ajouter(contenu, "div", "qbd-pdf-sources qbd-qz-sources");
+	/* The files the quiz cites, as ONE pill right of the title (filled once the
+	   cards are read; pdf-sources-view.ts monterPastilleSources). */
+	const puces = ajouter(titrage, "div", "qbd-qz-sources");
 
 	/* The container given to the engine, and THAT ALONE: the engine sets
 	   `__quizDestroy` on it, and the teardown must aim at it. The plugin does
@@ -209,7 +210,7 @@ export async function openQuizPage(
 		   block must say why, not leave an empty screen. */
 		const quiz = parseQuizSource(bloc[1]);
 		questionsJouees = commeLaNote(quiz);
-		monterSources(puces, questionsJouees, entry.path);
+		monterPastilleSources(puces, questionsJouees, entry.path);
 		/* The app's side of "Set up your test": the modal and the settings last
 		   used for this quiz. A Learn never asks (the engine skips it). */
 		setupPage = createTestSetupPage({
