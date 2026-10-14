@@ -223,13 +223,13 @@ await withSrcModule(["src/dashboard/ai-client.ts"], ({ composerPrompts }) => {
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	/* 2026-10-10: the readings take the validated style of their notion as an html page (explorable, structured course, annotated diagram) and vary along the path; the older rules that made every reading plain steps ("ALWAYS etapes", html "MAY" / "ONLY when") are gone, so no prompt can carry both. */
 	r.check("Learn: each reading takes the style of its notion as an html page, and the styles vary",
-		[learnP.includes("ITS STYLE:"), learnP.includes("give the page to EVERY slice that does"), learnP.includes("the readings VARY along the path"), learnP.includes('"lecture" is ALWAYS "etapes"'), learnP.includes('MAY carry "html"'), learnP.includes("Use it ONLY when")], [true, true, true, false, false, false]);
+		[learnP.includes("ITS STYLE:"), learnP.includes("AT LEAST 8 READINGS IN 10 carry their page"), learnP.includes("the readings VARY along the path"), learnP.includes('"lecture" is ALWAYS "etapes"'), learnP.includes('MAY carry "html"'), learnP.includes("Use it ONLY when")], [true, true, true, false, false, false]);
 	r.check("Practice : aucun style de lecture",
 		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
 	/* Interactive pages (2026-10-09): a reading MAY carry `html`; the rule is
 	   Learn-only and says what keeps the page safe and readable. */
 	r.check("Learn : une lecture porte `html` quand sa notion a un style (page autonome, sans réseau, thème, 60 Ko)",
-		["a \"read\" card carries \"html\" whenever its notion fits", "self-contained", "no network", "--nq-bg", "60 KB", "NEVER for plain text"].filter(p => !learnP.includes(p)), []);
+		["AT LEAST 8 READINGS IN 10 carry \"html\"", "the learner ACTS on the course", "self-contained", "no network", "--nq-bg", "60 KB", "NEVER a page that only SHOWS text"].filter(p => !learnP.includes(p)), []);
 	r.check("Practice : aucune page interactive", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("INTERACTIVE PAGES"), false);
 	r.done();
 });
