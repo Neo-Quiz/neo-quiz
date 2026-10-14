@@ -43,6 +43,7 @@ import { mathifyElement } from "../../../../src/engine/mathjax";
 import { brancherCadres, htmlFrameMarkup } from "../../../../src/engine/html-frame";
 import { splitHtmlBlocks } from "../../../../src/engine/html-frame-core";
 import { consigneExplication, contexteQuiz, positionCourante } from "../../../../src/explain-prompt";
+import { composerOpen } from "../../../../src/explain-follow";
 import { ancrerImagesCitees } from "../../../../src/explain-images";
 import type { ImageJointe } from "../../../../src/explain-images";
 import { poserImagesCitees } from "./explain-images";
@@ -634,14 +635,12 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 
 	/** The quiz's folder, a contract path: where Claude Code and Codex work. */
 	const dossierQuiz = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")) : undefined;
-	/* The quiz with NO question marked (the position says where the learner
-	   is, `positionDe`) and the tutor's instructions for the question `qi` the
-	   first message is about. No edit instruction: it follows the slide, with
-	   each message (`consigneEditionDe`). */
-	const contexteDe = (qi: number): string => {
+	/* The quiz with NO question marked. The position says where the learner is
+	   (`positionDe`), then the tutor's instructions for the question on screen
+	   (`consigneExplication`, `consigneEditionDe`) follow it with each message. */
+	const contexteDe = (): string => {
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
-		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: -1 });
-		return base + "\n" + consigneExplication(questions[qi]?.role === "read");
+		return contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: -1 });
 	};
 	/* The instruction to rewrite the reading card `qi` or improve the question
 	   `qi`, sent after the position with each message, so it names the
@@ -692,6 +691,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	boutonQuiz.hidden = true;
 	peindreLogoBouton();
 	let uniteCourante: Unite | null = null;
+	/* Repaints the open window's composer: its lock follows the question on screen. */
+	let majComposeur: (() => void) | null = null;
 	/* One toggle for both AI buttons (the icon on the quiz card): open the
 	   window on the unit on screen, or close it when it is already open. */
 	const basculer = (): void => {
@@ -735,6 +736,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const q = u ? questions[u.qi] : undefined;
 		uniteCourante = u;
 		boutonQuiz.hidden = !u || !q || !(u.lecture ? q.role === "read" : corrigee(u.juge));
+		majComposeur?.();
 	};
 	const observateur = new MutationObserver(majVisibilite);
 	observateur.observe(hote, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "aria-pressed", "aria-hidden"] });
@@ -852,7 +854,18 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const champ = ajouter(zone, "textarea", "qbd-ai-composer-input");
 				champ.rows = 1;
 				champ.placeholder = t("ai.explain.ownQuestion");
-				const majPlaceholder = (): void => { champ.placeholder = t(derniers.length ? "ai.explain.followUp" : "ai.explain.ownQuestion"); };
+				/* The lock: no message while the question on screen is not corrected (the
+				   reading cards stay open). The field and its placeholder say why. */
+				const saisieVerrouillee = (): boolean => {
+					const u = uniteAffichee();
+					return !!u && !composerOpen(questions[u.qi], u.lecture || corrigee(u.juge));
+				};
+				const majSaisie = (): void => {
+					const bloque = saisieVerrouillee();
+					champ.disabled = bloque;
+					champ.placeholder = t(bloque ? "ai.explain.answerFirst" : derniers.length ? "ai.explain.followUp" : "ai.explain.ownQuestion");
+				};
+				majComposeur = majSaisie;
 				const pied = ajouter(composer, "div", "qbd-ai-composer-bottom");
 				// "+" on the left, as on the Generate page: add files, mention with "@".
 				const ajout = ajouter(pied, "button", "qbd-ai-composer-add");
@@ -920,7 +933,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					   and as the stop square while an answer runs. */
 					envoi.classList.toggle("is-visible", marche || contenu);
 					// A PDF still being read (or unreadable) holds the message back, and says why.
-					envoi.disabled = !marche && (!contenu || !etat.jointes.pret());
+					envoi.disabled = !marche && (!contenu || !etat.jointes.pret() || saisieVerrouillee());
 					envoi.classList.toggle("qbd-ai-composer-send--disabled", envoi.disabled);
 					envoi.title = !marche && !etat.jointes.pret() ? t("ai.attach.reading") : "";
 				};
@@ -1296,11 +1309,11 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				let image = 0;
 				etat.repeindre = () => {
 					if (image) return;
-					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); majPlaceholder(); } });
+					image = requestAnimationFrame(() => { image = 0; if (fil.isConnected) { peindreFil(); majEnvoi(); majSaisie(); } });
 				};
 				peindreFil();
 				majEnvoi();
-				majPlaceholder();
+				majSaisie();
 				/* The queue (a line added or ended), the transcripts of this chat's
 				   lines (a chunk, a live turn's change) and the chat store (a record
 				   written, a chat deleted) repaint the thread. */
@@ -1318,6 +1331,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (enCours()) return;
 					const perso = champ.value.trim();
 					if (!perso && etat.jointes.vide()) return;
+					if (saisieVerrouillee()) return;
 					if (!etat.jointes.pret()) return;
 					if (!peutExpliquer()) { fournisseurBtn.click(); return; }
 					/* The unit on screen when the message leaves: what "this" means in it. */
@@ -1336,9 +1350,12 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (prises.urls.length) etat.vignettes.set(requestId, { urls: prises.urls, noms: prises.nomsImages });
 					etat.questionDe.set(requestId, qi);
 					/* Read NOW, while the page shows what the learner sees (the course may take a while). */
+					/* The position, then the tutor's instruction for the question on screen
+					   (its kind read now), then the edit instruction. */
 					const consigne = consigneEditionDe(qi);
-					const position = positionDe(qi) + (consigne ? "\n\n" + consigne : "");
-					const contexte = contexteDe(qi);
+					const explication = questions[qi] ? consigneExplication(questions[qi].role === "read") : "";
+					const position = [positionDe(qi), explication, consigne].filter(Boolean).join("\n\n");
+					const contexte = contexteDe();
 					const envoi: NonNullable<EtatFenetre["envoi"]> = { cle: requestId, texte: perso, documents: prises.nomsDocuments, fournisseur, modele: libelleModele(), debut: sentAt, annule: false };
 					etat.envoi = envoi;
 					// Sending is the one thing that brings the thread back to its bottom.
@@ -1453,6 +1470,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				ligneForfait = null;
 				desabonner?.();
 				desabonner = null;
+				majComposeur = null;
 				etat.repeindre = null;
 				detacherMentions?.();
 				detacherMentions = null;

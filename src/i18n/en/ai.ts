@@ -569,7 +569,7 @@ export const EN_AI = {
 	"ai.reqstatus.failedHere": "Failed",
 	"ai.reqstatus.failedWhyHere": "Failed: {reason}",
 	"ai.explain.button": "Ask the AI",
-	"ai.explain.answerFirst": "Answer the question first to have it explained",
+	"ai.explain.answerFirst": "Answer this question first, then ask.",
 	"ai.explain.asked": "Explain this question to me: {question}",
 	"ai.explain.ownQuestion": "Write your question",
 	"ai.explain.readingCourse": "Reading the course…",

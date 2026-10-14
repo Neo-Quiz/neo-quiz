@@ -13,7 +13,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts"], (C, P) => {
+await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "src/explain-follow.ts"], (C, P, F) => {
 	const r = makeReporter("Explain chats, pure core");
 	const { chatForQuiz, explainMessages, explainTurnTexts } = C;
 	const { positionCourante } = P;
@@ -54,5 +54,11 @@ await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts"], 
 	r.check("position names the slide out of the total", pos.includes("slide 2 of 2"), true);
 	r.check("position holds that whole question and the learner's answer, not another one", [pos.includes("What is a queue?"), pos.includes("Learner's answer: LIFO"), pos.includes("What is a stack?")], [true, true, false]);
 	r.check("no position for a missing slide", positionCourante(qs, { courant: 5 }), "");
+	// The lock: asking before answering would give the answer away; a reading card stays open.
+	const { composerOpen } = F;
+	r.check("a reading card is open before any answer", composerOpen({ role: "read" }, false), true);
+	r.check("a question is locked until it is corrected", composerOpen({}, false), false);
+	r.check("a corrected question is open", composerOpen({}, true), true);
+	r.check("no question on screen: nothing to lock on", composerOpen(undefined, true), false);
 	r.done();
 });
