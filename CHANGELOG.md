@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.94] - 2026-10-14
+
 ### Changed
 
 - The current bead is now larger instead of ringed.
