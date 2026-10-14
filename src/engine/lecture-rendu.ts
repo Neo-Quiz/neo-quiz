@@ -46,9 +46,11 @@ export interface CorpsLecture {
 	html: string;
 }
 
-function etapesHtml(items: string[], p: PortesLecture): string {
+/** The steps; `apres` (the interactive page) goes inside step `rang`, right
+    after its text. */
+function etapesHtml(items: string[], p: PortesLecture, rang = -1, apres = ""): string {
 	return `<ol class="quiz-lecture-etapes">${items.map((e, i) =>
-		`<li class="quiz-lecture-etape"><span class="quiz-lecture-num" aria-hidden="true">${i + 1}</span><div class="quiz-lecture-etape-texte">${p.bloc(e)}</div></li>`
+		`<li class="quiz-lecture-etape"><span class="quiz-lecture-num" aria-hidden="true">${i + 1}</span><div class="quiz-lecture-etape-texte">${p.bloc(e)}${i === rang ? apres : ""}</div></li>`
 	).join("")}</ol>`;
 }
 
@@ -127,13 +129,20 @@ export function corpsLectureCourteHtml(item: unknown, brut: string, texteHtml: s
 function rendre(item: unknown, brut: string, texteHtml: string, titre: string | undefined, p: PortesLecture, courte: boolean): CorpsLecture {
 	const l = lireLecture(item);
 	let corps: string;
+	let pageApres = "";
+	let pagePlacee = false;
 	if (l.style === "etapes") {
 		/* Les étapes ÉCRITES, avec le texte en introduction ; à défaut, les
 		   paragraphes du texte deviennent les étapes (spec §2). */
 		const ecrites = l.etapes.length > 0;
 		const items = ecrites ? l.etapes : paragraphes(brut);
+		/* The interactive page sits RIGHT UNDER the step that holds the code
+		   (2026-10-14): it acts on that code, which stays in view, instead of
+		   at the end of the reading, far from it. */
+		const rangCode = courte ? -1 : items.findIndex(e => e.includes("```"));
+		if (rangCode >= 0) { pageApres = pageInteractive(item, titre); pagePlacee = pageApres !== ""; }
 		corps = items.length
-			? `${ecrites && texteHtml.trim() ? `<div class="quiz-lecture-intro">${texteHtml}</div>` : ""}${etapesHtml(items, p)}`
+			? `${ecrites && texteHtml.trim() ? `<div class="quiz-lecture-intro">${texteHtml}</div>` : ""}${etapesHtml(items, p, rangCode, pageApres)}`
 			: `<div class="quiz-lecture-texte">${texteHtml}</div>`;
 	} else if (l.style === "tableau" && l.tableau) {
 		corps = `${texteHtml.trim() ? `<div class="quiz-lecture-intro">${texteHtml}</div>` : ""}${tableauHtml(l.tableau, p)}`;
@@ -154,7 +163,7 @@ function rendre(item: unknown, brut: string, texteHtml: string, titre: string | 
 	const source = typeof cite === "string" && cite.trim()
 		? `<div class="quiz-lecture-source"${citeOuvrable(cite) ? ` data-cite="${p.attribut(cite.trim())}" role="button" tabindex="0"` : ""}>${p.inline(t("engine.lecture.source", { source: cite.trim() }))}</div>`
 		: "";
-	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${accroche}${courte ? "" : figureHtml(item, p)}${corps}${courte ? "" : pageInteractive(item, titre)}${retenir}${source}</div>` };
+	return { style: l.style, html: `<div class="quiz-lecture quiz-lecture--${l.style}${courte ? " quiz-lecture--courte" : ""}">${tete}${accroche}${courte ? "" : figureHtml(item, p)}${corps}${courte || pagePlacee ? "" : pageInteractive(item, titre)}${retenir}${source}</div>` };
 }
 
 /** The reading's interactive page (`html`, 2026-10-09): a complete HTML page in

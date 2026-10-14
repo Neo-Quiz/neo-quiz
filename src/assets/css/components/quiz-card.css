@@ -534,3 +534,12 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
 }
 .quiz-code-online-btn:hover{ background: var(--background-modifier-hover); }
 .quiz-code-online-icon svg{ width: 14px; height: 14px; }
+
+/* Backtick code coloured by the generic tokenizer (engine/code-generique.ts,
+   2026-10-14): the pill of plain inline code is kept, only the tokens take
+   the colours of the app's code. */
+code.quiz-code-tokens .token.comment{ color: #565f89; font-style: italic; }
+code.quiz-code-tokens .token.keyword{ color: #7aa2f7; }
+code.quiz-code-tokens .token.function{ color: #7dcfff; }
+code.quiz-code-tokens .token.string{ color: #9ece6a; }
+code.quiz-code-tokens .token.number{ color: #ff9e64; }

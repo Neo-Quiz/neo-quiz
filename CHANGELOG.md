@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Code between backticks is coloured everywhere in a quiz, whatever its language.
+- An interactive page sits right under the step of the reading that holds its code, and new pages no longer repeat that code.
+
 ## [1.20.108] - 2026-10-14
 
 ### Changed

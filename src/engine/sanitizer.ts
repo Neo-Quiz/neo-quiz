@@ -14,6 +14,15 @@ import { rendreBlocs } from "./grammaire-blocs";
    never filled, and fell back on a "⬇" character (2026-09-27). */
 const ICON_PAPERCLIP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>';
 import { colorerCode, budgetRestant, consommerBudget } from "./code-highlight";
+import { colorerGenerique } from "./code-generique";
+
+/** A backtick code span: coloured when the generic tokenizer finds something
+    to colour (then `quiz-code-tokens`, quiz-card.css), else unchanged. `code`
+    arrives escaped. */
+function codeGenerique(code: string): string {
+	const html = colorerGenerique(unescapeHtmlText(code), escapeHtmlText);
+	return html.includes("<span") ? `<code class="quiz-code-tokens">${html}</code>` : `<code>${code}</code>`;
+}
 
 /** Spec `![[lien|100x50|alt]]` décomposée (buildEmbedImgHtml, resolveEmbedFile). */
 interface ParsedEmbedSpec {
@@ -138,8 +147,11 @@ function inlineMarkdown(escaped: string): string {
 		})
 		// Double accent grave AVANT le simple : c'est la forme markdown
 		// d'un code qui CONTIENT un accent grave (``a ` b``).
-		.replace(motifCodeDouble(), (_m, code: string) => keep(`<code>${code}</code>`))
-		.replace(motifCodeSimple(), (_m, code: string) => keep(`<code>${code}</code>`))
+		/* Code between backticks names no language: coloured by the generic
+		   tokenizer (code-generique.ts, 2026-10-14), from the RAW text it
+		   escapes again token by token, exactly as `colorerCode` above. */
+		.replace(motifCodeDouble(), (_m, code: string) => keep(codeGenerique(code)))
+		.replace(motifCodeSimple(), (_m, code: string) => keep(codeGenerique(code)))
 		// `\$` ÉCHAPPÉ n'ouvre pas une formule : « Prix \$5 … \$10 » n'est
 		// pas du LaTeX, et le prendre pour tel figeait tout le segment (le
 		// gras au milieu restait littéral). Une formule n'enjambe jamais un
