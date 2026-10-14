@@ -14,6 +14,7 @@ import { corpsLecture, corpsLectureCourte } from "./passage";
 import { figureDeLecture } from "./lecture-rendu";
 import { t, type TransKey } from "../i18n";
 import { drawOrder, formatElapsed, learnFigures, stepHue, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { mindMapHtml, mindMapModel } from "./mind-map";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -628,6 +629,10 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const fig = learnFigures(sum, gradedTotal);
 		const seg = (cls: string, n: number) => n > 0 ? `<span class="quiz-learn-gauge-seg ${cls}" style="flex-grow:${n}"></span>` : "";
 		const rest = Math.max(0, fig.total - sum.first - sum.retried - sum.missed);
+		const centre = (ctx.sourcePath.split(/[\\/]/).pop() ?? "").replace(/\.md$/i, "");
+		const mindMap = ctx.stepSlides ? mindMapHtml(mindMapModel(ctx.stepSlides, ctx.quiz), centre, s => ctx.sanitize.renderInlineText(s), {
+			title: t("engine.learn.mindMapTitle"), hint: t("engine.learn.mindMapHint"), showAll: t("engine.learn.mindMapShowAll"), leafAria: t("engine.learn.mindMapLeafAria"),
+		}) : "";
 		const stat = (cls: string, n: number, key: TransKey) => `<li class="quiz-learn-summary-stat ${cls}"><strong>${n}</strong><span>${t(key)}</span></li>`;
 		return `<div class="quiz-track-item" data-slide-kind="results"><section class="quiz-result quiz-learn-result">
 			<h2 class="quiz-result-title">${t("engine.learn.summaryTitle")}</h2>
@@ -639,6 +644,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				<div class="quiz-learn-gauge" role="img" aria-label="${ctx.escapeHtmlAttr(t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total }))}">${seg("first", sum.first)}${seg("retried", sum.retried)}${seg("missed", sum.missed)}${seg("rest", rest)}</div>
 				<ul class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</ul>
 			</div>
+			${mindMap}
 			${objectivesHtml("engine.learn.objectivesDone", true)}
 			<div class="quiz-actions quiz-learn-actions"><button class="quiz-action-btn success quiz-learn-done-btn" type="button">${t("engine.learn.done")}</button><button class="quiz-action-btn quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${resultsFileButtonHtml()}</div>
 			${pendingNote}${writtenReview}

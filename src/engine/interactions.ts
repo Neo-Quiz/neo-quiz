@@ -535,6 +535,15 @@ export function createInteractionHandlers(ctx: EngineCtx): InteractionHandlers {
 			}
 		});
 
+		/* The mind map (engine/mind-map.ts): a leaf shows its text, "Show all" every leaf. */
+		rootEl.addEventListener("click", e => {
+			const target = e.target as Element | null;
+			const reveal = (leaf: Element) => { leaf.classList.add("is-shown"); leaf.setAttribute("aria-pressed", "true"); };
+			const leaf = target?.closest?.(".quiz-mindmap-leaf");
+			if (leaf) { reveal(leaf); return; }
+			if (target?.closest?.(".quiz-mindmap-show-all")) rootEl.querySelectorAll(".quiz-mindmap-leaf").forEach(reveal);
+		});
+
 		// "Done" on a Learn's summary: the host closes the quiz (no confirmation:
 		// a Learn's state is in the session snapshot).
 		rootEl.querySelector(".quiz-learn-done-btn")?.addEventListener("click", e => {

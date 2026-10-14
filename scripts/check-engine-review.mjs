@@ -1508,3 +1508,28 @@ await withSrcModule(["src/results-files.ts", "src/engine/results-save.ts"], asyn
 	r.check("the refusal is said, the results stay offered", ctx.quizState.resultsSave.status, "saved");
 	r.done();
 });
+
+/* Mind map of a Learn's summary (2026-10-14). */
+await withSrcModule("src/engine/mind-map.ts", ({ mindMapModel, mindMapHtml }) => {
+	const r = makeReporter("Mind map - model and HTML");
+	const quiz = [
+		{ role: "read", title: "Listes", retenir: { forme: "cartes", items: [{ recto: "Index du 1er", verso: "0" }, { recto: "Crochets", verso: "[]" }] } },
+		{ role: "recall", prompt: "q" },
+		{ role: "read", title: "Boucles" },
+		{ role: "read", title: "Dicts", retenir: { forme: "recap", items: ["a", "b", "c", "d", "e", "f"] } },
+	];
+	const slides = [{ step: 1, reads: [0], questions: [1] }, { step: 2, reads: [2], questions: [] }, { step: 3, reads: [3], questions: [] }, { step: 4, reads: [], questions: [1] }];
+	const m = mindMapModel(slides, quiz);
+	r.check("one branch per step, titled by its reading", m.map(b => b.title), ["Listes", "Boucles", "Dicts", ""]);
+	r.check("leaves: the cards' fronts", m[0].leaves, ["Index du 1er", "Crochets"]);
+	r.check("a reading without key points has no leaves", m[1].leaves, []);
+	r.check("leaves capped at 5", m[2].leaves.length, 5);
+	r.check("hue follows the step", m.map(b => b.hue), [0, 1, 2, 3]);
+	const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+	const html = mindMapHtml(m, "<b>Python</b>", esc, { title: "Mind map", hint: "Recall", showAll: "Show all", leafAria: "Show" });
+	r.check("leaves start hidden", (html.match(/quiz-mindmap-leaf"/g) || []).length, 7);
+	r.check("centre text goes through the door", html.includes("<b>Python</b>"), false);
+	r.check("a step without a reading falls back on its number", /data-step="4"[\s\S]*?>4</.test(html), true);
+	r.check("no branch = no map", mindMapHtml([], "x", esc, { title: "", hint: "", showAll: "", leafAria: "" }), "");
+	r.done();
+});

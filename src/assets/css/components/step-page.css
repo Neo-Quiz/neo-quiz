@@ -299,3 +299,10 @@
 .quiz-learn-objectives.is-done li{ display: flex; gap: 8px; align-items: flex-start; }
 .quiz-learn-objective-mark{ color: var(--color-green, #22c55e); flex: none; margin-top: 2px; }
 .quiz-learn-objective-mark svg{ width: 16px; height: 16px; }
+
+/* The first card after the objectives keeps the first card's spacing. */
+.quiz-step-page > .quiz-learn-objectives + .quiz-step-card{
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 0;
+}

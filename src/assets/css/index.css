@@ -58,6 +58,7 @@
 @import url('./pages/exam.css');
 @import url('./pages/learn.css');
 @import url('./components/step-page.css');
+@import url('./components/mind-map.css');
 
 /* Mobile overrides — MUST come after components & pages for correct cascade */
 @import url('./components/mobile.css');
