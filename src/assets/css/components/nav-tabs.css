@@ -167,13 +167,14 @@
   --tab-edge: var(--quiz-primary-edge);
   --tab-text: #fff;
 }
-/* A RING marks the current bead whatever its state (2026-10-14): a Learn's
-   step beads are already solid green, amber or red once done, so the solid
-   fill said nothing, and on a phone the sweep animation, the only other cue,
-   is off (mobile.css): on step 3 of four green beads, nothing showed it. */
+/* The current bead is LARGER, whatever its state (2026-10-14): once a
+   Learn's steps are done their beads are all green, the solid fill of the
+   current one barely differs from the others' tint, and on a phone the sweep
+   animation, the only other cue, is off (mobile.css). A ring was tried and
+   judged ugly. `scale`, not `transform`, so the 3D press still works. */
 .quiz-tab.active{
-  outline: 2px solid var(--text-normal);
-  outline-offset: 2px;
+  scale: 1.15;
+  z-index: 1;
 }
 .quiz-tab.correct.active{ --tab-face: var(--quiz-success); --tab-edge: var(--quiz-success-edge); }
 .quiz-tab.wrong.active{ --tab-face: #b91c1c; --tab-edge: #6f1111; }
