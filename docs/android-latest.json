@@ -1,8 +1,8 @@
 {
-  "versionCode": 34,
-  "versionName": "0.2.32",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.32/NeoQuiz-0.2.32.apk",
-  "sha256": "d3e2b1ea850b34194439de4a899ea992c0c70bce791317c7f82a766f81133bb0",
-  "size": 56148853,
-  "notes": "Active Learns: hooks, interactive pages, mind map; clearer Generate page"
+  "versionCode": 35,
+  "versionName": "0.2.33",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.33/NeoQuiz-0.2.33.apk",
+  "sha256": "ec5b5244a949804fc47e70b67f6aaebb25dab976d5df16713653382a7fc3761b",
+  "size": 56149953,
+  "notes": "Interactive pages under their code, coloured inline code, wider readings"
 }
