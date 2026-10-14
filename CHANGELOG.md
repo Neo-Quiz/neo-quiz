@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.93] - 2026-10-14
+
 ### Fixed
 
 - The current bead carries a ring, so the step you are on stands out even when every bead is green.
