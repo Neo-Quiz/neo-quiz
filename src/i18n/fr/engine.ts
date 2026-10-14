@@ -137,6 +137,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.learn.summaryAccuracy": "Précision",
 	"engine.learn.objectivesTitle": "Ce que vous allez apprendre",
 	"engine.learn.objectivesDone": "Vous savez maintenant",
+	"engine.learn.pauseSuggest": "25 minutes d'apprentissage : une pause de 5 minutes aide à retenir.",
+	"engine.learn.pauseContinue": "Continuer",
 	"engine.learn.mindMapTitle": "Carte mentale",
 	"engine.learn.mindMapHint": "Retrouvez de mémoire ce que contient chaque branche, puis touchez une feuille pour vérifier.",
 	"engine.learn.mindMapShowAll": "Tout montrer",

@@ -4,6 +4,7 @@ import type { ReviewGrade } from "../scheduler";
 import { isExamSetup } from "../test-setup";
 import { attemptDateOf } from "../results-files";
 import { t } from "../i18n";
+import { shouldSuggestPause } from "./step-page";
 
 /** Sous-ensemble du store de stats (dashboard/stats-store) réellement lu ici. */
 type StatsStoreLike = { updateRecord(path: string, update: StatsRecord): unknown };
@@ -46,6 +47,9 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 	// Constantes
 	const NAV_TAB_PRESS_MS = 130;
 	const NAV_TAB_FALLBACK_CLEAR_MS = 320;
+	// Pause suggestion (step-page.ts shouldSuggestPause): once per session.
+	const learnStartedAt = Date.now();
+	let pauseSuggested = false;
 
 	function hasAnyAnswer(i: number): boolean {
 		// isTextOnlyFor(i), pas isTextOnlyMode() : une question "recall" de Leçon
@@ -386,6 +390,29 @@ export function createStateHandlers(ctx: EngineCtx): StateHandlers {
 		// isQuestionSlideIndex garantit la variante « question » de slideMap[next].
 		if (ctx.isQuestionSlideIndex(next)) ctx.quizState.lastQuestionIndex = (ctx.slideMap[next] as { questionIndex: number }).questionIndex;
 		updateNavHighlight();
+		/* A pause after 25 minutes of a Learn (step-page.ts shouldSuggestPause):
+		   a dismissible note at the top of the step page being reached. */
+		if (ctx.learn.isActive() && ctx.stepSlides && ctx.isQuestionSlideIndex(next)) {
+			const qi = (ctx.slideMap[next] as { questionIndex: number }).questionIndex;
+			const step = ctx.stepOf?.(qi)?.step ?? 0;
+			if (shouldSuggestPause(Date.now() - learnStartedAt, step, pauseSuggested)) {
+				const page = ctx.container.querySelector<HTMLElement>(`.quiz-step-page[data-step="${step}"]`);
+				if (page) {
+					pauseSuggested = true;
+					const note = document.createElement("div");
+					note.className = "quiz-learn-pause";
+					const text = document.createElement("p");
+					text.textContent = t("engine.learn.pauseSuggest");
+					const btn = document.createElement("button");
+					btn.type = "button";
+					btn.className = "quiz-action-btn";
+					btn.textContent = t("engine.learn.pauseContinue");
+					btn.addEventListener("click", () => { note.remove(); ctx.viewport.scheduleViewportHeightSync({ index: ctx.quizState.current, animate: false, refresh: true }); });
+					note.append(text, btn);
+					page.prepend(note);
+				}
+			}
+		}
 		ctx.quizState.isSliding = true;
 		ctx.setSlidingClass(true);
 		if (forceRender) ctx.render();

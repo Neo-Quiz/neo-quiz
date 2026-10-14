@@ -154,6 +154,8 @@ export const EN_ENGINE = {
 	"engine.learn.summaryTime": "Time",
 	"engine.learn.objectivesTitle": "What you will learn",
 	"engine.learn.objectivesDone": "You can now",
+	"engine.learn.pauseSuggest": "25 minutes of learning: a 5-minute break helps it sink in.",
+	"engine.learn.pauseContinue": "Continue",
 	"engine.learn.mindMapTitle": "Mind map",
 	"engine.learn.mindMapHint": "Recall what each branch holds, then tap a leaf to check.",
 	"engine.learn.mindMapShowAll": "Show all",

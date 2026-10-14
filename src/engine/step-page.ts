@@ -144,3 +144,12 @@ export const STEP_HUES: readonly number[] = [215, 160, 30, 280, 350, 190, 50, 12
 export function stepHue(step: number): number {
 	return Number.isFinite(step) && step >= 1 ? (Math.floor(step) - 1) % STEP_HUES.length : 0;
 }
+
+/** A Learn suggests a pause once, after 25 minutes (2026-10-14): attention
+    drops past that, and a short break helps the notions settle. */
+export const PAUSE_AFTER_MS = 25 * 60_000;
+
+/** Suggest the pause on arriving on step `step`? Never on the first step, once per session. */
+export function shouldSuggestPause(elapsedMs: number, step: number, suggested: boolean): boolean {
+	return !suggested && step > 1 && elapsedMs >= PAUSE_AFTER_MS;
+}

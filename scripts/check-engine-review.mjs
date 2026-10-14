@@ -1368,7 +1368,7 @@ await withSrcModule("src/engine/step-page.ts", ({ drawOrder }) => {
 });
 
 /* Step page: card kind and the Learn summary's numbers. */
-await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, formatElapsed, stepHue }) => {
+await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, formatElapsed, stepHue, shouldSuggestPause, PAUSE_AFTER_MS }) => {
 	const r = makeReporter("Step page - card kind and summary");
 	r.check("flashcard kind", stepCardKind({ flashcard: true, options: [] }), "flashcard");
 	r.check("choice kind", stepCardKind({ options: ["a", "b"], correctIndex: 0 }), "choice");
@@ -1381,6 +1381,8 @@ await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, fo
 	r.check("elapsed h:mm:ss", formatElapsed(3_725_000), "1:02:05");
 	r.check("step hue cycles over 10", [stepHue(1), stepHue(2), stepHue(10), stepHue(11)], [0, 1, 9, 0]);
 	r.check("step hue never negative or NaN", [stepHue(0), stepHue(-3), stepHue(NaN)], [0, 0, 0]);
+	r.check("pause: after 25 min on a later step, once", [shouldSuggestPause(PAUSE_AFTER_MS, 3, false), shouldSuggestPause(PAUSE_AFTER_MS, 3, true)], [true, false]);
+	r.check("pause: never before 25 min nor on the first step", [shouldSuggestPause(PAUSE_AFTER_MS - 1, 3, false), shouldSuggestPause(PAUSE_AFTER_MS * 2, 1, false)], [false, false]);
 	r.done();
 });
 
