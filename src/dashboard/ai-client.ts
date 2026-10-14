@@ -290,7 +290,7 @@ export interface ChatOptions {
 	live?: LiveOptions & { followUp?: string };
 }
 
-/** Client IA — retour de createAiClient(plugin). */
+/** The AI client, returned by `createAiClient`. */
 export interface AiClient {
 	/** With `options.documents`, resolves with `lot` (one quiz per document, in
 	    the documents' order) and an empty `questions`; otherwise one quiz. */
@@ -1209,7 +1209,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
 	    Claude Code may run in it with read-only tools once it is trusted. */
 	let dossierOutils: string | null = null;
-	/** The live session of the running generation or plan (`GenerateOptions.live`). */
+	/** The live session of the running generation or plan (`GenerateOptions.live`),
+	    or of the running chat message (`ChatOptions.live`). */
 	let liveCtx: LiveOptions | null = null;
 	/** The short follow-up of a live chat turn (`ChatOptions.live.followUp`),
 	    sent when the session already holds the conversation. Never set by a
@@ -1319,6 +1320,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		appelsCli = 0;
 		dossierOutils = options.dossier ?? null;
 		liveCtx = options.live ?? null;
+		texteSuite = null;
 		pendingUsage = null;
 		lastUsage = null;
 		/* L'INSTANTANÉ des fichiers de CLI, relu AVANT l'appel : `resolveCodexModel`
@@ -2197,6 +2199,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		repriseBase = options.reprise ?? null;
 		dossierOutils = options.dossier ?? null;
 		liveCtx = options.live ?? null;
+		texteSuite = null;
 		appelsCli = 0;
 		await refreshCliCaches();
 		try {
@@ -2301,8 +2304,9 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		dossierOutils = options.dossier ?? null;
 		liveCtx = options.live ? { chatId: options.live.chatId, key: options.live.key } : null;
 		texteSuite = options.live?.followUp || null;
-		await refreshCliCaches();
 		try {
+			// Inside the `try`: should it throw, `finally` still resets the live state above.
+			await refreshCliCaches();
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
 			const turns = history.filter(h => h.text.trim());
@@ -2348,7 +2352,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			throw new Error(t("ai.chat.providerUnsupported"));
 		} catch (err) {
 			if (aborted) {
-				const e = new Error("Discussion annulée") as Error & { aborted?: boolean };
+				const e = new Error("Chat cancelled") as Error & { aborted?: boolean };
 				e.aborted = true;
 				throw e;
 			}
