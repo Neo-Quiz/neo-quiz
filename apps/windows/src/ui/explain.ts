@@ -63,6 +63,7 @@ import { mountUsageLine } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 import type { HostModalHandle } from "../../../../src/host/types";
 import { creerBlocTravail } from "../../../../src/dashboard/transcript-steps";
+import { modeleDiffere } from "../../../../src/dashboard/transcript";
 import { suivreLeBas } from "./suivi-bas";
 import type { BlocTravail } from "../../../../src/dashboard/transcript-steps";
 import { fileDeGeneration, figerReglages, onQueueCreated } from "../../../../src/dashboard/file-generation-app";
@@ -1197,7 +1198,12 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
 					const p = aiProviders.getProvider(msg.fournisseur || courant || "claude-code");
 					aiProviders.setBrandLogo(ajouter(tete, "span", "qbd-provider-logo qbd-provider-logo--" + p.logo), p.logo);
-					const nom = msg.modele || p.name;
+					/* The model that really answered, when Claude Code's safeguards
+					   switched off the one chosen (as the AI page says it): never the
+					   chosen name on an answer another model wrote. */
+					const effectif = msg.lineId === undefined ? undefined : q.live(msg.lineId)?.thread.effectiveModel ?? q.transcript(msg.lineId)?.effectiveModel;
+					const effectifNom = effectif && p.id === "claude-code" ? aiProviders.libelleModele("claude-code", effectif) : "";
+					const nom = effectifNom && modeleDiffere(msg.modele || p.name, effectifNom) ? effectifNom : msg.modele || p.name;
 					ajouter(tete, "span", undefined, msg.lecture ? t("ai.explain.readingCourse")
 						: msg.pause ? nom
 						: msg.enCours ? t("ai.chat.working", { model: nom })
