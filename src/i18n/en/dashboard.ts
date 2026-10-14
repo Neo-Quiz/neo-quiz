@@ -23,7 +23,7 @@ export const EN_DASHBOARD = {
 	/* ── Sidebar ── */
 	"dashboard.nav.home": "Home",
 	"dashboard.nav.quizzes": "Folders",
-	"dashboard.nav.generate": "Generate",
+	"dashboard.nav.generate": "AI",
 	"dashboard.nav.settings": "Settings",
 	// Entrée du rail que l'hôte ne sait pas encore ouvrir (ex. « Générer »
 	// côté application avant la tranche 4) : rendue désactivée, jamais masquée.

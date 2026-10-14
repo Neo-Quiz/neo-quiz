@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- The Generate page is now called AI.
 - Explain now runs Claude Code and Codex as agents in the quiz's folder, like generation, and shows their reasoning and tools above the answer.
 - Explain conversations are saved: closing and reopening a quiz keeps them.
 - Explain keeps one conversation per quiz and always knows which slide you are on.

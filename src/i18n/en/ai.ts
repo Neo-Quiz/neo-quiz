@@ -430,7 +430,7 @@ export const EN_AI = {
 	"ai.queue.limitResumeNow": "Resume now",
 	"ai.queue.limitCancelled": "Stopped on the usage limit.",
 	"ai.queue.close": "Close",
-	"ai.queue.readyNotice": "“{title}” is ready. Open it from Generate.",
+	"ai.queue.readyNotice": "“{title}” is ready. Open it from the AI page.",
 	"ai.queue.lotSaved": "{count} quizzes, one per document",
 	"ai.queue.missing": "This quiz can no longer be found. It may have been moved or deleted.",
 	"ai.card.missing": "This quiz is not on this device (yet).",

@@ -393,7 +393,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.queue.limitResumeNow": "Reprendre maintenant",
 	"ai.queue.limitCancelled": "Arrêtée sur la limite d'usage.",
 	"ai.queue.close": "Fermer",
-	"ai.queue.readyNotice": "« {title} » est prêt. Ouvrez-le depuis Générer.",
+	"ai.queue.readyNotice": "« {title} » est prêt. Ouvrez-le depuis la page IA.",
 	"ai.queue.lotSaved": "{count} quiz, un par document",
 	"ai.queue.missing": "Ce quiz est introuvable. Il a peut-être été déplacé ou supprimé.",
 	"ai.card.missing": "Ce quiz n'est pas (encore) sur cet appareil.",

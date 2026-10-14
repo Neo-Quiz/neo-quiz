@@ -15,7 +15,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	/* ── Sidebar ── */
 	"dashboard.nav.home": "Accueil",
 	"dashboard.nav.quizzes": "Dossiers",
-	"dashboard.nav.generate": "Générer",
+	"dashboard.nav.generate": "IA",
 	"dashboard.nav.settings": "Réglages",
 	"dashboard.nav.soon": "Bientôt disponible",
 
