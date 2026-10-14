@@ -654,20 +654,22 @@
 	border-left: 0;
 }
 
-/* The full row, not the text's width: a running turn's label changes every
-   second (clock) and every 4 s (the rotating word), and a button sized to its
-   text shrank and grew under the pointer, so hover flickered on and off. */
+/* The full row is the HOVER AREA, not the text's width: a running turn's
+   label changes every second (clock) and every 4 s (the rotating word), and a
+   button sized to its text shrank and grew under the pointer, so hover
+   flickered on and off. The hover is PAINTED only behind the content
+   (`-in`, 2026-10-14): a background across the whole row looked heavy. */
 .qbd-ai-transcript-ligne {
 	align-self: stretch;
 	display: flex;
 	font-variant-numeric: tabular-nums;
 	align-items: center;
-	gap: 8px;
 	max-width: 100%;
-	padding: 3px 8px 3px 4px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
-	background: transparent;
+	background: transparent !important;
+	box-shadow: none;
 	color: var(--text-muted);
 	font: inherit;
 	font-size: 13px;
@@ -677,8 +679,21 @@
 	transition: color 120ms ease;
 }
 
+.qbd-ai-transcript-ligne-in {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	max-width: 100%;
+	padding: 3px 8px 3px 4px;
+	border-radius: 6px;
+}
+
 .qbd-ai-transcript-ligne:hover {
 	color: var(--text-normal);
+}
+
+.qbd-ai-transcript-ligne:hover .qbd-ai-transcript-ligne-in {
 	background: var(--background-modifier-hover);
 }
 

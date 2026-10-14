@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Hovering the AI work line highlights only its text, not the whole row.
+
 ## [1.20.97] - 2026-10-14
 
 ### Fixed

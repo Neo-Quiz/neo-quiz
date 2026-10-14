@@ -706,10 +706,13 @@ export function creerVueFile(opts: {
 			if (!v) {
 				const b = ajouter(bloc, "button", "qbd-ai-transcript-ligne");
 				b.type = "button";
-				const icone = ajouter(b, "span", "qbd-ai-transcript-titre-icone");
+				/* The row is the hover area (stable under a changing label); the
+				   inner span is what the hover paints, sized to its content. */
+				const dedans = ajouter(b, "span", "qbd-ai-transcript-ligne-in");
+				const icone = ajouter(dedans, "span", "qbd-ai-transcript-titre-icone");
 				poserIcone(icone, s.icone);
-				const libelle = ajouter(b, "span", "qbd-ai-transcript-ligne-texte");
-				const chevron = ajouter(b, "span", "qbd-ai-transcript-chevron");
+				const libelle = ajouter(dedans, "span", "qbd-ai-transcript-ligne-texte");
+				const chevron = ajouter(dedans, "span", "qbd-ai-transcript-chevron");
 				const neuve: LigneTranscript = { bouton: b, icone, iconeNom: s.icone, libelle, chevron, detail: null, ouvert, chevronNom: "" };
 				v = neuve;
 				etat.lignes.set(s.cle, neuve);
