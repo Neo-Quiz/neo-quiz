@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The AI's question card takes the same quiet tint as your request bubbles, without a border.
+
 ## [1.20.102] - 2026-10-14
 
 ### Changed

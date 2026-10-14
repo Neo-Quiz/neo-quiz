@@ -1553,11 +1553,11 @@
 	width: min(520px, 100%);
 	box-sizing: border-box;
 	padding: 16px 12px 12px;
-	border-radius: 14px;
-	border: 1px solid var(--qbd-glass-edge, var(--background-modifier-border));
-	background: var(--qbd-glass-bg, var(--background-secondary));
-	backdrop-filter: var(--qbd-glass-blur, none);
-	-webkit-backdrop-filter: var(--qbd-glass-blur, none);
+	/* The same tint as a request bubble (2026-10-14): close to the page, no
+	   border, no glass. */
+	border-radius: 18px;
+	border: 0;
+	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	outline: none;
 }
 
