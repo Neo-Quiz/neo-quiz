@@ -228,7 +228,10 @@
 
 .quiz-lecture-carte{
   appearance: none;
-  display: block;
+  /* grid, not block: the inner card stretches to the row height, so every
+     card of a row has faces of the same height (block left a short card
+     centred inside a taller cell). */
+  display: grid;
   width: 100%;
   height: auto;
   min-height: 110px;

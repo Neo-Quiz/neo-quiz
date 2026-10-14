@@ -269,28 +269,6 @@
   color: #fff;
 }
 
-/* ── A colour per step (2026-10-14, step-page.ts STEP_HUES, same order) ── */
-.quiz-step-page[data-step-hue="0"]{ --quiz-step-h: 215; }
-.quiz-step-page[data-step-hue="1"]{ --quiz-step-h: 160; }
-.quiz-step-page[data-step-hue="2"]{ --quiz-step-h: 30; }
-.quiz-step-page[data-step-hue="3"]{ --quiz-step-h: 280; }
-.quiz-step-page[data-step-hue="4"]{ --quiz-step-h: 350; }
-.quiz-step-page[data-step-hue="5"]{ --quiz-step-h: 190; }
-.quiz-step-page[data-step-hue="6"]{ --quiz-step-h: 50; }
-.quiz-step-page[data-step-hue="7"]{ --quiz-step-h: 120; }
-.quiz-step-page[data-step-hue="8"]{ --quiz-step-h: 320; }
-.quiz-step-page[data-step-hue="9"]{ --quiz-step-h: 250; }
-.quiz-step-page[data-step-hue]{ --quiz-step-accent: hsl(var(--quiz-step-h) 70% 55%); }
-.quiz-step-page[data-step-hue] .quiz-lecture-titre{ color: var(--quiz-step-accent); }
-.quiz-step-page[data-step-hue] .quiz-lecture-num{
-  background: color-mix(in srgb, var(--quiz-step-accent) 18%, transparent);
-  color: var(--quiz-step-accent);
-}
-/* lecture.css gives .quiz-lecture-carte no border (border: 0), so the edge is an inset ring. */
-.quiz-step-page[data-step-hue] .quiz-lecture-carte{
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--quiz-step-accent) 45%, transparent);
-}
-
 /* ── The Learn's objectives (2026-10-14): first step page and summary ── */
 /* Same column as the cards (--quiz-max-width, centred). */
 .quiz-step-page > .quiz-learn-objectives,
@@ -324,9 +302,4 @@
   margin-top: 8px;
   padding-top: 12px;
   border-top: 0;
-}
-
-/* The front of a key-point card takes the step colour too. */
-.quiz-step-page[data-step-hue] .quiz-lecture-face.is-recto{
-  background: color-mix(in srgb, var(--quiz-step-accent) 22%, transparent);
 }

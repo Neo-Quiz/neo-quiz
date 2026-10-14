@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Most Learn readings now come with an interactive page to act on the course, and step pages no longer change colour.
+
+### Fixed
+
+- Key-point cards of a reading keep the same height in a row, without a square frame around them.
+
 ## [1.20.91] - 2026-10-14
 
 ### Added

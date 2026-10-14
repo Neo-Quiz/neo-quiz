@@ -13,7 +13,7 @@ import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { figureDeLecture } from "./lecture-rendu";
 import { t, type TransKey } from "../i18n";
-import { drawOrder, formatElapsed, learnFigures, stepHue, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { drawOrder, formatElapsed, learnFigures, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 import { mindMapHtml, mindMapModel } from "./mind-map";
 import { titreSansMode } from "../quiz-format";
 
@@ -744,7 +744,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
 		const cards = order.map(qi => cardParts(qi, true).section).join("");
 		const objectives = step.step === 1 ? objectivesHtml("engine.learn.objectivesTitle", false) : "";
-		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}" data-step-hue="${stepHue(step.step)}">${objectives}${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${objectives}${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 
 	/** The title line of a card of a step page: "Question 2: Title" (just
