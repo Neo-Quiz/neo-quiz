@@ -46,12 +46,14 @@ export interface CorpsLecture {
 	html: string;
 }
 
-/** The steps; `apres` (the interactive page) goes inside step `rang`, right
-    after its text. */
+/** The steps, as flowing paragraphs; `apres` (the interactive page) goes
+    inside step `rang`, right after its text. No numbers and no rules between
+    them (2026-10-14): a numbered list on every reading of every Learn was
+    found exhausting to read, and a notion is not a procedure. */
 function etapesHtml(items: string[], p: PortesLecture, rang = -1, apres = ""): string {
-	return `<ol class="quiz-lecture-etapes">${items.map((e, i) =>
-		`<li class="quiz-lecture-etape"><span class="quiz-lecture-num" aria-hidden="true">${i + 1}</span><div class="quiz-lecture-etape-texte">${p.bloc(e)}${i === rang ? apres : ""}</div></li>`
-	).join("")}</ol>`;
+	return `<div class="quiz-lecture-etapes">${items.map((e, i) =>
+		`<div class="quiz-lecture-etape"><div class="quiz-lecture-etape-texte">${p.bloc(e)}${i === rang ? apres : ""}</div></div>`
+	).join("")}</div>`;
 }
 
 function tableauHtml(tab: TableauLecture, p: PortesLecture): string {

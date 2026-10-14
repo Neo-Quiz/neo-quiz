@@ -20,6 +20,7 @@ release notes.
 - Explain conversations are saved: closing and reopening a quiz keeps them.
 - Explain keeps one conversation per quiz and always knows which slide you are on.
 - Explain conversations are listed in the AI page, where they can be continued.
+- Readings in a Learn read as flowing paragraphs, without a numbered list.
 
 ### Fixed
 

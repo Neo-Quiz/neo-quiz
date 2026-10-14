@@ -112,37 +112,11 @@
   height: 14px;
 }
 
-/* ── Une idée par ligne (E) : numérotée, séparée par un filet ── */
+/* ── The steps (E): flowing paragraphs, no number and no rule between them
+   (2026-10-14: a numbered list on every reading was exhausting to read) ── */
 
-.quiz-lecture-etapes{
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.quiz-lecture-etape{
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 14px;
-  padding: 14px 0;
-  border-top: 1px solid var(--background-modifier-border);
-}
-
-.quiz-lecture-etape:first-child{
-  border-top: 0;
-  padding-top: 0;
-}
-
-.quiz-lecture-num{
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--quiz-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+.quiz-lecture-etape + .quiz-lecture-etape{
+  margin-top: 12px;
 }
 
 .quiz-lecture-etape-texte{
@@ -374,16 +348,8 @@
   font-size: 0.9em;
 }
 
-.quiz-lecture--courte .quiz-lecture-etape{
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 10px;
-  padding: 8px 0;
-}
-
-.quiz-lecture--courte .quiz-lecture-num{
-  width: 22px;
-  height: 22px;
-  font-size: 12px;
+.quiz-lecture--courte .quiz-lecture-etape + .quiz-lecture-etape{
+  margin-top: 8px;
 }
 
 .quiz-lecture--courte .quiz-lecture-intro{
