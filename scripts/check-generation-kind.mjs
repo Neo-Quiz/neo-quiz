@@ -79,8 +79,18 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		['"questions"', '"header"', '"description"', '"default"', 'most beginner option', '1 to 3 questions', '2 to 4 options', '12 characters', 'NEVER ask what the attached documents already answer', 'language of the request'].filter(w => !p.system.includes(w)), []);
 	r.check("clarify prompt: always asks the question count with Auto first and as the default",
 		['Always ask one question about the NUMBER OF QUESTIONS', 'the option labeled exactly "Auto" first', 'set the default to index 0', 'decide freely', 'NO numeric bound', '15, 25, and 40'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
-	r.check("clarify prompt: asks quiz count for multiple documents with the same Auto default",
-		['If two or more attached documents', 'HOW MANY QUIZZES', 'one combined quiz over everything', 'one quiz per document'].map(w => p.system.includes(w)), [true, true, true, true]);
+	r.check("clarify prompt: asks how many quizzes for several documents, marked for the app, without Auto",
+		['If two or more attached documents', 'HOW MANY QUIZZES', '"purpose":"quizzes"', '{"quizzes":"each"}', '{"quizzes":"one"}', 'It has no "Auto" option'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
+	/* The composer's "one quiz" toggle is gone (2026-10-14): the answer to the
+	   model's "how many quizzes" question decides, read by the app. */
+	const quizzesQ = { purpose: "quizzes", header: "Quiz", question: "How many quizzes?", multiple: false, default: 0, options: [{ label: "Per document", description: "", quizzes: "each" }, { label: "One quiz", description: "", quizzes: "one" }] };
+	const parsedQ = K.parseClarifyAnswer(JSON.stringify({ questions: [quizzesQ] }));
+	r.check("parse: a valid quizzes question keeps its purpose and option values", [parsedQ.questions?.[0]?.purpose, parsedQ.questions?.[0]?.options.map(o => o.quizzes)], ["quizzes", ["each", "one"]]);
+	r.check("parse: a quizzes question with a value missing loses its purpose",
+		K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...quizzesQ, options: [quizzesQ.options[0], { label: "Two", description: "" }] }] })).questions?.[0]?.purpose, undefined);
+	r.check("one quiz: picked, per document, skipped = default, typed = null, absent = null",
+		[K.oneQuizFromClarifications([quizzesQ], [["One quiz"]]), K.oneQuizFromClarifications([quizzesQ], [["Per document"]]), K.oneQuizFromClarifications([quizzesQ], [[]]), K.oneQuizFromClarifications([quizzesQ], [["something else"]]), K.oneQuizFromClarifications([], [])],
+		[true, false, false, null, null]);
 	r.check("clarify prompt: allows one optional question and never exceeds three",
 		['at most ONE optional clarifying question', 'ask about kind when it is ambiguous', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true, true]);
 	r.check("clarify prompt: infers kind from meaning and ignores keywords inside paths and filenames",

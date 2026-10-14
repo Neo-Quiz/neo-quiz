@@ -13,6 +13,15 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The "One quiz" button under attached documents is gone: with several documents, the AI asks whether to make one quiz per document or a single one.
+- The AI's question card has a cleaner look: numbers in small discs, a discreet "Recommended" tag and a real text field.
+
+### Fixed
+
+- Typing an answer of your own in the AI's question card no longer closes it as if Enter had been pressed.
+
 ## [1.20.94] - 2026-10-14
 
 ### Changed

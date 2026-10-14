@@ -5,7 +5,7 @@ import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
-import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn, canChooseQuizCount } from "./generation-demande";
+import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
 import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
@@ -56,7 +56,7 @@ import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runn
 import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
 import { suivreDebord } from "./detail-fiche";
-import { formatClarifications, kindFromClarifications, parseClarifyAnswer } from "./generation-kind";
+import { formatClarifications, kindFromClarifications, oneQuizFromClarifications, parseClarifyAnswer } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -357,19 +357,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The destination was set by the exam (its course folder): giving up
 	    the exam gives it back to the default folder. */
 	let destinationParExam = false;
-	/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3): `true` = ONE quiz over all
-	   the attached documents, `false` = one quiz per document. Only offered
-	   with at least two documents and no image (`decouperParFichier` keeps a
-	   single quiz otherwise). The default is N quizzes, in Learn and in Test
-	   alike, and is reset each time the type changes and each time the
-	   composer is emptied. */
-	let oneQuiz = false;
-	let oneQuizBtn: HTMLElement | null = null;
-	const paintOneQuiz = (): void => {
-		if (!oneQuizBtn?.isConnected) return;
-		oneQuizBtn.setAttribute("aria-pressed", String(oneQuiz));
-		oneQuizBtn.classList.toggle("is-on", oneQuiz);
-	};
 	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
 	   par défaut. Le CHOIX fait dans les options ou les suggestions est
 	   persisté (`aiComposerDestination`) et relu à chaque arrivée sur la page
@@ -1889,30 +1876,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					if (!note.lecture) ouvrirApercu(note);
 				});
 			}
-			/* "N quizzes <-> 1 quiz" (spec 2026-09-29 §4.3), right under the
-			   documents it is about: text with its icon, no frame (a bordered
-			   button inside the composer's card would be a tile within a tile).
-			   `aria-pressed` = ONE quiz over all the documents. */
-			oneQuizBtn = null;
-			// Not for an exam: its preparation makes one Learn per document anyway.
-			if (canChooseQuizCount(noteAttachments.length, images.length) && !examCible) {
-				const toggle = ajouter(contenuZone, "button", "qbd-ai-onequiz");
-				toggle.type = "button";
-				host.ui.setIcon(ajouter(toggle, "span", "qbd-ai-onequiz-icon"), "layers");
-				ajouter(toggle, "span", "qbd-ai-onequiz-label", t("ai.oneQuiz.label"));
-				oneQuizBtn = toggle;
-				paintOneQuiz();
-				toggle.addEventListener("click", () => {
-					oneQuiz = !oneQuiz;
-					paintOneQuiz();
-				});
-				attachHoverTip(toggle, (tip) => {
-					ajouter(tip, "div", "qbd-hover-tip-title", t("ai.oneQuiz.label"));
-					ajouter(tip, "div", "qbd-hover-tip-body", t(oneQuiz ? "ai.oneQuiz.tipOne" : "ai.oneQuiz.tipMany", { count: noteAttachments.length }));
-				});
-			}
 		}
-		if (!avecPieces) { zonePieces = null; oneQuizBtn = null; }
+		if (!avecPieces) zonePieces = null;
 
 		/* LES TUILES VIDÉO (spec « Vidéos YouTube » § 3.4) : leur rangée est
 		   TOUJOURS là, dans la même bande que les chips, pour qu'une tuile
@@ -3954,7 +3919,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		noteAttachments = [];
 		for (const img of images) URL.revokeObjectURL(img.url);
 		images = [];
-		oneQuiz = false;
 	}
 
 	/** Ce que la détection de catégorie lit d'une demande : les noms des
@@ -4399,7 +4363,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	async function clarifier(container: HTMLElement | null, jointesVideo: NoteAttachment[], action: ClarifyAction): Promise<void> {
 		const envoi = capturerEnvoi(jointesVideo);
 		const pieces = [...envoi.notes.map(n => (n.path ? { name: n.name, path: n.path } : { name: n.name })), ...envoi.images.map(i => ({ name: i.file.name }))];
-		const seulQuiz = oneQuiz;
+		/* One quiz per document unless the clarifying question says otherwise
+		   (2026-10-14: the composer toggle is gone, the AI asks). */
+		const seulQuiz = false;
 		attenteGenre = { text: envoi.text, documents: pieces };
 		viderComposer();
 		render(container);
@@ -4446,9 +4412,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
 		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
 		const genre = kindFromClarifications(requete.clarify.genre ?? attente.genre, requete.clarify.questions, reponses);
+		const seulQuiz = oneQuizFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
 		const action = gardee?.action ?? requete.clarify.action ?? "generate";
 		demarrage = true;
-		void continuerApresClarification(envoi, attente.envoi, genre, attente.oneQuiz, action, requestId, requete.at)
+		void continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at)
 			.catch(err => { console.warn(LOG_PREFIX, "clarification continuation failed:", err); host.ui.notice(t("ai.error.checkSettings")); })
 			.finally(() => { demarrage = false; render(containerRef); });
 	}
@@ -4517,7 +4484,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    vide aussitôt et reste libre : on peut préparer la demande suivante
 	    pendant que celle-ci tourne. */
 	function envoyerDansLaFile(envoi: DemandeTexte, genre: KindChoice | "exam", repris: { dejaVide: boolean; oneQuiz?: boolean; requestId?: string; sentAt?: number }): void {
-		const seulQuiz = repris.oneQuiz ?? oneQuiz;
+		const seulQuiz = repris.oneQuiz ?? false;
 		const vider = (): void => { if (!repris.dejaVide) viderComposer(); };
 		/* A FOLLOW-UP carries the chat's history: the earlier requests of the
 		   chat on screen (live or read back from its record), their documents
