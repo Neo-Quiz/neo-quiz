@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.101] - 2026-10-14
+
 ### Fixed
 
 - A generation still running shows its work line with a moving shine, so it no longer looks finished.
