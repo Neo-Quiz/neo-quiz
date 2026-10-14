@@ -470,7 +470,7 @@ async function ouvrirQuiz(root: HTMLElement, scanner: Scanner, store: ReviewStor
 	try {
 		const page = await openQuizPage(root, entry, () => {
 			mount(root, scanner, store, stats, sessions);
-		}, store, stats, sessions, estMobile() ? undefined : reglagesIa);
+		}, store, stats, sessions, estMobile() ? undefined : reglagesIa, scanner);
 		/* A LAUNCH CANCELLED in the "Set up your test" modal (2026-09-29): the
 		   page was never shown (its screen is out of `root` and was invisible
 		   while loading), so nothing plays. The kept dashboard, exactly as it

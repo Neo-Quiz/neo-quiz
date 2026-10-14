@@ -67,11 +67,6 @@ function annoncer(title: string, body: string): void {
 	void notifyPc(title, body);
 }
 
-/** An "Explain" answer came back. */
-export function annoncerExplication(): void {
-	annoncer(t("ai.notify.explainReady"), "");
-}
-
 /** Watches the generation queue: a line that becomes ready announces itself (one notification for the lines that finish together). */
 export function armerNotificationsFin(queue: { lignes(): readonly LigneGeneration[]; abonner(cb: () => void, affichee: () => boolean): unknown }): void {
 	const vues = new Set<number>();
@@ -81,7 +76,9 @@ export function armerNotificationsFin(queue: { lignes(): readonly LigneGeneratio
 		if (pretes.length === 0) return;
 		const premier = readyKind(pretes[0]);
 		const extra = pretes.length - 1;
-		const titre = premier.kind === "text" ? t("ai.notify.textReady")
+		// An Explain answer says so (the Explain window sends through this queue too).
+		const titre = pretes[0].demande.explication ? t("ai.notify.explainReady")
+			: premier.kind === "text" ? t("ai.notify.textReady")
 			: extra > 0 ? t("ai.notify.quizReadyMore", { title: premier.title, extra }) : t("ai.notify.quizReady", { title: premier.title });
 		annoncer(titre, "");
 	}, () => false);

@@ -21,7 +21,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { LOG_PREFIX } from "../../../../src/branding";
-import type { QuizIndexEntry } from "../../../../src/dashboard/scanner";
+import type { QuizIndexEntry, Scanner } from "../../../../src/dashboard/scanner";
 import { renderInteractiveQuiz } from "../../../../src/engine";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
@@ -103,6 +103,9 @@ export async function openQuizPage(
 	/* The AI settings, for the "Explain" button of a played question
 	   (`ui/explain.ts`). Absent: no button. */
 	aiSettings?: AiSettingsHost,
+	/* The catalog: the "Explain" window sends through the generation queue,
+	   which needs it when that window is the first to create it. */
+	scanner?: Scanner,
 ): Promise<QuizPageHandle> {
 	const contenu = ajouter(root, "div", "qbd-content qbd-qz");
 
@@ -318,9 +321,9 @@ export async function openQuizPage(
 		return jouees;
 	};
 	const debrancherCitations = brancherCitations(hote, entry.path);
-	const demonterExpliquer = aiSettings && questionsJouees.length
+	const demonterExpliquer = aiSettings && scanner && questionsJouees.length
 		? monterBoutonExpliquer(hote, {
-			questions: questionsJouees, titre: entry.title, settings: aiSettings, chemin: entry.path, note: source, recharger,
+			questions: questionsJouees, titre: entry.title, settings: aiSettings, scanner, chemin: entry.path, note: source, recharger,
 			historique: reviewSink?.history ? (qi) => {
 				try {
 					const quiz = parseQuizSource(source.match(QUIZ_BLOCK_RE)?.[1] ?? "[]");

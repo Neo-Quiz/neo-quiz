@@ -16,6 +16,7 @@ release notes.
 ### Changed
 
 - Explain now runs Claude Code and Codex as agents in the quiz's folder, like generation, and shows their reasoning and tools above the answer.
+- Explain conversations are saved: closing and reopening a quiz keeps them.
 
 ### Fixed
 

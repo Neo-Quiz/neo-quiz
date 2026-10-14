@@ -468,17 +468,6 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-m
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 .nq-explain-modal .nq-explain-titre { font-size: 15px; }
-.nq-explain-sous-titre {
-	display: block;
-	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: 12.5px;
-	font-weight: 400;
-	color: var(--text-faint);
-}
-.nq-explain-sous-titre .katex, .nq-explain-sous-titre mjx-container { font-size: 1em !important; }
 .nq-explain-modal .modal-content {
 	flex: 1 1 auto;
 	display: flex;

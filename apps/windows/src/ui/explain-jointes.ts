@@ -33,12 +33,14 @@ export interface PiecesMessage {
 	images: ImagePayload[];
 	/** Their names, in the same order (`learner-picture-N.ext`). */
 	nomsImages: string[];
-	/** Their object URLs, for the message bubble (revoked with the conversation). */
+	/** Their object URLs, for the message bubble (revoked when the quiz page goes). */
 	urls: string[];
 	/** The documents' names, for the bubble. */
 	nomsDocuments: string[];
 	/** The documents' text, one `--- name ---` section each ("" without any). */
 	texte: string;
+	/** The documents themselves, for the request's `notes` (the record keeps their names). */
+	notes: NoteAttachment[];
 }
 
 export interface JointesExplain {
@@ -53,7 +55,7 @@ export interface JointesExplain {
 	vide(): boolean;
 	/** False while a PDF is being read or failed: nothing may leave. */
 	pret(): boolean;
-	/** Takes everything for the message that leaves; `rang` = pictures already sent in this conversation. */
+	/** Takes everything for the message that leaves; `rang` = pictures already sent from this page. */
 	prendre(rang: number): Promise<PiecesMessage>;
 	/** Drops everything (the quiz page goes). */
 	liberer(): void;
@@ -163,7 +165,7 @@ export function creerJointesExplain(deps: { rendre(): void }): JointesExplain {
 			const corps = n.content.length > DOCUMENT_MAX_CHARS ? n.content.slice(0, DOCUMENT_MAX_CHARS) + "\n[cut]" : n.content;
 			return `--- ${n.name} ---\n${corps}`;
 		}).join("\n\n");
-		return { images: payloads, nomsImages, urls: prises.map(p => p.url), nomsDocuments: docs.map(n => n.name), texte };
+		return { images: payloads, nomsImages, urls: prises.map(p => p.url), nomsDocuments: docs.map(n => n.name), texte, notes: docs };
 	}
 
 	function liberer(): void {
