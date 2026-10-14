@@ -92,8 +92,8 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 		["5e0c175a59790c4bab2e0e0086bf2e21dead384ae895c6598da78816c53f6dc6", "8587d6e0cb5078f6cc5cf124fe073ce76d7a2d4d36a2d66050bc2fa9bdebdd04", "93faa5b023fc559f443d4938a0811fc96ba4a6093fa69d78fff2d3320b633ad5", "477415a42d1a988654818d129fcc273e3399db409f22843e4d9fcbe1bbfd14b1"]);
 	r.check("Learn and Test: every question has a title naming its notion, never a question",
 		[learnP, composerPrompts("x", { mode: "practice" }).systemPrompt].map(p => /title: REQUIRED on every question: the notion it tests/.test(p) && p.includes("never a question")), [true, true]);
-	r.check("Learn : « À retenir », cartes pour des termes, récapitulatif pour des faits",
-		['"forme": "cartes"', "for TERMS to memorize", '"forme": "recap"', "for FACTS to keep"].filter(p => !learnP.includes(p)), []);
+	r.check("Learn: every reading has a hook whose form varies", /"accroche"[\s\S]*analogie[\s\S]*histoire[\s\S]*image[\s\S]*mnemo/.test(learnP) && /never the same form twice in a row/i.test(learnP), true);
+	r.check("Learn: key points are recall cards, never a recap", /"retenir"[^\n]*ALWAYS[^\n]*"cartes"/.test(learnP) && !/"forme": "recap", "items"/.test(learnP), true);
 	/* Retours du 2026-09-26 (lot B) : indices, mots clés, idiomes, cartes,
 	   classement. Chaque consigne est présente mot pour mot. */
 	for (const mode of ["learn", "practice"]) {

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Learn readings open on a hook (an analogy, a story, a picture or a memory trick), and their key points are cards to recall before flipping.
+
 ## [1.20.90] - 2026-10-13
 
 ### Changed

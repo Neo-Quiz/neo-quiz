@@ -38,7 +38,7 @@ export const CHAMPS_DECRITS: Readonly<Record<ModeGeneration, readonly string[]>>
 	learn: ['"slice"', '"role"', '"pre"', '"read"', '"explain"', '"recall"', '"hint"', 'mode: "learn"', '"objectives"', '"topic"', '"flashcard"',
 		// A generated Learn is tap-only (spec 2026-10-07-learn-scroll §5): readings are
 		// always "etapes" with "retenir"; no typed, cloze, ordering, hint-run field.
-		'"lecture"', '"etapes"', '"retenir"', '"accroche"', '"forme"', '"cartes"', '"recap"', '"recto"', '"verso"',
+		'"lecture"', '"etapes"', '"retenir"', '"accroche"', '"forme"', '"cartes"', '"recto"', '"verso"',
 		// Glossary (batch D, 2026-09-27, spec §6): generation writes it in the
 		// final configuration, next to `objectives`.
 		'"glossary"', '"term"', '"definition"'],
