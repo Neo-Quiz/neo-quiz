@@ -134,6 +134,8 @@ export interface EngineCtx {
 	 * `term`/`definition` par l'index posé sur `.qb-terme[data-terme]`.
 	 */
 	glossaire: EntreeGlossaire[];
+	/** The Learn's objectives (extractExamOptions), shown on its first step page and in its summary; empty when none. */
+	objectifs: string[];
 	/**
 	 * Puits du journal de révision. Le moteur ne connaît que cette FORME,
 	 * jamais l'implémentation — exactement comme `StatsStoreLike`. C'est ce

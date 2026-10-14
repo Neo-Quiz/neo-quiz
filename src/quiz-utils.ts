@@ -30,6 +30,8 @@ interface QuizModeConfig {
 	    validated here: `extractExamOptions` hands it to `lireGlossaire`
 	    (src/glossaire.ts), which filters out invalid entries. */
 	glossary?: unknown;
+	/** Learning objectives of a Learn, raw; read by extractExamOptions. */
+	objectives?: unknown;
 }
 
 /** Bounds of an Exam's duration, in minutes (spec 2026-09-29 §1.1: the upper
@@ -244,6 +246,12 @@ export function findQuizModeConfigIndex(items: readonly unknown[]): number {
 	return items.findIndex(isStrictQuizModeConfig);
 }
 
+/** The learning objectives of a Learn's configuration: trimmed non-empty
+    strings, at most 8 (the prompt asks for 3 to 6). */
+function lireObjectifs(v: unknown): string[] {
+	return Array.isArray(v) ? v.filter((o): o is string => typeof o === "string" && o.trim() !== "").map(o => o.trim()).slice(0, 8) : [];
+}
+
 function extractExamOptions(quizArray: QuizQuestion[]): {
 	questions: QuizQuestion[];
 	quizMode: QuizMode;
@@ -252,8 +260,11 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 	    (`lireGlossaire`) — empty without a configuration object, or when it
 	    carries no `glossary`. */
 	glossary: EntreeGlossaire[];
+	/** The Learn's learning objectives (`objectives` of the configuration),
+	    trimmed, at most 8 — empty without a configuration. */
+	objectives: string[];
 } {
-	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [] };
+	if (!Array.isArray(quizArray) || quizArray.length === 0) return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [], objectives: [] };
 
 	/* ANYWHERE in the array, not only last. The export always writes the
 	   configuration at the end, but a quiz written by hand — or by a model —
@@ -287,11 +298,12 @@ function extractExamOptions(quizArray: QuizQuestion[]): {
 			questions,
 			quizMode,
 			examOptions,
-			glossary: lireGlossaire(lastItem.glossary)
+			glossary: lireGlossaire(lastItem.glossary),
+			objectives: lireObjectifs(lastItem.objectives)
 		};
 	}
 
-	return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [] };
+	return { questions: quizArray, quizMode: "quiz", examOptions: null, glossary: [], objectives: [] };
 }
 
 /** Forme structurelle minimale acceptée par `pickLessonFields` : les six

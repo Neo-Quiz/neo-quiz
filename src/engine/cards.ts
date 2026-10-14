@@ -639,6 +639,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 				<div class="quiz-learn-gauge" role="img" aria-label="${ctx.escapeHtmlAttr(t("engine.learn.summaryLearned", { learned: fig.learned, total: fig.total }))}">${seg("first", sum.first)}${seg("retried", sum.retried)}${seg("missed", sum.missed)}${seg("rest", rest)}</div>
 				<ul class="quiz-learn-summary">${stat("first", sum.first, "engine.learn.summaryFirst")}${stat("retried", sum.retried, "engine.learn.summaryRetried")}${stat("missed", sum.missed, "engine.learn.summaryMissed")}</ul>
 			</div>
+			${objectivesHtml("engine.learn.objectivesDone", true)}
 			<div class="quiz-actions quiz-learn-actions"><button class="quiz-action-btn success quiz-learn-done-btn" type="button">${t("engine.learn.done")}</button><button class="quiz-action-btn quiz-retry-btn" type="button">${t("engine.result.retry")}</button>${resultsFileButtonHtml()}</div>
 			${pendingNote}${writtenReview}
 		</section></div>`;
@@ -717,6 +718,14 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		return `<div class="quiz-track-item${card.roleClass}${card.revealedClass}" data-slide-kind="question" data-qi="${qi}">${card.section}</div>`;
 	}
 
+	/** The Learn's objectives as a list (first step page, summary). Empty string when none. */
+	function objectivesHtml(titleKey: TransKey, done: boolean): string {
+		const list = ctx.objectifs ?? [];
+		if (list.length === 0) return "";
+		const mark = done ? `<span class="quiz-learn-objective-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>` : "";
+		return `<section class="quiz-learn-objectives${done ? " is-done" : ""}"><h3>${t(titleKey)}</h3><ul>${list.map(o => `<li>${mark}<span>${ctx.sanitize.renderInlineText(o)}</span></li>`).join("")}</ul></section>`;
+	}
+
 	/** One slide per STEP (engine/step-page.ts): the step's readings, then its
 	    questions, stacked in one page, then the way on. Each card is a
 	    `section` of its own (`data-card-qi`), refreshed alone by
@@ -727,7 +736,8 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const st = ctx.quizState;
 		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
 		const cards = order.map(qi => cardParts(qi, true).section).join("");
-		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}" data-step-hue="${stepHue(step.step)}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+		const objectives = step.step === 1 ? objectivesHtml("engine.learn.objectivesTitle", false) : "";
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}" data-step-hue="${stepHue(step.step)}">${objectives}${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 
 	/** The title line of a card of a step page: "Question 2: Title" (just

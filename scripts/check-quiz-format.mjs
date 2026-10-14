@@ -334,5 +334,10 @@ await withSrcModule("src/quiz-utils.ts", ({ extractExamOptions, findQuizModeConf
 	r.check("mode: \"lesson\" is not a Learn", lu({ mode: "lesson", source: "[[CM1]]" }).quizMode, "quiz");
 	r.check("examMode / learnMode no longer mark a configuration",
 		[findQuizModeConfigIndex([q(), { examMode: true }]), findQuizModeConfigIndex([q(), { learnMode: true }])], [-1, -1]);
+	r.check("objectives read from the configuration",
+		extractExamOptions([{ prompt: "q" }, { mode: "learn", objectives: ["Lire", "  ", 3, "Écrire"] }]).objectives, ["Lire", "Écrire"]);
+	r.check("objectives capped at 8", extractExamOptions([{ prompt: "q" }, { mode: "learn", objectives: Array.from({ length: 12 }, (_, i) => `o${i}`) }]).objectives.length, 8);
+	r.check("no configuration = no objectives", extractExamOptions([{ prompt: "q" }]).objectives, []);
+	r.check("objectives not an array = none", extractExamOptions([{ prompt: "q" }, { mode: "learn", objectives: "x" }]).objectives, []);
 	r.done();
 });

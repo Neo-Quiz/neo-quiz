@@ -104,7 +104,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		return;
 	}
 
-	const { questions: quiz, quizMode, examOptions, glossary } = extractExamOptions(rawQuiz);
+	const { questions: quiz, quizMode, examOptions, glossary, objectives } = extractExamOptions(rawQuiz);
 
 	if (!Array.isArray(quiz) || quiz.length === 0) {
 		renderParagraph(container, t("engine.error.noQuestions"));
@@ -200,6 +200,7 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 		// Glossaire du quiz (engine/termes.ts l'indexe, engine/termes-bulle.ts
 		// y relit term/definition) — voir types/engine-ctx.ts.
 		glossaire: glossary,
+		objectifs: objectives,
 		/* `reviewSink` était un accessor parce qu'il lisait `plugin._reviewStore`,
 		   assigné après le chargement du greffon. Il arrive maintenant par le
 		   contexte d'appel, donc déjà résolu : un accessor n'aurait plus rien à

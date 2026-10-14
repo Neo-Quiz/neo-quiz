@@ -152,6 +152,8 @@ export const EN_ENGINE = {
 	"engine.learn.summaryTitle": "Your summary",
 	"engine.learn.summaryAccuracy": "Accuracy",
 	"engine.learn.summaryTime": "Time",
+	"engine.learn.objectivesTitle": "What you will learn",
+	"engine.learn.objectivesDone": "You can now",
 	"engine.learn.summaryLearned": "{learned}/{total} learned",
 	"engine.learn.done": "Done",
 	"engine.step.questionTitle": "Question {n}:",
