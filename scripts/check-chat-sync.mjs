@@ -63,10 +63,29 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	r.check("explain mark: to file, path relative to the root", inFile[0].explain, { path: "Cours/Quiz.md", quiz: "Q" });
 	r.check("explain mark: from file under another root id, path re-anchored", M.chatsFromFile(inFile, "rootB")[0].explain, { path: "rootB/Cours/Quiz.md", quiz: "Q" });
 	const outside = M.chatsToFile([chat("e3", 1, "pc", [], { explain: { path: "Elsewhere/q.md", quiz: "Q" } })], "rootA");
-	r.check("explain mark: a path outside the root drops the mark, the chat stays", [outside.length, outside[0].id, "explain" in outside[0]], [1, "e3", false]);
+	r.check("explain mark: a clean path outside the root is kept as a foreign full path, the chat stays", [outside.length, outside[0].id, outside[0].explain], [1, "e3", { path: "Elsewhere/q.md", quiz: "Q", foreign: true }]);
 	const hidden = M.chatsFromFile([chat("e4", 1, "pc", [], { explain: { path: ".neo-quiz/x.md", quiz: "Q" } })], "rootB");
 	r.check("explain mark: a stored path into the internal folder is dropped, the chat stays", [hidden[0].id, "explain" in hidden[0]], ["e4", false]);
 	r.check("explain mark: a chat without one gets no field from the conversion", "explain" in M.chatsFromFile(M.chatsToFile([chat("e5", 1, "pc")], "rootA"), "rootB")[0], false);
+	/* A quiz of another open root (a declared vault): relative to the chats
+	   root it would be lost on restart, so the full contract path is kept,
+	   marked foreign, and read back verbatim. */
+	const foreignFile = M.chatsToFile([chat("e6", 1, "pc", [], { explain: { path: "rootB/x.md", quiz: "Q" } })], "rootA");
+	r.check("explain mark: a quiz of another root is written as a foreign full path", foreignFile[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
+	r.check("explain mark: a foreign path is read back verbatim", M.chatsFromFile(foreignFile, "rootA")[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
+	r.check("explain mark: a foreign mark written again stays the same", M.chatsToFile(M.chatsFromFile(foreignFile, "rootA"), "rootA")[0].explain, { path: "rootB/x.md", quiz: "Q", foreign: true });
+	for (const bad of ["../x.md", "rootB/../x.md", "/abs.md", "C:/x.md", "rootB\\x.md", ".neo-quiz/x.md", ".NEO-QUIZ/x.md", "rootB/a\u0001.md"]) {
+		const w = M.chatsToFile([chat("e7", 1, "pc", [], { explain: { path: bad, quiz: "Q" } })], "rootA");
+		const rd = M.chatsFromFile([chat("e7", 1, "pc", [], { explain: { path: bad, quiz: "Q", foreign: true } })], "rootA");
+		r.check("explain mark: an unclean foreign path drops the mark, the chat stays: " + JSON.stringify(bad), [w[0].id, "explain" in w[0], rd[0].id, "explain" in rd[0]], ["e7", false, "e7", false]);
+	}
+	// The internal folder, as Windows reads its name.
+	for (const bad of [".NEO-QUIZ/x.md", ".neo-quiz./x.md", ".neo-quiz /x.md", ".Neo-Quiz. ./x.md"]) {
+		r.check("internal folder refused whatever its case or trailing dots: " + JSON.stringify(bad), [M.relativeToRoot("Root/" + bad, "Root"), M.absoluteInRoot(bad, "Root")], ["", ""]);
+	}
+	r.check("a folder that only starts like the internal one is not refused", M.relativeToRoot("Root/.neo-quizzes/x.md", "Root"), ".neo-quizzes/x.md");
+	r.check("explain mark: the merge fallback skips a tombstone's mark",
+		"explain" in M.mergeChats([[chat("e8", 9, "pc")], [chat("e8", 7, "pc", [], { deleted: true, explain: { path: "r/q.md", quiz: "Q" } })]])[0], false);
 
 	// What a device may write.
 	const mine = chat("m", 5, "ph"), foreign = chat("f", 5, "pc", [rq("r", 1)]);

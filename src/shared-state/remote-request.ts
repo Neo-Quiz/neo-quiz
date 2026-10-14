@@ -1,4 +1,4 @@
-import { isCleanRelativePath } from "./chat-merge";
+import { isCleanRelativePath } from "../dashboard/chat-record";
 import { MODEL_ID } from "./devices";
 
 /* ══════════════════════════════════════════════════════════

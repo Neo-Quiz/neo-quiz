@@ -142,7 +142,12 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 		r.check("hostile explain mark dropped, chat kept: " + JSON.stringify(bad).slice(0, 40), [c && c.id, c && "explain" in c], ["c2", false]);
 	}
 	const proto = C.readChats({ v: 1, chats: [{ id: "c3", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], explain: JSON.parse('{"__proto__":{"polluted":1},"path":"root/x.md","quiz":"b"}') }] })[0];
-	r.check("only the two fields are copied", [Object.keys(proto.explain).join(), ({}).polluted, Object.getPrototypeOf(proto.explain) === Object.prototype], ["path,quiz", undefined, true]);
+	const mark = (explain) => C.readChats({ v: 1, chats: [{ id: "c4", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], explain }] })[0].explain;
+	r.check("a foreign mark (quiz of another root) is kept", mark({ path: "rootB/x.md", quiz: "b", foreign: true }), { path: "rootB/x.md", quiz: "b", foreign: true });
+	r.check("foreign: any value but true is ignored, the mark kept", [mark({ path: "r/x.md", quiz: "b", foreign: "yes" }), mark({ path: "r/x.md", quiz: "b", foreign: 1 })], [{ path: "r/x.md", quiz: "b" }, { path: "r/x.md", quiz: "b" }]);
+	r.check("a control character in the path drops the mark", [mark({ path: "r/a\u0001.md", quiz: "b" }), mark({ path: "r/a\u007f.md", quiz: "b" }), mark({ path: "r/a\nb.md", quiz: "b" })], [undefined, undefined, undefined]);
+	r.check("the shared path rule: control characters refused", [C.isCleanRelativePath("a/b c.md"), C.isCleanRelativePath("a/b\u0000.md"), C.isCleanRelativePath("a/b\u001f.md")], [true, false, false]);
+	r.check("only the two fields are copied",[Object.keys(proto.explain).join(), ({}).polluted, Object.getPrototypeOf(proto.explain) === Object.prototype], ["path,quiz", undefined, true]);
 	r.done();
 });
 

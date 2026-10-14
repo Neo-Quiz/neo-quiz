@@ -189,23 +189,33 @@ export function readFolder(x: unknown): string | undefined {
 	return x;
 }
 
+/** A stored path: segments separated by "/", none empty, "." or "..", no
+    drive letter, no backslash, no control character, not absolute. The one
+    path rule of the synced chat files (Explain marks, result and document
+    paths, remote requests). */
+export function isCleanRelativePath(p: string): boolean {
+	if (!p || p.length > 500 || p.includes("\\") || /[\u0000-\u001f\u007f]/.test(p) || p.startsWith("/") || /^[A-Za-z]:/.test(p)) return false;
+	return p.split("/").every(s => s !== "" && s !== "." && s !== "..");
+}
+
 /** The quiz an Explain chat is about (2026-10-14, one chat per quiz): the
     quiz note (a contract path) and its title shown in the chat list. Read
-    from a synced file: hostile. */
-export interface ChatExplain { path: string; quiz: string }
+    from a synced file: hostile. `foreign`: the quiz lives in another root
+    than the chats file's, so the stored path is the full contract path, kept
+    verbatim (only a device that has that root resolves it). */
+export interface ChatExplain { path: string; quiz: string; foreign?: true }
 
-/** A stored Explain mark: a clean contract path ending in `.md` (no drive,
-    no backslash, no `..`, not absolute) and a bounded label; anything else
-    drops the mark (the chat stays a plain chat). Only the two fields are
-    copied. */
+/** A stored Explain mark: a clean path (`isCleanRelativePath`) ending in
+    `.md` and a bounded label; anything else drops the mark (the chat stays a
+    plain chat). `foreign` is kept only when it is exactly `true`. Only the
+    known fields are copied. */
 export function readExplain(x: unknown): ChatExplain | undefined {
 	if (!isObj(x) || !isStr(x.path) || !isStr(x.quiz)) return undefined;
 	const p = x.path;
-	if (p.length > 500 || !p.toLowerCase().endsWith(".md") || p.includes("\\") || p.includes("\0") || p.startsWith("/") || /^[A-Za-z]:/.test(p)) return undefined;
-	if (!p.split("/").every(s => s !== "" && s !== "." && s !== "..")) return undefined;
+	if (!isCleanRelativePath(p) || !p.toLowerCase().endsWith(".md")) return undefined;
 	const quiz = readLabel(x.quiz);
 	if (!quiz) return undefined;
-	return { path: p, quiz };
+	return x.foreign === true ? { path: p, quiz, foreign: true } : { path: p, quiz };
 }
 
 /** A stored label: a non-empty string without control characters, at most `MAX_LABEL` long; anything else is dropped. */
