@@ -78,6 +78,20 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("a second send: a second request in the same chat, in order of sending", deux.chats[0].requests.map(q => [q.id, q.text]), [["r1", "make quizzes"], ["r2", "again"]]);
 	const autre = R.reconcileChats(rec.chats, g(line(6, "prete", { chatId: "c2", requestId: "r9" }, quiz("Z", "z.md"))), dev, 9000);
 	r.check("another chat: another record", autre.chats.map(c => c.id), ["c1", "c2"]);
+	// An Explain turn (2026-10-14): the line carries the chat's mark, the record keeps it.
+	const mark = { path: "r/q.md", quiz: "Q" };
+	const expl = g(line(1, "prete", { chatId: "cx", requestId: "rx", mode: "learn", explication: { mark, context: "ctx", course: "", position: "" } }, { titre: "", chemin: "", texte: "answer" }));
+	const ex = R.reconcileChats([], expl, dev, 5000);
+	r.check("an Explain line creates a chat with its mark and a prose result",
+		[ex.changed, ex.chats[0].explain, ex.chats[0].requests[0].results, ex.chats[0].requests[0].mode], [true, mark, [{ kind: "text", text: "answer" }], "learn"]);
+	r.check("an Explain line reconciled again changes nothing", R.reconcileChats(ex.chats, expl, dev, 9000).changed, false);
+	r.check("the mark is a copy, its foreign flag kept",
+		R.reconcileChats([], g(line(1, "prete", { chatId: "cx", requestId: "rx", explication: { mark: { ...mark, foreign: true }, context: "", course: "", position: "" } }, { titre: "", chemin: "", texte: "a" })), dev, 5000).chats[0].explain, { ...mark, foreign: true });
+	const own = { path: "own/x.md", quiz: "X" };
+	const kept = R.reconcileChats([{ id: "cx", origin: dev, createdAt: 1, updatedAt: 1, explain: own, requests: [] }], expl, dev, 5000);
+	r.check("a chat that already has a mark keeps its own", kept.chats[0].explain, own);
+	const gets = R.reconcileChats(rec.chats, g(line(9, "prete", { requestId: "r3", explication: { mark, context: "", course: "", position: "" } }, { titre: "", chemin: "", texte: "b" })), dev, 9000);
+	r.check("an existing chat without a mark gets it", gets.chats[0].explain, mark);
 
 	const old = { chatId: undefined, requestId: undefined, sentAt: undefined };
 	const rien0 = () => true;

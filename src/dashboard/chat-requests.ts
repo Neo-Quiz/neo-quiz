@@ -146,6 +146,9 @@ export function reconcileChats(chats: readonly ChatRecord[], groups: readonly Re
 		const chat: ChatRecord = prev
 			? { ...prev, requests, updatedAt: now, title: prev.title ?? (deriveTitle(next) || undefined) }
 			: { id: g.chatId, origin: device, createdAt: next.at, updatedAt: now, title: deriveTitle(next) || undefined, requests };
+		// An Explain turn (2026-10-14) marks its chat; a chat already marked keeps its own mark.
+		const mark = g.lines[0].demande.explication?.mark;
+		if (mark && !chat.explain) chat.explain = { ...mark };
 		if (idx >= 0) list[idx] = chat; else list.push(chat);
 		changed = true;
 	}

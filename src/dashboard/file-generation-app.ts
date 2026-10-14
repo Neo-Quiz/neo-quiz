@@ -47,11 +47,12 @@ import type { Transcript } from "./transcript";
 import { remoteProviderAllowed } from "./remote-providers";
 import { garderFile, relireFile, sessionDeFenetre } from "./generation-queue-store";
 import { LEGACY_CHAT_ID } from "./chat-record";
-import type { ChatRun } from "./chat-record";
+import type { ChatExplain, ChatRun } from "./chat-record";
 import { UsageLimitError, resetFromRows } from "./usage-limit";
 import { answerLivePermission, liveToolOutput, liveTurnPlace, liveTurnRunning, liveTurnView, onLiveTurn, sendDuringTurn } from "./live-generation";
 import type { LiveImage, LiveTurnView } from "./live-generation";
 import { transcriptOfThread } from "./live-turn";
+import { explainTurnTexts } from "./explain-chat";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -118,7 +119,7 @@ export interface DemandeFile extends DemandeTexte {
     not a generation, and ends with a prose answer. */
 export interface DemandeExplication {
 	/** The chat record's mark (`ChatExplain`). */
-	mark: { path: string; quiz: string };
+	mark: ChatExplain;
 	/** The whole quiz and the tutor instructions (`contexteQuiz` + `consigneExplication` …), frozen at send. */
 	context: string;
 	/** The course read by the app (empty when the sender could not read it: the agent opens it). */
@@ -383,7 +384,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	    request goes again, ONCE and on its own, on the fallback model (cyber:
 	    Opus 4.8). The retry line says so in orange (file-generation-vue). */
 	function relancerSurRepli(id: number, d: DemandeFile): void {
-		if (d.repliDe || d.reglages.aiProvider !== "claude-code") return;
+		// An Explain turn is a chat, never retried as a generation.
+		if (d.explication || d.repliDe || d.reglages.aiProvider !== "claude-code") return;
 		const tr = lireTranscript(id);
 		if (!tr?.refusals) return;
 		const p = aiProvidersRepli.getProvider("claude-code");
@@ -423,6 +425,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		};
 		const client = createAiClient(figes);
 		clients.set(ligne.id, client);
+		if (d.explication) { await expliquer(ligne, client); return; }
 		if (d.planifier) { await planifier(ligne, client); return; }
 		try {
 			// « Lecture du document… » quand la demande en porte un.
@@ -550,6 +553,49 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		file = F.completer(file, ligne.id, complete);
 		etapeDe(ligne.id, "enregistrement");
 		await enregistrer(ligne.id, complete);
+	}
+
+	/** AN EXPLAIN TURN (2026-10-14): the tutor chat of a quiz, as a turn of
+	    the chat's live session (the queue's key, as a generation), or one call
+	    with the whole conversation when it cannot run live. The answer is
+	    prose: the line ends with `texte`, never a note. */
+	async function expliquer(ligne: LigneGeneration, client: AiClient): Promise<void> {
+		const d = ligne.demande;
+		const x = d.explication!;
+		try {
+			etapeDe(ligne.id, "redaction");
+			const transcript = transcriptVide();
+			transcripts.set(ligne.id, transcript);
+			const images = await encoderImages(d.images);
+			// Stopped while the pictures were read: no process launched yet.
+			if (!tourne(ligne.id)) return;
+			const { followUp } = explainTurnTexts({ context: x.context, course: x.course, message: d.text, position: x.position });
+			/* The position goes LAST, after the message, in the one-shot call too. */
+			const reponse = await client.chat([{ role: "user", text: d.text + (x.position ? "\n\n---\n\n" + x.position : "") }], {
+				style: "explain",
+				context: x.context + (x.course ? "\n\n=== COURSE ===\n" + x.course : "") + (d.contexte ? "\n\nCONVERSATION SO FAR:\n" + d.contexte : ""),
+				images,
+				maxChars: x.maxChars,
+				// Never the agent folder for a request from another device: nobody at this PC asked for it.
+				dossier: d.fromDevice ? undefined : x.folder,
+				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne), followUp },
+				onTranscript: (ev) => {
+					if (transcripts.get(ligne.id) !== transcript) return;
+					appliquer(transcript, ev);
+					transcriptChange(ligne.id);
+				},
+			});
+			if (tourne(ligne.id)) file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte: reponse, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
+		} catch (err) {
+			if (err instanceof UsageLimitError && tourne(ligne.id)) { await pauserSurLimite(ligne, err); return; }
+			const e = err as Error & { aborted?: boolean };
+			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
+		} finally {
+			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
+			etapes.delete(ligne.id);
+			file = F.solder(file, ligne.id);
+			pomper();
+		}
 	}
 
 	/** THE PLANNING LINE of an "/exam" preparation: the model reads every
