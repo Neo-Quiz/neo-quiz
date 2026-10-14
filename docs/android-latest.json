@@ -1,8 +1,8 @@
 {
-  "versionCode": 33,
-  "versionName": "0.2.31",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.31/NeoQuiz-0.2.31.apk",
-  "sha256": "9b617a23c10101953114371ef9b92b1a69204e799fb56c6ba8aeb1f5d8fa4139",
-  "size": 56138829,
-  "notes": "Model picker fixes and each PC listed once"
+  "versionCode": 34,
+  "versionName": "0.2.32",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.32/NeoQuiz-0.2.32.apk",
+  "sha256": "d3e2b1ea850b34194439de4a899ea992c0c70bce791317c7f82a766f81133bb0",
+  "size": 56148853,
+  "notes": "Active Learns: hooks, interactive pages, mind map; clearer Generate page"
 }
