@@ -216,7 +216,7 @@ const { readFileSync } = await import("node:fs");
 const { runInNewContext } = await import("node:vm");
 const { transform } = await import("esbuild");
 const sourcePage = readFileSync("src/dashboard/ai.ts", "utf8");
-const noms = ["startGeneration", "lancerSurSite", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
+const noms = ["startGeneration", "lancerSurSite", "capturerEnvoi", "messagePourSite", "ouvrirSite", "arreterAttenteWeb", "takeComposerMessage", "dropSentMessage", "restoreComposerMessage", "composerIsEmpty"];
 const fonctions = noms.map(nom => {
 	const debut = sourcePage.search(new RegExp(`\\t(?:async )?function ${nom}\\(`));
 	const fin = sourcePage.indexOf("\n\t}", debut);
@@ -237,21 +237,23 @@ const fonctions = noms.map(nom => {
 		fonctions.push(sourceDemande.slice(debut, fin + 2).replace(/^export /, ""));
 	}
 }
-/* `startGeneration` also reads the module-level `retirerCommandeExam` and
-   `decideByKeywords` (the /exam command, the kind from keywords): same
-   extraction from their real files, never a copy. */
+/* `startGeneration` also reads the module-level `retirerCommandeExam` (the
+   /exam command): same extraction from its real file, never a copy. The kind
+   from keywords (`decideByKeywords`) left with 82e34bb2: the AI decides it. */
 {
-	const kind = readFileSync("src/dashboard/generation-kind.ts", "utf8");
-	const debut = kind.indexOf("function plain(");
-	const fin = kind.indexOf(String.fromCharCode(10) + "}", kind.indexOf("export function decideByKeywords"));
-	if (debut < 0 || fin < 0) throw new Error("generation-kind: decideByKeywords not found");
-	fonctions.push(kind.slice(debut, fin + 2).replace(/^export /m, ""));
 	const cmd = readFileSync("src/dashboard/exam-command.ts", "utf8");
 	const d2 = cmd.search(/^export function retirerCommandeExam[<(]/m);
 	const f2 = cmd.indexOf(String.fromCharCode(10) + "}", d2);
 	if (d2 < 0 || f2 < 0) throw new Error("exam-command: retirerCommandeExam not found");
 	fonctions.push(cmd.slice(d2, f2 + 2).replace(/^export /, ""));
 }
+/* Since 82e34bb2 a web send goes through the clarify step first; with a
+   ready answer it lands in `lancerSurSite` with the captured request. This
+   stub is that ready path only (the clarify call itself needs a CLI). */
+fonctions.push(`async function clarifier(container, jointesVideo, action) {
+	const envoi = capturerEnvoi(jointesVideo);
+	if (action === "web") await lancerSurSite(envoi, envoi, "learn", oneQuiz, container);
+}`);
 const codePage = (await transform(fonctions.join("\n"), { loader: "ts" })).code;
 const refus = makeReporter("Canal web : refus pendant une attente");
 for (const avecImage of [false, true]) {
@@ -270,7 +272,7 @@ for (const avecImage of [false, true]) {
 		   version future, ou un site retiré. */
 		settings: () => ({ aiProvider: avecImage ? "claude-web" : "un-site-sans-web" }),
 		aiProviders: { estCanalWeb: () => true, getCanal: () => ({ label: "site", web: avecImage ? {} : undefined }) },
-		host: { ui: { notice: () => {} }, platform: { isMobile: false } }, t: cle => cle,
+		host: { ui: { notice: () => {} }, platform: { isMobile: false } }, t: cle => cle, URL: { createObjectURL: () => "blob:test" },
 		/* La tuile vidéo (2026-09-22) : `startGeneration` attend désormais
 		   `prets()` avant la capture. Sans transcription en vol ici, la
 		   réponse est immédiate et ne joint rien — exactement ce que ces
