@@ -427,7 +427,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
-				documents, plansParDocument: liens?.map(l => l?.plan),
+				documents, plansParDocument: liens?.map(l => l?.plan), parties: d.parties,
 				/* The quiz's folder: Claude Code may read it with read-only tools
 				   once the user trusts it. Never for a request from another
 				   device: nobody at this PC asked for it. */
@@ -457,7 +457,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				reponse = await lancer();
 			}
 			if (!tourne(ligne.id)) return;
-			if (documents && reponse.lot) {
+			if ((documents || d.parties !== undefined) && reponse.lot) {
 				await produireLot(ligne, d, client, deps, reponse.lot, liens);
 				return;
 			}

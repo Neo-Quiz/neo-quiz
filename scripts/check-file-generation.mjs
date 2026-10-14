@@ -338,6 +338,16 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 	r.check("one pass: a single document is never flagged", gd.decouperParFichier(msg(["CM1.md"]), false, true)[0].parDocument, undefined);
 	r.check("without the one-pass condition: one request per document, as before",
 		noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), false, false)), [["CM1.md"], ["CM2.md"]]);
+	/* 2026-10-14: the AI asks how many quizzes; 2 or more, or "auto", are that
+	   many quizzes over ALL the documents, split by theme, in one pass. */
+	r.check("several quizzes over all the documents: one request, every document, the count kept",
+		[2, 3, "auto"].map(n => { const m = gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), n, true); return [noms(m), m[0].parties, m[0].parDocument]; }),
+		[[[["CM1.md", "CM2.md"]], 2, undefined], [[["CM1.md", "CM2.md"]], 3, undefined], [[["CM1.md", "CM2.md"]], "auto", undefined]]);
+	r.check("1 quiz asked = one plain request; no answer (null) = one per document as before",
+		[(() => { const m = gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), 1, true); return [noms(m), m[0].parties, m[0].parDocument]; })(), gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), null, true)[0].parDocument],
+		[[[["CM1.md", "CM2.md"]], undefined, undefined], true]);
+	r.check("several quizzes without one pass (Ollama): one quiz per document",
+		noms(gd.decouperParFichier(msg(["CM1.md", "CM2.md"]), 2, false)), [["CM1.md"], ["CM2.md"]]);
 	r.check("which providers read in one pass: every one but Ollama (its structured answer holds a single quiz)",
 		["claude-cli", "claude-code", "codex", "antigravity-cli", "claude-web", "ollama"].map(gd.lectureEnUnePasse), [true, true, true, true, true, false]);
 

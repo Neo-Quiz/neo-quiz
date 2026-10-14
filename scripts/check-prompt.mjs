@@ -271,7 +271,7 @@ await withSrcModule("src/dashboard/ai-client.ts", ({ assemblerQuestionsOllama, p
    writes one quiz per document. The prompt names the documents in order and
    asks for one wrapped quiz per document; every forbidden word of each type
    stays absent; the single-quiz prompt is untouched. */
-await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, parseReponseQuiz, parseReponseLot }, { MOTS_INTERDITS }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ composerPrompts, parseReponseQuiz, parseReponseLot, parseReponseParties }, { MOTS_INTERDITS }) => {
 	const r = makeReporter("One pass over N documents - prompt and parser");
 	const docs = ["CM1 - RÃ©seaux.pdf", "CM2 - Routage.pdf", "CM3 - SÃ©curitÃ©.pdf"];
 	for (const mode of ["learn", "practice"]) {
@@ -311,6 +311,22 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.check("the single-quiz form still reads as before", parseReponseQuiz("[" + JSON.stringify(q(1)) + "]").questions.length, 1);
 	r.check("a missing comma between two quizzes is repaired like in the single form",
 		parseReponseLot(reponse(bloc(docs[0], 1), bloc(docs[1], 2), bloc(docs[2], 3)).replace(/\},\n\{/g, "}\n{"), docs).length, 3);
+	/* SEVERAL QUIZZES OVER ALL THE DOCUMENTS (2026-10-14): the learner's number
+	   of quizzes, split by theme, never one per document. */
+	for (const mode of ["learn", "practice"]) {
+		const sans = composerPrompts("x", { mode }).systemPrompt;
+		const deux = composerPrompts("x", { mode, parties: 2 }).systemPrompt;
+		const auto = composerPrompts("x", { mode, parties: "auto" }).systemPrompt;
+		r.check(`${mode}: N quizzes over all the documents, split by theme`, ["SEVERAL QUIZZES OVER ALL THE DOCUMENTS", "EXACTLY 2 parts", "by THEME, never one part per document", '"part"'].filter(w => !deux.includes(w)), []);
+		r.check(`${mode}: auto lets the model choose how many`, auto.includes("as many parts as it needs"), true);
+		r.check(`${mode}: 1 or no count leaves the single-quiz prompt unchanged`, [composerPrompts("x", { mode, parties: 1 }).systemPrompt === sans, composerPrompts("x", { mode }).systemPrompt === sans], [true, true]);
+	}
+	const partie = (n, titre) => `{ part: ${n}, title: ${JSON.stringify(titre)}, quiz: [${JSON.stringify(q(n))}, { mode: "quiz", glossary: [] }] }`;
+	const parts = parseReponseParties(reponse(partie(1, "Couches"), partie(2, "Routage")), 2);
+	r.check("parts: one entry per quiz with its title and questions", [parts.map(x => x.titre), parts.map(x => x.questions[0].title)], [["Couches", "Routage"], ["Q1", "Q2"]]);
+	r.check("parts: a count that differs from the one asked is refused", (() => { try { parseReponseParties(reponse(partie(1, "A")), 2); return "accepted"; } catch { return "refused"; } })(), "refused");
+	r.check("parts: auto accepts the count the model chose", parseReponseParties(reponse(partie(1, "A"), partie(2, "B"), partie(3, "C")), "auto").length, 3);
+	r.check("parts: two equal titles get distinct keys", (() => { const x = parseReponseParties(reponse(partie(1, "Même"), partie(2, "Même")), 2); return x[0].document !== x[1].document; })(), true);
 	r.done();
 });
 

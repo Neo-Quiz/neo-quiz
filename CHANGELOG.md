@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- With several documents, the AI simply asks how many quizzes to make (Auto, 1, 2, 3 or a number you type); two quizzes or more share the material of all the documents by theme instead of one quiz per document.
+
 ## [1.20.95] - 2026-10-14
 
 ### Changed

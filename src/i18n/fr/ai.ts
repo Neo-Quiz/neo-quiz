@@ -636,6 +636,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.transcript.progressQuestionOf": "Question {n} / {total}",
 	"ai.transcript.progressQuestion": "Question {n}",
 	"ai.transcript.progressQuizOf": "Quiz {n} / {total}",
+	"ai.transcript.progressQuiz": "Quiz {n}",
 	"ai.transcript.progressLinesOther": "{count} lignes",
 	"ai.transcript.progressLinesOne": "1 ligne",
 	"ai.transcript.toLatest": "Aller au dernier message",

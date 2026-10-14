@@ -117,6 +117,11 @@ export interface GenerateOptions {
 	    order, `undefined` for a document with no Learn) — a Test follows the
 	    Learn of ITS document. */
 	plansParDocument?: ({ slice: number; titre: string }[] | undefined)[];
+	/** SEVERAL QUIZZES OVER ALL THE DOCUMENTS (2026-10-14): 2 or more, or
+	    "auto" (the model decides how many). The material of every document is
+	    split by theme into that many quizzes, read by `parseReponseParties`.
+	    Never with `documents`. */
+	parties?: number | "auto";
 	/** The folder of the quiz, a CONTRACT path (2026-10-09). With Claude
 	    Code, the host is asked whether the user trusts it
 	    (`HostProcess.trustFolder`, a native dialog the first time); trusted,
@@ -695,6 +700,16 @@ ${documents.map((d, i) => `\t${i + 1}. ${d}`).join("\n")}
 
 	` : "";
 
+	/* SEVERAL QUIZZES OVER ALL THE DOCUMENTS (2026-10-14): the number of
+	   quizzes is the learner's (the clarifying "how many quizzes"), never one
+	   per document by rule: a quiz takes a THEME from every document that
+	   treats it. Read by `parseReponseParties`. */
+	const parties = !documents && options.parties !== undefined && (options.parties === "auto" || options.parties >= 2) ? options.parties : null;
+	const blocParties = parties !== null ? `SEVERAL QUIZZES OVER ALL THE DOCUMENTS — THIS OVERRIDES THE "JSON5 array of questions" FORMAT ABOVE: read ALL the attached documents first, then split the WHOLE material into ${parties === "auto" ? `as many parts as it needs, from 2 to ${MAX_PARTIES}, each the size of one quiz` : `EXACTLY ${parties} parts`} by THEME, never one part per document: a part draws from every document that treats its theme. Write ONE quiz per part, in a sensible learning order. Together the quizzes cover every notion of the material, with no question repeated across quizzes, and each quiz stands on its own.
+	Your answer is ONE JSON5 array with one element per quiz: { "part": <its number, from 1>, "title": "<the quiz title, see QUIZ TITLE>", "quiz": [ ...the array of questions described above, configuration object last... ] }. The QUIZ TITLE goes in "title" of each element, not in a comment. Every rule above (QUANTITY, MODE, GLOSSARY, LANGUAGE…) applies to EACH quiz on its own.
+
+	` : "";
+
 	/* The question fields. A Learn is answered by TAPPING (single choice, flashcards): its list names no typed, ordered, matched or computed answer. The Test keeps the full list, unchanged. */
 	const learnFields = `	- title: REQUIRED on every question: the notion it tests, as a short noun phrase of 2 to 6 words in the quiz language, shown as "Question N: <title>" above the prompt (e.g. "La requête préparée", "Le nombre de colonnes", "La SQLi en aveugle"); never a question, never the prompt repeated, never the answer, never a number such as "Question 3"
 	- prompt: full question text
@@ -749,7 +764,7 @@ ${categorieBloc}
 
 ${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES + LEARN_HTML : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
-	${blocLot}${quantite}
+	${blocLot}${blocParties}${quantite}
 
 	Generate ${typeInstruction}. ${PHRASE_FINALE_CLI}`;
 
@@ -996,6 +1011,34 @@ function cleDocument(nom: string): string {
     document (or the same document twice), a quiz with no question, or an
     answer that is not this shape — saving fewer quizzes than documents, or a
     quiz under the wrong document, would be silent. */
+/** The most quizzes "auto" may make in one answer. */
+export const MAX_PARTIES = 6;
+
+/**
+ * The answer of SEVERAL QUIZZES OVER ALL THE DOCUMENTS (`GenerateOptions.parties`):
+ * one element `{ part, title, quiz }` per quiz. A number asked must be met
+ * exactly; "auto" accepts 1 to 10. Each quiz gets a unique key in `document`
+ * (its title, or "Quiz N"), which `enregistrerLot` keys its saves by.
+ */
+export function parseReponseParties(content: string, parties: number | "auto"): ReponseDocument[] {
+	const lu = parseReponseQuiz(content).questions;
+	const elements = lu.map(el => {
+		const o = el && typeof el === "object" && !Array.isArray(el) ? el as { title?: unknown; quiz?: unknown } : null;
+		if (!o || !Array.isArray(o.quiz)) throw new Error(t("ai.err.lotShape"));
+		return { titre: typeof o.title === "string" ? nettoyerTitre(o.title) : undefined, questions: sansFauxTitres(o.quiz) };
+	});
+	const attendu = parties === "auto" ? null : parties;
+	if (attendu !== null ? elements.length !== attendu : elements.length < 1 || elements.length > 10) throw new Error(t("ai.err.lotCount", { expected: attendu ?? MAX_PARTIES, got: elements.length }));
+	const vus = new Set<string>();
+	return elements.map((el, i) => {
+		if (el.questions.length === 0) throw new Error(t("ai.err.lotEmpty", { name: el.titre ?? `Quiz ${i + 1}` }));
+		let cle = el.titre ?? `Quiz ${i + 1}`;
+		if (vus.has(cleDocument(cle))) cle = `${cle} (${i + 1})`;
+		vus.add(cleDocument(cle));
+		return { document: cle, questions: el.questions, titre: el.titre };
+	});
+}
+
 export function parseReponseLot(content: string, documents: readonly string[]): ReponseDocument[] {
 	const lu = parseReponseQuiz(content).questions;
 	const elements = lu.map(el => {
@@ -1306,8 +1349,11 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   error, never fewer quizzes). Ollama never gets `documents`: its
 		   structured answer holds a single quiz (`lectureEnUnePasse`). */
 		const documents = options.documents;
+		const parties = options.parties;
 		const lireBrut: LireReponse = documents && documents.length >= 2
 			? (texte) => ({ questions: [], lot: parseReponseLot(texte, documents) })
+			: parties === "auto" || (typeof parties === "number" && parties >= 2)
+			? (texte) => ({ questions: [], lot: parseReponseParties(texte, parties) })
 			: parseReponseQuiz;
 		/* An unreadable answer: a size limit told in words, or the raw answer
 		   kept in the host's diagnostic file (`lireOuDiagnostiquer`). */

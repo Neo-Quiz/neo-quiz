@@ -56,7 +56,7 @@ import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runn
 import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
 import { suivreDebord } from "./detail-fiche";
-import { formatClarifications, kindFromClarifications, oneQuizFromClarifications, parseClarifyAnswer } from "./generation-kind";
+import { formatClarifications, kindFromClarifications, quizCountFromClarifications, parseClarifyAnswer, type QuizzesChoice } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -350,7 +350,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The clarifying questions asked and not answered yet, by request id: what the click
 	    needs to generate (the documents' text is only in memory). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean; action: ClarifyAction }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction }>();
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
@@ -4333,7 +4333,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    qu'une demande à la fois : le premier fichier part, les autres attendent
 	    la réponse du précédent (`recevoirReponse`). A site cannot make both
 	    kinds from one request: `both` starts with the Learn. */
-	async function lancerSurSite(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean, container: HTMLElement | null): Promise<void> {
+	async function lancerSurSite(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, container: HTMLElement | null): Promise<void> {
 		modeGeneration = genre === "practice" ? "practice" : "learn";
 		const restore = messagePourSite(original);
 		dropSentMessage();
@@ -4341,7 +4341,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* ONE PASS (2026-10-01): with several documents the site gets ALL of
 		   them in one request and answers with one quiz per document. */
 		const msg: SentMessage = { ...envoi, images: restore.images };
-		const parFichier = decouperParFichier(msg, seulQuiz, lectureEnUnePasse(settings().aiProvider || ""));
+		/* The site's answer is read one quiz per document at most
+		   (`recevoirLotWeb`): several quizzes over all the documents stay a
+		   generation of the app's own queue. */
+		const parFichier = decouperParFichier(msg, seulQuiz === true || seulQuiz === 1, lectureEnUnePasse(settings().aiProvider || ""));
 		lotWebRestant = parFichier.slice(1);
 		lotWebPremier = null;
 		lot = parFichier.length > 1 ? { index: 1, total: parFichier.length, nom: parFichier[0].notes[0]?.name ?? "" } : null;
@@ -4412,7 +4415,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
 		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
 		const genre = kindFromClarifications(requete.clarify.genre ?? attente.genre, requete.clarify.questions, reponses);
-		const seulQuiz = oneQuizFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
+		const seulQuiz = quizCountFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
 		const action = gardee?.action ?? requete.clarify.action ?? "generate";
 		demarrage = true;
 		void continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at)
@@ -4420,7 +4423,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			.finally(() => { demarrage = false; render(containerRef); });
 	}
 
-	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean, action: ClarifyAction, requestId: string, sentAt: number): Promise<void> {
+	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, action: ClarifyAction, requestId: string, sentAt: number): Promise<void> {
 		if (action === "web") { await lancerSurSite(envoi, original, genre, seulQuiz, containerRef); return; }
 		if (action === "relay") { await partagerClarifiee(envoi, original, genre, requestId); return; }
 		if (action === "remote") { await envoyerClarifieeAuPc(envoi, original, genre, requestId); return; }
@@ -4483,7 +4486,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    un réglage ensuite ne touche que les envois suivants. Le composer se
 	    vide aussitôt et reste libre : on peut préparer la demande suivante
 	    pendant que celle-ci tourne. */
-	function envoyerDansLaFile(envoi: DemandeTexte, genre: KindChoice | "exam", repris: { dejaVide: boolean; oneQuiz?: boolean; requestId?: string; sentAt?: number }): void {
+	function envoyerDansLaFile(envoi: DemandeTexte, genre: KindChoice | "exam", repris: { dejaVide: boolean; oneQuiz?: boolean | QuizzesChoice | null; requestId?: string; sentAt?: number }): void {
 		const seulQuiz = repris.oneQuiz ?? false;
 		const vider = (): void => { if (!repris.dejaVide) viderComposer(); };
 		/* A FOLLOW-UP carries the chat's history: the earlier requests of the

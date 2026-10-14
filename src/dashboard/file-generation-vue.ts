@@ -472,11 +472,14 @@ export function creerVueFile(opts: {
 	    there is nothing to say: a plan, no question begun yet). */
 	function libelleProgres(l: LigneGeneration, texte: string, lignes: number): string | null {
 		if (l.demande.planifier) return null;
-		const lot = !!l.demande.parDocument && l.demande.notes.length >= 2;
+		const lot = (!!l.demande.parDocument && l.demande.notes.length >= 2) || l.demande.parties !== undefined;
 		const p = quizProgress(texte, { batch: lot });
 		if (p.question === 0 && p.quiz === null) return null;
 		const parts: string[] = [];
-		if (p.quiz !== null) parts.push(t("ai.transcript.progressQuizOf", { n: p.quiz, total: l.demande.notes.length }));
+		/* One quiz per document: as many as documents; several quizzes over all
+		   of them: the number asked, none known for "auto". */
+		const nbQuiz = l.demande.parties === "auto" ? null : l.demande.parties ?? l.demande.notes.length;
+		if (p.quiz !== null) parts.push(nbQuiz === null ? t("ai.transcript.progressQuiz", { n: p.quiz }) : t("ai.transcript.progressQuizOf", { n: p.quiz, total: nbQuiz }));
 		const total = l.demande.count;
 		parts.push(total ? t("ai.transcript.progressQuestionOf", { n: p.question, total }) : t("ai.transcript.progressQuestion", { n: p.question }));
 		if (p.readings > 0) parts.push(libelleLectures(p.readings));

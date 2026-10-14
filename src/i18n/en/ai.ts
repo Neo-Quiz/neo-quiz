@@ -681,6 +681,7 @@ export const EN_AI = {
 	"ai.transcript.progressQuestionOf": "Question {n} of {total}",
 	"ai.transcript.progressQuestion": "Question {n}",
 	"ai.transcript.progressQuizOf": "Quiz {n} of {total}",
+	"ai.transcript.progressQuiz": "Quiz {n}",
 	"ai.transcript.progressLinesOther": "{count} lines",
 	"ai.transcript.progressLinesOne": "1 line",
 	"ai.transcript.toLatest": "Scroll to the latest message",

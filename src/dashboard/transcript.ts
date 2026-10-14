@@ -605,7 +605,7 @@ export function quizProgress(text: string, opts: { batch?: boolean } = {}): Quiz
 				frame.reading = true;
 				if (frame.counted) { frame.counted = false; questions--; }
 			}
-		} else if (key === "document" && opts.batch) { docs++; questions = 0; readings = 0; }
+		} else if ((key === "document" || key === "part") && opts.batch) { docs++; questions = 0; readings = 0; }
 	}
 	return { quiz: opts.batch && docs > 0 ? docs : null, question: Math.max(0, questions), readings };
 }

@@ -79,6 +79,11 @@ export interface DemandeTexte<I extends { file: File } = { file: File }> {
 	    (`decouperParFichier`, "N quizzes"). Absent: one quiz over the whole
 	    request, as before. */
 	parDocument?: boolean;
+	/** SEVERAL QUIZZES OVER ALL THE DOCUMENTS (2026-10-14): the number of
+	    quizzes asked (2 or more), or "auto" (the model decides), each covering
+	    a part of the WHOLE material split by theme, from one reading of every
+	    document. Set only by `decouperParFichier`. */
+	parties?: number | "auto";
 	/** The earlier turns of the conversation (`conversation-context.ts`),
 	    frozen at send time: a follow-up reaches the model WITH them, for every
 	    provider. */
@@ -119,8 +124,13 @@ export function composerDemande(msg: DemandeTexte): { source: "image" | "text" |
     with one quiz per document (the request is flagged `parDocument`); without
     it, one sub-request per file, the same instruction for each, each seeing
     only its own document. */
-export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, oneQuiz: boolean, enUnePasse = false): DemandeTexte<I>[] {
-	if (oneQuiz || msg.images.length > 0 || msg.notes.length < 2) return [msg];
+export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I>, nbQuiz: boolean | number | "auto" | null, enUnePasse = false): DemandeTexte<I>[] {
+	/* `true`/`1` = one quiz; `false`/`null` = the default, one per document;
+	   2 or more, or "auto" (2026-10-14, the AI's "how many quizzes"): that
+	   many quizzes over ALL the documents, split by theme, in one pass. A
+	   provider without one pass (Ollama) keeps one quiz per document. */
+	if (nbQuiz === true || nbQuiz === 1 || msg.images.length > 0 || msg.notes.length < 2) return [msg];
+	if (enUnePasse && (nbQuiz === "auto" || (typeof nbQuiz === "number" && nbQuiz >= 2))) return [{ ...msg, parties: nbQuiz }];
 	if (enUnePasse) return [{ ...msg, parDocument: true }];
 	return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
 }
