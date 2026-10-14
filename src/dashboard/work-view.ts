@@ -349,9 +349,18 @@ function toolBlock(item: ToolItem, deps: WorkViewDeps, prev: HTMLElement | undef
 	const build = () => {
 		if (built) return;
 		built = true;
-		if (isRun && item.input) body.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
-		if (item.diff) body.appendChild(diffNode(item, item.diff));
 		const output = renderOutput(item, deps);
+		/* A command and its output in ONE terminal block (2026-10-14), the
+		   output right under the prompt line, as a terminal shows them. */
+		if (isRun && item.input) {
+			const term = el("div", "qbd-work-terminal");
+			term.appendChild(commandNode(item.input, COMMAND_LANGUAGES[item.name] ?? "bash"));
+			if (output) term.appendChild(output);
+			body.appendChild(term);
+			if (item.diff) body.appendChild(diffNode(item, item.diff));
+			return;
+		}
+		if (item.diff) body.appendChild(diffNode(item, item.diff));
 		if (output) body.appendChild(output);
 	};
 	if (open) build();

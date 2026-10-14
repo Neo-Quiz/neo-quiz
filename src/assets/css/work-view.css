@@ -304,6 +304,25 @@
 	display: none;
 }
 
+/* A command and its output in one block (work-view.ts, 2026-10-14): one
+   background and one radius for both, a faint rule between them. */
+.qbd-work-terminal {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	background: var(--code-background);
+	border-radius: 6px;
+}
+
+.qbd-work-terminal .qbd-work-pre {
+	background: transparent;
+	border-radius: 0;
+}
+
+.qbd-work-terminal > .qbd-work-output {
+	border-top: 1px solid color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
 /* A terminal line: the $ prompt, then the command in the app's token colours. */
 .qbd-work-term {
 	--qwv-comment: #565f89;

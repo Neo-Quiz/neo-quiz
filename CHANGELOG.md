@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- In the AI work view, a command and its output show in one terminal block.
+
 ## [1.20.98] - 2026-10-14
 
 ### Changed
