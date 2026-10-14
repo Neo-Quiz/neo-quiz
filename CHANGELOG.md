@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.112] - 2026-10-14
+
 ### Changed
 
 - The Generate page is now called AI.
