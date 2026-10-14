@@ -339,3 +339,9 @@
 .quiz-co-fold { width: 16px; height: 16px; flex: none; margin-left: auto; opacity: 0.8; transition: transform 120ms ease; }
 .quiz-learn-objectives.is-folded[open] .quiz-co-fold { transform: rotate(90deg); }
 .quiz-learn-objectives.is-folded > ul { margin: 0; padding: 0 14px 10px 38px; color: var(--text-normal); }
+
+/* A reading of a step page takes the WHOLE width of its card (2026-10-14):
+   the 62ch book measure of lecture.css left a narrow column in a wide card. */
+.quiz-step-page .quiz-lecture{
+  max-width: none;
+}
