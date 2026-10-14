@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.104] - 2026-10-14
+
 ### Fixed
 
 - Requests already sent no longer repeat your answers to the AI's questions under them either: the question card is the only place they show.
