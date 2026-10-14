@@ -67,6 +67,7 @@ import type { BlocTravail } from "../../../../src/dashboard/transcript-steps";
 import { fileDeGeneration, figerReglages, onQueueCreated } from "../../../../src/dashboard/file-generation-app";
 import type { DemandeFile, FileGenerationApp, LigneGeneration } from "../../../../src/dashboard/file-generation-app";
 import { chatForQuiz, explainMessages } from "../../../../src/dashboard/explain-chat";
+import { EXPLAIN_MAX_CHARS_DEFAULT } from "../../../../src/dashboard/explain-demand";
 import type { ExplainMessage } from "../../../../src/dashboard/explain-chat";
 import type { ChatRecord, ChatRequest } from "../../../../src/dashboard/chat-record";
 import { getChats } from "../../../../src/dashboard/chat-store";
@@ -302,9 +303,8 @@ function fermerSansMouvement(fenetre: HostModalHandle): void {
 const LETTRES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const NL = String.fromCharCode(10);
 
-/** The default longest explanation, in characters: a full explanation (error
-    diagnosis, steps, every wrong option, example, check question) fits. */
-export const EXPLAIN_MAX_CHARS_DEFAUT = 4000;
+/** The default longest explanation, in characters (shared with the AI page, which continues Explain chats). */
+export const EXPLAIN_MAX_CHARS_DEFAUT = EXPLAIN_MAX_CHARS_DEFAULT;
 
 /* What `envoyer` adds to the learner's text for the model (never shown: the
    record keeps what the learner typed, `texteAffiche`). */

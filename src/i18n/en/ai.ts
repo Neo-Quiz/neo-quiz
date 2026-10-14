@@ -569,6 +569,8 @@ export const EN_AI = {
 	"ai.reqstatus.failedHere": "Failed",
 	"ai.reqstatus.failedWhyHere": "Failed: {reason}",
 	"ai.explain.button": "Ask the AI",
+	"ai.explain.openQuiz": "Open the quiz",
+	"ai.explain.quizGone": "This quiz is no longer there.",
 	"ai.explain.answerFirst": "Answer this question first, then ask.",
 	"ai.explain.asked": "Explain this question to me: {question}",
 	"ai.explain.ownQuestion": "Write your question",

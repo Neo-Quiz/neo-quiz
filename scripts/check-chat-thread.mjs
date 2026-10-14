@@ -198,6 +198,9 @@ await withSrcModule(["src/dashboard/chat-thread.ts", "src/dashboard/chat-list.ts
 	const vif = L.chatListItems([], [line(1, "cours", { chatId: "fresh", text: "Brand new\nsecond line", sentAt: 80 })], now);
 	r.check("a chat that only exists in the queue is listed, running, titled by its request", vif.map(i => [i.id, i.title, i.running, i.date]), [["fresh", "Brand new", true, 80]]);
 	r.check("a waiting line counts as running", L.chatListItems([], [line(1, "attente", { chatId: "w" })], now)[0].running, true);
+	// An Explain chat is listed with the quiz it is about; a plain chat has no such mark.
+	const marked = L.chatListItems([rec("x", 50, [req("r", 1, { text: "Why?" })], { explain: { path: "r/q.md", quiz: "Q" } }), rec("p", 40, [req("r", 1)])], [], now);
+	r.check("an Explain chat carries its quiz, a plain chat none", marked.map(i => [i.id, i.explain ?? null]), [["x", { quiz: "Q" }], ["p", null]]);
 	r.check("a finished line is not running", L.chatListItems([], [line(1, "prete", { chatId: "w" }, quiz("A", "a.md"))], now)[0].running, false);
 	r.check("newest first", L.chatListItems([rec("a", 10, [req("r", 1)]), rec("b", 30, [req("r", 1)]), rec("c", 20, [req("r", 1)])], [], now).map(i => i.id), ["b", "c", "a"]);
 

@@ -28,6 +28,8 @@ export interface ChatListItem {
 	/** The device that SENT the chat's first request (`origin` when there is none), and the name it gave itself. */
 	sender: string;
 	senderName?: string;
+	/** An Explain chat (the tutor chat of a quiz): the quiz's title, shown under the chat's. */
+	explain?: { quiz: string };
 }
 
 export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = "", remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = []): ChatListItem[] {
@@ -46,7 +48,7 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 	for (const c of chats) {
 		if (c.deleted) continue;
 		const s = chatSender(c.requests, c.origin);
-		items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && s.id !== device, sender: s.id, ...(s.name ? { senderName: s.name } : {}) });
+		items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && s.id !== device, sender: s.id, ...(s.name ? { senderName: s.name } : {}), ...(c.explain ? { explain: { quiz: c.explain.quiz } } : {}) });
 	}
 	const tombstones = new Set(chats.filter(c => c.deleted).map(c => c.id));
 	for (const l of lines) {

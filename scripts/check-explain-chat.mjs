@@ -13,7 +13,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "src/explain-follow.ts"], (C, P, F) => {
+await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "src/explain-follow.ts", "src/dashboard/explain-demand.ts"], (C, P, F, D) => {
 	const r = makeReporter("Explain chats, pure core");
 	const { chatForQuiz, explainMessages, explainTurnTexts } = C;
 	const { positionCourante } = P;
@@ -60,5 +60,18 @@ await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts", "
 	r.check("a question is locked until it is corrected", composerOpen({}, false), false);
 	r.check("a corrected question is open", composerOpen({}, true), true);
 	r.check("no question on screen: nothing to lock on", composerOpen(undefined, true), false);
+
+	// A turn sent from the AI page: the whole quiz from the note, no slide on screen.
+	const { explainDemandFromNote } = D;
+	const NL = String.fromCharCode(10);
+	const note = ["# Q", "", "```quiz-blocks", "[", '  { title: "Intro", prompt: "What is a stack?", options: ["LIFO", "FIFO"], correctIndex: 0 },', '  { title: "Queues", prompt: "What is a queue?", options: ["LIFO", "FIFO"], correctIndex: 1 },', "]", "```", ""].join(NL);
+	const dem = explainDemandFromNote(note, { path: "r/Cours/q.md", quiz: "Q" });
+	r.check("the demand holds BOTH questions and no slide marked", [dem?.context.includes("What is a stack?"), dem?.context.includes("What is a queue?"), dem?.context.includes("<<< QUESTION ON SCREEN >>>")], [true, true, false]);
+	r.check("no course read, no position, the quiz's folder", [dem?.course, dem?.position, dem?.folder], ["", "", "r/Cours"]);
+	r.check("the demand keeps the chat's mark", dem?.mark, { path: "r/Cours/q.md", quiz: "Q" });
+	r.check("the tutor method closes the context", dem?.context.trimEnd().endsWith(P.consigneExplication(false).trimEnd()), true);
+	r.check("a note without a quiz block: no demand", explainDemandFromNote("# Just text" + NL, { path: "r/q.md", quiz: "Q" }), null);
+	r.check("a broken quiz block: no demand", explainDemandFromNote(["```quiz-blocks", "[ { oops", "```", ""].join(NL), { path: "r/q.md", quiz: "Q" }), null);
+	r.check("a quiz at the root: no folder", explainDemandFromNote(note, { path: "q.md", quiz: "Q" })?.folder, undefined);
 	r.done();
 });

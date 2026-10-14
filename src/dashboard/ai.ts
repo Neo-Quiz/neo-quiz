@@ -8,7 +8,10 @@ import { debutDeDemande } from "./ai-sources";
 import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
-import type { FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
+import type { DemandeFile, FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
+import { explainMessages } from "./explain-chat";
+import { EXPLAIN_MAX_CHARS_DEFAULT, explainDemandFromNote } from "./explain-demand";
+import type { ChatExplain } from "./chat-record";
 import { creerVueFile } from "./file-generation-vue";
 import type { HostFile, HostModalHandle, ImageDeGlisser } from "../host/types";
 import { currentHost, requireHost } from "../host/current";
@@ -397,6 +400,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		return { id, record: getChats().find(c => c.id === id) ?? null };
 	};
 	const nomDuChemin = (p: string): string => p.slice(p.lastIndexOf("/") + 1);
+	/** The chat on screen is an Explain chat (the tutor chat of a quiz): its mark, else null. */
+	const marqueExplain = (): ChatExplain | null => {
+		const c = chatSurEcran().record;
+		return c && !c.deleted && c.explain ? c.explain : null;
+	};
 	const filDuChat = () => { const c = chatSurEcran(); return threadItems(c.record, fileGen.lignes(), c.id, getRemoteGenerations(), Date.now(), getOwnRequests()); };
 	const chatAContenu = (): boolean => filDuChat().length > 0 || attenteGenre !== null || relaisAffiche() !== null;
 	/* ── THE PHONE'S RELAY (Android): the request goes to an AI app through the
@@ -816,7 +824,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   composer est libre dès l'envoi. */
 		if (phase === "web" || phase === "connexion") return false;
 		// The phone needs no provider of its own: the PC that owns the chat runs the request (`ai-remote.ts`).
-		if (host.platform.isMobile) return !!composerText.trim() && !noteAttachments.some(n => n.lecture) && pcConnu();
+		/* An Explain chat runs on this device, as the Explain window does: the rule below applies. */
+		if (host.platform.isMobile && !marqueExplain()) return !!composerText.trim() && !noteAttachments.some(n => n.lecture) && pcConnu();
 		const providerId = settings().aiProvider || "";
 		if (!providerId) return false;
 		// Un fournisseur desktop-only (Claude Code CLI) est inutilisable sur
@@ -1136,6 +1145,27 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const resultZone = phase === "result" ? ajouter(stage, "div", "qbd-ai-result-zone") : null;
 		const formCol = stage;
 		if (conversation) {
+			/* An Explain chat: "Open the quiz" above its thread. Switching chats
+			   does not rebuild the page, so the link follows the chat on screen. */
+			const lienQuiz = ajouter(stage, "div", "qbd-ai-explain-quiz");
+			const peindreLienQuiz = (): void => {
+				const marque = marqueExplain();
+				lienQuiz.replaceChildren();
+				lienQuiz.hidden = !marque;
+				if (!marque) return;
+				const b = ajouter(lienQuiz, "button", "qbd-ai-explain-quiz-lien");
+				b.type = "button";
+				host.ui.setIcon(ajouter(b, "span", "qbd-ai-explain-quiz-icone"), "lightbulb");
+				ajouter(b, "span", undefined, t("ai.explain.openQuiz"));
+				b.title = marque.quiz;
+				b.addEventListener("click", () => {
+					const quiz = deps.scanner.getQuiz(marque.path);
+					if (quiz) deps.navigate("detail", { quiz });
+					else host.ui.notice(t("ai.explain.quizGone"));
+				});
+			};
+			peindreLienQuiz();
+			const arretLienQuiz = onChatsChanged(() => { if (lienQuiz.isConnected) peindreLienQuiz(); else arretLienQuiz(); });
 			const fil = ajouter(stage, "div", "qbd-ai-fil");
 			// Faded edges instead of a flat cut against the composer (same fade as the quiz pages).
 			suivreDebord(fil);
@@ -4231,6 +4261,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	}
 
 	async function startGeneration(container: HTMLElement | null): Promise<void> {
+		/* An Explain chat is continued as a TUTOR turn, never a generation. */
+		const marque = marqueExplain();
+		if (marque) { await envoyerExplication(container, marque); return; }
 		if (host.platform.isMobile) { await envoyerVersPc(container); return; }
 		/* VERROU d'abord, et de façon synchrone : sans lui, Entrée ou un
 		   second clic pendant l'attente ci-dessous envoyait la MÊME demande
@@ -4307,6 +4340,67 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		/* A missing clarify provider safely means Learn; /exam stays explicit. */
 		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : "learn", { dejaVide: false });
+		render(container);
+	}
+
+	/** A message of an Explain chat sent from this page (2026-10-14): a turn
+	    of the tutor, built as the Explain window builds one, with the whole
+	    quiz read again from its note and no slide on screen (no position, no
+	    edit instruction: proposals only exist in the Explain window). The
+	    documents and pictures of the composer go with it. A quiz whose note
+	    or block is gone: a notice, nothing sent. */
+	async function envoyerExplication(container: HTMLElement | null, marque: ChatExplain): Promise<void> {
+		if (demarrage) return;
+		const perso = composerText.trim();
+		if (!perso && !images.length && !noteAttachments.length) return;
+		if (noteAttachments.some(n => n.lecture)) return;
+		demarrage = true;
+		try {
+			let note: string | null = null;
+			try { note = await host.fs.read(marque.path); } catch { note = null; }
+			const explication = note === null ? null : explainDemandFromNote(note, marque);
+			if (!explication) { host.ui.notice(t("ai.explain.quizGone")); return; }
+			const chatId = activeChatId();
+			/* The earlier turns, for a provider that cannot keep a live session:
+			   the one call then carries the whole conversation. */
+			const avant = explainMessages(chatSurEcran().record, fileGen.lignes(), chatId)
+				.map(x => ({ ...x, text: x.text.trim() || (x.role === "user" && x.documents.length ? "(attached: " + x.documents.join(", ") + ")" : "") }))
+				.filter(x => x.error === undefined && x.text)
+				.map(x => (x.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + x.text)
+				.join("\n\n");
+			const envoi = capturerEnvoi([]);
+			/* What the model reads (never shown): the learner's text, the names of
+			   the pictures in their order, the documents' text. */
+			const nomsImages = envoi.images.map(i => i.file.name);
+			const documents = envoi.notes.map(n => "--- " + n.name + " ---\n" + n.content).join("\n\n");
+			const pourModele = (perso || "Look at what I attached and help me understand it.")
+				+ (nomsImages.length ? "\n\nPICTURES attached to this message, in this order (image-1, image-2...): " + nomsImages.map((n, i) => `${i + 1}. ${n}`).join("; ") : "")
+				+ (documents ? "\n\n=== DOCUMENTS I ATTACHED ===\n" + documents : "");
+			const demande: DemandeFile = {
+				text: pourModele,
+				texteAffiche: perso,
+				notes: envoi.notes,
+				images: envoi.images,
+				...(avant ? { contexte: avant } : {}),
+				mode: "learn",
+				count: null,
+				type: ["Mixte"],
+				destination: "",
+				reglages: figerReglages(settings()),
+				categorie: "general",
+				chatId,
+				requestId: newRequestId(),
+				sentAt: Date.now(),
+				explication: { ...explication, maxChars: settings().aiExplainMaxChars ?? EXPLAIN_MAX_CHARS_DEFAULT },
+			};
+			viderComposer();
+			fileGen.envoyer(demande);
+		} catch (err) {
+			console.warn(LOG_PREFIX, "Explain message not sent:", err);
+			host.ui.notice(t("ai.error.checkSettings"));
+		} finally {
+			demarrage = false;
+		}
 		render(container);
 	}
 

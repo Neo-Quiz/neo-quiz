@@ -38,6 +38,40 @@
 	scrollbar-color: var(--scrollbar-thumb-bg) transparent;
 }
 
+/* An Explain chat: "Open the quiz", above its thread. */
+.qbd-ai-explain-quiz {
+	width: min(732px, 100%);
+	flex-shrink: 0;
+	display: flex;
+	margin: 0 auto;
+}
+.qbd-ai-explain-quiz[hidden] {
+	display: none;
+}
+.qbd-ai-explain-quiz-lien {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-accent);
+	font-size: 13px;
+	cursor: pointer;
+}
+.qbd-ai-explain-quiz-lien:hover {
+	background: var(--background-modifier-hover) !important;
+}
+.qbd-ai-explain-quiz-icone {
+	display: inline-flex;
+}
+.qbd-ai-explain-quiz-icone svg {
+	width: 14px;
+	height: 14px;
+}
+
 /* ── Les tours ── */
 .qbd-ai-stage .qbd-ai-file {
 	width: min(732px, 100%);
@@ -1084,6 +1118,9 @@
 	background: var(--background-modifier-hover);
 }
 .qbd-ai-chat-ouvrir {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	flex: 1;
 	min-width: 0;
 	padding: 7px 10px;
@@ -1095,9 +1132,34 @@
 	font-size: 14px;
 	text-align: left;
 	overflow: hidden;
+	cursor: pointer;
+}
+/* The kind of chat: a lightbulb (an Explain chat) or sparkles. */
+.qbd-chat-item-icone {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+.qbd-chat-item-icone svg {
+	width: 14px;
+	height: 14px;
+}
+.qbd-chat-item-textes {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+}
+.qbd-chat-item-titre,
+.qbd-chat-item-quiz {
+	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	cursor: pointer;
+}
+/* An Explain chat: the quiz it is about, under its title. */
+.qbd-chat-item-quiz {
+	font-size: 12px;
+	color: var(--text-muted);
 }
 .qbd-ai-chat-item.is-active .qbd-ai-chat-ouvrir {
 	cursor: pointer;

@@ -524,6 +524,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.reqstatus.failedHere": "Échec",
 	"ai.reqstatus.failedWhyHere": "Échec : {reason}",
 	"ai.explain.button": "Demander à l'IA",
+	"ai.explain.openQuiz": "Ouvrir le quiz",
+	"ai.explain.quizGone": "Ce quiz n'existe plus.",
 	"ai.explain.answerFirst": "Réponds d'abord à la question, puis demande.",
 	"ai.explain.asked": "Explique-moi cette question : {question}",
 	"ai.explain.ownQuestion": "Écris ta question",
