@@ -68,6 +68,28 @@ await withSrcModule("src/dashboard/exam-command.ts", ({ trouverCommandeExam, ret
 	r.done();
 });
 
+/* THE "/" MENU (`src/dashboard/slash-commands.ts`): which commands a prefix
+   lists, and which text is a whole app command (never a request). */
+await withSrcModule("src/dashboard/slash-commands.ts", ({ findSlashCommand, exactCommand }) => {
+	const r = makeReporter("/ menu");
+	const noms = (texte) => findSlashCommand(texte, texte.length)?.commandes.map(c => c.name) ?? null;
+	r.check("\"/\" lists the four commands", noms("/"), ["exam", "clear", "model", "resume"]);
+	r.check("\"/c\" lists /clear only", noms("/c"), ["clear"]);
+	r.check("\"/ex\" lists /exam", noms("/ex"), ["exam"]);
+	r.check("an unknown command lists nothing", noms("/zzz"), null);
+	r.check("not at the start of the field", noms("x /clear"), null);
+	r.check("text after an app command lists nothing", noms("/clear now"), null);
+	r.check("\"/exam algo\" stays the exam level", findSlashCommand("/exam algo", 10)?.exam, true);
+	r.check("\"/ex\" is not the exam level yet", findSlashCommand("/ex", 3)?.exam, false);
+	r.check("\"/clear\" is a whole command", exactCommand("/clear"), "clear");
+	r.check("case and spaces around are tolerated", exactCommand("  /Model "), "model");
+	r.check("\"/resume\" is a whole command", exactCommand("/resume"), "resume");
+	r.check("\"/clear now\" is not", exactCommand("/clear now"), null);
+	r.check("\"x /clear\" is not", exactCommand("x /clear"), null);
+	r.check("\"/exam\" keeps its own flow", exactCommand("/exam"), null);
+	r.done();
+});
+
 /* THE PREPARATION PROMPT (`composerPrompts`): each step says what it is,
    the exam is named, the quantity has no cap, and a Learn cites its pages. */
 await withSrcModule("src/dashboard/ai-client.ts", ({ composerPrompts }) => {

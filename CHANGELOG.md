@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Typing / in the AI page lists commands: /clear starts a new conversation, /model picks the model, /resume finds a past conversation.
+
 ### Fixed
 
 - An Explain answer no longer says which model worked twice.

@@ -267,6 +267,8 @@ for (const avecImage of [false, true]) {
 		rattacherDocumentsHerites: async () => {}, envoyerPendantLeTour: async () => false, fournisseurAgent: () => false,
 		// An Explain chat on screen sends a tutor turn instead (2026-10-14): none here.
 		marqueExplain: () => null,
+		// The "/" menu (slash-commands.ts): no command typed here.
+		commandeSlash: null,
 		/* Un identifiant qui n'est PAS dans le registre : les trois sites du
 		   registre sont câblés depuis le 2026-09-20, et nommer l'un d'eux ici
 		   laisserait croire que ce cas les décrit. Ce qui est éprouvé, c'est le

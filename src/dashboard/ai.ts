@@ -65,8 +65,10 @@ import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
 import { poserPlan } from "./plan-sidebar";
 import { ouvrirDocumentsExam } from "./exam-documents";
-import { PALIERS_TEST, attachExamCommand, promptPreparation, retirerCommandeExam } from "./exam-command";
-import type { ExamCible, ExamCommandHandle } from "./exam-command";
+import { PALIERS_TEST, promptPreparation, retirerCommandeExam } from "./exam-command";
+import type { ExamCible } from "./exam-command";
+import { attachSlashCommands } from "./slash-commands";
+import type { SlashCommandHandle } from "./slash-commands";
 import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
 import { composerImageDeGlisser } from "./image-de-glisser";
 import { renderMarkdownPreview } from "../markdown-preview";
@@ -354,6 +356,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    needs to generate (the documents' text is only in memory). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
 	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction }>();
+	/** The "/" menu of the composer on screen (slash-commands.ts). */
+	let commandeSlash: SlashCommandHandle | null = null;
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
@@ -1109,16 +1113,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		recherche.type = "button";
 		host.ui.setIcon(ajouter(recherche, "span", "qbd-ai-lateral-icone"), "search");
 		ajouter(recherche, "span", undefined, t("ai.search.placeholder"));
-		recherche.addEventListener("click", () => ouvrirRecherche({
-			quizzes: () => deps.scanner.getQuizzes(),
-			iconeQuiz: (chemin) => quizModeIcon(deps.scanner.getQuiz(chemin)?.mode ?? "practice"),
-			ouvrirQuiz: (chemin) => {
-				const quiz = deps.scanner.getQuiz(chemin);
-				if (quiz) deps.navigate("detail", { quiz });
-				else host.ui.notice(t("ai.queue.missing"));
-			},
-			ouvrirSession: (id) => setActiveChat(id),
-		}));
+		recherche.addEventListener("click", ouvrirRechercheChats);
 		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
 		/* Phone: the Claude app's layout. The nav becomes a left drawer, the top
 		   bar carries the menu and "new conversation" (`phone-chat.ts`). */
@@ -1930,7 +1925,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (chipsRow) chipsRow.prepend(tuileExam);
 		const composerInput = ajouter(textZone, "textarea", "qbd-ai-composer-input");
 		let mentions: MentionPickerHandle | null = null;
-		let commandeExam: ExamCommandHandle | null = null;
 		// UN SEUL placeholder, quoi qu'il y ait de joint (demande Ahmed,
 		// 2026-09-17). La variante « Ajouter des instructions (facultatif) »
 		// qui apparaissait dès la première pièce jointe changeait le texte sous
@@ -2091,7 +2085,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// (sinon effacer une lettre de sa recherche supprimerait une
 			// pièce jointe) ne doivent lui être volés.
 			if (mentions && mentions.isOpen()) return;
-			if (commandeExam && commandeExam.isOpen()) return;
+			if (commandeSlash && commandeSlash.isOpen()) return;
 			if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
 			e.preventDefault();
 			if (canGenerate()) void startGeneration(containerRef);
@@ -2114,7 +2108,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			// Lu au rendu (le réglage peut changer sans rouvrir la vue).
 			getExtraRoots: () => settings().aiMentionExtraFolders || [],
 		});
-		commandeExam = attachExamCommand(composerInput, composer, {
+		commandeSlash = attachSlashCommands(composerInput, composer, {
 			exams: () => deps.upcomingExams?.() ?? [],
 			onPick: (exam) => {
 				examCible = exam;
@@ -2128,6 +2122,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				composerCaret = 0;
 				autoGrow();
 				updateGenerateBtn(generateBtnRef);
+			},
+			onCommand: (nom) => {
+				if (nom === "clear") { viderComposer(); if (chatAContenu()) startNewChat(); else void render(containerRef); }
+				else if (nom === "resume") ouvrirRechercheChats();
+				// The pill of the provider in use opens its own model menu.
+				else composer.querySelector<HTMLElement>(".qbd-model-trigger")?.click();
 			},
 		});
 
@@ -3946,6 +3946,20 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		synchroniserModales();
 	}
 
+	/** The search window over the quizzes and the chats (sidebar button, "/resume"). */
+	function ouvrirRechercheChats(): void {
+		ouvrirRecherche({
+			quizzes: () => deps.scanner.getQuizzes(),
+			iconeQuiz: (chemin) => quizModeIcon(deps.scanner.getQuiz(chemin)?.mode ?? "practice"),
+			ouvrirQuiz: (chemin) => {
+				const quiz = deps.scanner.getQuiz(chemin);
+				if (quiz) deps.navigate("detail", { quiz });
+				else host.ui.notice(t("ai.queue.missing"));
+			},
+			ouvrirSession: (id) => setActiveChat(id),
+		});
+	}
+
 	/** Vide le composer : texte, pièces jointes, images et tuiles vidéo (dont
 	    les transcriptions en vol sont abandonnées, l'arbre yt-dlp tué). Les
 	    URL d'objet des vignettes se libèrent ici, sinon elles resteraient
@@ -4270,6 +4284,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 
 	async function startGeneration(container: HTMLElement | null): Promise<void> {
 		/* An Explain chat is continued as a TUTOR turn, never a generation. */
+		// "/clear", "/model", "/resume" typed whole are commands, never a request.
+		if (commandeSlash?.runExact()) return;
 		const marque = marqueExplain();
 		if (marque) { await envoyerExplication(container, marque); return; }
 		if (host.platform.isMobile) { await envoyerVersPc(container); return; }

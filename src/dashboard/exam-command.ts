@@ -1,5 +1,6 @@
 /* ══════════════════════════════════════════════════════════
-   THE /exam COMMAND of the Generate composer (2026-09-30)
+   THE /exam COMMAND of the Generate composer (2026-09-30; its menu lives in
+   slash-commands.ts since the "/" menu)
 
    "/exam" at the start of the composer opens a menu of
    the upcoming exams, the way "@" opens the files. Picking one sets the
@@ -11,8 +12,6 @@
 ══════════════════════════════════════════════════════════ */
 
 import { currentLang, t } from "../i18n";
-import { openMentionMenu } from "./ui-select";
-import type { MentionMenuHandle, MentionMenuItem } from "./ui-select";
 
 /** An upcoming exam, as the menu shows it. Date as `YYYY-MM-DD`. */
 export interface ExamCible {
@@ -66,74 +65,4 @@ export function promptPreparation(exam: ExamCible, modele?: string): string {
 export function dateCourte(iso: string): string {
 	const [a, mo, j] = iso.split("-").map(Number);
 	return new Intl.DateTimeFormat(currentLang(), { day: "numeric", month: "short" }).format(new Date(a, mo - 1, j));
-}
-
-export interface ExamCommandHandle {
-	isOpen(): boolean;
-	detach(): void;
-}
-
-/** Plugs the menu into the composer's field, next to the "@" picker. */
-export function attachExamCommand(textarea: HTMLTextAreaElement, ancre: HTMLElement, opts: {
-	exams(): ExamCible[];
-	onPick(exam: ExamCible): void;
-	onTextReplaced(valeur: string): void;
-}): ExamCommandHandle {
-	let menu: MentionMenuHandle | null = null;
-	/** Exams listed: with none, Enter goes on to the composer (it sends). */
-	let nombre = 0;
-	const fermer = (): void => { if (menu) { const m = menu; menu = null; m.close(); } };
-
-	function rafraichir(): void {
-		const jeton = trouverCommandeExam(textarea.value, textarea.selectionStart ?? 0);
-		if (!jeton || textarea.selectionStart !== textarea.selectionEnd) { fermer(); return; }
-		const requete = jeton.requete.toLowerCase();
-		const items: MentionMenuItem[] = opts.exams()
-			.filter(e => !requete || (e.nom + " " + e.module).toLowerCase().includes(requete))
-			.map(e => ({
-				label: e.nom,
-				sub: `${e.module} · ${dateCourte(e.date)}`,
-				icon: "graduation-cap",
-				onChoose: () => {
-					// The command and its filter leave the text: the exam becomes a tile.
-					const reste = textarea.value.slice(jeton.fin).replace(/^[ \t]+/, "");
-					textarea.value = reste;
-					textarea.setSelectionRange(0, 0);
-					opts.onTextReplaced(reste);
-					opts.onPick(e);
-				},
-			}));
-		nombre = items.length;
-		// Something typed that names no exam: it is the subject, the menu leaves.
-		if (!items.length && requete) { fermer(); return; }
-		if (!menu) menu = openMentionMenu(ancre, () => { menu = null; });
-		menu.setItems(items, items.length ? undefined : t("ai.exam.none"));
-	}
-
-	const surTouche = (e: KeyboardEvent): void => {
-		if (!menu) return;
-		if (e.key === "ArrowDown") { e.preventDefault(); menu.moveSelection(1); return; }
-		if (e.key === "ArrowUp") { e.preventDefault(); menu.moveSelection(-1); return; }
-		if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fermer(); return; }
-		if ((e.key === "Enter" || e.key === "Tab") && !e.isComposing && nombre > 0) {
-			e.preventDefault();
-			e.stopPropagation();
-			menu.confirm();
-		}
-	};
-	const surSaisie = (): void => rafraichir();
-	textarea.addEventListener("input", surSaisie);
-	textarea.addEventListener("click", surSaisie);
-	textarea.addEventListener("keydown", surTouche, true);
-	textarea.addEventListener("blur", fermer);
-	return {
-		isOpen: () => menu !== null && nombre > 0,
-		detach() {
-			textarea.removeEventListener("input", surSaisie);
-			textarea.removeEventListener("click", surSaisie);
-			textarea.removeEventListener("keydown", surTouche, true);
-			textarea.removeEventListener("blur", fermer);
-			fermer();
-		},
-	};
 }
