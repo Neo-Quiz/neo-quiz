@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Interactive pages colour every piece of code they hold, in any language, and new Learns lay them out without an outer frame, one list element per line.
+
 ## [1.20.105] - 2026-10-14
 
 ### Fixed

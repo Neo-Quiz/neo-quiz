@@ -22,6 +22,7 @@
 
    PURE (no DOM, no host): `npm run check:html-frame` holds it.
 ══════════════════════════════════════════════════════════ */
+import { FRAME_CODE_CSS, FRAME_CODE_SCRIPT } from "./html-frame-code";
 
 /** The ONLY sandbox tokens of the frame. Never `allow-same-origin`. */
 export const FRAME_SANDBOX = "allow-scripts";
@@ -77,7 +78,7 @@ function themeCss(th: FrameTheme): string {
 		+ `html,body{margin:0;padding:0;overflow:hidden;background:transparent;color:var(--nq-fg);font-family:var(--nq-font);font-size:15px;line-height:1.5}`
 		+ `body{padding:4px}*{box-sizing:border-box}svg{max-width:100%;height:auto}img,video,canvas{max-width:100%}`
 		+ `button{font:inherit;color:inherit}`
-		+ FRAME_CONTROLS_CSS;
+		+ FRAME_CONTROLS_CSS + FRAME_CODE_CSS;
 }
 
 /** Default look of the native controls of a page (range, button, fields), in the
@@ -132,7 +133,7 @@ export function buildSrcdoc(source: unknown, theme: FrameTheme = FRAME_DEFAULT_T
 	const srcdoc = `<!doctype html><html><head><meta charset="utf-8">`
 		+ `<meta http-equiv="Content-Security-Policy" content="${FRAME_CSP}">`
 		+ `<base target="_self"><meta name="viewport" content="width=device-width, initial-scale=1">`
-		+ `<style>${themeCss(theme)}</style></head><body>${source}<script>${FRAME_CONTROLS_SCRIPT}</script><script>${FRAME_HEIGHT_SCRIPT}</script></body></html>`;
+		+ `<style>${themeCss(theme)}</style></head><body>${source}<script>${FRAME_CONTROLS_SCRIPT}</script><script>${FRAME_CODE_SCRIPT}</script><script>${FRAME_HEIGHT_SCRIPT}</script></body></html>`;
 	return { ok: true, srcdoc };
 }
 
