@@ -48,9 +48,11 @@ body.is-mobile .nq-html-frame-more { opacity: 1; }
 	display: block;
 	width: 100%;
 	min-height: 40px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 12px;
-	background: var(--background-secondary);
+	/* No outline and no fill of its own (2026-10-14): the page sits in the
+	   reading, right under the code it acts on, not in a box. */
+	border: 0;
+	border-radius: 0;
+	background: transparent;
 	overflow: hidden;
 }
 
