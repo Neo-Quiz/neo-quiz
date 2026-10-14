@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.110] - 2026-10-14
+
 ### Changed
 
 - Interactive pages no longer sit in a bordered box: they blend into the reading.
