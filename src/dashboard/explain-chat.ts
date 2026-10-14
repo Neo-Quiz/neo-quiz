@@ -4,7 +4,7 @@
  * which saved chat a quiz reopens, what its thread shows (the record, then
  * the queue lines not yet recorded), and what a turn sends. No DOM, no host.
  */
-import type { ChatRecord } from "./chat-record";
+import type { ChatRecord, ChatRun } from "./chat-record";
 import type { LigneGeneration } from "./file-generation-app";
 
 /** The newest non-deleted Explain chat of the quiz at `path`. */
@@ -31,6 +31,8 @@ export interface ExplainMessage {
 	at: number;
 	model?: string;
 	durationMs?: number;
+	/** A recorded answer that ran as a live turn: where its AI work sits in its run. */
+	runs?: ChatRun[];
 }
 
 /** The thread of chat `chatId`: its recorded turns, then each queue line of
@@ -42,7 +44,7 @@ export function explainMessages(record: ChatRecord | null, lines: readonly Ligne
 		recorded.add(q.id);
 		out.push({ key: q.id + ":u", role: "user", text: q.text, documents: q.documents.map(d => d.name), at: q.at });
 		const answer = q.results.map(r => (r.kind === "text" ? r.text : "")).filter(Boolean).join("\n\n");
-		out.push({ key: q.id + ":a", role: "assistant", text: answer, documents: [], at: q.at, error: q.state === "failed" ? (q.error ?? "") : undefined, stopped: q.state === "stopped", model: q.model });
+		out.push({ key: q.id + ":a", role: "assistant", text: answer, documents: [], at: q.at, error: q.state === "failed" ? (q.error ?? "") : undefined, stopped: q.state === "stopped", model: q.model, ...(q.runs?.length ? { runs: q.runs } : {}) });
 	}
 	for (const l of lines) {
 		const d = l.demande;

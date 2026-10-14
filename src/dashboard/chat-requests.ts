@@ -97,8 +97,9 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 		at: old?.at ?? first.sentAt ?? now,
 		from: old?.from ?? first.fromDevice ?? device,
 		// What the user sent is fixed once recorded; the remaining lines may be
-		// only a part of the send.
-		text: old?.text ?? first.text,
+		// only a part of the send. An Explain turn keeps what the learner typed:
+		// its `text` is what the model read (attached documents included).
+		text: old?.text ?? (first.explication ? first.texteAffiche ?? first.text : first.text),
 		mode: old?.clarify ? ((first.mode === "learn" ? "learn" : "practice") as ChatMode) : old?.mode ?? ((first.mode === "learn" ? "learn" : "practice") as ChatMode),
 		documents: unionDocuments(old?.documents ?? [], documentsOf(g)),
 		results: mergeResults(old?.results ?? [], terminal.flatMap(resultsOfLine)),

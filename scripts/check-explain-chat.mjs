@@ -6,7 +6,8 @@
  * unmarked chat taking its place, a recorded turn doubled by its live line, a
  * line of another chat showing in this thread, a failed line without its
  * error, a turn whose position is not the LAST thing sent (so "this" points
- * to the wrong slide), and a position naming another question.
+ * to the wrong slide), a position naming another question, and a recorded
+ * answer that lost the place of its AI work (`runs`).
  *
  *     npm run check:explain-chat
  */
@@ -34,6 +35,11 @@ await withSrcModule(["src/dashboard/explain-chat.ts", "src/explain-prompt.ts"], 
 	r.check("a line of another chat never shows", msgs.length, 4);
 	r.check("a recorded request is not doubled by its line", msgs.filter(m => m.text === "because").length, 1);
 	r.check("documents of a recorded request", msgs[0].documents.join(), "a.png");
+	const RUN = { runId: "00000000-0000-4000-8000-000000000001", fromSeq: 3, toSeq: 8 };
+	const recLive = { ...rec, requests: [{ ...rec.requests[0], runs: [RUN] }] };
+	const live = explainMessages(recLive, [], "b");
+	r.check("a recorded answer that ran live keeps its runs, its question none", [live[1].runs, "runs" in live[0]], [[RUN], false]);
+	r.check("a recorded answer without a live turn has no runs", "runs" in msgs[1], false);
 	const failed = explainMessages(null, [line(10, "b", "r3", "echouee", { erreur: "boom" })], "b");
 	r.check("a failed line shows its error", [failed[1].error, failed[1].running], ["boom", false]);
 

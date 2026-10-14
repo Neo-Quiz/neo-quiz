@@ -83,6 +83,14 @@ function morceauxTitre(parent: HTMLElement, avant: HTMLElement | null, ms: numbe
 	return [icone, make("span", "qbd-ai-transcript-ligne-texte", texte)];
 }
 
+/** The AI work of a recorded request (its live turns), as the AI page paints
+    it under a recorded turn: for a view that paints the rest of the turn
+    itself (the Explain window). Nothing without runs or a run store. */
+export function peindreTravailEnregistre(parent: HTMLElement, q: ChatRequest, deps: { chatOrigin: string; racine?(): string | null; ouvrirFichier?(absolu: string): void }): void {
+	if (!q.runs?.length) return;
+	peindreTravail(parent, q, recordOrigin(q, deps.chatOrigin, originContext()).runner, deps);
+}
+
 /** One folded line per live turn of the request. A turn run on THIS device is
     a button: its details are read from the store on the first unfolding, and
     its time is read lazily to fill the label. A turn run on ANOTHER device has

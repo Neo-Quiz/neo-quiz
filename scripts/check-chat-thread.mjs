@@ -47,6 +47,15 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	const ko2 = R.recordRequest(R.groupLines([{ ...line(1, "echouee"), erreur: "boom" }])[0], dev, 5000);
 	r.check("the error of a failed request is kept", ko2.error, "boom");
 	r.check("a stopped line (arret) is a stopped request", R.recordRequest(g(line(1, "arret"))[0], dev, 5000).state, "stopped");
+	/* 2026-10-14: an Explain turn's `text` is what the model read (the attached
+	   documents' text included); the record keeps what the learner typed. */
+	const explication = { mark: { path: "r/q.md", quiz: "Q" }, context: "", course: "", position: "" };
+	r.check("an Explain line records what the learner typed, a generation line its text",
+		[R.recordRequest(g(line(1, "prete", { text: "MODEL", texteAffiche: "typed", explication }, { titre: "", chemin: "", texte: "ok" }))[0], dev, 5000).text,
+			R.recordRequest(g(line(1, "prete", { text: "MODEL", texteAffiche: "typed" }, { titre: "", chemin: "", texte: "ok" }))[0], dev, 5000).text],
+		["typed", "MODEL"]);
+	r.check("an Explain line sent with attachments only records an empty text",
+		R.recordRequest(g(line(1, "prete", { text: "MODEL", texteAffiche: "", explication }, { titre: "", chemin: "", texte: "ok" }))[0], dev, 5000).text, "");
 	/* 2026-10-11: the place of a line's finished live turn is kept with its
 	   request, so its AI work is read back once the line left the queue. */
 	const RUN = "00000000-0000-4000-8000-000000000001";

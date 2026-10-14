@@ -73,6 +73,7 @@ import { newChatId, onChatsChanged } from "../../../../src/dashboard/chat-sessio
 import { newRequestId } from "../../../../src/dashboard/chat-requests";
 import { suivreConversations } from "../../../../src/dashboard/chat-sidebar";
 import { renderThread, threadHasLiveRow } from "../../../../src/dashboard/work-view";
+import { peindreTravailEnregistre } from "../../../../src/dashboard/chat-record-vue";
 import type { Scanner } from "../../../../src/dashboard/scanner";
 
 /* THE SPLIT VIEW (2026-10-09). The Explain window is a second card, on the
@@ -304,23 +305,12 @@ const NL = String.fromCharCode(10);
     diagnosis, steps, every wrong option, example, check question) fits. */
 export const EXPLAIN_MAX_CHARS_DEFAUT = 4000;
 
-/* What `envoyer` adds to the learner's text for the model. The bubble of a
-   recorded message (whose text is the model's) is cut at the first of these. */
+/* What `envoyer` adds to the learner's text for the model (never shown: the
+   record keeps what the learner typed, `texteAffiche`). */
 const PAR_DEFAUT = "Look at what I attached and help me understand it.";
 const MARQUE_PERIME = "\n\n(The question was just changed: its current version is under WHERE THE LEARNER IS NOW.)";
 const MARQUE_IMAGES = "\n\nPICTURES attached to this message, in this order (image-1, image-2...): ";
 const MARQUE_DOCUMENTS = "\n\n=== DOCUMENTS I ATTACHED ===\n";
-
-/** What the learner wrote, from the text the model read. */
-function texteVisible(text: string): string {
-	let fin = text.length;
-	for (const marque of [MARQUE_PERIME, MARQUE_IMAGES, MARQUE_DOCUMENTS]) {
-		const i = text.indexOf(marque);
-		if (i >= 0 && i < fin) fin = i;
-	}
-	const vu = text.slice(0, fin);
-	return vu === PAR_DEFAUT ? "" : vu;
-}
 
 /** "0:07" — the time the model has worked. */
 function duree(ms: number): string {
@@ -378,6 +368,8 @@ interface Message {
 	arrete: boolean;
 	/** The queue line of a turn still in the queue (its AI work, its Stop). */
 	lineId?: number;
+	/** A recorded answer that ran as a live turn: its request, whose `runs` give its AI work. */
+	requete?: ChatRequest;
 }
 
 /** The proposal of a new version of a reading card, or of a change of a
@@ -643,16 +635,21 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 	/** The quiz's folder, a contract path: where Claude Code and Codex work. */
 	const dossierQuiz = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")) : undefined;
 	/* The quiz with NO question marked (the position says where the learner
-	   is, `positionDe`), the tutor's instructions for the question `qi` the
-	   message is about, and, when the app can re-render the page, the
-	   instruction to rewrite that reading card or improve that question. */
+	   is, `positionDe`) and the tutor's instructions for the question `qi` the
+	   first message is about. No edit instruction: it follows the slide, with
+	   each message (`consigneEditionDe`). */
 	const contexteDe = (qi: number): string => {
-		const q = questions[qi];
 		const dossier = deps.chemin.includes("/") ? deps.chemin.slice(0, deps.chemin.lastIndexOf("/")).split("/").pop() : "";
 		const base = contexteQuiz(questions, { quiz: deps.titre, folder: dossier, courant: -1 });
-		const avecConsigne = base + "\n" + consigneExplication(q?.role === "read");
-		if (!deps.recharger || !q) return avecConsigne;
-		return avecConsigne + "\n" + (q.role === "read" ? consigneEditionCarte(q) : consigneEditionQuestion(q));
+		return base + "\n" + consigneExplication(questions[qi]?.role === "read");
+	};
+	/* The instruction to rewrite the reading card `qi` or improve the question
+	   `qi`, sent after the position with each message, so it names the
+	   question on screen at send time. "" when the app cannot re-render the page. */
+	const consigneEditionDe = (qi: number): string => {
+		const q = questions[qi];
+		if (!deps.recharger || !q) return "";
+		return q.role === "read" ? consigneEditionCarte(q) : consigneEditionQuestion(q);
 	};
 	/* The element that holds question `qi` now (its card in a step page, else
 	   its slide): the page may have been rendered again since it was opened. */
@@ -781,7 +778,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const brut = l?.demande.reglages.aiModel || m.model || "";
 		const v = etat.vignettes.get(requete);
 		const user = m.role === "user";
-		let text = user ? texteVisible(m.text) : m.text;
+		let text = m.text;
 		// A running answer: the text streamed so far.
 		if (!user && !text && l && m.running) text = file?.transcript(l.id)?.text ?? "";
 		return {
@@ -798,8 +795,12 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 			erreur: m.error !== undefined ? (m.error || t("ai.error.checkSettings")) : undefined,
 			arrete: !!m.stopped,
 			lineId: m.lineId,
+			// A recorded answer that ran live: its request, to read its AI work back.
+			...(!user && m.runs && q ? { requete: q } : {}),
 		};
 	};
+	/** The device that started the chat on screen (where its recorded work was run, by default). */
+	let origineChat = "";
 	/** The thread: the chat's record, then its queue lines not recorded yet,
 	    then the message being prepared. */
 	const messages = (): Message[] => {
@@ -808,6 +809,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		const lignes = file?.lignes() ?? [];
 		const parLigne = new Map(lignes.map(l => [l.id, l] as const));
 		const parRequete = new Map((record?.requests ?? []).map(q => [q.id, q] as const));
+		origineChat = record?.origin ?? "";
 		const out = explainMessages(record, lignes, id).map(m => versMessage(m, parLigne, parRequete));
 		const e = etat.envoi;
 		if (e) {
@@ -1133,7 +1135,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				/* What a message shows (its running time and its AI work aside, updated in place). */
 				const cleDe = (msg: Message): string => {
 					const p = etat.propositions.get(msg.key);
-					return JSON.stringify([msg.role, msg.text, msg.images, msg.documents, msg.enCours, msg.lecture, msg.erreur, msg.arrete, msg.duree, msg.modele, msg.fournisseur, msg.lineId !== undefined, p ? [p.etat, p.occupe, p.message] : null]);
+					return JSON.stringify([msg.role, msg.text, msg.images, msg.documents, msg.enCours, msg.lecture, msg.erreur, msg.arrete, msg.duree, msg.modele, msg.fournisseur, msg.lineId !== undefined, msg.requete?.runs ?? null, p ? [p.etat, p.occupe, p.message] : null]);
 				};
 				/** A new node for `msg`, put in the thread by `placer` BEFORE it is filled
 				    (the maths and the interactive pages render in a connected element). */
@@ -1174,6 +1176,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						: msg.duree !== undefined ? t("ai.chat.worked", { model: nom, time: duree(msg.duree) })
 						: t("ai.chat.workedNoTime", { model: nom }));
 					if (msg.enCours) ajouter(tete, "span", "qbd-ai-file-temps", duree(Date.now() - msg.debut));
+					// A recorded answer: its live turns read back from the run store, as the AI page shows them.
+					if (msg.lineId === undefined && msg.requete) peindreTravailEnregistre(rep, msg.requete, { chatOrigin: origineChat });
 					if (msg.lineId !== undefined) {
 						/* The AI's work: a live turn in full (`renderThread`, as the AI
 						   page shows it), folded under one line; else the one-shot
@@ -1332,7 +1336,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (prises.urls.length) etat.vignettes.set(requestId, { urls: prises.urls, noms: prises.nomsImages });
 					etat.questionDe.set(requestId, qi);
 					/* Read NOW, while the page shows what the learner sees (the course may take a while). */
-					const position = positionDe(qi);
+					const consigne = consigneEditionDe(qi);
+					const position = positionDe(qi) + (consigne ? "\n\n" + consigne : "");
 					const contexte = contexteDe(qi);
 					const envoi: NonNullable<EtatFenetre["envoi"]> = { cle: requestId, texte: perso, documents: prises.nomsDocuments, fournisseur, modele: libelleModele(), debut: sentAt, annule: false };
 					etat.envoi = envoi;
@@ -1345,8 +1350,9 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						/* The earlier turns, for a provider that cannot keep a live session:
 						   the one call then carries the whole conversation. */
 						const avant = explainMessages(getChats().find(c => c.id === chatId && !c.deleted) ?? null, q.lignes(), chatId)
-							.filter(x => x.error === undefined && x.text.trim())
-							.map(x => (x.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + x.text.trim())
+							.map(x => ({ ...x, text: x.text.trim() || (x.role === "user" && x.documents.length ? "(attached: " + x.documents.join(", ") + ")" : "") }))
+							.filter(x => x.error === undefined && x.text)
+							.map(x => (x.role === "user" ? "LEARNER" : "TUTOR") + ":\n" + x.text)
 							.join("\n\n");
 						const lecture = questions[qi]?.role === "read";
 						/* What the model reads (never shown): the learner's text, a word
