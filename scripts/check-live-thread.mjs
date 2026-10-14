@@ -410,17 +410,20 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 
 /* THE TEXT OF A TURN THAT STARTS A NEW RUN (2026-10-14, `freshText`): a chat
    turn on a session that already holds the conversation sends only the short
-   follow-up (`text`); a turn that STARTS a run (no run yet, or the stored run
-   was deleted and a new one began) sends the whole text, or the model would
-   answer a follow-up with no conversation behind it. Driven with a fake
-   `HostLive` that records what `send` receives. */
+   follow-up (`text`); a turn on a run that does not hold it yet (no run, the
+   stored run deleted and a new one begun, or a new run whose first send
+   failed) sends the whole text, or the model would answer a follow-up with
+   no conversation behind it. Driven with a fake `HostLive` that records what
+   `send` receives. */
 await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"], async (G, H) => {
 	const r = makeReporter("Live turn text: follow-up or whole text");
 	const R1 = "00000000-0000-4000-8000-0000000000d1";
 	const R2 = "00000000-0000-4000-8000-0000000000d2";
+	const R3 = "00000000-0000-4000-8000-0000000000d3";
 	const sent = [];
 	const deleted = new Set();
-	let next = R1;
+	const fresh = [R1, R2, R3];
+	let failNextSend = false;
 	let emit = () => {};
 	let seq = 0;
 	H.installHost({
@@ -430,11 +433,13 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 					if (deleted.has(o.runId)) throw Object.assign(new Error("run gone"), { name: "refused" });
 					return { runId: o.runId };
 				}
-				const id = next;
-				next = R2;
-				return { runId: id };
+				return { runId: fresh.shift() };
 			},
-			send: async (runId, input) => { if (input.kind === "message") sent.push(runId.slice(-2) + ":" + input.text); },
+			send: async (runId, input) => {
+				if (input.kind !== "message") return;
+				if (failNextSend) { failNextSend = false; throw Object.assign(new Error("send failed"), { name: "failed" }); }
+				sent.push(runId.slice(-2) + ":" + input.text);
+			},
 			close: async () => {},
 			onEvent: (cb) => { emit = cb; return () => {}; },
 			readRun: async () => null,
@@ -445,8 +450,8 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 		paths: { defaultRoot: () => ({ id: "R", name: "Neo Quiz", deviceId: "pc" }), contractPath: (root, local) => root + "/" + local },
 	});
 	const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((ok) => setImmediate(ok)); };
-	const turn = async (key, runOf, spec) => {
-		const p = G.runLiveTurn({ tool: "claude", chatId: "chat-f", model: "claude-haiku-5-5", mode: "full", images: [], key, abortable: () => {}, ...spec });
+	const turn = async (key, runOf, spec, chatId = "chat-f") => {
+		const p = G.runLiveTurn({ tool: "claude", chatId, model: "claude-haiku-5-5", mode: "full", images: [], key, abortable: () => {}, ...spec });
 		await flush();
 		const runId = runOf();
 		emit({ kind: "line", runId, seq: ++seq, line: { type: "result", subtype: "success", is_error: false, result: "ok" } });
@@ -463,6 +468,14 @@ await withSrcModule(["src/dashboard/live-generation.ts", "src/host/current.ts"],
 		r.check("the chat's run was deleted: a new run, which gets the whole text", sent.at(-1), "d2:FULL");
 		await turn("k-f4", () => R2, { text: "ONLY" });
 		r.check("no `freshText` (a generation): `text` is sent, as before", sent.at(-1), "d2:ONLY");
+		failNextSend = true;
+		const failed = await G.runLiveTurn({ tool: "claude", chatId: "chat-g", model: "claude-haiku-5-5", mode: "full", images: [], key: "k-g1", abortable: () => {}, text: "SHORT", freshText: "FULL" })
+			.then(() => "resolved", (e) => "error:" + e.name);
+		r.check("a new run whose first send rejects: the turn fails, nothing reached the run", [failed, sent.length], ["error:failed", 4]);
+		await turn("k-g2", () => R3, { text: "SHORT", freshText: "FULL" }, "chat-g");
+		r.check("the retry on that run (bound, never reached) still sends the whole text", sent.at(-1), "d3:FULL");
+		await turn("k-g3", () => R3, { text: "SHORT", freshText: "FULL" }, "chat-g");
+		r.check("after one successful send, the next turn sends the follow-up only", sent.at(-1), "d3:SHORT");
 	} finally {
 		H.uninstallHost();
 	}

@@ -60,9 +60,10 @@ export interface LiveTurnSpec {
 	mode: ModeAgent;
 	/** The whole message of the turn (system prompt and request). */
 	text: string;
-	/** The text sent instead of `text` when this turn STARTS a new run (no
-	    run resumed): a short follow-up in `text` would reach a session that
-	    holds no conversation (2026-10-14). */
+	/** The text sent instead of `text` while the run does not hold the
+	    conversation (a run started by this page that no turn reached yet,
+	    a failed first send included): a short follow-up in `text` would
+	    reach a session that holds nothing (2026-10-14). */
 	freshText?: string;
 	images: readonly LiveImage[];
 	/** The resume key of the generation: the same after a reload. */
@@ -98,6 +99,10 @@ interface Session {
 	last: Turn | null;
 	/** Events received while the store is read, applied after it. */
 	buffer: LiveEvent[] | null;
+	/** The run holds the conversation: a resumed run does, a run started
+	    by this page does only once a turn was sent to it successfully. Until
+	    then a turn sends its `freshText` (2026-10-14). */
+	primed: boolean;
 }
 
 /** How long a stopped turn may take to end before its session is closed. */
@@ -179,7 +184,7 @@ function settle(s: Session, turn: Turn, err: Error | null): void {
 
 function session(runId: string): Session {
 	let s = sessions.get(runId);
-	if (!s) { s = { runId, maxSeq: -1, current: null, last: null, buffer: null }; sessions.set(runId, s); }
+	if (!s) { s = { runId, maxSeq: -1, current: null, last: null, buffer: null, primed: true }; sessions.set(runId, s); }
 	return s;
 }
 
@@ -375,10 +380,10 @@ async function storedRun(live: HostLive, chatId: string, tool: LiveTool): Promis
 
 const settingsOf = (spec: LiveTurnSpec) => ({ tool: spec.tool, chatId: spec.chatId, model: spec.model, mode: spec.mode, ...(spec.effort ? { effort: spec.effort } : {}) });
 
-/** The chat's session for this tool, started or resumed. `fresh`: the run
-    was started by this call (the deleted-run fallback included), so it holds
-    none of the chat's earlier turns. */
-async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<{ session: Session; fresh: boolean }> {
+/** The chat's session for this tool, started or resumed. A run started by
+    this call (the deleted-run fallback included) holds none of the chat's
+    earlier turns: its session is not `primed`. */
+async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<Session> {
 	const mapKey = spec.chatId + "|" + spec.tool;
 	let known = bound.get(mapKey) ?? await storedRun(live, spec.chatId, spec.tool);
 	let runId: string;
@@ -391,12 +396,13 @@ async function ensureSession(live: HostLive, spec: LiveTurnSpec): Promise<{ sess
 		runId = await startTrusted(live, settingsOf(spec));
 	}
 	bound.set(mapKey, runId);
-	const fresh = runId !== known;
-	if (fresh) {
+	const s = session(runId);
+	if (runId !== known) {
+		s.primed = false;
 		setChats(addRunId(getChats(), spec.chatId, runId, chatDevice(), Date.now()));
 		notifyChatsChanged();
 	}
-	return { session: session(runId), fresh };
+	return s;
 }
 
 /** The `seq` the next line of the run will have at least. */
@@ -487,7 +493,7 @@ export async function runLiveTurn(spec: LiveTurnSpec): Promise<TurnOutcome> {
 		const back = await reattach(live, spec, saved);
 		if (back) return back;
 	}
-	const { session: s, fresh } = await ensureSession(live, spec);
+	const s = await ensureSession(live, spec);
 	if (s.current) throw Object.assign(new Error("A turn is already running"), { name: "busy" });
 	const fromSeq = await nextSeq(live, s);
 	const turn: Turn = { runId: s.runId, thread: emptyThread(), outcome: emptyOutcome(), fromSeq, toSeq: null, settle: null };
@@ -499,7 +505,8 @@ export async function runLiveTurn(spec: LiveTurnSpec): Promise<TurnOutcome> {
 	notify(turn);
 	const done = waitFor(live, s, turn, spec);
 	try {
-		await live.send(s.runId, { kind: "message", text: fresh && spec.freshText ? spec.freshText : spec.text, images: spec.images.map(i => ({ mediaType: i.mediaType as LiveMediaType, base64: i.base64 })) });
+		await live.send(s.runId, { kind: "message", text: !s.primed && spec.freshText ? spec.freshText : spec.text, images: spec.images.map(i => ({ mediaType: i.mediaType as LiveMediaType, base64: i.base64 })) });
+		s.primed = true;
 	} catch (e) {
 		turn.settle = null;
 		if (s.current === turn) s.current = null;
