@@ -346,7 +346,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The request waiting for its kind (spec 2026-10-07-generate-auto-kind):
 	    shown at the end of the thread with a status line while the decide call
 	    runs. */
-	let attenteGenre: { text: string; documents: { name: string; path?: string }[] } | null = null;
+	let attenteGenre: { text: string; documents: { name: string; path?: string; thumb?: string }[] } | null = null;
 	/** The clarifying questions asked and not answered yet, by request id: what the click
 	    needs to generate (the documents' text is only in memory). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
@@ -4369,7 +4369,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* One quiz per document unless the clarifying question says otherwise
 		   (2026-10-14: the composer toggle is gone, the AI asks). */
 		const seulQuiz = false;
-		attenteGenre = { text: envoi.text, documents: pieces };
+		/* The bubble shown while the AI prepares its questions keeps the
+		   thumbnails the composer already drew (2026-10-14): without them its
+		   cards fell back on the name and a "PDF" tag, which read as PDFs still
+		   loading. In memory only: the chat record keeps names and paths. */
+		attenteGenre = { text: envoi.text, documents: [...envoi.notes.map((n, i) => ({ ...pieces[i], ...(n.thumb ? { thumb: n.thumb } : {}) })), ...pieces.slice(envoi.notes.length)] };
 		viderComposer();
 		render(container);
 		let reponse: ClarifyAnswer = { ready: true };

@@ -181,7 +181,7 @@ export function creerVueFile(opts: {
 	chat: () => { id: string; record: ChatRecord | null };
 	/** A request waiting for the kind of quiz to be decided (spec
 	    2026-10-07-generate-auto-kind): shown last, with a status line. */
-	attente?: () => { text: string; documents: { name: string; path?: string }[] } | null;
+	attente?: () => { text: string; documents: { name: string; path?: string; thumb?: string }[] } | null;
 	/** The answers given to the clarifying cards (a recorded request, nothing live yet). */
 	repondre?: (requestId: string, answers: string[][]) => void;
 	/** May the pending card of this request still be answered (its state survived)? */
