@@ -395,6 +395,11 @@ jobs:
       # and the list derived from record + live lines, the follow-up context.
       - name: Chat thread and list
         run: npm run check:chat-thread
+      # THE PURE CORE OF EXPLAIN CHATS: the chat a quiz reopens, the thread of
+      # a chat (recorded turns, then live lines), and a turn's text with the
+      # learner's position LAST.
+      - name: Explain chats, pure core
+        run: npm run check:explain-chat
 
       # REMOTE REQUESTS from the phone, the validator between a synced file and
       # a CLI launch: strict schema, sender/target, age, sizes, document paths

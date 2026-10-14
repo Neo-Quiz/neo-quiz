@@ -110,6 +110,25 @@ export interface DemandeFile extends DemandeTexte {
 	fromDevice?: string;
 	/** The name that device gave itself (from the request file), kept in the record. */
 	fromName?: string;
+	/** An Explain turn (2026-10-14): set on a line that runs the Explain chat. */
+	explication?: DemandeExplication;
+}
+
+/** An Explain turn (2026-10-14): the line runs `AiClient.chat` as a tutor,
+    not a generation, and ends with a prose answer. */
+export interface DemandeExplication {
+	/** The chat record's mark (`ChatExplain`). */
+	mark: { path: string; quiz: string };
+	/** The whole quiz and the tutor instructions (`contexteQuiz` + `consigneExplication` …), frozen at send. */
+	context: string;
+	/** The course read by the app (empty when the sender could not read it: the agent opens it). */
+	course: string;
+	/** Where the learner is on the quiz when the message left (`positionCourante`); "" from the AI page. */
+	position: string;
+	/** The longest answer wanted (`ChatOptions.maxChars`). */
+	maxChars?: number;
+	/** The quiz's folder, a contract path (`ChatOptions.dossier`). */
+	folder?: string;
 }
 
 /** Ce qu'une génération a rapporté, de quoi écrire la note sans le modèle. */

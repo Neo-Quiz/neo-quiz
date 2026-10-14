@@ -194,3 +194,14 @@ export function contexteQuiz(questions: Q[], extra: { quiz: string; folder?: str
 	tete.push("The question marked \"QUESTION ON SCREEN\" is the one the learner is looking at; the others are the rest of the same quiz.");
 	return tete.join("\n") + "\n\n" + questions.map((q, i) => bloc(q, i + 1, i === extra.courant, extra)).join("\n\n") + "\n";
 }
+
+/** WHERE THE LEARNER IS NOW (2026-10-14): appended at the END of every
+    Explain message, so that "I understood nothing of all this" means the
+    slide on screen when the message left, wherever the chat began. The
+    whole question as `contexteQuiz` writes the one on screen, with the
+    learner's answer and whether it was right. */
+export function positionCourante(questions: Q[], extra: { courant: number; ordre?: number[]; myAnswer?: string; correct?: boolean | null; history?: HistoireQuestion | null }): string {
+	const q = questions[extra.courant];
+	if (!q) return "";
+	return `WHERE THE LEARNER IS NOW: slide ${extra.courant + 1} of ${questions.length} of the quiz. "This", "this question", "all this" in the message above refer to it unless the learner says otherwise.\n\n` + bloc(q, extra.courant + 1, true, extra);
+}
