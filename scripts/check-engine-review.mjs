@@ -1368,7 +1368,7 @@ await withSrcModule("src/engine/step-page.ts", ({ drawOrder }) => {
 });
 
 /* Step page: card kind and the Learn summary's numbers. */
-await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, formatElapsed }) => {
+await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, formatElapsed, stepHue }) => {
 	const r = makeReporter("Step page - card kind and summary");
 	r.check("flashcard kind", stepCardKind({ flashcard: true, options: [] }), "flashcard");
 	r.check("choice kind", stepCardKind({ options: ["a", "b"], correctIndex: 0 }), "choice");
@@ -1379,6 +1379,8 @@ await withSrcModule("src/engine/step-page.ts", ({ stepCardKind, learnFigures, fo
 	r.check("summary: the total never falls under the answered count", learnFigures({ first: 3, retried: 0, missed: 0 }, 1).total, 3);
 	r.check("elapsed m:ss", formatElapsed(132_000), "2:12");
 	r.check("elapsed h:mm:ss", formatElapsed(3_725_000), "1:02:05");
+	r.check("step hue cycles over 10", [stepHue(1), stepHue(2), stepHue(10), stepHue(11)], [0, 1, 9, 0]);
+	r.check("step hue never negative or NaN", [stepHue(0), stepHue(-3), stepHue(NaN)], [0, 0, 0]);
 	r.done();
 });
 

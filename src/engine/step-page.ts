@@ -135,3 +135,12 @@ export function formatElapsed(ms: number): string {
 	const ss = String(s).padStart(2, "0");
 	return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
+
+/** The hue of each step (2026-10-14): ten steps never look alike. Degrees,
+    read by step-page.css through `data-step-hue`. */
+export const STEP_HUES: readonly number[] = [215, 160, 30, 280, 350, 190, 50, 120, 320, 250];
+
+/** The index in STEP_HUES of a 1-based step; 0 for anything not a positive number. */
+export function stepHue(step: number): number {
+	return Number.isFinite(step) && step >= 1 ? (Math.floor(step) - 1) % STEP_HUES.length : 0;
+}

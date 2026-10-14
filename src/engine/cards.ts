@@ -13,7 +13,7 @@ import { renderLessonHtml, stripInlineMarkdown } from "./sanitizer";
 import { corpsLecture, corpsLectureCourte } from "./passage";
 import { figureDeLecture } from "./lecture-rendu";
 import { t, type TransKey } from "../i18n";
-import { drawOrder, formatElapsed, learnFigures, stepMembers, stepBeadState, type StepSlide } from "./step-page";
+import { drawOrder, formatElapsed, learnFigures, stepHue, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -727,7 +727,7 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 		const st = ctx.quizState;
 		const order = drawOrder(members, qi => !!st.learnRetrying?.[qi] && !st.learnChecked?.[qi]);
 		const cards = order.map(qi => cardParts(qi, true).section).join("");
-		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
+		return `<div class="quiz-track-item quiz-step-page" data-slide-kind="question" data-qi="${members[0]}" data-step="${step.step}" data-step-hue="${stepHue(step.step)}">${cards}${stepFooterHtml(members[members.length - 1])}</div>`;
 	}
 
 	/** The title line of a card of a step page: "Question 2: Title" (just
