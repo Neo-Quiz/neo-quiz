@@ -1937,10 +1937,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// les yeux, et la parenthèse gênait. Le champ RESTE facultatif avec une
 		// pièce jointe (`canGenerate` accepte texte OU images OU notes) ; c'est
 		// seulement le texte qui ne bouge plus.
+		/* Under an Explain chat the composer asks the quiz's tutor, not for a
+		   quiz: its prompt says so, and follows the chat on screen. */
+		const majInvite = (): void => {
+			composerInput.placeholder = t(examCible ? "ai.exam.addDetails" : marqueExplain() ? "ai.explain.ownQuestion" : "ai.composer.placeholder");
+		};
+		const arretInvite = onChatsChanged(() => { if (composerInput.isConnected) majInvite(); else arretInvite(); });
 		const peindreExamCible = (): void => {
 			tuileExam.replaceChildren();
 			tuileExam.hidden = !examCible;
-			composerInput.placeholder = t(examCible ? "ai.exam.addDetails" : "ai.composer.placeholder");
+			majInvite();
 			if (!examCible) return;
 			ajouter(tuileExam, "div", "qbd-ai-exam-cible-texte", promptPreparation(examCible, settings().aiExamPrompt));
 			const pied = ajouter(tuileExam, "div", "qbd-ai-exam-cible-pied");
