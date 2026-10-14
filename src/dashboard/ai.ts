@@ -4417,7 +4417,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		setChats(r.chats);
 		notifyChatsChanged();
 		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
-		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n") };
+		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n"), ...(precisions ? { texteAffiche: attente.envoi.text } : {}) };
 		const genre = kindFromClarifications(requete.clarify.genre ?? attente.genre, requete.clarify.questions, reponses);
 		const seulQuiz = quizCountFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
 		const action = gardee?.action ?? requete.clarify.action ?? "generate";

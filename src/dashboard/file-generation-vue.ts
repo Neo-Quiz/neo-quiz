@@ -280,7 +280,8 @@ export function creerVueFile(opts: {
 			}
 			peindrePieces(pieces, notes, opts.ouvrirPiece);
 		}
-		if (d.text.trim()) ajouter(message, "div", "qbd-ai-bulle", d.text.trim());
+		const affiche = (d.texteAffiche ?? d.text).trim();
+		if (affiche) ajouter(message, "div", "qbd-ai-bulle", affiche);
 		/* No "Learn · Opus 5.5" under the request any more (2026-09-30): the
 		   working line and the result already name the model and the type. */
 	}

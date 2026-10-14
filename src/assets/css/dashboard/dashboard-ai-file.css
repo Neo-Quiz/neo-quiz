@@ -529,6 +529,10 @@
 .qbd-ai-transcript-titre-icone {
 	display: inline-flex;
 	flex-shrink: 0;
+	/* Centred box on centred box left the logo 1 px above the middle of the
+	   lowercase letters (2026-10-14, measured): nudged down. */
+	position: relative;
+	top: 1px;
 }
 
 .qbd-ai-transcript-titre-icone svg {
@@ -701,6 +705,18 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* A turn still running sweeps its label with the status shine (2026-10-14):
+   without it, a long silent step read as a finished turn. The clock class is
+   only on a running line (file-generation-vue.ts). */
+.qbd-ai-transcript-ligne-texte.qbd-ai-transcript-chrono {
+	background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 35%, var(--text-normal) 50%, var(--text-muted) 65%, var(--text-muted) 100%);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: qbd-ai-reflet 2.2s linear infinite;
 }
 
 .qbd-ai-transcript-chevron {

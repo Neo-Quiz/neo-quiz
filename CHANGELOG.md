@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A generation still running shows its work line with a moving shine, so it no longer looks finished.
+- The model logo of the work line sits level with its text.
+- Your answers to the AI's questions no longer show twice: once under your request and once in the question card.
+
 ## [1.20.100] - 2026-10-14
 
 ### Fixed

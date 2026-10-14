@@ -84,6 +84,10 @@ export interface DemandeTexte<I extends { file: File } = { file: File }> {
 	    a part of the WHOLE material split by theme, from one reading of every
 	    document. Set only by `decouperParFichier`. */
 	parties?: number | "auto";
+	/** The request as the user wrote it, when `text` also carries the answers
+	    to the AI's clarifying questions (2026-10-14): the bubble shows this, the
+	    model reads `text`; the answers already show in the question card. */
+	texteAffiche?: string;
 	/** The earlier turns of the conversation (`conversation-context.ts`),
 	    frozen at send time: a follow-up reaches the model WITH them, for every
 	    provider. */
@@ -132,7 +136,7 @@ export function decouperParFichier<I extends { file: File }>(msg: DemandeTexte<I
 	if (nbQuiz === true || nbQuiz === 1 || msg.images.length > 0 || msg.notes.length < 2) return [msg];
 	if (enUnePasse && (nbQuiz === "auto" || (typeof nbQuiz === "number" && nbQuiz >= 2))) return [{ ...msg, parties: nbQuiz }];
 	if (enUnePasse) return [{ ...msg, parDocument: true }];
-	return msg.notes.map(note => ({ text: msg.text, notes: [note], images: [] }));
+	return msg.notes.map(note => ({ text: msg.text, ...(msg.texteAffiche !== undefined ? { texteAffiche: msg.texteAffiche } : {}), notes: [note], images: [] }));
 }
 
 /** Whether a provider can write N quizzes in one answer. Every one but Ollama:
