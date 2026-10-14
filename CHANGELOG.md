@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.106] - 2026-10-14
+
 ### Changed
 
 - The quiz player shows its source files as one pill next to the title, listing them on hover with their file-type icons, which leaves more room for the quiz.
