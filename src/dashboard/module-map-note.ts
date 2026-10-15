@@ -2,26 +2,33 @@ import { currentHost } from "../host/current";
 import { parseModuleMap, type ModuleMap } from "./quiz-modules";
 
 /**
- * La table des modules, lue dans la note de correspondance.
+ * The module table, read from the mapping note.
  *
- * Écrite deux fois à l'identique (accueil et « Mes quiz ») avant ce
- * fichier, et le commentaire d'origine dit pourquoi les deux pages doivent
- * lire la MÊME chose : un quiz rangé dans un sous-dossier de son module
- * recevait sinon l'accent du sous-dossier sur une page et celui du module
- * sur l'autre — deux couleurs pour un même quiz.
+ * Written twice, identically (Home and "My quizzes"), before this file, and
+ * the original comment says why both pages must read the SAME thing: a quiz
+ * filed in a sub-folder of its module otherwise got the sub-folder's accent on
+ * one page and the module's on the other, two colours for one quiz.
  *
- * Passe par l'HÔTE, plus par `app.metadataCache` : `links.resolve` comprend
- * « Dashboard » écrit sans chemin, exactement comme le faisait
- * `getFirstLinkpathDest`, et `fs.readCached` sert le cache du coffre sous
- * Obsidian comme `cachedRead` le faisait.
+ * Goes through the HOST: `links.resolve` understands "Dashboard" written
+ * without a path, and `fs.readCached` serves the cached copy.
  *
- * Une table VIDE est un état normal — la note n'existe pas, ou le réglage
- * est vide. Les modules retombent alors sur leur dossier parent
- * (`moduleForQuiz`), ce qui est le comportement historique.
+ * An EMPTY table is a normal state: the note does not exist, or the setting is
+ * empty. Modules then fall back on their parent folder (`moduleForQuiz`), the
+ * historical behaviour.
  */
 export const MODULE_MAP_VIDE: ModuleMap = { byFolder: new Map(), ueOrder: [] };
 
+/** The table of the last read, for SYNCHRONOUS readers that cannot await one
+    (the review catalogue, which pauses the reviews of hidden folders by the
+    same folder rule as the pages). Empty until a first read. */
+let last: ModuleMap = MODULE_MAP_VIDE;
+export const lastModuleMap = (): ModuleMap => last;
+
 export async function lireModuleMap(nomNote: string): Promise<ModuleMap> {
+	return last = await read(nomNote);
+}
+
+async function read(nomNote: string): Promise<ModuleMap> {
 	const nom = String(nomNote ?? "").trim();
 	if (!nom) return MODULE_MAP_VIDE;
 	try {
@@ -29,8 +36,8 @@ export async function lireModuleMap(nomNote: string): Promise<ModuleMap> {
 		if (!fichier) return MODULE_MAP_VIDE;
 		return parseModuleMap(await currentHost().fs.readCached(fichier.path));
 	} catch (e) {
-		/* Note illisible : on rend une table vide plutôt que d'empêcher le
-		   rendu de la page. Les modules retombent sur leur dossier parent. */
+		/* Unreadable note: an empty table rather than a page that cannot
+		   render. Modules fall back on their parent folder. */
 		return MODULE_MAP_VIDE;
 	}
 }

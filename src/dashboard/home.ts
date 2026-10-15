@@ -5,6 +5,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { isFolderArchived } from "./folder-archive";
+import { isFolderHidden } from "./folder-hidden";
 import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, declaredFolders, estLeSas } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
@@ -82,9 +83,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		if (entering) weekOffset = 0;
 		container.replaceChildren();
 
-		// The quizzes of ARCHIVED FOLDERS (⋯ menu of a folder card in "My
-		// quizzes") no longer exist for the home: no task, no folder. They
-		// only come back under the "Archived" section of "My quizzes". Same
+		// The quizzes of ARCHIVED and HIDDEN FOLDERS (⋯ menu of a folder card
+		// in "My quizzes") no longer exist for the home: no task, no folder, no
+		// Resume, no exam. They only come back under the "Archived" or "Hidden"
+		// section of "My quizzes". Same
 		// effective table as "My quizzes": the note (loaded in the background
 		// on the first render) overlaid by the "Edit folder" modal's
 		// overrides, re-read at every render.
@@ -94,7 +96,8 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			ctx.settings.quizzesModuleOverrides || {}
 		);
 		const allQuizzes: QuizIndexEntry[] = ctx.scanner ? ctx.scanner.getQuizzes() : [];
-		const quizzes = allQuizzes.filter(q => !isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
+		const outOfHome = (folder: string): boolean => isFolderArchived(ctx, folder) || isFolderHidden(ctx, folder);
+		const quizzes = allQuizzes.filter(q => !outOfHome(moduleForQuiz(q.path, map).folder));
 		const stats: Record<string, QuizStatRecord> = ctx.statsStore ? ctx.statsStore.getAll() : {};
 
 		// ── First use: no quiz → guided onboarding ──
@@ -134,7 +137,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		/* Built apart from the folder cards: a declared folder still EMPTY has no
 		   card, but its exam is as real as any. */
 		const examGroups = buildModuleGroups(quizzes, stats, map, declaredFolders(ctx.settings.quizzesModuleOverrides))
-			.filter(g => !estLeSas(g, ctx.generatedFolder?.()) && !isFolderArchived(ctx, g.folder));
+			.filter(g => !estLeSas(g, ctx.generatedFolder?.()) && !outOfHome(g.folder));
 		const exams: HomeExam[] = examGroups
 			.flatMap(group => upcomingExams(ctx.examens?.(group) ?? [], todayIso).map(exam => ({ exam, group })))
 			.sort((a, b) => a.exam.date.localeCompare(b.exam.date));

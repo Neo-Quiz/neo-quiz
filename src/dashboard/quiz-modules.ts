@@ -56,6 +56,10 @@ export interface ModuleOverride {
 	    source de vérité pour un dossier déclaré SANS quiz : sans quiz dedans,
 	    il n'y a aucun chemin d'où le déduire. */
 	path?: string;
+	/** `"1"`: the folder is hidden from the lists ("Hide from list" of its ⋯
+	    menu, `folder-hidden.ts`) and its reviews are paused. Absent = shown.
+	    Synced like the other fields (`src/shared-state/merge.ts`). */
+	hidden?: string;
 	/* PAS DE `examDate` ICI, et c'est délibéré (2026-09-17) : ces overrides
 	   sont indexés par NOM DE SEGMENT, qui confond deux dossiers homonymes
 	   ouverts depuis deux racines — acceptable pour une couleur, pas pour un

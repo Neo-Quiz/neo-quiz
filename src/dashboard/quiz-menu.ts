@@ -15,6 +15,8 @@ import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { isFolderArchived, setFolderArchived } from "./folder-archive";
+import { isFolderHidden, setFolderHidden } from "./folder-hidden";
+import { saveSettingsReporting } from "./save-settings";
 import { freeNotePath } from "./folder-create";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
@@ -877,14 +879,27 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		if (!fixe) items.push({
 			icon: "archive",
 			label: t(archived ? "dashboard.quizzes.menuUnarchive" : "dashboard.quizzes.menuArchive"),
-			// Direct dans les deux sens (demande Ahmed 2026-07-19 : plus
-			// aucune confirmation d'archivage). Un seul flag par DOSSIER :
-			// opérationnel même quand la grille ne montre aucun quiz du
-			// module (l'ancien modèle par-quiz rendait « Unarchive »
-			// inopérant sur un module entièrement archivé, g.quizzes filtré
-			// étant vide).
+			// Direct both ways (2026-07-19: no archive confirmation any more).
+			// One flag per FOLDER: it works even when the grid shows none of
+			// the module's quizzes (the old per-quiz model made "Unarchive"
+			// do nothing on a fully archived module, the filtered g.quizzes
+			// being empty).
 			onClick: () => { setFolderArchived(ctx, g.folder, !archived); rerender(); },
 		});
+		/* Hide from the lists, reviews paused (folder-hidden.ts); the card then
+		   lives in the "Hidden" section at the bottom of My quizzes. */
+		if (!fixe) {
+			const hidden = isFolderHidden(ctx, g.folder);
+			items.push({
+				icon: hidden ? "eye" : "eye-off",
+				label: t(hidden ? "dashboard.quizzes.menuShow" : "dashboard.quizzes.menuHide"),
+				onClick: () => {
+					saveSettingsReporting(() => setFolderHidden(ctx, g.folder, !hidden));
+					host.ui.notice(t(hidden ? "dashboard.quizzes.folderShown" : "dashboard.quizzes.folderHidden", { name: g.name }));
+					rerender();
+				},
+			});
+		}
 		// Une seule racine (le vault, sous Obsidian) : rien où déplacer.
 		// `anchorEl` manquant (appelant qui n'aurait pas encore été mis à jour) :
 		// même chose, plutôt que d'ouvrir un sous-menu sans rien à y ancrer.

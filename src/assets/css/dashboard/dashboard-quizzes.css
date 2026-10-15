@@ -402,6 +402,13 @@
 	cursor: pointer;
 	transition: var(--qbd-carte-transition);
 }
+/* A HIDDEN folder's card (the "Hidden" section of My quizzes,
+   folder-hidden.ts): dimmed through its CONTENT, not the card itself. An
+   opacity below 1 on the card would cut its glass blur (a backdrop root) and
+   fight the entry animation, which ends at opacity 1. */
+.qbd-quizzes-hidden .qbd-module-card > * {
+	opacity: 0.5;
+}
 /* LE HALO D'ANGLE NE DISPARAÎT JAMAIS, SURVOL COMPRIS (Ahmed, 2026-09-17 :
    « la lumière qui vient d'en haut à gauche ne doit jamais disparaître »).
    PLUS DE LEVÉE au survol (StudySmarter, 2026-09-27, « elles ne se déplacent

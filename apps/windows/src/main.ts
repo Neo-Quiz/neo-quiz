@@ -54,7 +54,7 @@ import { creerSessionsApp } from "./review/sessions";
 import { createSharedSessions } from "./host/shared-sessions";
 import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
-import { adopterOverrides, chargerReglagesPages, overridesPartages, monterDashboard, reprendre } from "./ui/dashboard-shell";
+import { adopterOverrides, chargerReglagesPages, overridesPartages, monterDashboard, reglagesDeLaCoquille, reprendre } from "./ui/dashboard-shell";
 import { chargerReprise } from "./ui/reprise";
 import { aiSettingsDefaults } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
@@ -742,7 +742,7 @@ async function demarrer(): Promise<void> {
 		   model of the previous session on its first render. */
 		await chargerReglagesIa();
 		await chargerSilence();
-		const store = await creerJournalApp(currentHost(), scanner);
+		const store = await creerJournalApp(currentHost(), scanner, () => reglagesDeLaCoquille().settings.quizzesModuleOverrides);
 		/* Les STATISTIQUES par quiz : à côté du journal, mais un système
 		   distinct (spec de l'ordonnanceur §9.1 — voir `review/stats.ts`).
 		   Construit ici et non dans `creerJournalApp` : les deux stores

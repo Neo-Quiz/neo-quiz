@@ -16,33 +16,36 @@ import { saveSettingsReporting } from "./save-settings";
 type ModuleEditState = Required<Pick<ModuleOverride, "name" | "ue">>
 	& Omit<ModuleOverride, "name" | "ue">;
 
-// Toute extension persistée doit casser tsc tant que ce reconstructeur ne la
-// traite pas explicitement, sinon une simple édition effacerait le nouveau champ.
+// Any persisted field added to `ModuleOverride` must break tsc until this
+// rebuilder handles it explicitly, otherwise a plain edit would erase the new field.
 const MODULE_EDIT_HANDLED_FIELDS = {
 	name: true,
 	ue: true,
 	color: true,
 	icon: true,
 	path: true,
+	hidden: true,
 } satisfies Record<keyof ModuleOverride, true>;
 
-/** Centralise le contrat de persistance du modal pour que la date civile reste
-    identique jusqu'à l'adaptateur et que son effacement retire vraiment la clé. */
+/** The modal's persistence contract in one place, so that the civil date stays
+    identical down to the adapter and clearing it really removes the key. */
 export function buildModuleOverride(folder: string, state: ModuleEditState): ModuleOverride {
 	void MODULE_EDIT_HANDLED_FIELDS;
 	const ov: ModuleOverride = {};
 	if (state.name.trim() && state.name.trim() !== folder) ov.name = state.name.trim();
-	// `null` force « Sans UE », tandis qu'`undefined` conserverait l'UE de la note.
+	// `null` forces "No UE", while `undefined` would keep the UE of the mapping note.
 	ov.ue = state.ue;
 	if (state.color) ov.color = state.color;
 	if (state.icon) ov.icon = state.icon;
-	/* REPORTÉ TEL QUEL, jamais recalculé : ce modal ne désigne aucun dossier,
-	   il édite un nom et des couleurs. L'appelant lui passe le chemin DÉJÀ
-	   DÉCLARÉ (et rien quand il n'y en a pas) — sans ce report, renommer un
-	   dossier effacerait son chemin, et « Nouveau quiz » y retomberait sur le
-	   segment seul. On ne promeut PAS ici un chemin déduit d'un quiz : il vaut
-	   pour ce quiz, et il se recalcule tout seul au rendu suivant. */
+	/* CARRIED OVER AS IS, never recomputed: this modal designates no folder,
+	   it edits a name and colours. The caller passes it the path ALREADY
+	   DECLARED (and nothing when there is none). Without this, renaming a
+	   folder would erase its path, and "New quiz" there would fall back on the
+	   bare segment. A path deduced from a quiz is NOT promoted here: it holds
+	   for that quiz, and it is recomputed on its own at the next render. */
 	if (state.path) ov.path = state.path;
+	// Carried over too: editing the name or colour of a hidden folder must not show it again.
+	if (state.hidden) ov.hidden = state.hidden;
 	return ov;
 }
 
@@ -75,10 +78,12 @@ export function openModuleEditModal(
 	   d'icône et la teinte du modal montrent ce que l'utilisateur voit
 	   ailleurs, et non le défaut générique. */
 	const genere = estLeSas(group, ctx.generatedFolder?.());
-	/* Le chemin DÉCLARÉ, lu dans l'override et non dans le groupe : celui du
-	   groupe peut être déduit d'un quiz, et le persister figerait dans les
-	   réglages une valeur qui, aujourd'hui, se recalcule seule. */
+	/* The DECLARED path, read from the override and not from the group: the
+	   group's may be deduced from a quiz, and persisting it would freeze in
+	   the settings a value that is, today, recomputed on its own. Same for
+	   the hidden flag, which this modal does not edit. */
 	const path = ctx.settings.quizzesModuleOverrides?.[group.folder]?.path;
+	const hidden = ctx.settings.quizzesModuleOverrides?.[group.folder]?.hidden;
 	/** Un changement au moins a eu lieu → onClose persiste + rafraîchit. */
 	let dirty = false;
 
@@ -90,7 +95,7 @@ export function openModuleEditModal(
 	   écriture disque est différée à onClose (pas de martèlement I/O). */
 	const apply = (): void => {
 		const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-		const ov = buildModuleOverride(group.folder, { name, ue, color, icon, path });
+		const ov = buildModuleOverride(group.folder, { name, ue, color, icon, path, hidden });
 		overrides[group.folder] = ov;
 		ctx.settings.quizzesModuleOverrides = overrides;
 		dirty = true;

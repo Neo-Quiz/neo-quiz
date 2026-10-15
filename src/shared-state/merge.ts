@@ -97,8 +97,8 @@ export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]
 }
 
 /* ══════════════════════════════════════════════════════════
-   FOLDER SETTINGS (colour, icon, name, teaching unit, path), MERGED ACROSS
-   DEVICES (2026-10-07)
+   FOLDER SETTINGS (colour, icon, name, teaching unit, path, hidden), MERGED
+   ACROSS DEVICES (2026-10-07)
 
    Each device writes `<root>/.neo-quiz/modules/<deviceId>.json`: per module key
    (the folder's segment, as in `quizzesModuleOverrides`) and per FIELD a stamp
@@ -107,13 +107,19 @@ export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]
    is a CLEARED field (a tombstone, never dropped: an older value on another
    device must not come back); `ue: null` ("no UE") is a value, distinct from
    cleared. Ties break on the serialised stamp, identical on every device.
+
+   `hidden` (2026-10-15): `"1"` = the folder is hidden from the lists (and its
+   reviews paused), a cleared stamp = shown again. Same per-field rule as the
+   others, so a hide on one device and a later show on another end shown, and
+   an older hide never brings it back. A reader that predates the field drops
+   it (it only reads `MODULE_FIELDS`): the folder simply shows there.
 ══════════════════════════════════════════════════════════ */
 
-export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path"] as const;
+export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path", "hidden"] as const;
 export type ModuleField = (typeof MODULE_FIELDS)[number];
 export interface ModuleStamp { v?: string | null; at: number }
 export type StoredModules = Record<string, Partial<Record<ModuleField, ModuleStamp>>>;
-export interface ModuleValues { name?: string; ue?: string | null; color?: string; icon?: string; path?: string }
+export interface ModuleValues { name?: string; ue?: string | null; color?: string; icon?: string; path?: string; hidden?: string }
 
 function stampWins(a: ModuleStamp, b: ModuleStamp): boolean {
 	if (a.at !== b.at) return a.at > b.at;

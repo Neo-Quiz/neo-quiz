@@ -142,6 +142,8 @@ const MODULE_VALUE_OK: Record<ModuleField, (v: string) => boolean> = {
 	path: v => v.length <= 1000,
 	color: v => /^#[0-9a-fA-F]{3,8}$/.test(v),
 	icon: v => /^[a-z0-9-]{1,64}$/.test(v),
+	// The one value; "shown" is a cleared stamp, never another string.
+	hidden: v => v === "1",
 };
 
 /** `now`: a stamp more than a year ahead is a corrupt or hostile clock and is

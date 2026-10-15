@@ -902,7 +902,7 @@ await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/
 	} } };
 	try {
 		await withManualDebounce(async () => {
-			const { host } = fauxHote();
+			const { host, ecritures } = fauxHote();
 			const items = (n) => Array.from({ length: n }, (_, i) => ({ id: "q" + i }));
 			// 300 questions neuves dans un module SANS examen, 30 dans celui qui
 			// en a un : plus que la part de neuf du budget, pour que le budget
@@ -926,7 +926,8 @@ await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/
 			});
 			await etat.load();
 			installSharedState(etat);
-			const store = await creerJournalApp(host, { getQuizzes: () => quizzes });
+			let folderSettings = {};
+			const store = await creerJournalApp(host, { getQuizzes: () => quizzes }, () => folderSettings);
 			r.check("sans examen : rien à réviser aujourd'hui", store.plan(Date.now()).today, []);
 			await enregistrerExamen("B/Reseaux", { id: "e1", nom: "", date: "2099-06-01" });
 			const today = store.plan(Date.now()).today;
@@ -939,6 +940,16 @@ await withSrcModule(["apps/windows/src/review/store.ts", "apps/windows/src/host/
 			quizzes.splice(0, 1);
 			r.check("le module sans examen ne prend rien au budget du jour",
 				today, store.plan(Date.now()).today);
+			/* A HIDDEN folder (2026-10-15): its reviews are paused at the same
+			   gate, read at every plan, and nothing is written to the journal:
+			   shown again, the plan is the one from before. */
+			const before = store.plan(Date.now()).today;
+			const writesBefore = ecritures.length;
+			folderSettings = { Reseaux: { hidden: "1" } };
+			r.check("hidden folder: nothing of it to review (every reader of the plan agrees)", store.plan(Date.now()).today, []);
+			folderSettings = { Reseaux: { color: "#f00" } };
+			r.check("shown again: the same plan as before, exactly", store.plan(Date.now()).today, before);
+			r.check("hiding and showing wrote nothing to the journal", ecritures.length, writesBefore);
 			store.destroy();
 		});
 	} finally {

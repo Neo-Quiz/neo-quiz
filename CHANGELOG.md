@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A folder can be hidden from the list (⋯ menu > Hide from list): it moves to a Hidden section at the bottom of My quizzes, leaves Home, and its reviews are paused while it is hidden. Show in list brings it back on every synced device.
+
 ### Changed
 
 - Moodle now has a button in the sidebar above Settings (it can be hidden in Settings > Moodle), and the Moodle button of My quizzes is gone.

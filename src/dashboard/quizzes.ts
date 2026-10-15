@@ -9,6 +9,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { isFolderArchived } from "./folder-archive";
+import { hiddenFolders } from "./folder-hidden";
 import { renderQuizGrid, renderModuleDrill } from "./quizzes-render";
 import type { GroupingKey, OngletDossier, VuesDossier } from "./quizzes-render";
 import { renderOngletsDossier, basculerVueDossier } from "./folder-progress";
@@ -204,12 +205,16 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		else render(container);
 	}
 
-	/** Filtre de la GRILLE : exclut les quiz des DOSSIERS archivés (l'archivage
-	    n'existe qu'au niveau dossier). Recherche et pilules d'état ont été
-	    RETIRÉES (demande Ahmed 2026-07-18). */
+	/** The GRID's filter: leaves out the quizzes of ARCHIVED and HIDDEN
+	    folders (both exist at folder level only). Search and state pills were
+	    REMOVED (2026-07-18). */
 	function applyFilters(quizzes: QuizIndexEntry[]): QuizIndexEntry[] {
 		const map = effectiveMap();
-		return quizzes.filter(q => !isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
+		const hidden = new Set(hiddenFolders(ctx.settings.quizzesModuleOverrides));
+		return quizzes.filter(q => {
+			const folder = moduleForQuiz(q.path, map).folder;
+			return !isFolderArchived(ctx, folder) && !hidden.has(folder);
+		});
 	}
 
 	/* Bascule entre la grille et le drill-down d'un module ouvert. `inModule`
@@ -237,7 +242,11 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			vuesDossier = renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); }, ongletDossier, { isExpanded: (key) => expandedSet().has(key), toggleExpanded });
 		} else {
 			const map = effectiveMap();
-			const archivedQuizzes = quizzes.filter(q => isFolderArchived(ctx, moduleForQuiz(q.path, map).folder));
+			/* A folder both archived and hidden is shown under "Hidden" only. */
+			const hidden = new Set(hiddenFolders(ctx.settings.quizzesModuleOverrides));
+			const folderOf = (q: QuizIndexEntry): string => moduleForQuiz(q.path, map).folder;
+			const archivedQuizzes = quizzes.filter(q => isFolderArchived(ctx, folderOf(q)) && !hidden.has(folderOf(q)));
+			const hiddenQuizzes = quizzes.filter(q => hidden.has(folderOf(q)));
 			renderQuizGrid({
 				ctx,
 				isExpanded: (key) => expandedSet().has(key),
@@ -245,7 +254,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				rerender: () => { if (containerRef) render(containerRef); },
 				openModule,
 			}, treeEl, currentGrouping(), applyFilters(quizzes), stats, map, archivedQuizzes,
-				sujetFiltre === null ? undefined : (m) => sujetDe(m) === sujetFiltre);
+				sujetFiltre === null ? undefined : (m) => sujetDe(m) === sujetFiltre, hiddenQuizzes);
 		}
 	}
 
@@ -266,7 +275,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (!ctx.renderGroupingSelect) return;
 		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
-			declaredFolders(ctx.settings.quizzesModuleOverrides), ctx.settings.quizzesArchivedFolders || [], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
+			declaredFolders(ctx.settings.quizzesModuleOverrides), [...(ctx.settings.quizzesArchivedFolders || []), ...hiddenFolders(ctx.settings.quizzesModuleOverrides)], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
 		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
 		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
 		const TOUS = "";

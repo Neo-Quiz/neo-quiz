@@ -81,6 +81,21 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 	r.check("modules: diff lists changed fields and clears", diffModules({ K: { name: "a", color: "r" } }, { K: { name: "b" }, L: { ue: null } }),
 		[{ key: "K", field: "name", v: "b" }, { key: "K", field: "color" }, { key: "L", field: "ue", v: null }]);
 
+	// A HIDDEN folder (2026-10-15): `hidden: "1"`, shown again = a tombstone, newest stamp wins.
+	r.check("hidden: hidden on A, shown on B later: shown, whatever the order",
+		[mergeModules([{ K: { hidden: f("1", 10), color: f("#f00", 1) } }, { K: { hidden: f(undefined, 20) } }]),
+			mergeModules([{ K: { hidden: f(undefined, 20) } }, { K: { hidden: f("1", 10), color: f("#f00", 1) } }])],
+		[{ K: { color: "#f00" } }, { K: { color: "#f00" } }]);
+	r.check("hidden: an older hide from a device that missed the show does not hide it again",
+		mergeModules([{ K: { hidden: f(undefined, 20) } }, { K: { hidden: f("1", 15) } }, { K: { hidden: f("1", 5) } }]), {});
+	r.check("hidden: a hide made after the show wins",
+		mergeModules([{ K: { hidden: f(undefined, 20) } }, { K: { hidden: f("1", 30) } }]), { K: { hidden: "1" } });
+	r.check("hidden: showing a folder is a cleared field (a tombstone), never a second value",
+		diffModules({ K: { color: "#f00", hidden: "1" } }, { K: { color: "#f00" } }), [{ key: "K", field: "hidden" }]);
+	r.check("hidden: rebase keeps an unsaved local hide on top of another device's colour",
+		rebaseModules({ K: { color: "#f00" } }, { K: { color: "#f00", hidden: "1" } }, { K: { color: "#00f" } }),
+		{ K: { color: "#00f", hidden: "1" } });
+
 	// A folder's exams under its OLD key (the folder changed root). Exam ids and dates only.
 	const ex2 = (id, date) => ({ id, date });
 	const byId = (r) => r.examens.map(e => e.id);
@@ -524,6 +539,37 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 			fs.files.set(`${mdir}/phone.json`, JSON.stringify({ K: { name: stamp("b", 9), icon: stamp("star", 9) } }));
 			await st.refresh(() => true);
 			r.check("modules: refresh adopts the other device's newer stamps", st.modules(), { K: { name: "b", icon: "star" } });
+		}
+		// A hidden folder: written as our stamp, shown again on another device, tombstone kept.
+		{
+			const [fs, pc] = mk(mod("phone", { XTI: { color: stamp("#f00", 5), path: stamp("Efrei/XTI", 5) } }), "pc");
+			await pc.load();
+			await pc.syncModules({ XTI: { color: "#f00", path: "Efrei/XTI", hidden: "1" } });
+			r.check("hidden: the hide is our stamp, in our file only",
+				[json(fs, `${mdir}/pc.json`).XTI.hidden.v, Object.keys(json(fs, `${mdir}/pc.json`).XTI), json(fs, `${mdir}/phone.json`).XTI.hidden],
+				["1", ["hidden"], undefined]);
+			const phone = make(fs, "phone", ["Efrei"]); await phone.load();
+			r.check("hidden: the other device reads the folder as hidden", phone.modules().XTI.hidden, "1");
+			await phone.syncModules({ XTI: { color: "#f00", path: "Efrei/XTI" } });
+			r.check("hidden: shown on the phone = a tombstone in the phone's file, above the PC's stamp",
+				[json(fs, `${mdir}/phone.json`).XTI.hidden.v, "v" in json(fs, `${mdir}/phone.json`).XTI.hidden,
+					json(fs, `${mdir}/phone.json`).XTI.hidden.at > json(fs, `${mdir}/pc.json`).XTI.hidden.at], [undefined, false, true]);
+			await pc.refresh(() => true);
+			r.check("hidden: after a sync the PC sees it shown, the rest of its settings intact", pc.modules(), { XTI: { color: "#f00", path: "Efrei/XTI" } });
+			await phone.syncModules({ XTI: { color: "#0f0", path: "Efrei/XTI" } });
+			r.check("hidden: the tombstone stays in the phone's file across later edits", json(fs, `${mdir}/phone.json`).XTI.hidden, { at: json(fs, `${mdir}/phone.json`).XTI.hidden.at });
+			const third = make(fs, "tablet", ["Efrei"]); await third.load();
+			r.check("hidden: a third device sees it shown (the PC's older hide does not come back)", third.modules().XTI.hidden, undefined);
+		}
+		// Hostile or unknown values: only "1" means hidden; a field this version does not know is dropped, never fatal.
+		{
+			const [, st] = mk(mod("x", {
+				A: { hidden: stamp("yes", 5) }, B: { hidden: stamp(true, 5) }, C: { hidden: stamp("1", 5) },
+				D: { name: stamp("kept", 5), future: stamp("x", 5) },
+			}), "pc");
+			await st.load();
+			r.check("hidden: a value other than \"1\" is dropped; an unknown field (what a version before `hidden` does with it) leaves the rest readable",
+				st.modules(), { C: { hidden: "1" }, D: { name: "kept" } });
 		}
 		// Discrimination: a whole-module "last writer wins" would drop the phone's colour here.
 		{

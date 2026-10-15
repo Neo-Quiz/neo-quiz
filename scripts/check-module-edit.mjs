@@ -74,6 +74,40 @@ await withSrcModule("src/dashboard/module-edit.ts", async ({ buildModuleOverride
 	r.check("le chemin déclaré est reporté tel quel", avecChemin.path, "Efrei/B2 (2026-2027)/Reseaux");
 	r.check("et un override sans chemin n'en invente pas", "path" in renseigne, false);
 
+	/* A HIDDEN folder (2026-10-15): editing its name or colour must not show it again. */
+	const masque = buildModuleOverride(folder, { name: "Réseaux", ue: "UE 3", hidden: "1" });
+	r.check("the hidden flag is carried over by an edit", masque.hidden, "1");
+	r.check("and an override that is not hidden does not become so", "hidden" in renseigne, false);
+
+	r.done();
+});
+
+/* HIDDEN FOLDERS (2026-10-15, `src/dashboard/folder-hidden.ts`): which quizzes
+   a hidden folder takes out of the lists and out of the review catalogue, by
+   the same folder rule as the page (`moduleForQuiz`), and the flag set and
+   cleared in the settings. */
+await withSrcModule("src/dashboard/folder-hidden.ts", async ({ hiddenFolders, hiddenQuizTest, setFolderHidden }) => {
+	const r = makeReporter("Hidden folders");
+	const overrides = { Reseaux: { hidden: "1", path: "Efrei/B2/Reseaux" }, Maths: { color: "#f00" }, Odd: { hidden: "yes" } };
+	r.check("only the value \"1\" hides a folder", hiddenFolders(overrides), ["Reseaux"]);
+	r.check("no settings, nothing hidden", hiddenFolders(undefined), []);
+	const test = hiddenQuizTest(overrides);
+	r.check("a quiz of the hidden folder is hidden, one of another folder is not",
+		[test("Efrei/B2/Reseaux/tcp.md"), test("Efrei/B2/Maths/algebre.md"), test("Efrei/q.md")], [true, false, false]);
+	r.check("a quiz in a SUB-folder of the hidden folder is hidden too (its nearest known ancestor, as the page groups it)",
+		hiddenQuizTest(overrides)("Efrei/B2/Reseaux/TD/td1.md"), true);
+	r.check("the nearest known folder wins: a hidden sub-folder hides its quizzes even inside a module of the note",
+		hiddenQuizTest({ TD: { hidden: "1" } }, { byFolder: new Map([["Reseaux", { folder: "Reseaux", name: "Reseaux", ue: "UE" }]]), ueOrder: ["UE"] })("Efrei/B2/Reseaux/TD/td1.md"), true);
+	const ctx = { settings: { quizzesModuleOverrides: { Maths: { color: "#f00" } } }, saves: 0, saveSettings: async () => { ctx.saves++; } };
+	await setFolderHidden(ctx, "Maths", true);
+	await setFolderHidden(ctx, "Info", true);
+	r.check("hide: the flag joins the folder's settings, a folder with none gets an entry",
+		ctx.settings.quizzesModuleOverrides, { Maths: { color: "#f00", hidden: "1" }, Info: { hidden: "1" } });
+	await setFolderHidden(ctx, "Maths", false);
+	await setFolderHidden(ctx, "Info", false);
+	r.check("show: the field is removed (never another value), an entry left empty goes",
+		ctx.settings.quizzesModuleOverrides, { Maths: { color: "#f00" } });
+	r.check("every change is saved", ctx.saves, 4);
 	r.done();
 });
 
