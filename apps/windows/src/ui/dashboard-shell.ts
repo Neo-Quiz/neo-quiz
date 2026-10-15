@@ -157,7 +157,9 @@ export async function chargerReglagesPages(): Promise<DashboardPageSettings> {
 		quizzesGrouping: (await lireReglage<string>("quizzesGrouping")) ?? undefined,
 		quizzesModuleOverrides: await lireOverrides(),
 		quizzesModuleMapNote: (await lireReglage<string>("quizzesModuleMapNote")) ?? undefined,
-		quizzesArchivedFolders: (await lireReglage<string[]>("quizzesArchivedFolders")) ?? undefined,
+		/* `quizzesArchivedFolders` is no longer read (2026-10-15): archived
+		   folders became hidden ones (`migrateArchivedFolders`). Its stored
+		   value is left in place, ignored, so a rollback loses nothing. */
 		showMoodleInRail: (await lireReglage<boolean>("showMoodleInRail")) ?? undefined,
 	};
 	return reglagesPagesCache;
@@ -219,7 +221,6 @@ async function enregistrerReglagesPages(): Promise<void> {
 	if (modulesPartages) await sharedState().syncModules(overrides);
 	else await ecrireReglage("quizzesModuleOverrides", overrides);
 	await ecrireReglage("quizzesModuleMapNote", reglagesPagesCache.quizzesModuleMapNote ?? null);
-	await ecrireReglage("quizzesArchivedFolders", reglagesPagesCache.quizzesArchivedFolders ?? []);
 	await ecrireReglage("showMoodleInRail", reglagesPagesCache.showMoodleInRail ?? null);
 }
 

@@ -112,16 +112,14 @@ export function renderQuizGrid(
 	filtered: QuizIndexEntry[],
 	stats: Record<string, QuizStatRecord>,
 	map: ModuleMap,
-	/** Quizzes of ARCHIVED folders, drawn as FOLDER CARDS in a collapsible
-	    section at the foot of the grid (never quiz cards: archiving exists at
-	    folder level only, 2026-07-19). */
-	archivedQuizzes: QuizIndexEntry[] = [],
 	/** Keeps only the folders it accepts (the subject filter, 2026-09-29).
 	    Applied to the FOLDERS, not to the quizzes: a declared folder with no
 	    quiz shows as a card too, and must leave with the others. */
 	garder?: (m: ModuleGroup) => boolean,
-	/** The quizzes of HIDDEN folders (`folder-hidden.ts`): folder cards in a
-	    collapsed section at the very bottom, like the archived ones. */
+	/** The quizzes of HIDDEN folders (`folder-hidden.ts`), drawn as FOLDER
+	    CARDS in a collapsed section at the foot of the grid (never quiz cards:
+	    hiding exists at folder level only). It replaced the "Archived"
+	    section on 2026-10-15. */
 	hiddenQuizzes: QuizIndexEntry[] = [],
 ): void {
 	/* The "Generated" folder is not a card of the grid: the page's top bar
@@ -138,21 +136,19 @@ export function renderQuizGrid(
 	let entryIndex = 0;
 	const entryDelay = (): string => `${100 + entryIndex++ * 45}ms`;
 	const hiddenList = hiddenFolders(deps.ctx.settings.quizzesModuleOverrides);
-	// A folder both archived and hidden is shown under "Hidden" only.
-	const archivedFolders = (deps.ctx.settings.quizzesArchivedFolders || []).filter(f => !hiddenList.includes(f));
 	/* No early "No quiz found" on an empty quiz list: a folder made with
 	   "New folder" has no quiz yet and must still show as a card, even when it
 	   is the only folder (first run). The check below, made on the FOLDERS,
 	   covers the truly empty page. */
 	// Every axis shows MODULE cards (rule of 2026-07-18: "Recent" shows only
 	// folders, never quizzes). The folders declared by the New folder / Edit
-	// folder modals exist even without a quiz (alwaysInclude), EXCEPT archived
-	// and hidden ones: their card lives only in the "Archived" or "Hidden"
-	// section (otherwise it would stay in the grid with 0 quizzes).
+	// folder modals exist even without a quiz (alwaysInclude), EXCEPT hidden
+	// ones: their card lives only in the "Hidden" section (otherwise it would
+	// stay in the grid with 0 quizzes).
 	const sasVide = deps.ctx.generatedFolder?.();
 	const modules = modulesAffiches(filtered, stats, map,
-		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), [...archivedFolders, ...hiddenList], sasVide).filter(garde);
-	if (!garder && modules.length === 0 && archivedQuizzes.length === 0 && archivedFolders.length === 0 && hiddenList.length === 0) {
+		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), hiddenList, sasVide).filter(garde);
+	if (!garder && modules.length === 0 && hiddenList.length === 0) {
 		ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.empty"));
 		return;
 	}
@@ -176,23 +172,12 @@ export function renderQuizGrid(
 		for (const ue of buildUeGroups(modules, map)) renderUeGroup(deps, treeEl, ue, map, entryDelay);
 	}
 
-	// ── "Archived" section at the foot of the grid (every axis), collapsed by
-	// default, FOLDER CARDS (full ⋯ menu: direct Unarchive, drill on click).
-	// Archived folders without a quiz stay listed (alwaysInclude = every
-	// flagged folder). Key "archived:": ":" is forbidden in a path, no
-	// collision possible (same for "hidden:" below).
-	if (archivedQuizzes.length > 0 || archivedFolders.length > 0) {
-		const archivedModules = buildModuleGroups(archivedQuizzes, stats, map, archivedFolders).filter(garde);
-		if (archivedModules.length > 0) {
-			const body = renderCollapsibleSection(deps, treeEl, "archived:", t("dashboard.quizzes.archivedSection"), archivedModules.length, { entryDelay, defaultOpen: false });
-			renderModuleGrid(deps, body, archivedModules, map, entryDelay);
-		}
-	}
-
-	/* "Hidden" last, collapsed by default, its cards dimmed (CSS). Absent when
-	   nothing is hidden. The ⋯ menu of these cards offers "Show in list"; a
-	   click opens the folder as usual. Every hidden key is listed, even one
-	   with no quiz left, so that the flag can always be cleared. */
+	/* "Hidden" at the foot of the grid (every axis), collapsed by default,
+	   its cards dimmed (CSS). Absent when nothing is hidden. The ⋯ menu of
+	   these cards offers "Show in list"; a click opens the folder as usual.
+	   Every hidden key is listed, even one with no quiz left, so that the flag
+	   can always be cleared. Key "hidden:": ":" is forbidden in a path, no
+	   collision possible. */
 	if (hiddenList.length > 0) {
 		const hiddenModules = buildModuleGroups(hiddenQuizzes, stats, map, hiddenList).filter(garde);
 		if (hiddenModules.length > 0) {

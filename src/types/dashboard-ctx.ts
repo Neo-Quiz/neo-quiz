@@ -135,9 +135,9 @@ export interface AiSettings {
 	quizzesGrouping?: "module" | "ue" | "recent" | "type" | "folder";
 	/** Note de correspondance UE → module. Cf. plugin.ts DEFAULT_SETTINGS. */
 	quizzesModuleMapNote?: string;
-	/** DOSSIERS archivés (clé `folder` de module) — l'archivage n'existe qu'au
-	    niveau dossier. Cf. plugin.ts DEFAULT_SETTINGS. */
-	quizzesArchivedFolders?: string[];
+	/* `quizzesArchivedFolders` (archived folders) is retired since
+	   2026-10-15: archiving merged into the synced `hidden` field of
+	   `quizzesModuleOverrides`. The stored value stays, ignored. */
 	/** Overrides « Modifier dossier » (module-edit.ts). Cf. plugin.ts. */
 	quizzesModuleOverrides?: Record<string, ModuleOverride>;
 }
@@ -157,7 +157,6 @@ export interface DashboardPageSettings {
 	quizzesGrouping?: string;
 	quizzesModuleOverrides?: Record<string, ModuleOverride>;
 	quizzesModuleMapNote?: string;
-	quizzesArchivedFolders?: string[];
 	/** Show the Moodle button in the rail (default: shown). */
 	showMoodleInRail?: boolean;
 }

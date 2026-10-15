@@ -4,7 +4,6 @@ import { t } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
-import { isFolderArchived } from "./folder-archive";
 import { isFolderHidden } from "./folder-hidden";
 import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, declaredFolders, estLeSas } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
@@ -83,10 +82,10 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		if (entering) weekOffset = 0;
 		container.replaceChildren();
 
-		// The quizzes of ARCHIVED and HIDDEN FOLDERS (⋯ menu of a folder card
-		// in "My quizzes") no longer exist for the home: no task, no folder, no
-		// Resume, no exam. They only come back under the "Archived" or "Hidden"
-		// section of "My quizzes". Same
+		// The quizzes of HIDDEN FOLDERS (⋯ menu of a folder card in "My
+		// quizzes") no longer exist for the home: no task, no folder, no
+		// Resume, no exam. They only come back under the "Hidden" section of
+		// "My quizzes". Same
 		// effective table as "My quizzes": the note (loaded in the background
 		// on the first render) overlaid by the "Edit folder" modal's
 		// overrides, re-read at every render.
@@ -96,7 +95,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 			ctx.settings.quizzesModuleOverrides || {}
 		);
 		const allQuizzes: QuizIndexEntry[] = ctx.scanner ? ctx.scanner.getQuizzes() : [];
-		const outOfHome = (folder: string): boolean => isFolderArchived(ctx, folder) || isFolderHidden(ctx, folder);
+		const outOfHome = (folder: string): boolean => isFolderHidden(ctx, folder);
 		const quizzes = allQuizzes.filter(q => !outOfHome(moduleForQuiz(q.path, map).folder));
 		const stats: Record<string, QuizStatRecord> = ctx.statsStore ? ctx.statsStore.getAll() : {};
 

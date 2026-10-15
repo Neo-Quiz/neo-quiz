@@ -7,6 +7,7 @@ import type { QuizStatRecord, Tentative } from "../../../../src/dashboard/stats-
 import { MODULE_FIELDS, diffModules, foldAttemptState, mergeExams, mergeModules, winningStamps } from "../../../../src/shared-state/merge";
 import type { AttemptEvent, ModuleField, ModuleValues, StoredExam, StoredModules } from "../../../../src/shared-state/merge";
 import { brancherExamens, ecrireReglage, lireExamens, lireReglage } from "./folder";
+import { archivedFoldersToHide } from "../../../../src/dashboard/folder-archive";
 
 /* ══════════════════════════════════════════════════════════
    EXAMS AND ATTEMPTS IN THE SYNCED FOLDER (2026-10-01)
@@ -94,6 +95,9 @@ export interface SharedState {
 	/** Copies the legacy `quizzesModuleOverrides` as the oldest possible
 	    stamps, skipping every field already stamped anywhere. */
 	migrateModules(legacy: Record<string, ModuleValues>): Promise<void>;
+	/** Whether any device's file holds a stamp, value or tombstone, for this
+	    field of this folder key. */
+	hasStamp(key: string, field: ModuleField): boolean;
 	migrate(legacy: { exams: Record<string, ExamenDossier[]>; stats: Record<string, QuizStatRecord> }): Promise<string[]>;
 }
 
@@ -591,7 +595,9 @@ export function createSharedState(deps: SharedStateDeps): SharedState {
 		return skipped;
 	});
 
-	return { load, refresh, modules, syncModules, migrateModules, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
+	const hasStamp = (key: string, field: ModuleField): boolean => !!winningStamps(moduleTables()).get(key)?.[field];
+
+	return { load, refresh, modules, syncModules, migrateModules, hasStamp, exams, stats, saveExam, deleteExam, moveExams, recordAttempt, deleteAttempt, syncStats, migrate };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -648,6 +654,31 @@ export async function migrateLegacyModules(state: SharedState, settings: Setting
 	await settings.ecrire(MODULES_FLAG, true);
 }
 
+const ARCHIVE_FLAG = "archivedFoldersHidden";
+const ARCHIVE_KEY = "quizzesArchivedFolders";
+
+/** Archiving merged into "Hide from list" (2026-10-15, `folder-archive.ts`):
+    once per device, every folder this device had archived gets the synced
+    `hidden` stamp, through `syncModules`, the very path the menu's "Hide from
+    list" writes by. Only a folder with no `hidden` stamp at all is stamped:
+    one shown again on another device keeps its tombstone and stays shown.
+    The archive setting is only READ, and stays as it is (ignored from now
+    on, so a rollback loses nothing). Waits for the folder settings to be in
+    the synced folder (`migrateLegacyModules`); the flag is set only after a
+    successful write, and a run after it changes nothing anyway (every folder
+    it would stamp then has a stamp). */
+export async function migrateArchivedFolders(state: SharedState, settings: SettingsIo): Promise<void> {
+	if (await settings.lire(ARCHIVE_FLAG) === true) return;
+	if (await settings.lire(MODULES_FLAG) !== true) return;
+	const keys = archivedFoldersToHide(await settings.lire(ARCHIVE_KEY), key => state.hasStamp(key, "hidden"));
+	if (keys.length) {
+		const desired = state.modules();
+		for (const key of keys) desired[key] = { ...desired[key], hidden: "1" };
+		await state.syncModules(desired);
+	}
+	await settings.ecrire(ARCHIVE_FLAG, true);
+}
+
 let courant: SharedState | null = null;
 export const sharedState = (): SharedState => {
 	if (!courant) throw new Error("shared state not loaded");
@@ -669,6 +700,11 @@ export async function loadSharedState(roots: string[], deviceId: string): Promis
 		await migrateLegacyModules(state, { lire: k => lireReglage(k), ecrire: ecrireReglage });
 	} catch (e) {
 		console.warn(`${LOG_PREFIX} folder settings migration failed:`, e);
+	}
+	try {
+		await migrateArchivedFolders(state, { lire: k => lireReglage(k), ecrire: ecrireReglage });
+	} catch (e) {
+		console.warn(`${LOG_PREFIX} archived folders not moved to hidden, retried at the next start:`, e);
 	}
 	installSharedState(state);
 	return state;

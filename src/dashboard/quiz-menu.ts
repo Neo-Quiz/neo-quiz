@@ -14,8 +14,7 @@ import type { ActionMenuItem } from "./ui-select";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
 import type { QuizStatRecord } from "./stats-store";
 import { neContientQueLeFrontmatterNeoQuiz } from "../quiz-frontmatter";
-import { isFolderArchived, setFolderArchived } from "./folder-archive";
-import { isFolderHidden, setFolderHidden } from "./folder-hidden";
+import { hiddenFolders, isFolderHidden, setFolderHidden } from "./folder-hidden";
 import { saveSettingsReporting } from "./save-settings";
 import { freeNotePath } from "./folder-create";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
@@ -28,12 +27,13 @@ import { LOG_PREFIX } from "../branding";
 /* ══════════════════════════════════════════════════════════
    QUIZ MENU — the "⋯" menu of the cards of "My quizzes" (also opened by a
    right click on the card). From the StudySmarter reference (2026-07-18):
-   Share / Edit / Rename / Archive / Delete (red), adapted:
+   Share / Edit / Rename / Archive / Delete (red), adapted (Archive became
+   "Hide from list" on 2026-10-15):
    - Share     → the share window (a quiz's note, or a folder's archive);
    - Rename    → renames the NOTE (a quiz's title IS its name, scanner.ts),
                  quiz cards only: a folder card renames through "Edit";
    - Duplicate → a byte-for-byte copy of the note, "<title> (copy)";
-   - Archive   → folders only (`folder-archive.ts`);
+   - Hide      → folders only (`folder-hidden.ts`), synced, reviews paused;
    - Delete    → removes the block from the note (to the trash when the note
                  held nothing else) and its stats, after a confirmation.
    ("Pause study reminders" was removed on 2026-07-21, with its mechanism:
@@ -49,16 +49,7 @@ import { LOG_PREFIX } from "../branding";
    failure: entries a host cannot honour are left out, never greyed.
 ══════════════════════════════════════════════════════════ */
 
-/* `isFolderArchived`/`setFolderArchived` ont déménagé dans `folder-archive.ts`
-   (tour de correction 1, tâche 6) : ces deux fonctions ne lisaient déjà QUE
-   les cinq réglages de `DashboardShellCtx` (tâche 5), sans rien d'Obsidian —
-   les garder ici forçait home.ts et quizzes.ts (qui n'en ont besoin QUE pour
-   ça) à importer transitivement `Notice`/`TFile` via ce fichier. Ce module ne
-   les utilise plus qu'en INTERNE (import ci-dessus, `buildModuleCardMenu`) ;
-   home.ts et quizzes.ts importent désormais `folder-archive.ts` directement. */
-
-/* ── Confirmations : l'ARCHIVAGE est direct dans les deux sens (demande
-   Ahmed 2026-07-19), Delete confirme en rouge. ── */
+/* ── Confirmations: hiding is direct both ways, Delete confirms in red. ── */
 
 interface ConfirmSpec {
 	title: string;
@@ -383,9 +374,6 @@ export async function deleteFolder(ctx: DashboardShellCtx, group: ModuleGroup): 
 		if (key === group.folder || (group.path && ov?.path === group.path)) delete overrides[key];
 	}
 	ctx.settings.quizzesModuleOverrides = overrides;
-	if (ctx.settings.quizzesArchivedFolders?.includes(group.folder)) {
-		ctx.settings.quizzesArchivedFolders = ctx.settings.quizzesArchivedFolders.filter(f => f !== group.folder);
-	}
 	await ctx.saveSettings();
 	host.ui.notice(echecs
 		? t("dashboard.quizzes.deletedPartial", { count: echecs })
@@ -632,14 +620,13 @@ export async function duplicateQuiz(quiz: QuizIndexEntry): Promise<string | null
 
 /* ── Menus ── */
 
-/** Menu ⋯ d'une carte de quiz — l'ordre et la rangée rouge suivent la
-    référence StudySmarter. Bâti AU CLIC (le nom du quiz peut avoir changé).
-    AUCUNE entrée d'archivage : l'archivage n'existe qu'au niveau dossier
-    (Ahmed 2026-07-19). `map` sert au sous-menu « Déplacer vers » : les
-    dossiers connus de « Mes quiz », groupés par UE. `anchorEl`, comme pour
-    `buildModuleCardMenu`, est l'ancre où poser ce sous-menu — absent (appelant
-    qui ne le fournirait pas encore), pas d'entrée « Déplacer vers » : un
-    sous-menu sans rien où s'ancrer ne s'ouvrirait nulle part. */
+/** The ⋯ menu of a quiz card: the order and the red row follow the
+    StudySmarter reference. Built ON CLICK (the quiz's name may have changed).
+    NO hide entry: hiding exists at folder level only (2026-07-19, then for
+    archiving). `map` feeds the "Move to" submenu: the folders known to "My
+    quizzes", grouped by UE. `anchorEl`, as for `buildModuleCardMenu`, is the
+    anchor of that submenu; absent (a caller that does not pass it yet), no
+    "Move to" entry: a submenu with nothing to anchor to would open nowhere. */
 export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (quiz: QuizIndexEntry, anchorEl?: HTMLElement) => ActionMenuItem[] {
 	return (quiz, anchorEl) => {
 		/* Capturés dans des constantes : le rétrécissement de type d'un `if`
@@ -674,12 +661,13 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		   toucher au composant de menu partagé pour un état désactivé). */
 		if (anchorEl) {
 			const dossierActuel = moduleForQuiz(quiz.path, map).path;
-			// Les MÊMES dossiers que la page « Mes quiz », vides compris.
-			const archives = ctx.settings.quizzesArchivedFolders || [];
+			// The SAME folders as the "My quizzes" page, empty ones included,
+			// hidden ones left out (as the archived ones were).
+			const masques = hiddenFolders(ctx.settings.quizzesModuleOverrides);
 			const sas = ctx.generatedFolder?.();
 			const groupes = modulesAffiches(ctx.scanner.getQuizzes(), {}, map,
-				declaredFolders(ctx.settings.quizzesModuleOverrides), archives, sas)
-				.filter(g => g.path && g.path !== dossierActuel && !archives.includes(g.folder));
+				declaredFolders(ctx.settings.quizzesModuleOverrides), masques, sas)
+				.filter(g => g.path && g.path !== dossierActuel && !masques.includes(g.folder));
 			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
 			   au lieu d'un second menu qui remplaçait le premier au clic. */
 			const sousItems: ActionMenuItem[] = [];
@@ -771,13 +759,12 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 	};
 }
 
-/** Menu ⋯ d'une carte de module — mêmes rangées que la carte de quiz
-    (demande Excalidraw 2026-07-18), adaptées au niveau module :
-    Share = zip des notes du module (envoyable sur Discord), Edit = nom /
-    UE / couleur du dossier (le renommage du module vit là, d'où l'absence
-    d'entrée « Rename » ici), Archive = LE DOSSIER (flag unique
-    quizzesArchivedFolders — jamais par quiz), Delete = tous les quiz du
-    module (confirmation avec le compte). */
+/** The ⋯ menu of a module card: the same rows as the quiz card (2026-07-18),
+    adapted to the module level: Share = a zip of the module's notes, Edit =
+    name / UE / colour of the folder (renaming the module lives there, hence
+    no "Rename" entry here), Hide = THE FOLDER (the synced `hidden` field of
+    its settings, never per quiz), Delete = every quiz of the module (confirmed
+    with the count). */
 /** Déplace le dossier `g.folder` vers la racine `toRoot`, sous le même nom
     de dossier, puis transpose l'historique de révision qui lui appartient
     (§2.3 de la spec) — voir `moveModuleTo` plus bas pour le détail. Séparée
@@ -830,8 +817,7 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRoo
 
 export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (g: ModuleGroup, anchorEl?: HTMLElement) => ActionMenuItem[] {
 	return (g, anchorEl) => {
-		const archived = isFolderArchived(ctx, g.folder);
-		/* The "Generated" folder can be neither renamed, archived, moved nor
+		/* The "Generated" folder can be neither renamed, hidden, moved nor
 		   deleted (by its PATH): it is where generations land. */
 		const fixe = estLeSas(g, ctx.generatedFolder?.());
 		const { shareQuiz } = ctx;
@@ -876,18 +862,10 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				});
 			},
 		});
-		if (!fixe) items.push({
-			icon: "archive",
-			label: t(archived ? "dashboard.quizzes.menuUnarchive" : "dashboard.quizzes.menuArchive"),
-			// Direct both ways (2026-07-19: no archive confirmation any more).
-			// One flag per FOLDER: it works even when the grid shows none of
-			// the module's quizzes (the old per-quiz model made "Unarchive"
-			// do nothing on a fully archived module, the filtered g.quizzes
-			// being empty).
-			onClick: () => { setFolderArchived(ctx, g.folder, !archived); rerender(); },
-		});
 		/* Hide from the lists, reviews paused (folder-hidden.ts); the card then
-		   lives in the "Hidden" section at the bottom of My quizzes. */
+		   lives in the "Hidden" section at the bottom of My quizzes. It replaced
+		   Archive (2026-10-15). Direct both ways, no confirmation; one flag per
+		   FOLDER, so it works even when the grid shows none of its quizzes. */
 		if (!fixe) {
 			const hidden = isFolderHidden(ctx, g.folder);
 			items.push({

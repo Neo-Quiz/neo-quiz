@@ -15,9 +15,10 @@ import { cleModule } from "./catalogue";
    - path-keyed, renamed by prefix: `quizSessions`, `testSetups`;
    - module-keyed (`<rootId>/<folder>`): `examens`;
    - path VALUES: `quizzesModuleOverrides[*].path`, `quizzesModuleMapNote`;
-   - keyed by a folder NAME (`quizzesArchivedFolders`, `quizzesExpandedFolders`,
-     the override keys): a folder lands under its last segment, so the name
-     does not change and nothing is renamed.
+   - keyed by a folder NAME (`quizzesExpandedFolders`, the override keys,
+     whose `hidden` field replaced `quizzesArchivedFolders`): a folder lands
+     under its last segment, so the name does not change and nothing is
+     renamed.
 ══════════════════════════════════════════════════════════ */
 
 /** `path` is `from` itself or lies under it. */

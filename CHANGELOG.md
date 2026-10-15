@@ -15,7 +15,7 @@ release notes.
 
 ### Added
 
-- A folder can be hidden from the list (⋯ menu > Hide from list): it moves to a Hidden section at the bottom of My quizzes, leaves Home, and its reviews are paused while it is hidden. Show in list brings it back on every synced device.
+- A folder can be hidden from the list (⋯ menu > Hide from list): it moves to a Hidden section at the bottom of My quizzes, leaves Home, and its reviews are paused while it is hidden. Show in list brings it back on every synced device. Hiding replaces archiving: folders archived before are hidden once, on each device.
 
 ### Changed
 

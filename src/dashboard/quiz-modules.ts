@@ -297,20 +297,20 @@ export function buildFolderGroups(modules: ModuleGroup[]): FolderGroup[] {
 	return groupes.sort((a, b) => (a.parent === "" ? 1 : 0) - (b.parent === "" ? 1 : 0) || a.label.localeCompare(b.label));
 }
 
-/** Les dossiers que montre « Mes quiz » : ceux qui ont des quiz, ceux que
-    l'utilisateur a DÉCLARÉS (Nouveau dossier / Modifier dossier) même vides,
-    sauf les archivés, et le sas des quiz générés même vide. Une seule
-    écriture, lue par la page ET par « Déplacer vers » : le sous-menu ne
-    proposait que les dossiers qui avaient déjà un quiz (2026-09-27). */
+/** The folders "My quizzes" shows: those with quizzes, those the user
+    DECLARED (New folder / Edit folder) even empty, except the `excluded` ones
+    (the hidden folders), and the generated-quizzes folder even empty. One
+    rule, read by the page AND by "Move to": the submenu used to offer only
+    the folders that already had a quiz (2026-09-27). */
 export function modulesAffiches(
 	quizzes: QuizIndexEntry[],
 	stats: Record<string, QuizStatRecord>,
 	map: ModuleMap,
 	declares: string[],
-	archives: string[],
+	excluded: string[],
 	sas: string | undefined,
 ): ModuleGroup[] {
-	const modules = buildModuleGroups(quizzes, stats, map, declares.filter(f => !archives.includes(f)));
+	const modules = buildModuleGroups(quizzes, stats, map, declares.filter(f => !excluded.includes(f)));
 	/* LE SAS DES QUIZ GÉNÉRÉS EXISTE MÊME VIDE : c'est là que les générations
 	   arrivent, et le vider le faisait disparaître de la page (2026-09-20).
 	   Ajouté sans quiz s'il n'y est pas déjà, avec l'override de dossier

@@ -571,6 +571,49 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 			r.check("hidden: a value other than \"1\" is dropped; an unknown field (what a version before `hidden` does with it) leaves the rest readable",
 				st.modules(), { C: { hidden: "1" }, D: { name: "kept" } });
 		}
+		// Archiving merged into hiding (2026-10-15): this device's archived folders get the synced
+		// `hidden` stamp once; a folder with ANY `hidden` stamp is left alone; the setting stays.
+		{
+			const archived = ["XTI", "Gone", "Shown", "", 5, "XTI"];
+			const [fs, pc] = mk({
+				...mod("pc", { XTI: { color: stamp("#abc", 5) } }),
+				...mod("phone", { Shown: { hidden: stamp(undefined, 900) } }),
+			}, "pc");
+			await pc.load();
+			const io = settingsIo({ sharedModulesMigrated: true, quizzesArchivedFolders: archived });
+			await sh.migrateArchivedFolders(pc, io);
+			r.check("archive -> hidden: archived folders hidden (settings kept), one already shown elsewhere stays shown",
+				pc.modules(), { Gone: { hidden: "1" }, XTI: { color: "#abc", hidden: "1" } });
+			r.check("archive -> hidden: written as our own stamps, the other device's file untouched",
+				[json(fs, `${mdir}/pc.json`).XTI.hidden.v, json(fs, `${mdir}/pc.json`).Gone.hidden.v, json(fs, `${mdir}/phone.json`)],
+				["1", "1", { Shown: { hidden: stamp(undefined, 900) } }]);
+			r.check("archive -> hidden: flag set, the archive setting left exactly as it was (rollback loses nothing)",
+				[io.m.get("archivedFoldersHidden"), io.m.get("quizzesArchivedFolders")], [true, archived]);
+			const n = fs.writes.length;
+			await sh.migrateArchivedFolders(pc, io);
+			io.m.delete("archivedFoldersHidden");
+			await sh.migrateArchivedFolders(pc, io);
+			r.check("archive -> hidden: a second launch writes nothing, even with the flag lost", fs.writes.length, n);
+			// Shown again on the phone AFTER the migration: a rerun never hides it again.
+			const phone = make(fs, "phone", ["Efrei"]); await phone.load();
+			await phone.syncModules({ XTI: { color: "#abc" }, Gone: { hidden: "1" } });
+			io.m.delete("archivedFoldersHidden");
+			const again = make(fs, "pc", ["Efrei"]); await again.load();
+			await sh.migrateArchivedFolders(again, io);
+			r.check("archive -> hidden: a folder shown again on another device is never resurrected", again.modules().XTI, { color: "#abc" });
+		}
+		// Not before the folder settings live in the synced folder: nothing written, retried later.
+		{
+			const [fs, pc] = mk({}, "pc");
+			await pc.load();
+			const io = settingsIo({ quizzesArchivedFolders: ["XTI"] });
+			await sh.migrateArchivedFolders(pc, io);
+			r.check("archive -> hidden: waits for the folder settings migration (no write, no flag)",
+				[fs.writes.length, io.m.has("archivedFoldersHidden"), pc.modules()], [0, false, {}]);
+			const io2 = settingsIo({ sharedModulesMigrated: true, quizzesArchivedFolders: "XTI" });
+			await sh.migrateArchivedFolders(pc, io2);
+			r.check("archive -> hidden: a malformed stored value hides nothing", [fs.writes.length, io2.m.get("archivedFoldersHidden")], [0, true]);
+		}
 		// Discrimination: a whole-module "last writer wins" would drop the phone's colour here.
 		{
 			const [, st] = mk({ ...mod("phone", { Z: { color: stamp("#f00", 500) } }), ...mod("pc", { Z: { name: stamp("N", 600) } }) }, "pc");

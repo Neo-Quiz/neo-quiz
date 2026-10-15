@@ -1,29 +1,33 @@
-import type { DashboardShellCtx } from "../types/dashboard-ctx";
-
 /* ══════════════════════════════════════════════════════════
-   FOLDER ARCHIVE — état d'archivage d'un dossier de « Mes quiz ».
+   FOLDER ARCHIVE — RETIRED, MERGED INTO "HIDE FROM LIST" (2026-10-15)
 
-   Extrait de quiz-menu.ts (tour de correction 1, tâche 6) : ces deux
-   fonctions ne lisent que `ctx.settings.quizzesArchivedFolders` et
-   `ctx.saveSettings()` — les cinq réglages de `DashboardShellCtx` depuis la
-   tâche 5 — et n'ont donc aucune raison de vivre dans un fichier qui
-   importe `Notice`/`TFile` pour ses modals. Les y laisser poisonnait tout
-   appelant (home.ts, quizzes.ts) d'une dépendance TRANSITIVE à Obsidian :
-   importer la seule fonction pure `isFolderArchived` suffisait à faire
-   échouer le bundle de l'application (Vite/Rolldown résout tous les imports
-   d'un fichier avant tout tree-shaking, cf. task-6-report.md).
+   Archiving a folder of "My quizzes" (per device, the `quizzesArchivedFolders`
+   setting, a list of folder keys) and hiding it did nearly the same thing:
+   one gesture is left, "Hide from list" (`folder-hidden.ts`), synced across
+   devices and pausing the folder's reviews.
 
-   L'archivage est PAR DOSSIER (clé `folder` de module) — jamais de quiz
-   archivé individuellement (décision Ahmed 2026-07-19).
+   Each device migrates ONCE (`migrateArchivedFolders`,
+   `apps/windows/src/host/shared-state.ts`): every folder it had archived gets
+   the synced `hidden` stamp, then the setting is no longer read. The stored
+   list is LEFT IN PLACE, ignored, so a rollback to a version that reads it
+   loses nothing.
+
+   This module keeps the one pure decision of that migration, and stays free
+   of any host and of the DOM (`check:dashboard-dom` lists it).
 ══════════════════════════════════════════════════════════ */
 
-export function isFolderArchived(ctx: DashboardShellCtx, folder: string): boolean {
-	return new Set(ctx.settings.quizzesArchivedFolders || []).has(folder);
-}
+const MAX_KEYS = 1000;
 
-export function setFolderArchived(ctx: DashboardShellCtx, folder: string, on: boolean): void {
-	const set = new Set(ctx.settings.quizzesArchivedFolders || []);
-	if (on) set.add(folder); else set.delete(folder);
-	ctx.settings.quizzesArchivedFolders = [...set];
-	ctx.saveSettings().catch(() => {});
+/** The folders of the stored archive list to hide: the valid keys (non-empty
+    strings, at most 200 characters, each once) that carry NO `hidden` stamp
+    yet, whatever its value. A stamp means the folder was already hidden or
+    shown again somewhere, maybe after it was archived here: stamping it now
+    would hide again a folder the user brought back on another device. */
+export function archivedFoldersToHide(stored: unknown, hasHiddenStamp: (key: string) => boolean): string[] {
+	if (!Array.isArray(stored)) return [];
+	const keys = new Set<string>();
+	for (const k of stored.slice(0, MAX_KEYS)) {
+		if (typeof k === "string" && k !== "" && k.length <= 200) keys.add(k);
+	}
+	return [...keys].filter(k => !hasHiddenStamp(k));
 }

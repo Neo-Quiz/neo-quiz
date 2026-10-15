@@ -8,7 +8,6 @@ import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { applyModuleOverrides, moduleForQuiz } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
-import { isFolderArchived } from "./folder-archive";
 import { hiddenFolders } from "./folder-hidden";
 import { renderQuizGrid, renderModuleDrill } from "./quizzes-render";
 import type { GroupingKey, OngletDossier, VuesDossier } from "./quizzes-render";
@@ -205,23 +204,23 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		else render(container);
 	}
 
-	/** The GRID's filter: leaves out the quizzes of ARCHIVED and HIDDEN
-	    folders (both exist at folder level only). Search and state pills were
-	    REMOVED (2026-07-18). */
+	/** The GRID's filter: leaves out the quizzes of HIDDEN folders (hiding
+	    exists at folder level only). Search and state pills were REMOVED
+	    (2026-07-18). */
 	function applyFilters(quizzes: QuizIndexEntry[]): QuizIndexEntry[] {
 		const map = effectiveMap();
 		const hidden = new Set(hiddenFolders(ctx.settings.quizzesModuleOverrides));
 		return quizzes.filter(q => {
 			const folder = moduleForQuiz(q.path, map).folder;
-			return !isFolderArchived(ctx, folder) && !hidden.has(folder);
+			return !hidden.has(folder);
 		});
 	}
 
-	/* Bascule entre la grille et le drill-down d'un module ouvert. `inModule`
-	   (déjà filtré, PAS d'applyFilters au drill : on entre aussi dans un
-	   dossier ARCHIVÉ depuis sa carte de la section « Archivés » et on y voit
-	   son contenu) est calculé UNE fois par render() — mêmes quiz que les
-	   stats du header. */
+	/* Switches between the grid and the drill-down of an open module.
+	   `inModule` (already filtered, NO applyFilters in the drill: a HIDDEN
+	   folder is entered too, from its card in the "Hidden" section, and shows
+	   its content) is computed ONCE per render(), the same quizzes as the
+	   header stats. */
 	/* L'onglet du dossier ouvert : celui où ce dossier avait été laissé (« Contenu »
 	   la première fois) quand on change de dossier, inchangé sur un re-rendu du
 	   même dossier. */
@@ -242,18 +241,15 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			vuesDossier = renderModuleDrill(treeEl, ctx, inModule, stats, effectiveMap(), openModuleFolder, () => { if (containerRef) render(containerRef); }, ongletDossier, { isExpanded: (key) => expandedSet().has(key), toggleExpanded });
 		} else {
 			const map = effectiveMap();
-			/* A folder both archived and hidden is shown under "Hidden" only. */
 			const hidden = new Set(hiddenFolders(ctx.settings.quizzesModuleOverrides));
-			const folderOf = (q: QuizIndexEntry): string => moduleForQuiz(q.path, map).folder;
-			const archivedQuizzes = quizzes.filter(q => isFolderArchived(ctx, folderOf(q)) && !hidden.has(folderOf(q)));
-			const hiddenQuizzes = quizzes.filter(q => hidden.has(folderOf(q)));
+			const hiddenQuizzes = quizzes.filter(q => hidden.has(moduleForQuiz(q.path, map).folder));
 			renderQuizGrid({
 				ctx,
 				isExpanded: (key) => expandedSet().has(key),
 				toggleExpanded,
 				rerender: () => { if (containerRef) render(containerRef); },
 				openModule,
-			}, treeEl, currentGrouping(), applyFilters(quizzes), stats, map, archivedQuizzes,
+			}, treeEl, currentGrouping(), applyFilters(quizzes), stats, map,
 				sujetFiltre === null ? undefined : (m) => sujetDe(m) === sujetFiltre, hiddenQuizzes);
 		}
 	}
@@ -275,7 +271,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (!ctx.renderGroupingSelect) return;
 		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
-			declaredFolders(ctx.settings.quizzesModuleOverrides), [...(ctx.settings.quizzesArchivedFolders || []), ...hiddenFolders(ctx.settings.quizzesModuleOverrides)], ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
+			declaredFolders(ctx.settings.quizzesModuleOverrides), hiddenFolders(ctx.settings.quizzesModuleOverrides), ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
 		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
 		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
 		const TOUS = "";
@@ -469,9 +465,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   already opens the same share modal, and the button took the room
 			   that a long folder title needs. */
 
-			/* « ⋯ » : le menu du dossier (Modifier, Ouvrir dans l'explorateur,
-			   Archiver…), le MÊME que celui de sa carte dans « Mes quiz »
-			   (2026-09-26, comme StudySmarter). Absent si l'hôte n'en a pas. */
+			/* "⋯": the folder's menu (Edit, Open in Explorer, Hide…), the SAME
+			   as its card's in "My quizzes" (2026-09-26, like StudySmarter).
+			   Absent if the host has none. */
 			const { openModuleMenu } = ctx;
 			if (openModuleMenu && openModuleFolder !== null) {
 				const plus = ajouter(headerActions, "button", "qbd-folder-more-btn");

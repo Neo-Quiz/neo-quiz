@@ -108,7 +108,7 @@ await withSrcModule(
 		const setups = { [A + "/cm2.md"]: { hints: false }, [B + "/cm2.md"]: { hints: true } };
 		const reglages = {
 			quizzesModuleOverrides: { Reseaux: { name: "Reseaux", path: A }, Reseaux2: { name: "R2", path: B } },
-			quizzesArchivedFolders: ["Reseaux"],
+			quizzesExpandedFolders: ["Reseaux"],
 		};
 		let sessionsVidees = 0, ecrituresReglages = 0;
 		const roots = [{ id: "Efrei", name: "Efrei" }, { id: "NeoQuiz", name: "Neo Quiz" }];
@@ -162,7 +162,7 @@ await withSrcModule(
 		r.check("4. le chemin de l'override suit, celui du voisin non",
 			[reglages.quizzesModuleOverrides.Reseaux.path, reglages.quizzesModuleOverrides.Reseaux2.path], [N, B]);
 		r.check("4. les clés par NOM de dossier ne bougent pas, les réglages sont écrits",
-			[reglages.quizzesArchivedFolders, Object.keys(reglages.quizzesModuleOverrides), ecrituresReglages],
+			[reglages.quizzesExpandedFolders, Object.keys(reglages.quizzesModuleOverrides), ecrituresReglages],
 			[["Reseaux"], ["Reseaux", "Reseaux2"], 1]);
 	}
 
@@ -342,8 +342,7 @@ await withSrcModule(
 			const trashed = [], notices = [], statsDeleted = [];
 			let saved = 0;
 			const settings = {
-				quizzesModuleOverrides: { [g.folder]: { name: g.name, path: g.path }, Other: { name: "Other", path: "NeoQuiz/Other" }, Alias: { name: "Alias", path: g.path } },
-				quizzesArchivedFolders: [g.folder, "Other"],
+				quizzesModuleOverrides: { [g.folder]: { name: g.name, path: g.path, hidden: "1" }, Other: { name: "Other", path: "NeoQuiz/Other", hidden: "1" }, Alias: { name: "Alias", path: g.path } },
 			};
 			hote.installHost({
 				paths,
@@ -369,8 +368,9 @@ await withSrcModule(
 		const a = await run(g);
 		r.check("11. the folder goes to the trash, its stats go, settings saved",
 			[a.trashed, a.statsDeleted, a.saved], [["NeoQuiz/ZZ test"], ["NeoQuiz/ZZ test/q.md"], 1]);
-		r.check("11. every declaration of the folder is forgotten, others kept",
-			[Object.keys(a.settings.quizzesModuleOverrides), a.settings.quizzesArchivedFolders], [["Other"], ["Other"]]);
+		r.check("11. every declaration of the folder is forgotten (its hidden flag with it), others kept",
+			[Object.keys(a.settings.quizzesModuleOverrides), a.settings.quizzesModuleOverrides.Other.hidden], [["Other"], "1"]);
+		r.check("11. the retired archive setting is never written again", "quizzesArchivedFolders" in a.settings, false);
 		const empty = await run({ ...g, quizzes: [] }, { onDisk: false });
 		r.check("11. a folder already gone from disk only loses its declaration",
 			[empty.trashed, Object.keys(empty.settings.quizzesModuleOverrides)], [[], ["Other"]]);
