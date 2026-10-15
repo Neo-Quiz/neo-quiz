@@ -183,3 +183,5 @@
 	}
 	.qbd-nav-item:active:not(:disabled) { transform: none; }
 }
+
+.qbd-nav-item[hidden] { display: none; }

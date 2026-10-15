@@ -21,6 +21,8 @@ import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { boutonPlat, heure, origineValide } from "./moodle-common";
 import { openMoodleModal } from "./moodle-modal";
+import { reglagesDeLaCoquille } from "./dashboard-shell";
+import { RAIL_PREFS_EVENT } from "../../../../src/dashboard/nav";
 
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
@@ -35,7 +37,8 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	let champOuvert = false;
 
 	const racine = ajouter(page, "div", "nq-moodle");
-	const carte = ajouter(racine, "div", "nq-set-carte");
+	/* The card of the section being painted (`peindre` swaps it). */
+	let carte: HTMLElement = racine;
 
 	async function lireReglage(): Promise<Record<string, unknown>> {
 		const v = await pont().reglages.lire(CLE_REGLAGES_MOODLE).catch(() => null);
@@ -51,8 +54,37 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 		return { texte, controle: ajouter(l, "div", "nq-set-ligne-controle"), aide: a };
 	}
 
+	/** A titled section holding one card; later `ligne` calls land in it. */
+	function sectionCarte(titre: string | null): void {
+		const sec = ajouter(racine, "section", "nq-reglages-section");
+		if (titre) ajouter(sec, "h3", "nq-reglages-titre", titre);
+		carte = ajouter(sec, "div", "nq-set-carte");
+	}
+
+	function interrupteur(parent: HTMLElement, nom: string, valeur: boolean, surChangement: (v: boolean) => void): void {
+		const label = ajouter(parent, "label", "nq-moodle-interrupteur");
+		const sw = ajouter(label, "input", "nq-set-interrupteur");
+		sw.type = "checkbox";
+		sw.setAttribute("role", "switch");
+		sw.setAttribute("aria-label", nom);
+		sw.checked = valeur;
+		sw.addEventListener("change", () => surChangement(sw.checked));
+	}
+
+	/** Display: the Moodle button of the rail (an app preference, not the guarded `moodle` setting). */
+	function peindreAffichage(): void {
+		sectionCarte(t("settings.moodle.display"));
+		const l = ligne(t("settings.moodle.showInRail"), t("settings.moodle.showInRailHelp"));
+		const coque = reglagesDeLaCoquille();
+		interrupteur(l.controle, t("settings.moodle.showInRail"), coque.settings.showMoodleInRail !== false, v => {
+			coque.settings.showMoodleInRail = v;
+			document.dispatchEvent(new CustomEvent(RAIL_PREFS_EVENT));
+			void coque.saveSettings();
+		});
+	}
+
 	function peindre(): void {
-		carte.replaceChildren();
+		racine.replaceChildren();
 		const e = etat;
 		if (!e) return;
 		const erreur = e.error === "secure-storage-unavailable" ? "settings.moodle.errorStorage"
@@ -60,34 +92,39 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 				: e.error === "site-not-allowed" ? "settings.moodle.errorSite" : null;
 
 		if (e.loginPending) {
+			sectionCarte(null);
 			const l = ligne(t("settings.moodle.waiting"));
 			boutonPlat(l.controle, t("settings.moodle.cancel"), () => { void api!.deconnecter().then(rafraichir); });
+			peindreAffichage();
 			return;
 		}
 		if (e.connected && e.state === "connected") {
-			const l = ligne(t("settings.moodle.connectedAs", { name: e.fullname }), statut(e));
+			sectionCarte(t("settings.moodle.account"));
+			const l = ligne(t("settings.moodle.connectedAs", { name: e.fullname }), e.site ? hoteDe(e.site) : undefined);
 			boutonPlat(l.controle, t("settings.moodle.signOut"), () => { void api!.deconnecter().then(rafraichir); });
-			const a = ligne(t("settings.moodle.auto"));
-			const label = ajouter(a.controle, "label", "nq-moodle-interrupteur");
-			const sw = ajouter(label, "input", "nq-set-interrupteur");
-			sw.type = "checkbox";
-			sw.setAttribute("role", "switch");
-			sw.setAttribute("aria-label", t("settings.moodle.auto"));
-			sw.checked = e.auto;
-			sw.addEventListener("change", () => {
-				void lireReglage().then(cur => pont().reglages.ecrire(CLE_REGLAGES_MOODLE, { ...cur, auto: sw.checked }))
-					.catch(() => { sw.checked = !sw.checked; });
-			});
-			const p = ajouter(carte, "div", "nq-set-ligne");
-			const lien = ajouter(p, "button", "nq-moodle-lien", t("settings.moodle.openPage"));
-			lien.type = "button";
+			const st = ligne(statut(e));
 			/* Opened OVER the settings, which stay open below: closing the Moodle
 			   window brings the user back where they were (host modals stack). */
-			lien.addEventListener("click", () => openMoodleModal());
+			boutonPlat(st.controle, t("settings.moodle.openPage"), () => openMoodleModal());
+
+			sectionCarte(t("settings.moodle.sync"));
+			const maintenant = ligne(t("settings.moodle.syncNow"));
+			const bouton = boutonPlat(maintenant.controle, t("settings.moodle.syncNow"), () => {
+				bouton.disabled = true;
+				void api!.synchroniser().catch(() => undefined).finally(() => { bouton.disabled = false; void rafraichir(); });
+			});
+			bouton.disabled = e.syncing;
+			const a = ligne(t("settings.moodle.auto"));
+			interrupteur(a.controle, t("settings.moodle.auto"), e.auto, v => {
+				void lireReglage().then(cur => pont().reglages.ecrire(CLE_REGLAGES_MOODLE, { ...cur, auto: v }))
+					.catch(() => { void rafraichir(); });
+			});
+			peindreAffichage();
 			return;
 		}
 
 		/* Not signed in: ONE prominent button; "Another school?" stays a quiet link. */
+		sectionCarte(null);
 		const expire = e.state === "expired";
 		const solo = ajouter(carte, "div", "nq-set-ligne nq-moodle-solo");
 		if (expire) ajouter(solo, "span", "nq-set-ligne-aide", t("settings.moodle.expired"));
@@ -104,6 +141,12 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 		zone.hidden = !champOuvert;
 		lien.addEventListener("click", () => { champOuvert = true; lien.hidden = true; zone.hidden = false; void peindreEcoles(zone, e.site); });
 		if (champOuvert) void peindreEcoles(zone, e.site);
+		peindreAffichage();
+	}
+
+	/** The host of the site origin (`https://moodle.example.edu` becomes `moodle.example.edu`). */
+	function hoteDe(origine: string): string {
+		try { return new URL(origine).host; } catch { return origine; }
 	}
 
 	/** The compatible schools (name and city), filtered as you type, the current one marked;

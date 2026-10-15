@@ -158,6 +158,7 @@ export async function chargerReglagesPages(): Promise<DashboardPageSettings> {
 		quizzesModuleOverrides: await lireOverrides(),
 		quizzesModuleMapNote: (await lireReglage<string>("quizzesModuleMapNote")) ?? undefined,
 		quizzesArchivedFolders: (await lireReglage<string[]>("quizzesArchivedFolders")) ?? undefined,
+		showMoodleInRail: (await lireReglage<boolean>("showMoodleInRail")) ?? undefined,
 	};
 	return reglagesPagesCache;
 }
@@ -219,6 +220,7 @@ async function enregistrerReglagesPages(): Promise<void> {
 	else await ecrireReglage("quizzesModuleOverrides", overrides);
 	await ecrireReglage("quizzesModuleMapNote", reglagesPagesCache.quizzesModuleMapNote ?? null);
 	await ecrireReglage("quizzesArchivedFolders", reglagesPagesCache.quizzesArchivedFolders ?? []);
+	await ecrireReglage("showMoodleInRail", reglagesPagesCache.showMoodleInRail ?? null);
 }
 
 /* ══════════════════════════════════════════════════════════

@@ -158,6 +158,8 @@ export interface DashboardPageSettings {
 	quizzesModuleOverrides?: Record<string, ModuleOverride>;
 	quizzesModuleMapNote?: string;
 	quizzesArchivedFolders?: string[];
+	/** Show the Moodle button in the rail (default: shown). */
+	showMoodleInRail?: boolean;
 }
 
 /** Ce qu'une page transmet à la suivante en naviguant. */

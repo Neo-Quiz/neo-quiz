@@ -39,6 +39,9 @@ function markFill(wrap: HTMLElement, fill: NavItem["fill"]): void {
 	svg.prepend(shape);
 }
 
+/** Fired on `document` when a rail display preference changes. */
+export const RAIL_PREFS_EVENT = "nq:rail-prefs";
+
 export interface NavHandlers {
 	render(container: HTMLElement): void;
 	setActive(key: DashboardViewName): void;
@@ -57,6 +60,12 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 	   and not the page behind it. */
 	let settingsOpen = false;
 	let settingsBtn: HTMLElement | null = null;
+	let moodleBtn: HTMLElement | null = null;
+	/* Settings › Moodle announces a change of the preference; the button is
+	   shown or hidden in place, no re-render of the rail. */
+	document.addEventListener(RAIL_PREFS_EVENT, () => {
+		if (moodleBtn) moodleBtn.hidden = ctx.settings.showMoodleInRail === false;
+	});
 
 	function paintActive(): void {
 		for (const b of buttons) b.el.classList.toggle("qbd-nav-item--active", !settingsOpen && b.key === activeNav);
@@ -135,6 +144,16 @@ export function createNavHandlers(ctx: DashboardShellCtx): NavHandlers {
 		// l'onglet du plugin dans les réglages ; l'application ouvrira sa
 		// propre page Réglages.
 		const footer = ajouter(container, "div", "qbd-nav-footer");
+		/* Moodle sits right above Settings; it opens a modal, so it is never "active". */
+		moodleBtn = null;
+		if (ctx.openMoodle) {
+			const btnMoodle = ajouter(footer, "button", "qbd-nav-item");
+			moodleBtn = btnMoodle;
+			currentHost().ui.setIcon(ajouter(btnMoodle, "span", "qbd-nav-icon"), "graduation-cap");
+			ajouter(btnMoodle, "span", "qbd-nav-label", t("settings.moodle.title"));
+			btnMoodle.hidden = ctx.settings.showMoodleInRail === false;
+			btnMoodle.addEventListener("click", () => ctx.openMoodle?.());
+		}
 		const btnReglages = ajouter(footer, "button", "qbd-nav-item");
 		settingsBtn = btnReglages;
 		const settingsIcon = ajouter(btnReglages, "span", "qbd-nav-icon");

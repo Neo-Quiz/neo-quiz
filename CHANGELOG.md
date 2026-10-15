@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Moodle now has a button in the sidebar above Settings (it can be hidden in Settings > Moodle), and the Moodle button of My quizzes is gone.
+- Settings > Moodle is reorganised into Account, Sync and Display, with a Sync now button.
+
 ## [1.20.113] - 2026-10-14
 
 ### Added
