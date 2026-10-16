@@ -186,6 +186,10 @@ await withSrcModule(["src/dashboard/home.ts", "src/host/current.ts"], async (Hom
 	r.check("Quick actions remains available when every folder is caught up",
 		container.querySelectorAll(".qbd-home-quick .qbd-create-option").length, 2);
 
+	// The first render loads the module map in the background and renders again
+	// once it is read: let that late render finish BEFORE removing the host, or
+	// it throws "no host installed" after the cases have passed.
+	await new Promise(resolve => setTimeout(resolve, 50));
 	Host.uninstallHost();
 	r.done();
 });
