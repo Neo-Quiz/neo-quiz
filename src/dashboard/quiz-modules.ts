@@ -60,6 +60,13 @@ export interface ModuleOverride {
 	    menu, `folder-hidden.ts`) and its reviews are paused. Absent = shown.
 	    Synced like the other fields (`src/shared-state/merge.ts`). */
 	hidden?: string;
+	/** The course's class sessions ("Edit folder"): their number, the length
+	    of one in minutes, how many per week. Decimal integer strings, each
+	    optional; read through `readClassSessions` (`src/class-sessions.ts`),
+	    which leaves a damaged value out. Synced like the other fields. */
+	sessions?: string;
+	sessionMinutes?: string;
+	sessionsPerWeek?: string;
 	/* PAS DE `examDate` ICI, et c'est délibéré (2026-09-17) : ces overrides
 	   sont indexés par NOM DE SEGMENT, qui confond deux dossiers homonymes
 	   ouverts depuis deux racines — acceptable pour une couleur, pas pour un

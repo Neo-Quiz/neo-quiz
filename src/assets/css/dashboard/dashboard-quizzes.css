@@ -833,6 +833,17 @@
 	   second halo au titre faisait doublon. Le trait dégradé reste. */
 }
 
+/* The folder's class sessions under the title ("6 sessions of 5 h · 1 per
+   week · 30 h"): muted metadata text, no box, aligned on the title text like
+   the underline, wrapping on a narrow phone. */
+.qbd-quizzes-title-meta {
+	margin: 10px 0 0 61px;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--text-muted);
+	overflow-wrap: anywhere;
+}
+
 
 
 .qbd-quizzes-folder-hero .qbd-quizzes-header {

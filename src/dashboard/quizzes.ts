@@ -22,6 +22,8 @@ import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { peindreIconeCategorie, libelleCategorie } from "./categorie-affichage";
 import { phoneLayoutNow } from "../phone-layout";
+import { readClassSessions } from "../class-sessions";
+import { classSessionsLine } from "./class-sessions-line";
 
 /* ══════════════════════════════════════════════════════════
    QUIZZES VIEW — Dashboard
@@ -431,6 +433,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			currentHost().ui.setIcon(titleIcon, moduleIcon({ ...openModuleInfo, name: openModuleInfo?.name || openModuleFolder }, { generated: sas }));
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
 			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
+			/* The class sessions, as muted text under the title ("6 sessions of
+			   5 h · 1 per week · 30 h"); nothing when none is known. */
+			const seances = classSessionsLine(readClassSessions(ctx.settings.quizzesModuleOverrides?.[openModuleFolder]));
+			if (seances) ajouter(titleBlock, "p", "qbd-quizzes-title-meta", seances);
 
 			// ── À droite : Contenu | Progression. Plus de compteurs ni de
 			// « Nouveau quiz » (2026-09-25) : les chiffres sont dans l'onglet

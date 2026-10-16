@@ -96,6 +96,19 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 		rebaseModules({ K: { color: "#f00" } }, { K: { color: "#f00", hidden: "1" } }, { K: { color: "#00f" } }),
 		{ K: { color: "#00f", hidden: "1" } });
 
+	// CLASS SESSIONS (2026-10-16): three fields, each merged on its own, a cleared one is a tombstone.
+	r.check("sessions: each of the three fields merges on its own, newest wins",
+		mergeModules([{ K: { sessions: f("6", 10), sessionMinutes: f("300", 10), sessionsPerWeek: f("1", 10) } }, { K: { sessions: f("7", 20), color: f("#f00", 1) } }]),
+		{ K: { color: "#f00", sessions: "7", sessionMinutes: "300", sessionsPerWeek: "1" } });
+	r.check("sessions: a newer cleared field (tombstone) removes it, an older value never brings it back",
+		mergeModules([{ K: { sessionsPerWeek: f("1", 10), sessions: f("6", 10) } }, { K: { sessionsPerWeek: f(undefined, 20) } }, { K: { sessionsPerWeek: f("2", 15) } }]),
+		{ K: { sessions: "6" } });
+	r.check("sessions: clearing one is a tombstone of that field only",
+		diffModules({ K: { sessions: "6", sessionMinutes: "300" } }, { K: { sessions: "6" } }), [{ key: "K", field: "sessionMinutes" }]);
+	r.check("sessions: rebase keeps an unsaved local edit of the length on top of another device's count",
+		rebaseModules({ K: { sessions: "6" } }, { K: { sessions: "6", sessionMinutes: "150" } }, { K: { sessions: "8" } }),
+		{ K: { sessions: "8", sessionMinutes: "150" } });
+
 	// A folder's exams under its OLD key (the folder changed root). Exam ids and dates only.
 	const ex2 = (id, date) => ({ id, date });
 	const byId = (r) => r.examens.map(e => e.id);
@@ -570,6 +583,49 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 			await st.load();
 			r.check("hidden: a value other than \"1\" is dropped; an unknown field (what a version before `hidden` does with it) leaves the rest readable",
 				st.modules(), { C: { hidden: "1" }, D: { name: "kept" } });
+		}
+		// Class sessions: damaged values are dropped one by one, never guessed; the valid ones stay.
+		{
+			const [, st] = mk(mod("x", {
+				A: { sessions: stamp("0", 5), sessionMinutes: stamp("14", 5), sessionsPerWeek: stamp("15", 5) },
+				B: { sessions: stamp("201", 5), sessionMinutes: stamp("601", 5), sessionsPerWeek: stamp(1, 5) },
+				C: { sessions: stamp("06", 5), sessionMinutes: stamp("6.5", 5), sessionsPerWeek: stamp(" 1", 5) },
+				D: { sessions: stamp("1e2", 5), sessionMinutes: stamp(null, 5), sessionsPerWeek: stamp("-1", 5) },
+				E: { sessions: stamp("200", 5), sessionMinutes: stamp("15", 5), sessionsPerWeek: stamp("14", 5) },
+				F: { sessions: stamp("1", 5), sessionMinutes: stamp("600", 5), sessionsPerWeek: stamp("x", 5), name: stamp("kept", 5) },
+			}), "pc");
+			await st.load();
+			r.check("sessions: out of bounds, padded, decimal, spaced, non-string values are dropped; the bounds themselves are kept",
+				st.modules(), { E: { sessions: "200", sessionMinutes: "15", sessionsPerWeek: "14" }, F: { name: "kept", sessions: "1", sessionMinutes: "600" } });
+		}
+		// A one-time FILL (a timetable's class sessions): one more `.json` in `modules/`, named like no device,
+		// read like another device's file. A later edit in the app wins over it, and it is never rewritten.
+		{
+			// Stamped far AHEAD of this device's clock (1e6): the edit must still outrank it.
+			const fill = { XTI: { sessions: stamp("6", 5e7), sessionMinutes: stamp("300", 5e7), sessionsPerWeek: stamp("1", 5e7) } };
+			const [fs, pc] = mk({
+				...mod("pc", { XTI: { color: stamp("#f00", 5), path: stamp("Efrei/XTI", 5) } }),
+				[`${mdir}/timetable-2026-10-16.json`]: JSON.stringify(fill),
+			}, "pc");
+			await pc.load();
+			r.check("fill: merged with this device's own settings",
+				pc.modules(), { XTI: { color: "#f00", path: "Efrei/XTI", sessions: "6", sessionMinutes: "300", sessionsPerWeek: "1" } });
+			const fillBytes = fs.files.get(`${mdir}/timetable-2026-10-16.json`);
+			// An edit that touches nothing of the sessions writes no session stamp.
+			await pc.syncModules({ XTI: { ...pc.modules().XTI, color: "#0f0" } });
+			r.check("fill: an unrelated edit stamps only its own field", Object.keys(json(fs, `${mdir}/pc.json`).XTI).sort(), ["color", "path"]);
+			// Count changed, rhythm cleared: both our stamps, above the fill's, whatever this device's clock says.
+			const { sessionsPerWeek: _w, ...rest } = pc.modules().XTI;
+			await pc.syncModules({ XTI: { ...rest, sessions: "7" } });
+			r.check("fill: a later edit wins (new count, cleared rhythm), the length still from the fill",
+				pc.modules().XTI, { color: "#0f0", path: "Efrei/XTI", sessions: "7", sessionMinutes: "300" });
+			r.check("fill: the edit is a stamp above the fill's even with a clock behind it",
+				[json(fs, `${mdir}/pc.json`).XTI.sessions.at > 5e7, "v" in json(fs, `${mdir}/pc.json`).XTI.sessionsPerWeek], [true, false]);
+			r.check("fill: the fill file is never rewritten", fs.files.get(`${mdir}/timetable-2026-10-16.json`), fillBytes);
+			const phone = make(fs, "phone", ["Efrei"]); await phone.load();
+			r.check("fill: another device reads the same result", phone.modules().XTI, { color: "#0f0", path: "Efrei/XTI", sessions: "7", sessionMinutes: "300" });
+			r.check("fill: no device ever writes a file under the fill's name",
+				fs.writes.filter(w => w.includes("timetable")), []);
 		}
 		// Archiving merged into hiding (2026-10-15): this device's archived folders get the synced
 		// `hidden` stamp once; a folder with ANY `hidden` stamp is left alone; the setting stays.

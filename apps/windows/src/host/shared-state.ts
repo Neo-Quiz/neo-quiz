@@ -8,6 +8,7 @@ import { MODULE_FIELDS, diffModules, foldAttemptState, mergeExams, mergeModules,
 import type { AttemptEvent, ModuleField, ModuleValues, StoredExam, StoredModules } from "../../../../src/shared-state/merge";
 import { brancherExamens, ecrireReglage, lireExamens, lireReglage } from "./folder";
 import { archivedFoldersToHide } from "../../../../src/dashboard/folder-archive";
+import { isClassSessionValue } from "../../../../src/class-sessions";
 
 /* ══════════════════════════════════════════════════════════
    EXAMS AND ATTEMPTS IN THE SYNCED FOLDER (2026-10-01)
@@ -21,8 +22,12 @@ import { archivedFoldersToHide } from "../../../../src/dashboard/folder-archive"
                                 tombstones), replaced through a temp file;
      attempts/<deviceId>.jsonl  this device's attempt events, append only;
      modules/<deviceId>.json    this device's folder settings (colour, icon,
-                                name, UE, path), one stamp per field, replaced
-                                through a temp file (2026-10-07).
+                                name, UE, path, hidden, class sessions), one
+                                stamp per field, replaced through a temp file
+                                (2026-10-07). Any other `.json` there is read
+                                like another device's file, never written: a
+                                one-time fill (the class sessions of a
+                                timetable, 2026-10-16) lives there that way.
 
    A device writes ONLY its own two files, so a sync tool never sees two
    writers on one file; every device reads all of them and merges
@@ -148,6 +153,10 @@ const MODULE_VALUE_OK: Record<ModuleField, (v: string) => boolean> = {
 	icon: v => /^[a-z0-9-]{1,64}$/.test(v),
 	// The one value; "shown" is a cleared stamp, never another string.
 	hidden: v => v === "1",
+	// Decimal integers within their bounds (`src/class-sessions.ts`); "0", "06", "6.5" are dropped.
+	sessions: v => isClassSessionValue("sessions", v),
+	sessionMinutes: v => isClassSessionValue("sessionMinutes", v),
+	sessionsPerWeek: v => isClassSessionValue("sessionsPerWeek", v),
 };
 
 /** `now`: a stamp more than a year ahead is a corrupt or hostile clock and is

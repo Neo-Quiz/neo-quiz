@@ -19,6 +19,11 @@ export const EN_DASHBOARD = {
 	"dashboard.common.durationMin": "≈ {count} min",
 	"dashboard.common.durationH": "≈ {h} h",
 	"dashboard.common.durationHM": "≈ {h} h {m}",
+	/** Length of a class session (src/dashboard/class-sessions-line.ts): "5 h",
+	    "2 h 30", "45 min", with a no-break space so the unit never wraps alone. */
+	"dashboard.common.sessionMinutes": "{m}\u00a0min",
+	"dashboard.common.sessionHours": "{h}\u00a0h",
+	"dashboard.common.sessionHoursMinutes": "{h}\u00a0h\u00a0{m}",
 	/** Le mot seul, sans le nombre : pour un champ où le nombre est déjà
 	    affiché à côté (le champ personnalisé du nombre de questions). */
 	"dashboard.common.questionUnitOne": "question",
@@ -298,6 +303,23 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.moduleIconAll": "All",
 	"dashboard.quizzes.moduleIconNoResult": "No icon found",
 	"dashboard.quizzes.moduleEditCustomColor": "Custom color",
+	/** The class sessions of a folder ("Edit folder"); empty = unknown. */
+	"dashboard.quizzes.moduleEditSessions": "Class sessions",
+	"dashboard.quizzes.moduleEditSessionsCount": "Number of sessions",
+	"dashboard.quizzes.moduleEditSessionsLength": "Length of a session (min)",
+	"dashboard.quizzes.moduleEditSessionsPerWeek": "Sessions per week",
+	"dashboard.quizzes.moduleEditSessionsRange": "A whole number from {min} to {max}, or empty if unknown",
+	/** The line under a folder's title: "6 sessions of 5 h · 1 per week · 30 h". */
+	"dashboard.quizzes.sessionsCountOne": "{count} session",
+	"dashboard.quizzes.sessionsCountOther": "{count} sessions",
+	"dashboard.quizzes.sessionsCountLengthOne": "{count} session of {length}",
+	"dashboard.quizzes.sessionsCountLengthOther": "{count} sessions of {length}",
+	"dashboard.quizzes.sessionsPerWeekShort": "{count} per week",
+	"dashboard.quizzes.sessionsPerWeekOne": "{count} session per week",
+	"dashboard.quizzes.sessionsPerWeekOther": "{count} sessions per week",
+	"dashboard.quizzes.sessionsPerWeekLengthOne": "{count} session of {length} per week",
+	"dashboard.quizzes.sessionsPerWeekLengthOther": "{count} sessions of {length} per week",
+	"dashboard.quizzes.sessionsLengthOnly": "Sessions of {length}",
 	"dashboard.quizzes.moduleColor0": "Blue",
 	"dashboard.quizzes.moduleColor1": "Teal",
 	"dashboard.quizzes.moduleColor2": "Green",

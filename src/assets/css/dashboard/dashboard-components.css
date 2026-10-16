@@ -275,6 +275,34 @@
 	line-height: 1.4;
 	color: var(--text-faint);
 }
+/* Class sessions: one row per field, its label on the left and a small
+   number field on the right; the range hint, in red, under an invalid one. */
+.qbd-medit-sessions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.qbd-medit-session-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.qbd-medit-session-label {
+	min-width: 0;
+	font-size: 13.5px;
+	color: var(--text-normal);
+}
+.qbd-medit-input.qbd-medit-session-input {
+	flex: none;
+	width: 88px;
+	text-align: right;
+}
+.qbd-medit-hint.qbd-medit-session-error {
+	margin: -2px 0 0;
+	text-align: right;
+	color: var(--color-red, #f87171);
+}
 .qbd-medit-input,
 .qbd-medit-select {
 	width: 100%;

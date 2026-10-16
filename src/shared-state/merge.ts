@@ -97,8 +97,8 @@ export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]
 }
 
 /* ══════════════════════════════════════════════════════════
-   FOLDER SETTINGS (colour, icon, name, teaching unit, path, hidden), MERGED
-   ACROSS DEVICES (2026-10-07)
+   FOLDER SETTINGS (colour, icon, name, teaching unit, path, hidden, class
+   sessions), MERGED ACROSS DEVICES (2026-10-07)
 
    Each device writes `<root>/.neo-quiz/modules/<deviceId>.json`: per module key
    (the folder's segment, as in `quizzesModuleOverrides`) and per FIELD a stamp
@@ -113,13 +113,23 @@ export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]
    others, so a hide on one device and a later show on another end shown, and
    an older hide never brings it back. A reader that predates the field drops
    it (it only reads `MODULE_FIELDS`): the folder simply shows there.
+
+   `sessions`, `sessionMinutes`, `sessionsPerWeek` (2026-10-16): the course's
+   class sessions, decimal integer strings within the bounds of
+   `src/class-sessions.ts` (a damaged value is dropped by the reader, never
+   guessed). Each field is merged on its own, like the others; clearing one is
+   a tombstone. A reader that predates them drops them the same way: the
+   folder shows no session line there, and nothing else changes.
 ══════════════════════════════════════════════════════════ */
 
-export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path", "hidden"] as const;
+export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path", "hidden", "sessions", "sessionMinutes", "sessionsPerWeek"] as const;
 export type ModuleField = (typeof MODULE_FIELDS)[number];
 export interface ModuleStamp { v?: string | null; at: number }
 export type StoredModules = Record<string, Partial<Record<ModuleField, ModuleStamp>>>;
-export interface ModuleValues { name?: string; ue?: string | null; color?: string; icon?: string; path?: string; hidden?: string }
+export interface ModuleValues {
+	name?: string; ue?: string | null; color?: string; icon?: string; path?: string; hidden?: string;
+	sessions?: string; sessionMinutes?: string; sessionsPerWeek?: string;
+}
 
 function stampWins(a: ModuleStamp, b: ModuleStamp): boolean {
 	if (a.at !== b.at) return a.at > b.at;

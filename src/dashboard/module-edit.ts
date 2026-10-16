@@ -12,6 +12,8 @@ import { moduleIcon } from "./module-icons";
 import { MODULE_PALETTE, moduleAccent } from "./module-color";
 import { suggestIcons } from "./icon-suggest";
 import { saveSettingsReporting } from "./save-settings";
+import { CLASS_SESSION_BOUNDS, CLASS_SESSION_FIELDS, classSessionNumber, parseClassSessionInput } from "../class-sessions";
+import type { ClassSessionField } from "../class-sessions";
 
 type ModuleEditState = Required<Pick<ModuleOverride, "name" | "ue">>
 	& Omit<ModuleOverride, "name" | "ue">;
@@ -25,6 +27,9 @@ const MODULE_EDIT_HANDLED_FIELDS = {
 	icon: true,
 	path: true,
 	hidden: true,
+	sessions: true,
+	sessionMinutes: true,
+	sessionsPerWeek: true,
 } satisfies Record<keyof ModuleOverride, true>;
 
 /** The modal's persistence contract in one place, so that the civil date stays
@@ -46,6 +51,11 @@ export function buildModuleOverride(folder: string, state: ModuleEditState): Mod
 	if (state.path) ov.path = state.path;
 	// Carried over too: editing the name or colour of a hidden folder must not show it again.
 	if (state.hidden) ov.hidden = state.hidden;
+	// Class sessions: only a valid value is written; empty or damaged = absent.
+	for (const f of CLASS_SESSION_FIELDS) {
+		const v = state[f];
+		if (v !== undefined && classSessionNumber(f, v) !== null) ov[f] = v;
+	}
 	return ov;
 }
 
@@ -84,6 +94,15 @@ export function openModuleEditModal(
 	   the hidden flag, which this modal does not edit. */
 	const path = ctx.settings.quizzesModuleOverrides?.[group.folder]?.path;
 	const hidden = ctx.settings.quizzesModuleOverrides?.[group.folder]?.hidden;
+	/* The class sessions as stored when the modal opens. A field typed out of
+	   its bounds keeps its stored value (nothing is written for it, it shows
+	   red), it never becomes a guessed or a cleared one. */
+	const sessionsAtOpen: Partial<Record<ClassSessionField, string>> = {};
+	for (const f of CLASS_SESSION_FIELDS) {
+		const v = ctx.settings.quizzesModuleOverrides?.[group.folder]?.[f];
+		if (v !== undefined && classSessionNumber(f, v) !== null) sessionsAtOpen[f] = v;
+	}
+	const sessions: Partial<Record<ClassSessionField, string>> = { ...sessionsAtOpen };
 	/** Un changement au moins a eu lieu → onClose persiste + rafraîchit. */
 	let dirty = false;
 
@@ -95,7 +114,7 @@ export function openModuleEditModal(
 	   écriture disque est différée à onClose (pas de martèlement I/O). */
 	const apply = (): void => {
 		const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-		const ov = buildModuleOverride(group.folder, { name, ue, color, icon, path, hidden });
+		const ov = buildModuleOverride(group.folder, { name, ue, color, icon, path, hidden, ...sessions });
 		overrides[group.folder] = ov;
 		ctx.settings.quizzesModuleOverrides = overrides;
 		dirty = true;
@@ -177,6 +196,10 @@ export function openModuleEditModal(
 				});
 			}
 
+			// ── Class sessions: three small number fields, empty = unknown.
+			// After "Manage exams", which stays right under the UE. ──
+			renderClassSessionFields(c, sessions, sessionsAtOpen, apply);
+
 			// ── Couleur (8 pastilles ; re-cliquer la pastille active la retire →
 			// retour au liseré par avancement) + pastille « couleur personnalisée »
 			// (roue chromatique) qui ouvre le picker recopié de neo-calendar ──
@@ -240,6 +263,52 @@ export function openModuleEditModal(
 			if (dirty) saveSettingsReporting(() => ctx.saveSettings());
 		},
 	});
+}
+
+const SESSION_LABEL_KEYS: Record<ClassSessionField, TransKey> = {
+	sessions: "dashboard.quizzes.moduleEditSessionsCount",
+	sessionMinutes: "dashboard.quizzes.moduleEditSessionsLength",
+	sessionsPerWeek: "dashboard.quizzes.moduleEditSessionsPerWeek",
+};
+
+/** The "Class sessions" part of "Edit folder". `sessions` is the modal's
+    state, mutated in place; `atOpen` is what an invalid field falls back to. */
+function renderClassSessionFields(
+	c: HTMLElement,
+	sessions: Partial<Record<ClassSessionField, string>>,
+	atOpen: Partial<Record<ClassSessionField, string>>,
+	apply: () => void,
+): void {
+	ajouter(c, "p", "qbd-medit-label", t("dashboard.quizzes.moduleEditSessions"));
+	const list = ajouter(c, "div", "qbd-medit-sessions");
+	for (const f of CLASS_SESSION_FIELDS) {
+		const id = `qbd-medit-session-${f}`;
+		const row = ajouter(list, "div", "qbd-medit-session-row");
+		const label = ajouter(row, "label", "qbd-medit-session-label", t(SESSION_LABEL_KEYS[f]));
+		label.htmlFor = id;
+		const input = ajouter(row, "input", "qbd-medit-input qbd-medit-session-input");
+		input.id = id;
+		input.type = "text";
+		input.inputMode = "numeric";
+		input.autocomplete = "off";
+		input.maxLength = 4;
+		input.value = sessions[f] ?? "";
+		const { min, max } = CLASS_SESSION_BOUNDS[f];
+		const error = ajouter(list, "p", "qbd-medit-hint qbd-medit-session-error", t("dashboard.quizzes.moduleEditSessionsRange", { min, max }));
+		error.id = `${id}-error`;
+		error.hidden = true;
+		input.setAttribute("aria-describedby", error.id);
+		input.addEventListener("input", () => {
+			const parsed = parseClassSessionInput(f, input.value);
+			const invalid = parsed.kind === "invalid";
+			input.setAttribute("aria-invalid", String(invalid));
+			error.hidden = !invalid;
+			const next = parsed.kind === "value" ? parsed.v : parsed.kind === "empty" ? undefined : atOpen[f];
+			if (next === sessions[f]) return;
+			if (next === undefined) delete sessions[f]; else sessions[f] = next;
+			apply();
+		});
+	}
 }
 
 /* ── « New folder » — le bouton pilule du header (l'équivalent de « Create

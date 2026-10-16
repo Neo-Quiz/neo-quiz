@@ -79,6 +79,19 @@ await withSrcModule("src/dashboard/module-edit.ts", async ({ buildModuleOverride
 	r.check("the hidden flag is carried over by an edit", masque.hidden, "1");
 	r.check("and an override that is not hidden does not become so", "hidden" in renseigne, false);
 
+	/* CLASS SESSIONS (2026-10-16): carried over by an edit, a damaged value never written. */
+	const seances = buildModuleOverride(folder, { name: "Réseaux", ue: "UE 3", sessions: "6", sessionMinutes: "300", sessionsPerWeek: "1" });
+	r.check("the three class-session fields are carried over by an edit",
+		[seances.sessions, seances.sessionMinutes, seances.sessionsPerWeek], ["6", "300", "1"]);
+	const abimes = buildModuleOverride(folder, { name: "Réseaux", ue: "UE 3", sessions: "0", sessionMinutes: "14", sessionsPerWeek: "15" });
+	r.check("a value out of bounds is never written (0 sessions, 14 min, 15 per week)",
+		["sessions" in abimes, "sessionMinutes" in abimes, "sessionsPerWeek" in abimes], [false, false, false]);
+	const bornes = buildModuleOverride(folder, { name: "Réseaux", ue: "UE 3", sessions: "200", sessionMinutes: "600", sessionsPerWeek: "14" });
+	r.check("the upper bounds are kept (200, 600, 14)", [bornes.sessions, bornes.sessionMinutes, bornes.sessionsPerWeek], ["200", "600", "14"]);
+	const formes = ["06", "6.5", "1e2", " 6", "-1", "201", "", "６"].map(v => "sessions" in buildModuleOverride(folder, { name: "R", ue: null, sessions: v }));
+	r.check("only a plain decimal integer is a value (06, 6.5, 1e2, spaces, -1, 201, empty, full-width digit dropped)", formes, formes.map(() => false));
+	r.check("an override with no session field gets none", ["sessions", "sessionMinutes", "sessionsPerWeek"].some(f => f in renseigne), false);
+
 	r.done();
 });
 
@@ -340,5 +353,39 @@ await withSrcModule("src/dashboard/file-icons.ts", async ({ couperCheminAuMilieu
 		couperCheminAuMilieu("Personal/"), { tete: "Personal", queue: "" });
 	r.check("des séparateurs doublés ou inversés ne font pas une queue vide",
 		couperCheminAuMilieu("Efrei//B2\\Reseaux/"), { tete: "Efrei/B2", queue: "/Reseaux" });
+	r.done();
+});
+
+/* THE CLASS-SESSION LINE under a folder's title (2026-10-16,
+   `src/dashboard/class-sessions-line.ts`): only the known parts, no total
+   without a count and a length, nothing when the three are absent. */
+await withSrcModule(["src/dashboard/class-sessions-line.ts", "src/i18n.ts", "src/class-sessions.ts"], async ({ classSessionsLine, sessionDuration }, i18n, cs) => {
+	const r = makeReporter("Folder class sessions - line and reader");
+	const nb = (s) => s.replace(/\u00a0/g, " ");
+	const line = (s) => nb(classSessionsLine(s));
+	i18n.setLanguage("en");
+	r.check("durations: 5 h, 2 h 30, 1 h 05, 45 min, 27 h 30",
+		[300, 150, 65, 45, 1650].map(m => nb(sessionDuration(m))), ["5 h", "2 h 30", "1 h 05", "45 min", "27 h 30"]);
+	r.check("all three: count of length, rhythm, total", line({ count: 6, minutes: 300, perWeek: 1 }), "6 sessions of 5 h · 1 per week · 30 h");
+	r.check("count and length: the total, no rhythm", line({ count: 11, minutes: 150 }), "11 sessions of 2 h 30 · 27 h 30");
+	r.check("a single session: no total that repeats its length", line({ count: 1, minutes: 180 }), "1 session of 3 h");
+	r.check("count alone: no total", line({ count: 4 }), "4 sessions");
+	r.check("count and rhythm: no total", line({ count: 4, perWeek: 2 }), "4 sessions · 2 per week");
+	r.check("rhythm and length, no count", line({ minutes: 150, perWeek: 1 }), "1 session of 2 h 30 per week");
+	r.check("rhythm alone (plural)", line({ perWeek: 2 }), "2 sessions per week");
+	r.check("length alone", line({ minutes: 45 }), "Sessions of 45 min");
+	r.check("nothing known: nothing at all", classSessionsLine({}), "");
+	r.check("the separator keeps the dot on the line before (no-break space)", classSessionsLine({ count: 6, perWeek: 1 }).includes("\u00a0· "), true);
+	i18n.setLanguage("fr");
+	r.check("FR: all three", line({ count: 6, minutes: 300, perWeek: 1 }), "6 séances de 5 h · 1 par semaine · 30 h");
+	r.check("FR: rhythm and length", line({ minutes: 150, perWeek: 1 }), "1 séance de 2 h 30 par semaine");
+	r.check("FR: one session", line({ count: 1, minutes: 180 }), "1 séance de 3 h");
+	i18n.setLanguage("en");
+	r.check("reader: damaged values are left out, never guessed",
+		cs.readClassSessions({ sessions: "6", sessionMinutes: "14", sessionsPerWeek: 1 }), { count: 6 });
+	r.check("reader: nothing stored, nothing read", cs.readClassSessions(undefined), {});
+	r.check("typed input: empty clears, a valid value is kept, the rest is invalid",
+		[cs.parseClassSessionInput("sessions", "  "), cs.parseClassSessionInput("sessions", " 12 "), cs.parseClassSessionInput("sessionMinutes", "601")],
+		[{ kind: "empty" }, { kind: "value", v: "12" }, { kind: "invalid" }]);
 	r.done();
 });
