@@ -422,10 +422,14 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const ecrits = new Map();
 	const diagnostics = [];
 	let confiant = false;
+	/* Every trust question asked (its arguments), what it answers when the folder is not trusted, and the notices shown. */
+	const questionsConfiance = [];
+	let reponseConfiance = "refused";
+	const notices = [];
 	hote.installHost({
 		platform: { isDesktopApp: true },
 		/* Trust is granted only for the automatic line's section below: before it, every call runs without tools. */
-		process: { lireCache: async () => null, trustFolder: async () => (confiant ? "trusted" : "refused"), isFolderTrusted: async () => confiant, diagnosticReponse: async (texte) => { diagnostics.push(texte); }, run: async (spec) => {
+		process: { lireCache: async () => null, trustFolder: async (...a) => { questionsConfiance.push(a); return confiant ? "trusted" : reponseConfiance; }, isFolderTrusted: async () => confiant, diagnosticReponse: async (texte) => { diagnostics.push(texte); }, run: async (spec) => {
 			appels.push(spec);
 			// "!ERR:" marks an answer the CLI itself flags as an error (`is_error`).
 			const erreur = reponse.startsWith("!ERR:");
@@ -437,7 +441,7 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 			contractPath: (root, local) => root + "/" + local, defaultRoot: () => ({ id: "R", name: "Neo Quiz" }),
 			localPath: (p) => (p === "R" ? "" : p.replace(/^R\//, "")), rootOf: () => ({ id: "R", name: "Neo Quiz" }),
 		},
-		ui: { notice: () => {} },
+		ui: { notice: (m) => { notices.push(m); } },
 	});
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
 	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium", aiOutputFolder: "Quizzes" };
@@ -553,11 +557,95 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	await file.confier(nonConfiee.id);
 	await attendre();
 	r.check("Trust this folder: the line runs once trusted", [porteAppels, appels.length - avantConfiance], [2, 1]);
+
+	/* Trust withdrawn between the gate and the run (or the gate judged another
+	   folder): the run reads the trust and NEVER asks it (nobody is at the PC),
+	   and the line pauses as untrusted, with no CLI started. */
+	const vider = () => { for (const l of [...file.lignes()]) { file.annulerReprise(l.id); file.fermer(l.id); } };
+	vider();
+	confiant = false;
+	app.setAutoGate(async () => ({ go: true }));
+	const avantRetrait = appels.length, questionsAvantRetrait = questionsConfiance.length;
+	file.envoyer(autoLine);
+	await attendre();
+	const retiree = file.lignes().find(l => l.demande.auto);
+	r.check("trust withdrawn after the gate: no trust question, paused as untrusted, no CLI",
+		[questionsConfiance.length - questionsAvantRetrait, retiree?.etat, retiree?.pause?.motif, retiree?.pause?.reprise, retiree?.pause?.fournisseur, appels.length - avantRetrait],
+		[0, "pause", { kind: "untrusted" }, null, "auto:claude-code", 0]);
+	/* "Trust this folder" is an explicit click: asked as such, at the line's
+	   folder; a refusal or an unavailable answer says so, and the line stays paused. */
+	reponseConfiance = "refused";
+	const noticesAvant = notices.length;
+	await file.confier(retiree.id);
+	reponseConfiance = "unavailable";
+	await file.confier(retiree.id);
+	r.check("Trust this folder asks explicitly at the line's folder; refused, then unavailable: a notice each, still paused",
+		[questionsConfiance.slice(-2), notices.length - noticesAvant, new Set(notices.slice(-2)).size, file.lignes().find(l => l.id === retiree.id)?.etat],
+		[[["R/Cours", { explicit: true }], ["R/Cours", { explicit: true }]], 2, 2, "pause"]);
+	/* An empty destination: the button asks for the folder the line runs in. */
+	vider();
+	file.envoyer({ ...autoLine, destination: "" });
+	await attendre();
+	const sansDestination = file.lignes().find(l => l.demande.auto);
+	await file.confier(sansDestination.id);
+	r.check("an empty destination: Trust this folder asks for the default folder the line runs in",
+		[sansDestination?.pause?.motif, questionsConfiance.at(-1)?.[0]], [{ kind: "untrusted" }, "R/Quizzes"]);
+
+	/* An automatic line sent WITHOUT a chat, paused by its gate, never holds the
+	   chat of the lines saved before chats existed: a manual line without a chat still starts. */
+	vider();
+	app.setAutoGate(async () => ({ go: false, block: { kind: "session", percent: 86 }, retryAt: Date.now() + 3_600_000 }));
+	const { chatId: _sansChat, ...autoSansChat } = autoLine;
+	file.envoyer(autoSansChat);
+	await new Promise(res => setTimeout(res, 50));
+	const avantSansChat = appels.length;
+	file.envoyer({ ...unSeul });
+	await attendre();
+	r.check("a paused automatic line without a chat: a manual line without one still starts",
+		[file.lignes().find(l => l.demande.auto)?.etat, appels.length - avantSansChat], ["pause", 1]);
+
+	/* An automatic line is a Learn generation and nothing else: carrying an
+	   Explain turn, a plan or a command (the paths that may run live), it fails
+	   before its gate and no CLI starts. */
+	vider();
+	confiant = true;
+	let porteVue = 0;
+	app.setAutoGate(async () => { porteVue++; return { go: true }; });
+	for (const [nom, extra] of [["an Explain turn", { explication: { mark: { quiz: "R/Cours/Q.md", title: "Q" }, context: "c", course: "", position: "" } }], ["a plan", { planifier: true }], ["a command", { commandeCli: true }]]) {
+		const avantX = appels.length;
+		file.envoyer({ ...autoLine, ...extra });
+		await attendre();
+		const lx = file.lignes().find(l => l.demande.auto);
+		r.check("an automatic line carrying " + nom + ": failed before its gate, no CLI", [lx?.etat, porteVue, appels.length - avantX], ["echouee", 0, 0]);
+		if (lx) file.fermer(lx.id);
+	}
 	app.setAutoGate(null);
 	hote.uninstallHost();
 	delete globalThis.document;
 	r.done();
 });
+
+/* AN AUTOMATIC LINE NEVER RUNS LIVE, ON ANY PATH, and the queue's pure core
+   stays lean (review of the automatic Learn, 2026-10-16). Read in the source:
+   every `live:` option of the queue goes through `liveDeLigne` (a live session
+   loads the user's hooks, skills and MCP servers), except the command path,
+   which refuses an automatic line itself; and the gate reason the pure core
+   reads back comes from a module that imports nothing (the gate itself pulls
+   the i18n dictionaries). */
+{
+	const r = makeReporter("Automatic line - no live path, lean pure core");
+	const lire = (...p) => readFileSync(join(process.cwd(), ...p), "utf8");
+	const appSrc = lire("src", "dashboard", "file-generation-app.ts");
+	const lives = appSrc.split(/\r?\n/).filter(l => /^\s*live: /.test(l)).map(l => l.trim());
+	r.check("every live option but the command's goes through liveDeLigne",
+		[lives.length, lives.filter(l => l.startsWith("live: liveDeLigne(d) ? ")).length], [4, 3]);
+	r.check("the command path refuses an automatic line", /if \(d\.fromDevice \|\| d\.auto\) throw/.test(appSrc), true);
+	const gateBlock = lire("src", "dashboard", "gate-block.ts");
+	const core = lire("src", "dashboard", "file-generation.ts");
+	r.check("gate-block.ts imports nothing; the pure core never imports the gate",
+		[/^\s*(import\b|export [^\r\n]* from\b)/m.test(gateBlock), /from "\.\/auto-learn-gate"/.test(core), /from "\.\/gate-block"/.test(core)], [false, false, true]);
+	r.done();
+}
 
 /* The composer's output folder survives a reload (ai-settings-host.ts):
    the folder last chosen is read back on arrival, only while it is still

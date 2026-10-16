@@ -30,7 +30,7 @@ import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
-import { NoQuizAnswer, createAiClient, nettoyerTitre } from "./ai-client";
+import { FolderNotTrusted, NoQuizAnswer, createAiClient, nettoyerTitre } from "./ai-client";
 import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
@@ -54,7 +54,7 @@ import type { LiveImage, LiveTurnView } from "./live-generation";
 import { transcriptOfThread } from "./live-turn";
 import { explainTurnTexts } from "./explain-chat";
 import type { AutoLine } from "./auto-learn-line";
-import { AUTO_PAUSE_PREFIX, liveDeLigne, reglagesDeLigne } from "./auto-learn-line";
+import { AUTO_PAUSE_PREFIX, chatDeLigne, liveDeLigne, reglagesDeLigne } from "./auto-learn-line";
 import type { GateVerdict } from "./auto-learn-gate";
 import { UNKNOWN_RETRY_MS } from "./auto-learn-gate";
 
@@ -212,7 +212,7 @@ export interface FileGenerationApp {
 	reprendre(id: number): void;
 	/** A paused line: "Cancel the resume" turns it into a failed line. */
 	annulerReprise(id: number): void;
-	/** A line paused because its folder is not trusted: asks the host's trust question; trusted, the line waits its turn again. */
+	/** A line paused because its folder is not trusted: asks the host's trust question (an explicit click: a refusal given earlier in the session does not silence it); trusted, the line waits its turn again; otherwise a notice says why it stays paused. */
 	confier(id: number): Promise<void>;
 	/** Réécrit la note d'une ligne dont seul l'enregistrement a échoué. */
 	reessayerEnregistrement(id: number): void;
@@ -291,7 +291,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	    requests from another device one at a time (spec 2026-10-09). */
 	const REGLES: F.ReglesDemarrage<DemandeFile> = {
 		max: 8,
-		chat: d => d.chatId ?? LEGACY_CHAT_ID,
+		// An automatic line without a chat never shares the legacy one (`chatDeLigne`).
+		chat: d => chatDeLigne(d, LEGACY_CHAT_ID),
 		fournisseur: d => d.reglages.aiProvider ?? "",
 		groupe: d => (d.fromDevice ? "remote" : d.reglages.aiProvider === "antigravity-cli" ? "antigravity" : null),
 	};
@@ -391,6 +392,14 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		return false;
 	}
 
+	/** An automatic line whose folder was found untrusted at run time (the
+	    gate saw it trusted, then the trust was withdrawn, or it judged another
+	    folder): it pauses as its gate would, with "Trust this folder" and no
+	    retry time. Nothing asked the user: `neverAskTrust` read the trust only. */
+	function pauserNonConfiee(ligne: LigneGeneration): void {
+		file = F.mettreEnPause(file, ligne.id, { fournisseur: AUTO_PAUSE_PREFIX + (ligne.demande.reglages.aiProvider ?? ""), reprise: null, motif: { kind: "untrusted" } });
+	}
+
 	function publier(): void {
 		armerReprise();
 		if (restauree && file !== derniereGardee) {
@@ -456,6 +465,15 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			pomper();
 			return;
 		}
+		/* An automatic line is a Learn generation and nothing else: an Explain
+		   turn, a plan or a command would reach the paths that may run as a turn
+		   of a live session (the user's hooks, skills and MCP servers). */
+		if (d.auto && (d.explication || d.planifier || d.commandeCli)) {
+			file = F.echouer(file, ligne.id, t("ai.autoLearn.notAGeneration"));
+			file = F.solder(file, ligne.id);
+			pomper();
+			return;
+		}
 		// An automatic line asks its gate (usage, daily cap, trust) before anything starts.
 		if (d.auto && !(await passerPorte(ligne))) return;
 		const deps = lireDeps();
@@ -500,6 +518,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				   once the user trusts it. Never for a request from another
 				   device: nobody at this PC asked for it. */
 				dossier: d.fromDevice ? undefined : dossier,
+				// Nobody at this PC asked for an automatic line: its folder's trust is read, never asked.
+				neverAskTrust: !!d.auto,
 				/* A turn of the chat's live session (Claude Code, Codex), under
 				   the same key as the resume: a reload finds it again. Never for
 				   a remote or an automatic line (`liveDeLigne`). */
@@ -562,6 +582,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			await enregistrer(ligne.id, complete);
 		} catch (err) {
 			if (err instanceof UsageLimitError && tourne(ligne.id)) { await pauserSurLimite(ligne, err); return; }
+			if (err instanceof FolderNotTrusted && d.auto && tourne(ligne.id)) { pauserNonConfiee(ligne); return; }
 			/* Asked for no quiz: the prose is the answer, shown in place of a quiz. */
 			if (err instanceof NoQuizAnswer) {
 				if (tourne(ligne.id)) file = F.terminer(file, ligne.id, { titre: "", chemin: "", texte: err.texte, dureeMs: Date.now() - (ligne.debut ?? Date.now()) });
@@ -625,7 +646,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				maxChars: x.maxChars,
 				// Never the agent folder for a request from another device: nobody at this PC asked for it.
 				dossier: d.fromDevice ? undefined : x.folder,
-				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne), followUp },
+				// Never live for a remote or an automatic line (`liveDeLigne`), as a generation.
+				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne), followUp } : undefined,
 				// After a reload, attach to the one-shot call still running instead of launching it again.
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
@@ -698,7 +720,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, "redaction");
 			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mixte ? undefined : d.mode, {
 				dossier: d.fromDevice ? undefined : (d.destination || dossierParDefaut(d.reglages.aiOutputFolder)),
-				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
+				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) } : undefined,
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
@@ -839,11 +861,17 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		   once more. Anything else leaves it paused. */
 		async confier(id) {
 			const l = F.ligne(file, id);
-			const dossier = l?.demande.destination;
-			if (l?.etat !== "pause" || l.pause?.motif?.kind !== "untrusted" || !dossier) return;
+			if (l?.etat !== "pause" || l.pause?.motif?.kind !== "untrusted") return;
+			// The folder the line runs in, as `executer` computes it.
+			const dossier = l.demande.destination || dossierParDefaut(l.demande.reglages.aiOutputFolder);
 			let r: "trusted" | "refused" | "unavailable" = "unavailable";
-			try { r = (await currentHost().process?.trustFolder?.(dossier)) ?? "unavailable"; } catch { /* stays paused */ }
-			if (r !== "trusted") return;
+			/* `explicit`: this click IS the user's intent, so a refusal given to
+			   an earlier question of the session does not answer it silently. */
+			try { r = (await currentHost().process?.trustFolder?.(dossier, { explicit: true })) ?? "unavailable"; } catch { /* stays paused */ }
+			if (r !== "trusted") {
+				currentHost().ui.notice(t(r === "refused" ? "ai.autoLearn.trustRefused" : "ai.autoLearn.trustUnavailable"));
+				return;
+			}
 			const avant = file;
 			file = F.reprendre(file, id);
 			if (file !== avant) pomper();

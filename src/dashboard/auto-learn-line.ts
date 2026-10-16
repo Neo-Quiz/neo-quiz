@@ -28,3 +28,8 @@ export function reglagesDeLigne(vivants: AiSettings, d: { reglages: Partial<AiSe
 export function liveDeLigne(d: { fromDevice?: string; auto?: AutoLine }): boolean {
 	return !d.fromDevice && !d.auto;
 }
+
+/** The chat a line holds while it runs or waits. An automatic line sent without a chat gets one of its own (`auto:<key>`), never `legacy` (the chat of the lines saved before chats existed): paused by its gate for hours, it would hold that chat and block every manual line that has none. */
+export function chatDeLigne(d: { chatId?: string; auto?: AutoLine }, legacy: string): string {
+	return d.chatId ?? (d.auto ? AUTO_PAUSE_PREFIX + d.auto.key : legacy);
+}

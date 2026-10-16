@@ -129,6 +129,13 @@ export interface GenerateOptions {
 	    provider: no tool at all, as before. Never set for a request that
 	    came from another device. */
 	dossier?: string;
+	/** Nobody at this PC asked for this generation (an automatic Learn, spec
+	    2026-10-15-moodle-auto-learn): the trust question is NEVER asked. Only
+	    a `dossier` the user already trusted counts, read without any dialog
+	    (`HostProcess.isFolderTrusted`); any other answer stops the run with
+	    `FolderNotTrusted` before a CLI starts, instead of opening a modal
+	    nobody will answer while the line holds its slot. */
+	neverAskTrust?: boolean;
 	/** Learn only (2026-10-16): the length, in minutes, of ONE class session of
 	    the target folder (its class-session settings). It sets the slice cap
 	    (`learnMaxSlices`) and tells the model how long the lecture was, so the
@@ -260,6 +267,15 @@ export const NO_QUIZ_MARKER = "NO_QUIZ";
 export class NoQuizAnswer extends Error {
 	constructor(readonly texte: string) {
 		super("no quiz requested");
+	}
+}
+
+/** Thrown before any CLI starts when a run sent with `neverAskTrust` meets a
+    folder that is not already trusted: the queue pauses the line as
+    "untrusted" (its "Trust this folder" button), never asks by itself. */
+export class FolderNotTrusted extends Error {
+	constructor(readonly folder: string) {
+		super("folder not trusted");
 	}
 }
 
@@ -1249,6 +1265,24 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
 	    Claude Code may run in it with read-only tools once it is trusted. */
 	let dossierOutils: string | null = null;
+	/** `GenerateOptions.neverAskTrust` of the running generation; false for
+	    every other call (a chat, a plan, the clarify call). */
+	let neverAskTrust = false;
+	/** May the CLI of this run get tools in `dossier`? Asks the host's trust
+	    question, except for a run nobody at this PC asked for
+	    (`neverAskTrust`): only a folder ALREADY trusted counts there, and an
+	    untrusted one (or a failed read) throws `FolderNotTrusted`. A failure
+	    to ask is "no tools", never an error. */
+	async function folderTrusted(proc: NonNullable<ReturnType<typeof currentHost>["process"]>, dossier: string): Promise<boolean> {
+		if (neverAskTrust) {
+			let ok = false;
+			try { ok = (await proc.isFolderTrusted?.(dossier)) === true; } catch (e) { console.warn("[quiz-blocks] trust read failed:", e); }
+			if (!ok) throw new FolderNotTrusted(dossier);
+			return true;
+		}
+		if (!proc.trustFolder) return false;
+		try { return (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); return false; }
+	}
 	/** The live session of the running generation or plan (`GenerateOptions.live`),
 	    or of the running chat message (`ChatOptions.live`). */
 	let liveCtx: LiveOptions | null = null;
@@ -1359,6 +1393,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		repriseBase = options.reprise ?? null;
 		appelsCli = 0;
 		dossierOutils = options.dossier ?? null;
+		neverAskTrust = !!options.neverAskTrust;
 		liveCtx = options.live ?? null;
 		texteSuite = null;
 		pendingUsage = null;
@@ -1399,6 +1434,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			transcriptSink = null;
 			repriseBase = null;
 			dossierOutils = null;
+			neverAskTrust = false;
 			liveCtx = null;
 		}
 	}
@@ -1673,9 +1709,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		const dossier = dossierOutils;
 		let outils = false;
 		const proc = requireHost("process");
-		if (dossier && proc.trustFolder) {
-			try { outils = (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); }
-		}
+		if (dossier) outils = await folderTrusted(proc, dossier);
 		/* Pictures without a trusted folder (2026-10-09): Read only, with the
 		   same confinement as the tools form; the main process runs it IN the
 		   attachments folder. Without a picture, no tool at all. */
@@ -1855,9 +1889,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 		let agent = false;
 		const proc = requireHost("process");
-		if (dossier && proc.trustFolder) {
-			try { agent = (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); }
-		}
+		if (dossier) agent = await folderTrusted(proc, dossier);
 		const args = [
 			"exec", "--json", "-m", model,
 			"-c", "model_reasoning_effort=" + effortVal,
@@ -2238,6 +2270,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
 		dossierOutils = options.dossier ?? null;
+		neverAskTrust = false;
 		liveCtx = options.live ?? null;
 		texteSuite = null;
 		appelsCli = 0;
@@ -2282,6 +2315,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			transcriptSink = null;
 			repriseBase = null;
 			dossierOutils = null;
+			neverAskTrust = false;
 			liveCtx = null;
 		}
 	}
@@ -2295,6 +2329,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		transcriptSink = null;
 		// The clarify call never gets tools: request and document names only.
 		dossierOutils = null;
+		neverAskTrust = false;
 		liveCtx = null;
 		repriseBase = null;
 		await refreshCliCaches();
@@ -2354,6 +2389,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   tools (the pictures only). One live turn per message when the queue
 		   gives `live`; otherwise one call per message. */
 		dossierOutils = options.dossier ?? null;
+		neverAskTrust = false;
 		liveCtx = options.live ? { chatId: options.live.chatId, key: options.live.key } : null;
 		texteSuite = options.live?.followUp || null;
 		try {
@@ -2416,6 +2452,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			dossierOutils = null;
+			neverAskTrust = false;
 			liveCtx = null;
 			texteSuite = null;
 			repriseBase = null;

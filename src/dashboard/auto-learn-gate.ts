@@ -1,5 +1,8 @@
 import type { UsageRow } from "./usage-format";
 import { providerPublishesPlan } from "./usage-format";
+import type { GateBlock } from "./gate-block";
+export type { GateBlock } from "./gate-block";
+export { readGateBlock } from "./gate-block";
 
 /* The pure gate of the automatic Learn (spec 2026-10-15-moodle-auto-learn):
    given the owner's rules, the provider, the trust of the folder and the usage
@@ -16,7 +19,6 @@ export type AutoLearnMode = "off" | "propose" | "auto";
 export interface AutoLearnRule { on: boolean; value: number }
 export interface AutoLearnSettings { mode: AutoLearnMode; session: AutoLearnRule; weekly: AutoLearnRule; daily: AutoLearnRule }
 export interface UsageSnapshot { rows: readonly UsageRow[]; at: number }
-export type GateBlock = { kind: "session" | "weekly"; percent: number } | { kind: "daily"; count: number } | { kind: "unknown" } | { kind: "untrusted" };
 export type GateVerdict = { go: true } | { go: false; block: GateBlock; retryAt: number | null };
 
 export const AUTO_LEARN_LIMITS = { session: [1, 100], weekly: [1, 100], daily: [1, 50] } as const;
@@ -70,13 +72,4 @@ export function decideGate(i: { settings: AutoLearnSettings; provider: string; t
 	if (!blocks.length) return { go: true };
 	const last = blocks.reduce((a, b) => (b.retryAt > a.retryAt ? b : a));
 	return { go: false, block: last.block, retryAt: last.retryAt };
-}
-/** Reads back a stored block (a paused line); anything malformed is dropped. */
-export function readGateBlock(v: unknown): GateBlock | undefined {
-	if (!isObj(v)) return undefined;
-	const n = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0;
-	if ((v.kind === "session" || v.kind === "weekly") && n(v.percent)) return { kind: v.kind, percent: v.percent };
-	if (v.kind === "daily" && n(v.count)) return { kind: "daily", count: v.count };
-	if (v.kind === "unknown" || v.kind === "untrusted") return { kind: v.kind };
-	return undefined;
 }

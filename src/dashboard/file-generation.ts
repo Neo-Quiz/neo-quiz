@@ -36,8 +36,8 @@
      hand (`reprendre`); `annulerReprise` turns it into a failed line.
 ══════════════════════════════════════════════════════════ */
 
-import type { GateBlock } from "./auto-learn-gate";
-import { readGateBlock } from "./auto-learn-gate";
+import type { GateBlock } from "./gate-block";
+import { readGateBlock } from "./gate-block";
 
 export type EtatLigne = "attente" | "cours" | "arret" | "enregistrement" | "prete" | "echouee" | "pause";
 

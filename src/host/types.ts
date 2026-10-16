@@ -597,8 +597,11 @@ export interface HostProcess {
 	    which the page can neither word nor answer. `trusted`: run with tools
 	    in that folder; `refused` or `unavailable` (not an opened folder, or a
 	    host that has no such dialog): run without any tool, as before.
-	    Optional: a host without it never runs a CLI with tools. */
-	trustFolder?(dossier: string): Promise<"trusted" | "refused" | "unavailable">;
+	    Optional: a host without it never runs a CLI with tools.
+	    A host may remember a refusal for the session, so as not to ask again
+	    on every send; `explicit` (a click on "Trust this folder") is the
+	    user's own request to be asked, and always asks again. */
+	trustFolder?(dossier: string, options?: { explicit?: boolean }): Promise<"trusted" | "refused" | "unavailable">;
 	/** Is this folder (a CONTRACT path) already trusted? Never asks: no
 	    dialog, no modal. For a check made with nobody at the PC (the
 	    automatic Learn's gate, spec 2026-10-15-moodle-auto-learn): an

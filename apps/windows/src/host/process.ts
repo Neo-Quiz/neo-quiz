@@ -38,7 +38,8 @@ import { openTrustModal } from "../../../../src/dashboard/trust-modal";
    as Claude Code and MonoCode ask in their interface, instead of a light
    native Windows box with its system sound. One question per folder at a
    time; a folder refused is not asked again until the app restarts (a
-   terminal asks once per session). */
+   terminal asks once per session), unless the user asks for it by a click
+   (`trustFolder(…, { explicit: true })`, "Trust this folder"). */
 const refusesSession = new Set<string>();
 const questionsEnCours = new Map<string, Promise<boolean>>();
 function demanderConfiance(abs: string): Promise<boolean> {
@@ -121,12 +122,14 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 		   rattrape tout rejet et retombe sur son repli embarqué. */
 		/* The page only ASKS: the main process shows its own native dialog
 		   and keeps the answer. */
-		async trustFolder(dossier) {
+		async trustFolder(dossier, options) {
 			const abs = absolu ? absolu(dossier) : null;
 			if (!abs) return "unavailable";
 			const etat = await pont().processus.confiance(abs);
 			if (etat === "approuve") return "trusted";
 			if (etat !== "inconnu") return "unavailable";
+			// An explicit click asks again: the session's refusal answered an earlier question, not this one.
+			if (options?.explicit) refusesSession.delete(abs.toLowerCase());
 			if (refusesSession.has(abs.toLowerCase())) return "refused";
 			if (!(await demanderConfiance(abs))) {
 				refusesSession.add(abs.toLowerCase());

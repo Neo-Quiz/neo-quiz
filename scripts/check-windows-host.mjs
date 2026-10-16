@@ -2382,3 +2382,27 @@ await withSrcModule("apps/windows/src/host/code.ts", async ({ createWindowsCode,
 	r.check("enabling cpp re-enables c", magasin.get("languagesDisabled"), ["python"]);
 	r.done();
 });
+
+/* THE TRUST QUESTION'S SESSION MEMORY (`apps/windows/src/host/process.ts`):
+   a folder refused is not asked again on every send, but an EXPLICIT request
+   ("Trust this folder" on an automatic Learn paused as untrusted) always asks
+   again. Without it, one refusal made that button dead until a restart. */
+await withSrcModule(["apps/windows/src/host/process.ts", "src/host/current.ts"], async ({ createWindowsProcess }, hote) => {
+	const r = makeReporter("Windows host - trust question");
+	const precedent = globalThis.window;
+	let questions = 0;
+	globalThis.window = { neo: { processus: { confiance: async (_abs, accorder) => (accorder ? "approuve" : "inconnu") } } };
+	// Every question opened is answered Cancel.
+	hote.installHost({ modals: { open: (o) => { questions++; queueMicrotask(() => o.onClose?.()); return { close() {} }; } }, ui: { setIcon() {} } });
+	try {
+		const proc = createWindowsProcess((c) => "C:/Racine/" + c);
+		const reponses = [await proc.trustFolder("R/Cours"), questions, await proc.trustFolder("R/Cours"), questions, await proc.trustFolder("R/Cours", { explicit: true }), questions];
+		r.check("refused once: not asked again on its own, asked again on an explicit click", reponses, ["refused", 1, "refused", 1, "refused", 2]);
+		r.check("isFolderTrusted never opens the question", [await proc.isFolderTrusted("R/Cours"), questions], [false, 2]);
+	} finally {
+		hote.uninstallHost();
+		if (precedent === undefined) delete globalThis.window;
+		else globalThis.window = precedent;
+	}
+	r.done();
+});
