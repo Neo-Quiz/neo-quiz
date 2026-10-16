@@ -15,8 +15,8 @@ import { saveSettingsReporting } from "./save-settings";
 import { CLASS_SESSION_BOUNDS, CLASS_SESSION_FIELDS, classSessionNumber, parseClassSessionInput } from "../class-sessions";
 import type { ClassSessionField } from "../class-sessions";
 
-type ModuleEditState = Required<Pick<ModuleOverride, "name" | "ue">>
-	& Omit<ModuleOverride, "name" | "ue">;
+type ModuleEditState = Required<Pick<ModuleOverride, "name">>
+	& Omit<ModuleOverride, "name">;
 
 // Any persisted field added to `ModuleOverride` must break tsc until this
 // rebuilder handles it explicitly, otherwise a plain edit would erase the new field.
@@ -38,8 +38,11 @@ export function buildModuleOverride(folder: string, state: ModuleEditState): Mod
 	void MODULE_EDIT_HANDLED_FIELDS;
 	const ov: ModuleOverride = {};
 	if (state.name.trim() && state.name.trim() !== folder) ov.name = state.name.trim();
-	// `null` forces "No UE", while `undefined` would keep the UE of the mapping note.
-	ov.ue = state.ue;
+	// `null` forces "No UE", while `undefined` keeps the UE of the mapping note.
+	// Written only when set: a `ue` written on every edit pinned the effective UE
+	// (or `null`) with a fresh stamp, which overrode a UE set meanwhile on another
+	// device and froze the mapping note's UE into the override.
+	if (state.ue !== undefined) ov.ue = state.ue;
 	if (state.color) ov.color = state.color;
 	if (state.icon) ov.icon = state.icon;
 	/* CARRIED OVER AS IS, never recomputed: this modal designates no folder,
@@ -81,6 +84,9 @@ export function openModuleEditModal(
 ): void {
 	let name = group.name || group.folder;
 	let ue = group.ue;
+	/* What `ue` the override carries: the one STORED at opening (often none),
+	   replaced only when the user picks a UE in the menu below. */
+	let ueOverride = ctx.settings.quizzesModuleOverrides?.[group.folder]?.ue;
 	let color = group.color;
 	let icon = group.icon;
 	/* Le SAS des quiz générés se reconnaît au CHEMIN (`estLeSas`), comme la
@@ -114,7 +120,7 @@ export function openModuleEditModal(
 	   écriture disque est différée à onClose (pas de martèlement I/O). */
 	const apply = (): void => {
 		const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-		const ov = buildModuleOverride(group.folder, { name, ue, color, icon, path, hidden, ...sessions });
+		const ov = buildModuleOverride(group.folder, { name, ue: ueOverride, color, icon, path, hidden, ...sessions });
 		overrides[group.folder] = ov;
 		ctx.settings.quizzesModuleOverrides = overrides;
 		dirty = true;
@@ -173,7 +179,7 @@ export function openModuleEditModal(
 				openActionMenu(ueBtn, options.map(opt => ({
 					icon: opt === ue ? "check" : undefined,
 					label: opt ?? t("dashboard.quizzes.noUe"),
-					onClick: () => { ue = opt; paintUe(); apply(); },
+					onClick: () => { ue = opt; ueOverride = opt; paintUe(); apply(); },
 				})));
 			});
 

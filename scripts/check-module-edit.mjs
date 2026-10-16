@@ -90,6 +90,8 @@ await withSrcModule("src/dashboard/module-edit.ts", async ({ buildModuleOverride
 	r.check("the upper bounds are kept (200, 600, 14)", [bornes.sessions, bornes.sessionMinutes, bornes.sessionsPerWeek], ["200", "600", "14"]);
 	const formes = ["06", "6.5", "1e2", " 6", "-1", "201", "", "６"].map(v => "sessions" in buildModuleOverride(folder, { name: "R", ue: null, sessions: v }));
 	r.check("only a plain decimal integer is a value (06, 6.5, 1e2, spaces, -1, 201, empty, full-width digit dropped)", formes, formes.map(() => false));
+	const sansChoixUe = buildModuleOverride(folder, { name: "Réseaux", color: "#336699" });
+	r.check("an edit that never picked a UE writes no ue key (a fresh stamp would override another device's UE)", "ue" in sansChoixUe, false);
 	r.check("an override with no session field gets none", ["sessions", "sessionMinutes", "sessionsPerWeek"].some(f => f in renseigne), false);
 
 	r.done();

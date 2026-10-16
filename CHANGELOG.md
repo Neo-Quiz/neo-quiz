@@ -26,6 +26,10 @@ release notes.
 - Settings > Moodle is reorganised into Account, Sync and Display, with a Sync now button.
 - Moodle finds a course inside a year folder (B2 2026-2027…), and creates a new course in its year folder.
 
+### Fixed
+
+- Editing a folder (name, colour, icon, class sessions) no longer writes its course unit: a unit set on another device is no longer reset by a later edit here.
+
 ## [1.20.113] - 2026-10-14
 
 ### Added
