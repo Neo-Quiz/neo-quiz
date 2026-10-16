@@ -344,7 +344,9 @@ html.nq-mobile .modal-container {
 	margin-left: auto;
 }
 
-.is-mobile .qbd-folder-section-action > span:not(.qbd-folder-section-action-icon) {
+/* Only the icon-only buttons of the tab row: the same class also labels the
+   buttons inside the planning and the "Edit folder" modal, which keep their text. */
+.is-mobile .qbd-folder-tabs-actions .qbd-folder-section-action > span:not(.qbd-folder-section-action-icon) {
 	display: none;
 }
 
