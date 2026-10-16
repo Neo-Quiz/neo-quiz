@@ -64,3 +64,25 @@ export function boutonPlat(parent: HTMLElement, libelle: string, surClic: () => 
 	b.addEventListener("click", surClic);
 	return b;
 }
+
+/** One settings row (name, optional help, a slot for the control), shared by the Moodle sections. */
+export function ligneReglage(dans: HTMLElement, nom: string, aide?: string): { texte: HTMLElement; controle: HTMLElement; aide: HTMLElement } {
+	const l = ajouter(dans, "div", "nq-set-ligne");
+	const texte = ajouter(l, "div", "nq-set-ligne-texte");
+	ajouter(texte, "span", "nq-reglages-nom", nom);
+	const a = ajouter(texte, "span", "nq-set-ligne-aide", aide ?? "");
+	a.hidden = !aide;
+	return { texte, controle: ajouter(l, "div", "nq-set-ligne-controle"), aide: a };
+}
+
+/** A switch; returns the input so a caller can disable it. */
+export function interrupteurReglage(parent: HTMLElement, nom: string, valeur: boolean, surChangement: (v: boolean) => void): HTMLInputElement {
+	const label = ajouter(parent, "label", "nq-moodle-interrupteur");
+	const sw = ajouter(label, "input", "nq-set-interrupteur");
+	sw.type = "checkbox";
+	sw.setAttribute("role", "switch");
+	sw.setAttribute("aria-label", nom);
+	sw.checked = valeur;
+	sw.addEventListener("change", () => surChangement(sw.checked));
+	return sw;
+}

@@ -1901,6 +1901,14 @@ label.nq-set-ligne {
 .nq-moodle-rouge { color: var(--color-red, #f87171); }
 .nq-moodle-ambre { color: var(--color-orange, #fb923c); }
 .nq-moodle-interrupteur { display: inline-flex; }
+.nq-set-suffixe { margin: 0 8px 0 4px; font-size: 13px; color: var(--text-muted); }
+.nq-set-nombre:disabled { opacity: 0.5; }
+.nq-set-interrupteur:disabled { opacity: 0.5; cursor: default; }
+.nq-set-nombre[aria-invalid="true"] { border-color: var(--text-error, #d44); }
+.nq-moodle-auto { margin-top: 24px; }
+.nq-moodle-indice { padding: 8px 16px; }
+.nq-moodle-usage { padding: 0 16px 8px; }
+.nq-moodle-outil { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 .nq-moodle-solo { gap: 12px; align-items: center; }
 .nq-moodle-principal { padding: 9px 22px; font-weight: 600; font-size: 14px; color: var(--text-normal); border-color: var(--interactive-accent); }
 .nq-moodle-autre { flex-wrap: wrap; gap: 8px; min-height: 0; }

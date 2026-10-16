@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A Learn is generated for each new Moodle lecture, within the usage limits you set (Settings › Moodle › New lectures).
+
 ### Fixed
 
 - Edit folder keeps the label of Manage exams on a phone, instead of showing only its icon.

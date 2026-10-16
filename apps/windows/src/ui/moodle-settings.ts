@@ -19,20 +19,22 @@ import { CLE_REGLAGES_MOODLE } from "../../electron/pont";
 import { t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
-import { boutonPlat, heure, origineValide } from "./moodle-common";
+import { boutonPlat, heure, interrupteurReglage, ligneReglage, origineValide } from "./moodle-common";
 import { openMoodleModal } from "./moodle-modal";
 import { coquilleActive, reglagesDeLaCoquille } from "./dashboard-shell";
 import { openYearFoldersModal } from "./year-folders-modal";
 import { readYearPlan } from "../../../../src/dashboard/year-folders-run";
 import type { YearPlan } from "../../../../src/dashboard/year-folders";
 import { currentHost } from "../../../../src/host/current";
+import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
+import { mountAutoLearnSettings } from "./auto-learn-settings";
 import { RAIL_PREFS_EVENT } from "../../../../src/dashboard/nav";
 
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
 const PLAN_MS = 5000;
 
-export function mountMoodleSettings(page: HTMLElement): () => void {
+export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHost): () => void {
 	const api = pont().moodle;
 	if (!api) return () => undefined;
 	let detruit = false;
@@ -43,6 +45,9 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	let planLu: { at: number; plan: Promise<YearPlan | null> } | null = null;
 
 	const racine = ajouter(page, "div", "nq-moodle");
+	/* OUTSIDE `racine`: `peindre` empties it on every state push (sync progress), which would destroy the usage line. */
+	const nouveaux = ajouter(page, "div", "nq-moodle-auto");
+	const demonterAuto = mountAutoLearnSettings(nouveaux, aiSettings);
 	/* The card of the section being painted (`peindre` swaps it). */
 	let carte: HTMLElement = racine;
 
@@ -52,12 +57,7 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	}
 
 	function ligne(nom: string, aide?: string, dans: HTMLElement = carte): { texte: HTMLElement; controle: HTMLElement; aide: HTMLElement } {
-		const l = ajouter(dans, "div", "nq-set-ligne");
-		const texte = ajouter(l, "div", "nq-set-ligne-texte");
-		ajouter(texte, "span", "nq-reglages-nom", nom);
-		const a = ajouter(texte, "span", "nq-set-ligne-aide", aide ?? "");
-		a.hidden = !aide;
-		return { texte, controle: ajouter(l, "div", "nq-set-ligne-controle"), aide: a };
+		return ligneReglage(dans, nom, aide);
 	}
 
 	/** A titled section holding one card; later `ligne` calls land in it. */
@@ -69,13 +69,7 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	}
 
 	function interrupteur(parent: HTMLElement, nom: string, valeur: boolean, surChangement: (v: boolean) => void): void {
-		const label = ajouter(parent, "label", "nq-moodle-interrupteur");
-		const sw = ajouter(label, "input", "nq-set-interrupteur");
-		sw.type = "checkbox";
-		sw.setAttribute("role", "switch");
-		sw.setAttribute("aria-label", nom);
-		sw.checked = valeur;
-		sw.addEventListener("change", () => surChangement(sw.checked));
+		interrupteurReglage(parent, nom, valeur, surChangement);
 	}
 
 	/** Display: the Moodle button of the rail (an app preference, not the guarded `moodle` setting). */
@@ -310,5 +304,5 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 
 	const desabonner = api.surEtat(() => { void rafraichir(); });
 	void rafraichir();
-	return () => { detruit = true; arreterSonde(); desabonner(); };
+	return () => { detruit = true; arreterSonde(); desabonner(); demonterAuto(); };
 }
