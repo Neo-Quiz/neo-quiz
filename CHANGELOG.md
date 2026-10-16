@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.115] - 2026-10-16
+
 ### Added
 
 - A Learn is generated for each new Moodle lecture, within the usage limits you set (Settings › Moodle › New lectures).
