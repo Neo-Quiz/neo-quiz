@@ -11,13 +11,15 @@
    garde de quinze minutes, et toutes les quatre heures. Hors ligne est un
    état NORMAL : l'erreur est journalisée, jamais affichée en Notice.
 
-   COMMENT ON INSTALLE : par le chemin de FERMETURE existant. `installer()`
-   arme un drapeau puis ferme la fenêtre ; `main.ts` fait vider les
-   écritures différées du rendu comme pour une croix, et quand tout est
-   fermé, c'est `quitAndInstall(true, true)` — silencieux, relance forcée —
-   qui remplace `app.quit()`. Une frappe en attente ne se perd pas dans une
-   mise à jour. Sans clic, `autoInstallOnAppQuit` installe à la prochaine
-   fermeture (sans relance).
+   HOW IT INSTALLS: through the existing CLOSE path. `installer()` arms a
+   flag then closes the window; `main.ts` flushes the renderer's deferred
+   writes as for the close button, and once everything is closed,
+   `quitAndInstall(true, true)` (silent NSIS, forced relaunch) replaces
+   `app.quit()`. A pending keystroke is never lost to an update.
+   ONLY ON A CLICK (2026-10-16): `autoInstallOnAppQuit` is false. A
+   downloaded version used to install itself at the next close without
+   anyone asking; it now waits, shown as "ready", until the user clicks
+   Install. `check:updater` pins the flag.
 
    CONNEXION LIMITÉE (2026-10-07) : `autoDownload` est COUPÉ ; c'est ce module
    qui décide, à chaque `update-available`, selon `deps.limitee()` (voir
@@ -97,7 +99,7 @@ export function creerMiseAJour(deps: {
 	};
 
 	autoUpdater.autoDownload = false;
-	autoUpdater.autoInstallOnAppQuit = true;
+	autoUpdater.autoInstallOnAppQuit = false;
 	autoUpdater.allowPrerelease = false;
 	autoUpdater.logger = {
 		info: (m: unknown) => console.log(LOG_PREFIX, "mise à jour:", m),

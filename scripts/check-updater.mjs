@@ -15,6 +15,7 @@
  *
  *     npm run check:updater
  */
+import { readFileSync } from "node:fs";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("apps/windows/electron/mise-a-jour-etat.ts", ({ ETAT_INITIAL, transition }) => {
@@ -138,3 +139,14 @@ await withSrcModule("apps/windows/electron/expected-update.ts", ({ expectedUpdat
 	r.check("numeric, not lexical", compareVersions("1.20.10", "1.20.9"), 1);
 	r.done();
 });
+
+/* NO INSTALL WITHOUT A CLICK (2026-10-16): a downloaded version used to
+   install itself at the next close. The wiring cannot run outside a packaged
+   app, so the flag is pinned in the source text. */
+{
+	const r = makeReporter("Update installs only on a click");
+	const src = readFileSync(new URL("../apps/windows/electron/mise-a-jour.ts", import.meta.url), "utf8");
+	const sets = [...src.matchAll(/autoUpdater\.autoInstallOnAppQuit\s*=\s*(\w+)/g)].map(m => m[1]);
+	r.check("autoInstallOnAppQuit set exactly once, to false", sets, ["false"]);
+	r.done();
+}

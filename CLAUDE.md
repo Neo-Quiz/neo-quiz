@@ -385,7 +385,9 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   vérification en cours mais garde « prête ». Sur une connexion LIMITÉE
   (2026-10-07, sonde `connexion-limitee.ts`, `autoDownload` à faux), une
   version trouvée reste « disponible » sans un octet téléchargé, jusqu'au
-  clic. Le câblage electron-updater
+  clic. Depuis le 2026-10-16, une version téléchargée ne s'installe
+  plus seule à la fermeture (`autoInstallOnAppQuit` à faux, épinglé dans le
+  texte de `mise-a-jour.ts`) : seulement au clic sur « Installer ». Le câblage electron-updater
   (`mise-a-jour.ts`) ne s'éprouve qu'installé, sur deux releases.
 - `npm run check:fenetre-maj` — le REFLET de l'installation qui porte la
   fenêtre « Updating Neo Quiz » (`apps/windows/electron/fenetre-maj-liens.ts`,

@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A downloaded update no longer installs itself when you close Neo Quiz: it waits until you click Install.
+
 ## [1.20.115] - 2026-10-16
 
 ### Added
