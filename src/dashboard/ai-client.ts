@@ -22,6 +22,7 @@ import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
 import { clarifyPrompt } from "./generation-kind";
+import { lectureClassifyPrompt } from "./lecture-detect";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
 import { inertRemoteImages } from "./remote-images";
@@ -344,6 +345,8 @@ export interface AiClient {
 	    model's raw text (`parseClarifyAnswer` reads it); rejects on any failure,
 	    including a provider that cannot hold the exchange. */
 	clarify(request: string, documentNames: readonly string[]): Promise<string>;
+	/** The short call that sorts ambiguous file names (`lectureClassifyPrompt`): names only, no tools, lowest effort, 30 s at most; the raw text, read by `parseLectureVerdicts`; rejects on any failure. */
+	classifyLectures(names: readonly string[]): Promise<string>;
 	abort(): void;
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
@@ -2324,6 +2327,18 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    call forms (no tool, no new option), the LOWEST effort the provider
 	    offers, and 30 s at most. */
 	async function clarify(request: string, documentNames: readonly string[]): Promise<string> {
+		const { system, user } = clarifyPrompt(request, documentNames, currentLang());
+		return appelCourt(system, user);
+	}
+
+	/** The short call that sorts ambiguous Moodle file names: names only, never a tool. */
+	async function classifyLectures(names: readonly string[]): Promise<string> {
+		const { system, user } = lectureClassifyPrompt(names);
+		return appelCourt(system, user);
+	}
+
+	/** A short call without tools: same provider as the generation, the lowest effort it offers, 30 s at most. */
+	async function appelCourt(system: string, user: string): Promise<string> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = null;
@@ -2337,7 +2352,6 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
-			const { system, user } = clarifyPrompt(request, documentNames, currentLang());
 			const plusBas = (id: string, m?: string): string => getEfforts(id, m)[0]?.value ?? "";
 			if (provider === "claude-code") {
 				model = resolveClaudeModel(model);
@@ -2463,6 +2477,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		generate,
 		chat,
 		clarify,
+		classifyLectures,
 		planifier,
 		abort: () => { if (abortCurrent) abortCurrent(); },
 		get lastUsage() { return lastUsage; }

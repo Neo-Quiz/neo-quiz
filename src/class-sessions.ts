@@ -61,3 +61,11 @@ export function parseClassSessionInput(field: ClassSessionField, text: string): 
 	if (!s) return { kind: "empty" };
 	return isClassSessionValue(field, s) ? { kind: "value", v: s } : { kind: "invalid" };
 }
+
+/** The class-session length of a folder (a contract path), from the folder settings: the entry whose stored `path` is the folder, else the entry named like its last segment. Undefined when unknown. */
+export function lectureMinutesOfFolder(overrides: Record<string, unknown> | undefined, folder: string): number | undefined {
+	const all = overrides ?? {};
+	const byPath = Object.values(all).find(o => !!o && typeof o === "object" && (o as { path?: unknown }).path === folder);
+	const ov = byPath ?? all[folder.split("/").pop() as string];
+	return readClassSessions(ov && typeof ov === "object" ? ov as Partial<Record<ClassSessionField, unknown>> : undefined).minutes;
+}
