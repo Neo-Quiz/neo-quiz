@@ -258,6 +258,9 @@ jobs:
       - name: Stats attempts
         run: npm run check:stats
 
+      - name: Automatic Learn gate
+        run: npm run check:auto-learn-gate
+
       # SWIPE between pages: thresholds, edge zones, scrollers, fields, modals.
       - name: Swipe
         run: npm run check:swipe

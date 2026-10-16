@@ -6,6 +6,7 @@ import { cadenceRateLimited, cadenceSuccess, cadenceVerdict, newCadence } from "
 import type { Cadence } from "./usage-cadence";
 import { formatAge, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
 import type { UsageRead } from "./usage-format";
+import type { UsageSnapshot } from "./auto-learn-gate";
 import { spendable } from "./codex-resets";
 import type { ResetOutcome, ResetsError, ResetsRead } from "./codex-resets";
 import { clearAccountMessage, drawAccount } from "./usage-account";
@@ -107,6 +108,32 @@ const OUTCOME_KEYS = {
 /** Redraws of every live mount: a reading started by a mount the page has since
     replaced must still paint the one that replaced it. */
 const redraws = new Set<() => void>();
+
+/** One read of `tool`, when the cadence allows and none is in flight; resolves when it ends. Never rejects. */
+function startRead(tool: UsageTool, read: (tool: UsageTool) => Promise<UsageRead>): Promise<void> {
+	const deja = enVol.get(tool);
+	if (deja) return deja;
+	if (!cadenceVerdict(cadenceOf(tool), Date.now()).ok) return Promise.resolve();
+	const p = read(tool).then(r => {
+		const c = cadenceOf(tool);
+		if (r.error?.kind === "rate-limited") cadenceRateLimited(c, Date.now(), r.error.retryAfterSec);
+		else if (!r.error && r.rows.length) { cadenceSuccess(c, Date.now()); cache.set(tool, { rows: r.rows, at: Date.now() }); }
+	}).catch(() => { /* keep the last numbers */ }).finally(() => {
+		enVol.delete(tool);
+		redraws.forEach(f => f());
+	});
+	enVol.set(tool, p);
+	return p;
+}
+
+/** The usage of `tool` for a decision (the automatic Learn gate): the shared reading when at most `maxAgeMs` old, else one read through the shared cadence (never more often than the usage lines read), then whatever the cache holds. `null` when there is no reading at all: the caller must not assume 0 %. */
+export async function readUsageFresh(tool: UsageTool, read: (tool: UsageTool) => Promise<UsageRead>, maxAgeMs: number): Promise<UsageSnapshot | null> {
+	const cur = cache.get(tool);
+	if (cur && Date.now() - cur.at <= maxAgeMs) return { rows: cur.rows, at: cur.at };
+	await startRead(tool, read);
+	const after = cache.get(tool);
+	return after ? { rows: after.rows, at: after.at } : null;
+}
 
 export interface UsageLine {
 	/** Reads again (throttled): call when a generation or a reply ends. */
@@ -385,16 +412,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		const cur = cache.get(tool);
 		const age = cur ? Date.now() - cur.at : Infinity;
 		if (dead || enVol.has(tool) || (!force && age < RELOAD_MS)) return;
-		if (!cadenceVerdict(cadenceOf(tool), Date.now()).ok) return;
-		const p = read(tool).then(r => {
-			const c = cadenceOf(tool);
-			if (r.error?.kind === "rate-limited") cadenceRateLimited(c, Date.now(), r.error.retryAfterSec);
-			else if (!r.error && r.rows.length) { cadenceSuccess(c, Date.now()); cache.set(tool, { rows: r.rows, at: Date.now() }); }
-		}).catch(() => { /* keep the last numbers */ }).finally(() => {
-			enVol.delete(tool);
-			redraws.forEach(f => f());
-		});
-		enVol.set(tool, p);
+		void startRead(tool, read);
 	};
 
 	const tick = (): void => {

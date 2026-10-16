@@ -1,5 +1,6 @@
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { Hotkey } from "../hotkey-format";
+import { autoLearnDefaults } from "./auto-learn-gate";
 
 /* ══════════════════════════════════════════════════════════
    LES RÉGLAGES IA, VUS DU CLIENT DE GÉNÉRATION
@@ -44,7 +45,7 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAgentMode" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
 	| "aiOllamaModels" | "aiOllamaCatalog" | "aiOllamaPlansAppris" | "aiOllamaPlanCompte"
 	| "aiCanauxPayantsMasques" | "aiWebAvertissementMasque" | "aiUsageLog"
-	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiComposerDestination">> & { hotkeyAddFiles: Hotkey } {
+	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiComposerDestination" | "aiAutoLearn">> & { hotkeyAddFiles: Hotkey } {
 	return {
 		// Aucun fournisseur par défaut : le choix reste la première étape.
 		aiProvider: "",
@@ -61,6 +62,8 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		// Aucune liste tant qu'`agy models` n'a pas répondu une première fois.
 		aiAntigravityModels: null,
 		aiOllamaUrl: "http://localhost:11434",
+		// The owner's defaults of 2026-10-15 for the automatic Learn.
+		aiAutoLearn: autoLearnDefaults(),
 		aiOllamaCloudKey: "",
 		// Modèles Ollama affichés dans le menu (ordre réglable, max 7). null →
 		// sélection par défaut (cf. aiProviders.resolveOllamaSelection).

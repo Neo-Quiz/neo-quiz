@@ -73,6 +73,8 @@ export interface AiSettings {
 	    l'afficher tout de suite au lancement suivant (la lecture interroge le
 	    réseau, une seconde) ; relue en arrière-plan. */
 	aiAntigravityModels?: ModelDef[] | null;
+	/** Settings › Moodle › New lectures (spec 2026-10-15-moodle-auto-learn); always read through `readAutoLearnSettings`, never trusted as typed. */
+	aiAutoLearn?: unknown;
 	aiOllamaUrl?: string;
 	aiOllamaCloudKey?: string;
 	// `null` = sentinelle « défaut » réellement persistée par le plugin
