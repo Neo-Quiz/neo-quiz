@@ -565,5 +565,26 @@ await withSrcModule(
 			targets({ folder: "XTI302 - Admin", name: "XTI302", path: "NQ/B2 2026-2027/XTI302 - Admin", quizzes: [] }), ["Neo Quiz", "B1 2025-2026", "Fichiers"]);
 	}
 
+	/* ── 14. "Move to" offers the folders "My quizzes" shows, EMPTY ones
+	   included: a declared folder with no quiz is a target; the quiz's own
+	   folder and a hidden folder are not. ── */
+	{
+		const map = { byFolder: new Map(), ueOrder: [] };
+		const quizzes = [
+			{ path: "NQ/Alpha/a.md", basename: "a" },
+			{ path: "NQ/Beta/b.md", basename: "b" },
+		];
+		const overrides = {
+			Fresh: { name: "Fresh", path: "NQ/B2 2026-2027/Fresh" },
+			Secret: { name: "Secret", path: "NQ/Secret", hidden: "1" },
+			NoPath: { name: "NoPath" },
+		};
+		const names = (ov) => qm.quizMoveTargets(quizzes, map, ov, undefined, "NQ/Alpha").map(g => g.folder);
+		r.check("14a. an empty declared folder is offered; the current, a hidden one and one without a path are not",
+			names(overrides), ["Beta", "Fresh"]);
+		r.check("14b. without the empty folder's declaration it is gone (the check discriminates)",
+			names({}), ["Beta"]);
+	}
+
 	r.done();
 });

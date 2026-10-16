@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Edit folder keeps the label of Manage exams on a phone, instead of showing only its icon.
+- Move to offers every folder of the list, empty ones included, whatever the page the card menu was opened from.
+
 ### Changed
 
 - Generated Learns teach the lecture from zero at its own depth (its length comes from the folder's class sessions), define each term where it first appears, explain why each wrong answer is wrong, and open with what you need to know first when the lecture assumes it.

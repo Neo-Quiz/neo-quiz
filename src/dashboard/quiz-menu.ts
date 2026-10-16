@@ -4,8 +4,8 @@ import { t } from "../i18n";
 import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
-import type { ModuleGroup, ModuleMap } from "./quiz-modules";
-import { buildUeGroups, declaredFolders, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
+import type { ModuleGroup, ModuleMap, ModuleOverride } from "./quiz-modules";
+import { applyModuleOverrides, buildUeGroups, declaredFolders, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
 import { poserLogoObsidian } from "./brand-icons";
@@ -620,6 +620,26 @@ export async function duplicateQuiz(quiz: QuizIndexEntry): Promise<string | null
 
 /* ── Menus ── */
 
+/** The folders "Move to" offers for a quiz: the SAME set as the "My quizzes"
+    page (`modulesAffiches`: folders with a quiz, declared folders even when
+    empty, the generated folder), minus the quiz's current folder and the
+    hidden ones, and only those with a real path to write to. */
+export function quizMoveTargets(
+	quizzes: QuizIndexEntry[],
+	map: ModuleMap,
+	overrides: Record<string, ModuleOverride> | undefined,
+	sas: string | undefined,
+	currentFolder: string | undefined,
+): ModuleGroup[] {
+	const masques = hiddenFolders(overrides);
+	/* The declared folders take their path from the OVERRIDES: applied here
+	   (idempotent) so that a caller's map without them cannot drop an empty
+	   folder, which has no quiz to give it a path. */
+	const withOverrides = applyModuleOverrides(map, overrides || {});
+	return modulesAffiches(quizzes, {}, withOverrides, declaredFolders(overrides), masques, sas)
+		.filter(g => g.path && g.path !== currentFolder && !masques.includes(g.folder));
+}
+
 /** The ⋯ menu of a quiz card: the order and the red row follow the
     StudySmarter reference. Built ON CLICK (the quiz's name may have changed).
     NO hide entry: hiding exists at folder level only (2026-07-19, then for
@@ -663,11 +683,8 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			const dossierActuel = moduleForQuiz(quiz.path, map).path;
 			// The SAME folders as the "My quizzes" page, empty ones included,
 			// hidden ones left out (as the archived ones were).
-			const masques = hiddenFolders(ctx.settings.quizzesModuleOverrides);
 			const sas = ctx.generatedFolder?.();
-			const groupes = modulesAffiches(ctx.scanner.getQuizzes(), {}, map,
-				declaredFolders(ctx.settings.quizzesModuleOverrides), masques, sas)
-				.filter(g => g.path && g.path !== dossierActuel && !masques.includes(g.folder));
+			const groupes = quizMoveTargets(ctx.scanner.getQuizzes(), map, ctx.settings.quizzesModuleOverrides, sas, dossierActuel);
 			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
 			   au lieu d'un second menu qui remplaçait le premier au clic. */
 			const sousItems: ActionMenuItem[] = [];
