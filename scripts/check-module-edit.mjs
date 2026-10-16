@@ -162,6 +162,23 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ moduleForQuiz, app
 	r.done();
 });
 
+/* Year folders in the links of the module map note (spec 2026-10-15, §4): the
+   course is the segment right under `B<n> YYYY-YYYY`, as under `B<n> (…)`. A
+   note one folder deeper tells the year rule from the fallback (second-to-last
+   segment). */
+await withSrcModule("src/dashboard/quiz-modules.ts", async ({ moduleFolderFromLinkPath, parseModuleMap }) => {
+	const r = makeReporter("Modules — year folders in links");
+	r.check("B2 2026-2027/XTI303 …/note resolves to the course folder",
+		moduleFolderFromLinkPath("B2 2026-2027/XTI303 - Conception/XTI303 - Conception.md"), "XTI303 - Conception");
+	r.check("one folder deeper: still the course, never the sub-folder",
+		moduleFolderFromLinkPath("B2 2026-2027/XTI303 - Conception/TP/note.md"), "XTI303 - Conception");
+	r.check("B2 (…) still recognised", moduleFolderFromLinkPath("Efrei/B2 (2026-2027)/XTI301/TP/q.md"), "XTI301");
+	r.check("not a year folder (a plain B folder): the fallback", moduleFolderFromLinkPath("B2 notes/XTI303/TP/note.md"), "TP");
+	const map = parseModuleMap("> [!portals] UE31\n> - [[B2 2026-2027/XTI303 - Conception/TP/note|Conception]]\n");
+	r.check("the module map reads it", [...map.byFolder.keys()], ["XTI303 - Conception"]);
+	r.done();
+});
+
 
 /* CE QUE LE MODAL MONTRE, et non plus seulement ce qu'il écrit. Il résolvait
    lui-même l'icône et la teinte (`DEFAULT_MODULE_ICON`, `hashAccent`) : sur le

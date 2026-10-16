@@ -111,19 +111,20 @@ export interface ModuleMap {
 const CALLOUT_RE = /^>\s*\[!portals\]\s*(.+?)\s*$/;
 const LINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/;
 
-/* Extrait le SEGMENT de dossier de module d'un chemin de lien : le premier
-   segment situé après un dossier « année » (repéré par « B1 (…) », « B2 (…) »,
-   etc.). Si aucun dossier année n'est reconnu, on prend le dernier segment de
-   dossier (le lien pointe soit vers le dossier, soit vers une note dedans —
-   dans les deux cas le dossier de module est l'avant-dernier ou le dernier
-   segment ; on retient le segment sous l'année pour être robuste aux deux). */
-function moduleFolderFromLinkPath(linkPath: string): string {
+/* Extracts the module folder SEGMENT of a link path: the first segment after a
+   "year" folder ("B1 (…)", "B2 (…)", or "B2 2026-2027" since 2026-10-15). When
+   no year folder is recognised, the last folder segment (the link points either
+   at the folder or at a note inside it: in both cases the module folder is the
+   last or second-to-last segment; the segment under the year is kept to be
+   robust to both). */
+const YEAR_SEGMENT_RE = /\bB\d+\s*\(|^B\d+\s+\d{4}-\d{4}(?!\d)/;
+export function moduleFolderFromLinkPath(linkPath: string): string {
 	const segs = linkPath.split("/").filter(Boolean);
-	const yearIdx = segs.findIndex(s => /\bB\d+\s*\(/.test(s));
+	const yearIdx = segs.findIndex(s => YEAR_SEGMENT_RE.test(s));
 	if (yearIdx >= 0 && yearIdx + 1 < segs.length) return segs[yearIdx + 1];
-	// Repli : avant-dernier segment si le lien finit par une note homonyme,
-	// sinon le dernier. On ne peut pas distinguer note/dossier depuis le texte ;
-	// le 1er segment sous l'année couvre le vault réel d'Ahmed.
+	// Fallback: the second-to-last segment when the link ends with a note of the
+	// same name, else the last. Text alone cannot tell a note from a folder; the
+	// first segment under the year covers the real vaults.
 	return segs.length >= 2 ? segs[segs.length - 2] : segs[segs.length - 1] || "";
 }
 

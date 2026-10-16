@@ -9,6 +9,7 @@ import type { Client } from "./client";
 import { extensionRefusee } from "../ressources";
 import { newFolderName, prettyName } from "./noms";
 import { allFiles, limiter, type MoodleFile, type Scan } from "./pur";
+import { YEAR_FOLDER_RE, newCourseYearFolder } from "../../../../src/dashboard/year-folders";
 
 export const MTIME_TOLERANCE = 2000;    // ms: file systems round dates
 export const DOWNLOAD_CONCURRENCY = 8;
@@ -37,21 +38,37 @@ export function marquerWeb(chemin: string, origin: string, plateforme: string = 
 /** The perimeter, as the sync needs it: `contient` of `perimetre.ts`. */
 export interface Garde { contient(chemin: string): Promise<boolean> }
 
-/** The folder directly under `root` whose name starts with the course code
-    (case ignored, and not followed by another digit), else the one to create. */
-export function dossierDuCours(root: string, code: string, courseName: string): { dir: string; name: string; exists: boolean } {
-	const re = new RegExp("^" + code.replace(/[^A-Za-z0-9]/g, "") + "(?!\\d)", "i");
-	let found: string | undefined;
+/** The folders directly under `dir` (none when it cannot be read). */
+function sousDossiers(dir: string): string[] {
 	try {
-		found = fs.readdirSync(root, { withFileTypes: true })
-			.filter(e => e.isDirectory() && re.test(e.name))
-			.map(e => e.name)
-			.sort((a, b) => a.localeCompare(b))[0];
+		return fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
 	} catch {
-		// the root does not exist yet: the folder will be created
+		return [];
 	}
-	const name = found ?? newFolderName(code, courseName);
-	return { dir: path.join(root, name), name, exists: found !== undefined };
+}
+
+/** The course folder: a folder directly under `root` whose name starts with the
+    course code (case ignored, and not followed by another digit), else one
+    directly under a YEAR folder of the root (`^B\d+\s`, never deeper, never a
+    course's sub-folders); a root-level match wins. Else the one to create,
+    inside its year folder (`year-folders.ts`: an existing `B<level> …`
+    folder, else `B<level> <school year>`), or at the root for a code without a
+    level. `name` is the path under the root, with "/" between segments. */
+export function dossierDuCours(root: string, code: string, courseName: string, now: Date = new Date()): { dir: string; name: string; exists: boolean } {
+	const re = new RegExp("^" + code.replace(/[^A-Za-z0-9]/g, "") + "(?!\\d)", "i");
+	const premier = (noms: string[]): string | undefined => noms.filter(n => re.test(n)).sort((a, b) => a.localeCompare(b))[0];
+	const racine = sousDossiers(root);
+	const direct = premier(racine);
+	if (direct !== undefined) return { dir: path.join(root, direct), name: direct, exists: true };
+	for (const annee of racine.filter(n => YEAR_FOLDER_RE.test(n)).sort((a, b) => a.localeCompare(b))) {
+		const dedans = premier(sousDossiers(path.join(root, annee)));
+		if (dedans !== undefined) return { dir: path.join(root, annee, dedans), name: `${annee}/${dedans}`, exists: true };
+	}
+	const nom = newFolderName(code, courseName);
+	const annee = newCourseYearFolder(code, racine, now);
+	return annee === null
+		? { dir: path.join(root, nom), name: nom, exists: false }
+		: { dir: path.join(root, annee, nom), name: `${annee}/${nom}`, exists: false };
 }
 
 export function localStatus(file: { name: string; timemodified: number }, dir: string | null): "missing" | "present" | "outdated" {

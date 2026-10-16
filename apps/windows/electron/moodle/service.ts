@@ -384,7 +384,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return ensembleParDefaut(inscrits, connus, r, maintenant());
 	}
 	function versCours(c: CoursChoisi): CoursMoodle {
-		const f = c.course.code ? dossierDuCours(deps.racine(), c.course.code, c.course.name) : null;
+		const f = c.course.code ? dossierDuCours(deps.racine(), c.course.code, c.course.name, new Date(maintenant())) : null;
 		return {
 			id: c.course.id, name: c.course.name, code: c.course.code, folder: f ? f.name : null, folderExists: f ? f.exists : false,
 			favori: c.favori, exclu: c.exclu, enCours: c.enCours, extra: c.extra,
@@ -464,7 +464,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return [];
-			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name);
+			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
 			const scan = await scanCourse(client, id, dir);
 			const echecs = echecsFichiers.get(id);
 			const out: FichierMoodle[] = [];
@@ -485,7 +485,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return vide;
-			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name);
+			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
 			const scan = await scanCourse(client, id, dir);
 			const echecs = echecsFichiers.get(id);
 			const ignores = (await reglage()).ignores;
@@ -529,7 +529,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const devoirs: DevoirBrut[] = [];
 			for (const c of choisis) {
 				const code = c.course.code as string;
-				const { dir } = dossierDuCours(deps.racine(), code, c.course.name);
+				const { dir } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
 				if (!(await deps.garde.contient(dir))) { res.echecs++; continue; }
 				// A course that fails (no access, a hostile id) is skipped; it never aborts the run.
 				let scan: Awaited<ReturnType<typeof scanCourse>>;
@@ -619,7 +619,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	/** The folder of a known course, only when it exists as a plain folder inside the quiz root and the perimeter. */
 	async function dossierExistant(c: CoursChoisi): Promise<string | null> {
 		if (!c.course.code) return null;
-		const f = dossierDuCours(deps.racine(), c.course.code, c.course.name);
+		const f = dossierDuCours(deps.racine(), c.course.code, c.course.name, new Date(maintenant()));
 		if (!f.exists || !estDans(deps.racine(), f.dir)) return null;
 		try { if (!(await fs.lstat(f.dir)).isDirectory()) return null; } catch { return null; }
 		return (await deps.garde.contient(f.dir)) ? f.dir : null;
@@ -681,7 +681,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const liste: DevoirBrut[] = [];
 			for (const c of suivis(await catalogue(client, s.j.userid))) {
 				const code = c.course.code as string;
-				const { dir } = dossierDuCours(deps.racine(), code, c.course.name);
+				const { dir } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
 				for (const d of pendingDeposits(await scanCourse(client, c.course.id, null))) {
 					liste.push({ cmid: d.id, courseId: c.course.id, course: c.course.name, dossier: dir, name: d.name, state: d.state as DevoirMoodle["state"], due: d.due, remaining: d.remaining });
 				}

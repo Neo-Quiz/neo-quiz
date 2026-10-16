@@ -40,6 +40,13 @@ async function test(name, fn) {
 
 const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), "moodle-check-"));
 const ALL = { contient: async () => true };
+/** The year folder a NEW course of `level` lands in when the root has none:
+    the school year containing `ms` (September to August), spec 2026-10-15. */
+const anneeScolaire = (level, ms = Date.now()) => {
+	const d = new Date(ms);
+	const y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+	return `B${level} ${y}-${y + 1}`;
+};
 const MOODLE = "apps/windows/electron/moodle/";
 
 /* ─────────── local servers ─────────── */
@@ -140,10 +147,49 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		fs.writeFileSync(path.join(root, "XCS413 - fichier"), "x");
 		const a = disque.dossierDuCours(root, "XTI302", "XTI302-CYB - Admin");
 		assert.deepEqual([a.name, a.exists], ["XTI302 - Admin", true]);
-		const b = disque.dossierDuCours(root, "XCS413", "XCS413-CYB-2627PSA01 - Fondamentaux: réseaux/IA");
-		assert.deepEqual([b.name, b.exists], ["XCS413 - Fondamentaux- réseaux-IA", false]);
-		assert.equal(path.dirname(b.dir), root);
+		const b = disque.dossierDuCours(root, "XCS413", "XCS413-CYB-2627PSA01 - Fondamentaux: réseaux/IA", new Date(2026, 9, 16));
+		assert.deepEqual([b.name, b.exists], ["B2 2026-2027/XCS413 - Fondamentaux- réseaux-IA", false]);
+		assert.equal(b.dir, path.join(root, "B2 2026-2027", "XCS413 - Fondamentaux- réseaux-IA"));
 		assert.equal(disque.dossierDuCours(path.join(root, "absent"), "XTI302", "x - Y").exists, false);
+	});
+	/* Year folders (spec 2026-10-15-year-folders-design §3): a course is also
+	   found one level down, inside a `B<n> …` folder, and a NEW course is
+	   created in its year folder. Courses already at the root keep working. */
+	await test("course folder: found inside a year folder, the root match wins, never deeper nor in a course", () => {
+		const root = tmpdir();
+		const mk = (...p) => fs.mkdirSync(path.join(root, ...p), { recursive: true });
+		mk("B2 2026-2027", "XTI303 - Conception");
+		mk("B1 2025-2026", "XTI102 - Structures", "XTI405 - deeper");
+		mk("XTI101 - Algo", "XTI404 - inside a course");
+		mk("Archive", "XTI406 - not a year folder");
+		mk("XTI304 - Cloud");
+		mk("B2 2026-2027", "XTI304 - Cloud (year copy)");
+		const a = disque.dossierDuCours(root, "XTI303", "XTI303 - Conception");
+		assert.deepEqual([a.name, a.exists, a.dir], ["B2 2026-2027/XTI303 - Conception", true, path.join(root, "B2 2026-2027", "XTI303 - Conception")]);
+		const b = disque.dossierDuCours(root, "XTI304", "XTI304 - Cloud");
+		assert.deepEqual([b.name, b.exists], ["XTI304 - Cloud", true], "the root match wins");
+		for (const code of ["XTI404", "XTI405", "XTI406"]) {
+			assert.equal(disque.dossierDuCours(root, code, code + " - x", new Date(2026, 9, 16)).exists, false, code + " is never searched there");
+		}
+	});
+	await test("course folder: a new course goes into its year folder (existing, derived, today), a code without a level at the root", () => {
+		const now = new Date(2026, 9, 16);
+		const at = (...dirs) => { const r = tmpdir(); for (const d of dirs) fs.mkdirSync(path.join(r, d)); return r; };
+		// an existing B<level> folder is reused, whatever its form
+		assert.equal(disque.dossierDuCours(at("B2 (2026-2027)"), "XTI305", "XTI305-CYB - Ethical Hacking", now).name, "B2 (2026-2027)/XTI305 - Ethical Hacking");
+		// derived from another dated year folder: YYYY + (level - m)
+		const r = at("B1 2025-2026");
+		assert.equal(disque.dossierDuCours(r, "XTI401", "XTI401 - Réseaux 2", now).name, "B2 2026-2027/XTI401 - Réseaux 2");
+		assert.equal(disque.dossierDuCours(r, "XTI501", "XTI501 - Master", now).name, "B3 2027-2028/XTI501 - Master");
+		assert.equal(disque.dossierDuCours(at("B3 2030-2031"), "XTI101", "XTI101 - Algo", now).name, "B1 2028-2029/XTI101 - Algo");
+		// no year folder at all: the school year containing today (September to August)
+		assert.equal(disque.dossierDuCours(at(), "XTI302", "XTI302 - Admin", now).name, "B2 2026-2027/XTI302 - Admin");
+		assert.equal(disque.dossierDuCours(at(), "XTI302", "XTI302 - Admin", new Date(2026, 7, 31)).name, "B2 2025-2026/XTI302 - Admin");
+		assert.equal(disque.dossierDuCours(at(), "XTI302", "XTI302 - Admin", new Date(2026, 8, 1)).name, "B2 2026-2027/XTI302 - Admin");
+		// a code without a level keeps the old rule: created at the root
+		const z = at();
+		const c = disque.dossierDuCours(z, "XTI002", "XTI002 - Zero", now);
+		assert.deepEqual([c.name, c.dir], ["XTI002 - Zero", path.join(z, "XTI002 - Zero")]);
 	});
 	await test("flattenContents: files, folders, pages, links, assignments, deposit state", () => {
 		const tree = pur.flattenContents(SECTIONS, ASSIGNS, DEPOSITS);
@@ -819,7 +865,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			everything.push(cours, r, r2, devoirs, e, pushes);
 		} finally { stop(m.s); stop(other.s); }
 	});
-	await test("service: a new course folder is created under the default root when none starts with the code", async () => {
+	await test("service: a new course folder is created in its year folder under the default root when none starts with the code", async () => {
 		const { m, other } = await fakeMoodle();
 		const base = tmpdir();
 		const { svc, opened } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [1] } } });
@@ -828,7 +874,10 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
 			const r = await svc.synchroniser();
 			assert.equal(r.nouveaux, 1);
-			assert.deepEqual(fs.readdirSync(base).filter(n => !n.startsWith("..data")), ["XTI302 - Admin système"]);
+			// No year folder yet: created in "B2 <the school year containing today>" (September to August).
+			const annee = anneeScolaire(2);
+			assert.deepEqual(fs.readdirSync(base).filter(n => !n.startsWith("..data")), [annee]);
+			assert.deepEqual(fs.readdirSync(path.join(base, annee)), ["XTI302 - Admin système"]);
 		} finally { stop(m.s); stop(other.s); }
 	});
 	await test("service: an expired token -> state expired (no silent re-login), then a new login works", async () => {
@@ -932,8 +981,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			// the followed set (what downloads and what lists assignments) leaves the excluded out
 			const dest = path.join(c.base, "XTI500 - extra");
 			await c.svc.synchroniser();
-			assert.ok(fs.readdirSync(c.base).some(n => n.startsWith("XTI500")), "an added course downloads");
-			assert.equal(fs.readdirSync(c.base).some(n => n.startsWith("XCS413")), false, "an excluded course never does");
+			const cree = [...fs.readdirSync(c.base), ...fs.readdirSync(path.join(c.base, anneeScolaire(3))), ...fs.readdirSync(path.join(c.base, anneeScolaire(2)))];
+			assert.ok(cree.some(n => n.startsWith("XTI500")), "an added course downloads");
+			assert.equal(cree.some(n => n.startsWith("XCS413")), false, "an excluded course never does");
 			assert.equal(dest.length > 0, true);
 		} finally { fin(c); }
 	});
@@ -1037,7 +1087,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		try {
 			let f = await c.svc.fichiers(5);
 			assert.deepEqual(f.map(x => [x.name, x.section, x.status]), [["Notes.pdf", "S1", "missing"], ["tool.bat", "S1", "missing"]]);
-			assert.ok(f.every(x => x.relPath.startsWith("XTI500 - XTI500 extra/") || x.relPath.startsWith("XTI500")), JSON.stringify(f));
+			assert.ok(f.every(x => x.relPath.startsWith(anneeScolaire(3) + "/XTI500 - XTI500 extra/")), JSON.stringify(f));
 			assert.equal(/https?:|token/i.test(JSON.stringify(f)), false);
 			// the course as its page shows it: same files grouped by activity, same bounds, never a URL
 			const mod = await c.svc.module(5);
@@ -1072,7 +1122,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		const c = await connecte({}, { reglages: { extra: [5] }, garde: deny });
 		try {
 			await c.svc.telechargerFichier(5, "Notes.pdf");
-			const dir = path.join(c.base, fs.readdirSync(c.base).find(n => n.startsWith("XTI500")));
+			const dir = path.join(c.base, anneeScolaire(3), fs.readdirSync(path.join(c.base, anneeScolaire(3))).find(n => n.startsWith("XTI500")));
 			assert.equal(await c.svc.ouvrirFichier(5, "Notes.pdf"), true);
 			assert.equal(c.chemins.at(-1), path.join(dir, "Notes.pdf"));
 			assert.equal(await c.svc.ouvrirDossier(5), true);
@@ -1162,9 +1212,13 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			try {
 				await t.svc.connecter();
 				await t.svc.recevoirJeton(link(new URL(t.opened[0]).searchParams.get("passport"), TOKEN, m.root));
-				const dest = path.join(base, "XTI302 - Admin système");
+				const dest = path.join(base, anneeScolaire(2, clock), "XTI302 - Admin système");
 				await wait(() => fs.existsSync(dest) && fs.readdirSync(dest).length === 1);
 				assert.equal(fs.readdirSync(dest).length, 1, "downloaded right after sign-in");
+				/* The sign-in run is still going once its file has landed (assignments
+				   are read after the downloads): a check started now would join it
+				   (`synchroniser` returns the run in progress) and download nothing. */
+				for (let i = 0; i < 150 && (await t.svc.etat()).syncing; i++) await new Promise(r => setTimeout(r, 20));
 				// at start: arms the hourly timer ONCE and checks
 				fs.rmSync(dest, { recursive: true });
 				clock += 11000;
@@ -1235,7 +1289,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			await t.svc.demarrerAuto();
 			timers.forEach(fn => fn());
 			await new Promise(r => setTimeout(r, 300));
-			const dest = path.join(base, "XTI302 - Admin système");
+			const dest = path.join(base, anneeScolaire(2, clock), "XTI302 - Admin système");
 			assert.equal(fs.existsSync(dest), false, "metered: nothing downloaded automatically");
 			assert.equal(m.calls.some(f => /contents/.test(f)), false, "metered: Moodle is not asked for contents");
 			assert.equal((await t.svc.etat()).pausedMetered, true, "the pause is recorded in the state");

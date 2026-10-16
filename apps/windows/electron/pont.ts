@@ -217,7 +217,7 @@ export interface CoursMoodle {
 	name: string;
 	/** Module code parsed from the short name (`XTI302`), null when it has none (nothing downloads then). */
 	code: string | null;
-	/** The folder name under the default quiz root: existing, or the one to create. */
+	/** The course folder under the default quiz root ("B2 2026-2027/XTI303 - …" inside a year folder, "/" between segments): existing, or the one to create. */
 	folder: string | null;
 	folderExists: boolean;
 	favori: boolean;

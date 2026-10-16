@@ -21,6 +21,7 @@ release notes.
 
 - Moodle now has a button in the sidebar above Settings (it can be hidden in Settings > Moodle), and the Moodle button of My quizzes is gone.
 - Settings > Moodle is reorganised into Account, Sync and Display, with a Sync now button.
+- Moodle finds a course inside a year folder (B2 2026-2027…), and creates a new course in its year folder.
 
 ## [1.20.113] - 2026-10-14
 
