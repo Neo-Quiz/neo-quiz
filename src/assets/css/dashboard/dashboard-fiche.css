@@ -621,7 +621,10 @@
 	font-size: 12.5px;
 }
 .qbd-fiche-meta .qbd-fiche-chip:hover { transform: none; }
-.qbd-fiche-meta .qbd-fiche-chip + .qbd-fiche-chip::before,
+/* The "·" between two chips hangs at the END of the first one (`::after`),
+   not at the start of the second: when the line wraps (narrow column), it
+   stays at the end of the line instead of opening the next one. */
+.qbd-fiche-meta .qbd-fiche-chip:has(+ .qbd-fiche-chip)::after,
 .qbd-fiche-meta .qbd-fiche-modes + .qbd-fiche-chip::before {
 	content: "·";
 	/* La pastille est en `inline-flex` avec `gap: 6px` : ce `::before` en
