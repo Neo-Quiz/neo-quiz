@@ -212,6 +212,14 @@ export function reglagesDeLaCoquille(): Pick<DashboardShellCtx, "settings" | "sa
 	return { settings: reglagesPagesCache, saveSettings: enregistrerReglagesPages };
 }
 
+/** The ctx of the MOUNTED shell, for a gesture started from Settings that needs
+    the app's safe folder move (`moveModuleTo`: review store, stats, scanner);
+    null while no shell is mounted. */
+let coquilleMontee: DashboardShellCtx | null = null;
+export function coquilleActive(): DashboardShellCtx | null {
+	return coquilleMontee;
+}
+
 async function enregistrerReglagesPages(): Promise<void> {
 	// `?? null`/`?? []` : un réglage effacé par la page (retour à « aucun »)
 	// doit s'écrire comme tel, jamais laisser une ancienne valeur trainer.
@@ -694,6 +702,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		   them alike. Incoming [[links]] are not rewritten. */
 	};
 
+	coquilleMontee = ctx;
 	const nav = createNavHandlers(ctx);
 	const home = createHomeHandlers(ctx);
 	const quizzes = createQuizzesHandlers(ctx);
@@ -1222,6 +1231,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 
 	const demonter = (): Promise<void> => {
 		if (demontage) return demontage;
+		if (coquilleMontee === ctx) coquilleMontee = null;
 		document.removeEventListener("keydown", surCtrlZ);
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);

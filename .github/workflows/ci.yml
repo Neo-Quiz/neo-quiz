@@ -563,6 +563,10 @@ jobs:
       - name: Move quiz
         run: npm run check:move-quiz
 
+      # Course folders by school year: the plan, the Dashboard.md links, the run.
+      - name: Year folders
+        run: npm run check:year-folders
+
       # The debounced watcher and index never lose a note history on rename.
       - name: Electron file index
         run: npm run check:electron-index

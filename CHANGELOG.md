@@ -16,6 +16,7 @@ release notes.
 ### Added
 
 - A folder can be hidden from the list (⋯ menu > Hide from list): it moves to a Hidden section at the bottom of My quizzes, leaves Home, and its reviews are paused while it is hidden. Show in list brings it back on every synced device. Hiding replaces archiving: folders archived before are hidden once, on each device.
+- A folder's ⋯ menu > Move to also offers the folders of its own place (and the place itself, for a folder inside another one). Settings > Moodle > Sync has an Organise by school year button: it moves each course folder into its year folder (B1, B2…) in one go, with its review history, stats, exams and settings, and updates the links of Dashboard.md.
 
 ### Changed
 

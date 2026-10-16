@@ -21,11 +21,16 @@ import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { boutonPlat, heure, origineValide } from "./moodle-common";
 import { openMoodleModal } from "./moodle-modal";
-import { reglagesDeLaCoquille } from "./dashboard-shell";
+import { coquilleActive, reglagesDeLaCoquille } from "./dashboard-shell";
+import { openYearFoldersModal } from "./year-folders-modal";
+import { readYearPlan } from "../../../../src/dashboard/year-folders-run";
+import type { YearPlan } from "../../../../src/dashboard/year-folders";
+import { currentHost } from "../../../../src/host/current";
 import { RAIL_PREFS_EVENT } from "../../../../src/dashboard/nav";
 
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
+const PLAN_MS = 5000;
 
 export function mountMoodleSettings(page: HTMLElement): () => void {
 	const api = pont().moodle;
@@ -35,6 +40,7 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	let attenteDepuis = 0;
 	let sonde: ReturnType<typeof setInterval> | null = null;
 	let champOuvert = false;
+	let planLu: { at: number; plan: Promise<YearPlan | null> } | null = null;
 
 	const racine = ajouter(page, "div", "nq-moodle");
 	/* The card of the section being painted (`peindre` swaps it). */
@@ -45,8 +51,8 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 		return v && typeof v === "object" && !Array.isArray(v) ? { ...(v as Record<string, unknown>) } : {};
 	}
 
-	function ligne(nom: string, aide?: string): { texte: HTMLElement; controle: HTMLElement; aide: HTMLElement } {
-		const l = ajouter(carte, "div", "nq-set-ligne");
+	function ligne(nom: string, aide?: string, dans: HTMLElement = carte): { texte: HTMLElement; controle: HTMLElement; aide: HTMLElement } {
+		const l = ajouter(dans, "div", "nq-set-ligne");
 		const texte = ajouter(l, "div", "nq-set-ligne-texte");
 		ajouter(texte, "span", "nq-reglages-nom", nom);
 		const a = ajouter(texte, "span", "nq-set-ligne-aide", aide ?? "");
@@ -55,10 +61,11 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 	}
 
 	/** A titled section holding one card; later `ligne` calls land in it. */
-	function sectionCarte(titre: string | null): void {
+	function sectionCarte(titre: string | null): HTMLElement {
 		const sec = ajouter(racine, "section", "nq-reglages-section");
 		if (titre) ajouter(sec, "h3", "nq-reglages-titre", titre);
 		carte = ajouter(sec, "div", "nq-set-carte");
+		return sec;
 	}
 
 	function interrupteur(parent: HTMLElement, nom: string, valeur: boolean, surChangement: (v: boolean) => void): void {
@@ -119,6 +126,7 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 				void lireReglage().then(cur => pont().reglages.ecrire(CLE_REGLAGES_MOODLE, { ...cur, auto: v }))
 					.catch(() => { void rafraichir(); });
 			});
+			void peindreRangement(carte);
 			peindreAffichage();
 			return;
 		}
@@ -141,7 +149,31 @@ export function mountMoodleSettings(page: HTMLElement): () => void {
 		zone.hidden = !champOuvert;
 		lien.addEventListener("click", () => { champOuvert = true; lien.hidden = true; zone.hidden = false; void peindreEcoles(zone, e.site); });
 		if (champOuvert) void peindreEcoles(zone, e.site);
+		/* Organising the folders needs no Moodle account: signed out, the Sync
+		   section holds only that line, shown once the plan is known. */
+		const sync = sectionCarte(t("settings.moodle.sync"));
+		sync.hidden = true;
+		void peindreRangement(carte, sync);
 		peindreAffichage();
+	}
+
+	/** "Organise by school year", in the Sync card, only when at least one
+	    course folder of the Moodle root (the default root, where Moodle syncs)
+	    would move. Read asynchronously: the line is appended when the plan is known. */
+	async function peindreRangement(carteSync: HTMLElement, section?: HTMLElement): Promise<void> {
+		const ctx = coquilleActive();
+		if (!ctx) return;
+		const rootId = currentHost().paths.defaultRoot().id;
+		/* The state repaints this page on every sync progress: the disk is read
+		   at most every few seconds, never once per repaint. */
+		if (!planLu || Date.now() - planLu.at > PLAN_MS) planLu = { at: Date.now(), plan: readYearPlan(ctx, rootId, new Date()).catch(() => null) };
+		const plan = await planLu.plan;
+		if (detruit || !plan || plan.moves.length === 0 || !carteSync.isConnected) return;
+		if (section) section.hidden = false;
+		const l = ligne(t("settings.moodle.organise"), t("settings.moodle.organiseHelp"), carteSync);
+		boutonPlat(l.controle, t("settings.moodle.organiseCta"), () => {
+			openYearFoldersModal(ctx, rootId, plan, () => { planLu = null; void rafraichir(); });
+		});
 	}
 
 	/** The host of the site origin (`https://moodle.example.edu` becomes `moodle.example.edu`). */

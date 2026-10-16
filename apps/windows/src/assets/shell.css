@@ -1921,3 +1921,19 @@ label.nq-set-ligne {
 .nq-moodle-saisie { display: flex; gap: 8px; }
 .nq-moodle-saisie[hidden], .nq-moodle-ecoles[hidden] { display: none; }
 .nq-moodle-saisie .nq-moodle-site { flex: 1; width: auto; }
+
+/* "Organise by school year" (year-folders-modal.ts): what moves, by year folder.
+   The list scrolls only past a screenful (a whole school record can be 40
+   folders); the modal width follows `.qbd-medit-modal`. */
+.nq-annees-intro { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.nq-annees-liste { display: flex; flex-direction: column; gap: 12px; max-height: min(50vh, 420px); overflow-y: auto; }
+.nq-annees-annee { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text-normal); }
+.nq-annees-icone { display: inline-flex; color: var(--text-muted); }
+.nq-annees-icone svg { width: 16px; height: 16px; }
+.nq-annees-nom { min-width: 0; overflow-wrap: anywhere; }
+.nq-annees-neuf { font-weight: 400; font-size: 12px; color: var(--text-faint); }
+.nq-annees-cours { margin: 4px 0 0; padding-left: 32px; font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+.nq-annees-cours li { overflow-wrap: anywhere; }
+.nq-annees-erreur { margin: 10px 0 0; font-size: 13px; color: var(--color-red, #f87171); }
+.nq-annees-statut { margin: 12px 0 0; font-size: 13px; color: var(--text-normal); }
+.nq-annees-statut[hidden], .nq-reglages-section[hidden] { display: none; }
