@@ -496,5 +496,74 @@ await withSrcModule(
 			[rh.result, !!stranded && rh.notices.some(n => n.includes(stranded))], [false, true]);
 	}
 
+	/* ── 13. "Move to" a folder of the SAME root (spec 2026-10-15-year-folders,
+	   §1): the folder lands at `<parent>/<last segment>` with its history,
+	   stats and host keys; a taken name or a move to its current parent
+	   changes nothing. ── */
+	{
+		const roots = [{ id: "NQ", name: "Neo Quiz" }, { id: "Efrei", name: "Efrei" }];
+		const paths = {
+			roots: () => roots, defaultRoot: () => roots[0],
+			rootOf: (p) => roots.find(x => p === x.id || p.startsWith(x.id + "/")) ?? null,
+			localPath: (p) => p.split("/").slice(1).join("/"),
+			contractPath: (id, l) => (l ? id + "/" + l : id),
+		};
+		const run = async (g, toParent, { taken = [] } = {}) => {
+			const renames = [], moved = [], renamed = [], prefixes = [], notices = [];
+			hote.installHost({
+				paths, ui: { notice: (m) => { notices.push(m); } },
+				fs: { rename: async (a, b) => { if (taken.includes(b)) throw new Error(`${b} existe déjà`); renames.push([a, b]); } },
+			});
+			let ok;
+			try {
+				ok = await qm.moveModuleTo({
+					statsStore: { renamed: (a, b) => { renamed.push([a, b]); } },
+					reviewStore: { moved: async (a, b) => { moved.push([a, b]); } },
+					movedPrefix: async (a, b, before) => { prefixes.push([a, b, before]); },
+					scanner: { getQuizzes: () => [{ path: "NQ/XTI303 - Conception/cm.md" }] },
+				}, g, toParent);
+			} finally { hote.uninstallHost(); }
+			return { ok, renames, moved, renamed, prefixes, notices };
+		};
+		const g = { folder: "XTI303 - Conception", name: "XTI303", path: "NQ/XTI303 - Conception", quizzes: [] };
+		const a = await run(g, "NQ/B2 2026-2027");
+		const to = "NQ/B2 2026-2027/XTI303 - Conception";
+		r.check("13a. into a folder of the same root: one rename, history, stats and host keys follow",
+			[a.ok, a.renames, a.moved, a.renamed, a.prefixes],
+			[true, [[g.path, to]], [[g.path, to]], [[g.path, to]], [[g.path, to, ["NQ/XTI303 - Conception/cm.md"]]]]);
+		const back = await run({ ...g, path: to }, "NQ");
+		r.check("13a. and back to the root itself", [back.ok, back.renames], [true, [[to, g.path]]]);
+		const b = await run(g, "NQ/B2 2026-2027", { taken: [to] });
+		r.check("13b. a taken name: refused with the dedicated message, nothing follows",
+			[b.ok, b.notices, b.moved, b.renamed, b.prefixes], [false, ["A folder with this name already exists there."], [], [], []]);
+		const c = await run({ ...g, path: to }, "NQ/B2 2026-2027");
+		const c2 = await run(g, "NQ");
+		const c3 = await run(g, "NQ/XTI303 - Conception/TD");
+		r.check("13c. to its current parent, or into itself: a no-op returning false, nothing written",
+			[c.ok, c.renames, c2.ok, c2.renames, c3.ok, c3.renames], [false, [], false, [], false, []]);
+		const d = await run(g, "Efrei");
+		r.check("13d. between roots, as before: under its last segment at the target root's top level",
+			[d.ok, d.renames], [true, [[g.path, "Efrei/XTI303 - Conception"]]]);
+
+		/* The targets the menu offers in the same root. */
+		const files = ["NQ/Dashboard.md", "NQ/B2 2026-2027/XTI302 - Admin/cm.md", "NQ/B1 2025-2026/x.pdf", "NQ/XTI303 - Conception/cm.md",
+			"NQ/Generated/g.md", "NQ/Cache/c.md", "NQ/.neo-quiz/journal/a.jsonl", "NQ/Fichiers/f.pdf", "NQ/Secret/s.pdf", "Efrei/Other/o.md"];
+		const quizzes = ["NQ/B2 2026-2027/XTI302 - Admin/cm.md", "NQ/XTI303 - Conception/cm.md", "NQ/Generated/g.md", "NQ/Cache/c.md", "Efrei/Other/o.md"].map(path => ({ path }));
+		const targets = (grp) => {
+			hote.installHost({ paths, fs: { listFiles: () => files.map(path => ({ path })) }, ui: { notice() {} } });
+			try {
+				return qm.sameRootMoveTargets({
+					scanner: { getQuizzes: () => quizzes },
+					settings: { quizzesModuleOverrides: { Secret: { name: "Secret", hidden: "1" } } },
+					generatedFolder: () => "NQ/Generated",
+				}, grp).map(x => x.name);
+			} finally { hote.uninstallHost(); }
+		};
+		r.check("13e. a course at the root: the first-level folders that are not cards, never Generated, hidden, dot or itself",
+			targets(g), ["B1 2025-2026", "B2 2026-2027", "Fichiers"]);
+		r.check("13e. a course in a year folder: the root first, never its current parent",
+			targets({ folder: "XTI302 - Admin", name: "XTI302", path: "NQ/B2 2026-2027/XTI302 - Admin", quizzes: [] }), ["Neo Quiz", "B1 2025-2026", "Fichiers"]);
+	}
+
 	r.done();
 });

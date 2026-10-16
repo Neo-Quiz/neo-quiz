@@ -765,43 +765,53 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
     no "Rename" entry here), Hide = THE FOLDER (the synced `hidden` field of
     its settings, never per quiz), Delete = every quiz of the module (confirmed
     with the count). */
-/** Déplace le dossier `g.folder` vers la racine `toRoot`, sous le même nom
-    de dossier, puis transpose l'historique de révision qui lui appartient
-    (§2.3 de la spec) — voir `moveModuleTo` plus bas pour le détail. Séparée
-    de `buildModuleCardMenu` pour rester testable sans DOM. */
-export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRootId: string): Promise<boolean> {
+/** Moves the folder `g.path` into `toParent` (a ROOT, or a folder inside one,
+    as contract paths), under the same folder name, then carries the review
+    history and everything else that belongs to it (§2.3 of the spec).
+    False, with nothing written, when the folder already sits in `toParent`,
+    when `toParent` is inside the folder itself, or when the rename is refused.
+    Kept apart from `buildModuleCardMenu` to stay testable without a DOM. */
+export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toParent: string): Promise<boolean> {
 	const host = currentHost();
-	/* Le CHEMIN du dossier, jamais `g.folder`, qui n'est que son NOM
-	   (« Templates » pour « Personal/Templates ») : le renommage visait un
-	   chemin inexistant et échouait en disant « existe déjà » (2026-09-27).
-	   L'entrée n'est offerte qu'à un dossier qui a un chemin. */
+	/* The folder's PATH, never `g.folder`, which is only its NAME
+	   ("Templates" for "Personal/Templates"): the rename aimed at a path that
+	   did not exist and failed saying "already exists" (2026-09-27). The entry
+	   is only offered to a folder that has a path. */
 	const source = g.path;
 	if (!source || estLeSas(g, ctx.generatedFolder?.())) return false;
 	const localFrom = host.paths.localPath(source);
-	// Une RACINE entière (un quiz posé à la racine, `localFrom === ""`) ne se
-	// déplace jamais par ce chemin : le menu la masque déjà (B-mineur,
-	// 2026-09-27), ce second garde-fou protège l'appel direct.
+	// A whole ROOT (a quiz sitting at the root, `localFrom === ""`) never moves
+	// this way: the menu already hides it (2026-09-27); this second guard
+	// protects a direct call.
 	if (localFrom === "") return false;
-	// Dernier segment du chemin local : « B1/Cours/Reseaux » → « Reseaux ».
-	// Le dossier arrive à la racine cible SOUS LE MÊME NOM (spec §2.3), pas
-	// sous son chemin complet — un module d'un vault n'a pas à recréer toute
-	// l'arborescence de son ancien vault dans le dossier par défaut.
-	const nomDossier = localFrom.split("/").pop() ?? localFrom;
-	const to = host.paths.contractPath(toRootId, nomDossier);
+	const parentRoot = host.paths.rootOf(toParent);
+	if (!parentRoot) return false;
+	const parentLocal = host.paths.localPath(toParent);
+	// The last segment of the local path: "B1/Cours/Reseaux" -> "Reseaux". The
+	// folder lands in the target under the SAME NAME (spec §2.3), never under
+	// its full path: a module of a vault has no reason to recreate its old
+	// vault's whole tree in the default folder.
+	const segments = localFrom.split("/");
+	const nomDossier = segments.pop() ?? localFrom;
+	// Already there (a move to its current parent), or into itself: nothing to do.
+	if (host.paths.rootOf(source)?.id === parentRoot.id && segments.join("/") === parentLocal) return false;
+	if (toParent === source || toParent.startsWith(source + "/")) return false;
+	const to = host.paths.contractPath(parentRoot.id, parentLocal ? `${parentLocal}/${nomDossier}` : nomDossier);
 	/* The catalogue's paths BEFORE the rename: the watcher (300 ms debounce)
 	   may swap them for the new ones before `movedPrefix` runs. */
 	const cheminsAvant = ctx.scanner?.getQuizzes().map(q => q.path);
 	try {
 		await host.fs.rename(source, to);
 	} catch (e) {
-		/* Le contrat de `rename` refuse d'écraser : un homonyme existe déjà
-		   à la cible, rien n'a bougé. Toute autre erreur est un échec
-		   générique — même tri, par le message, que `moveQuizTo`. */
+		/* The `rename` contract refuses to overwrite: a same-named folder
+		   already sits at the target, nothing moved (the hosts' message says
+		   "existe déjà"). Any other error is a generic failure: the same
+		   sorting, by the message, as `moveQuizTo`. */
 		const message = e instanceof Error ? e.message : String(e);
 		if (message.includes("existe déjà")) {
 			host.ui.notice(t("dashboard.quizzes.moveExists"));
 		} else {
-			console.error("[quiz-blocks] déplacement de dossier impossible :", source, "->", to, e);
+			console.error("[quiz-blocks] folder move failed:", source, "->", to, e);
 			host.ui.notice(t("dashboard.quizzes.moveFolderError"));
 		}
 		return false;
@@ -813,6 +823,43 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toRoo
 	ctx.statsStore.renamed(source, to);
 	await ctx.movedPrefix?.(source, to, cheminsAvant);
 	return true;
+}
+
+/** The folders of `g`'s OWN root it may move into (spec 2026-10-15 §1): the
+    root itself when `g` sits in a sub-folder, then each first-level folder of
+    the root (by name) that is not a module card (no quiz directly inside),
+    never `g`'s own folder nor its current parent, never the "Generated"
+    folder, never a hidden folder. Folders are read from the host's file index
+    (synchronous, as a menu is): an EMPTY folder has no file and is not offered. */
+export function sameRootMoveTargets(ctx: DashboardShellCtx, g: ModuleGroup): { path: string; name: string; root: boolean }[] {
+	const host = currentHost();
+	if (!g.path) return [];
+	const root = host.paths.rootOf(g.path);
+	if (!root) return [];
+	const local = host.paths.localPath(g.path);
+	if (local === "") return [];
+	const parent = g.path.slice(0, g.path.lastIndexOf("/"));
+	const out: { path: string; name: string; root: boolean }[] = [];
+	if (local.includes("/")) out.push({ path: root.id, name: root.name, root: true });
+	const firstLevel = (p: string): string | null => {
+		if (host.paths.rootOf(p)?.id !== root.id) return null;
+		const segs = host.paths.localPath(p).split("/");
+		return segs.length >= 2 && segs[0] && !segs[0].startsWith(".") ? segs[0] : null;
+	};
+	const folders = new Set<string>();
+	for (const f of host.fs.listFiles()) { const n = firstLevel(f.path); if (n) folders.add(n); }
+	const quizzes = ctx.scanner.getQuizzes();
+	for (const q of quizzes) { const n = firstLevel(q.path); if (n) folders.add(n); }
+	// A folder with a quiz DIRECTLY inside is a module card, never a target.
+	const cards = new Set(quizzes.map(q => q.path.slice(0, q.path.lastIndexOf("/"))));
+	const hidden = hiddenFolders(ctx.settings.quizzesModuleOverrides);
+	const sas = ctx.generatedFolder?.();
+	for (const name of [...folders].sort((a, b) => a.localeCompare(b))) {
+		const path = host.paths.contractPath(root.id, name);
+		if (path === g.path || path === parent || path === sas || cards.has(path) || hidden.includes(name)) continue;
+		out.push({ path, name, root: false });
+	}
+	return out;
 }
 
 export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (g: ModuleGroup, anchorEl?: HTMLElement) => ActionMenuItem[] {
@@ -878,36 +925,43 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				},
 			});
 		}
-		// Une seule racine (le vault, sous Obsidian) : rien où déplacer.
-		// `anchorEl` manquant (appelant qui n'aurait pas encore été mis à jour) :
-		// même chose, plutôt que d'ouvrir un sous-menu sans rien à y ancrer.
-		const roots = host.paths.roots();
-		// `localPath(g.path) === ""` : `g` n'est pas un DOSSIER mais la
-		// RACINE elle-même (un quiz posé à la racine, sans sous-dossier —
-		// `quiz-modules.ts` lui donne alors `path = <rootId>`). La déplacer
-		// déplacerait tout le vault ; masquer l'entrée plutôt que de laisser
-		// `moveModuleTo` échouer sur « existe déjà » (revue du 2026-09-27, B-mineur).
-		if (!fixe && anchorEl && roots.length > 1 && g.path && host.paths.localPath(g.path) !== "") {
-			// Sous-menu au survol, comme « Move to » d'un quiz (2026-09-27).
+		/* "Move to": the folders of the SAME root (the root itself, its
+		   first-level folders that are not module cards), then the other roots.
+		   `anchorEl` missing (a caller not updated yet): no entry, rather than a
+		   submenu with nothing to anchor it.
+		   `localPath(g.path) === ""`: `g` is not a FOLDER but the ROOT itself (a
+		   quiz sitting at the root, `quiz-modules.ts` then gives it
+		   `path = <rootId>`). Moving it would move the whole vault, so the entry
+		   is hidden rather than letting `moveModuleTo` fail (2026-09-27). */
+		if (!fixe && anchorEl && g.path && host.paths.localPath(g.path) !== "") {
+			// A hover submenu, like a quiz's "Move to" (2026-09-27).
 			const rootDeG = host.paths.rootOf(g.path);
-			const cibles = roots.filter(root => root.id !== rootDeG?.id);
+			const cibles: { path: string; name: string; icon: string; vault?: boolean; section?: string }[] =
+				sameRootMoveTargets(ctx, g).map(c => ({ ...c, icon: c.root ? "folder-root" : "folder" }));
+			const autres = host.paths.roots().filter(root => root.id !== rootDeG?.id);
+			autres.forEach((root, i) => cibles.push({
+				path: root.id, name: root.name, icon: "folder", vault: root.vault,
+				// An intertitle between this root's folders and the other roots, only when both exist.
+				section: i === 0 && cibles.length > 0 ? t("dashboard.quizzes.moveOtherRoots") : undefined,
+			}));
 			if (cibles.length > 0) items.push({
 				icon: "folder-input",
 				label: t("dashboard.quizzes.menuMove"),
-				submenu: cibles.map(root => ({
-					// Le logo d'Obsidian pour un vault, comme au pied des cartes.
-					icon: "folder",
-					renderIcon: root.vault ? (el: HTMLElement) => { poserLogoObsidian(el, t("dashboard.quizzes.obsidianVault")); } : undefined,
-					label: root.name,
+				submenu: cibles.map(cible => ({
+					icon: cible.icon,
+					// The Obsidian logo for a vault, as at the foot of the cards.
+					renderIcon: cible.vault ? (el: HTMLElement) => { poserLogoObsidian(el, t("dashboard.quizzes.obsidianVault")); } : undefined,
+					label: cible.name,
+					section: cible.section,
 					onClick: () => {
 						openConfirm({
 							title: t("dashboard.quizzes.moveConfirmTitle"),
-							body: t("dashboard.quizzes.moveConfirmBody", { name: g.name, target: root.name }),
+							body: t("dashboard.quizzes.moveConfirmBody", { name: g.name, target: cible.name }),
 							cta: t("dashboard.quizzes.moveConfirmCta"),
 						}, () => {
-							void moveModuleTo(ctx, g, root.id).then(ok => {
+							void moveModuleTo(ctx, g, cible.path).then(ok => {
 								if (ok) {
-									host.ui.notice(t("dashboard.quizzes.moved", { target: root.name }));
+									host.ui.notice(t("dashboard.quizzes.moved", { target: cible.name }));
 									rerender();
 								}
 							}).catch(e => {
@@ -916,7 +970,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 								   before it, which used to be an unhandled rejection: no
 								   notice at all. The folder may already have moved, so the
 								   page refreshes too. */
-								console.error("[quiz-blocks] folder move failed:", g.path, "->", root.id, e);
+								console.error("[quiz-blocks] folder move failed:", g.path, "->", cible.path, e);
 								host.ui.notice(t("dashboard.quizzes.moveFolderError"));
 								rerender();
 							});

@@ -260,17 +260,18 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.deleteFolderConfirmBodyNoDisk": "Remove “{name}” from Neo Quiz?",
 	"dashboard.quizzes.folderDeleted": "“{name}” deleted",
 	"dashboard.quizzes.deleteFolderError": "The folder could not be deleted.",
-	/* « Déplacer vers… » (tranche 9, tâche 3) : n'apparaît que quand plusieurs
-	   racines sont ouvertes (l'application). L'historique de révision suit le
-	   dossier, jamais les wikilinks entrants — d'où l'avertissement. */
+	/* "Move to…" (slice 9, task 3): the folders of the same root and the other
+	   open roots (2026-10-15). The review history follows the folder, never the
+	   incoming wikilinks: hence the warning. */
 	"dashboard.quizzes.menuMove": "Move to",
 	"dashboard.quizzes.moveConfirmTitle": "Move module",
 	"dashboard.quizzes.moveConfirmBody": "Move “{name}” to {target}? Links from other notes to these are not rewritten.",
 	"dashboard.quizzes.moveConfirmCta": "Move",
 	"dashboard.quizzes.moved": "Module moved to {target}",
 	"dashboard.quizzes.moveExists": "A folder with this name already exists there.",
-	/* « Move to » d'UN quiz (menu ⋯ d'une carte de quiz), après Edit — distinct
-	   de menuMove/moved/moveExists ci-dessus, qui déplacent un MODULE entier. */
+	"dashboard.quizzes.moveOtherRoots": "Other folders",
+	/* "Move to" of ONE quiz (the ⋯ menu of a quiz card), after Edit: distinct
+	   from menuMove/moved/moveExists above, which move a whole MODULE. */
 	"dashboard.quizzes.menuMoveQuiz": "Move to",
 	"dashboard.quizzes.movedQuiz": "Moved to {target}",
 	"dashboard.quizzes.moveQuizExists": "A quiz with this name already exists there.",
