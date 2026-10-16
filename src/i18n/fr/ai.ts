@@ -458,6 +458,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.side.yesterday": "Hier",
 	"ai.side.older": "Plus ancien",
 	"ai.side.untitled": "Chat sans titre",
+	"ai.autoLearn.chatTitle": "Moodle · nouveaux cours",
 	"ai.side.delete": "Supprimer ce chat",
 	"ai.exam.remove": "Ne pas préparer cet examen",
 	"ai.exam.defaultPrompt": "Génère tous les quiz nécessaires pour couvrir tout ce qui peut tomber au contrôle « {exam} » ({module}, {date}) : chaque notion, définition, méthode et exercice type des documents, des bases jusqu’au niveau du contrôle.",

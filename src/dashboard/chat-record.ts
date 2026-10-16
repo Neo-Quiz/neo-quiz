@@ -86,7 +86,13 @@ export interface ChatRecord {
 	runIds?: string[];
 	/** The quiz this chat explains (an Explain chat). */
 	explain?: ChatExplain;
+	/** A chat the app fills on its own (see `ChatMark`). */
+	mark?: ChatMark;
 }
+
+/** A chat the app fills on its own: "moodle-auto" holds the automatic Learns of new Moodle lectures (spec 2026-10-15-moodle-auto-learn). */
+export type ChatMark = "moodle-auto";
+export function readMark(x: unknown): ChatMark | undefined { return x === "moodle-auto" ? x : undefined; }
 
 /** The chat that holds queue lines saved before chats existed. */
 export const LEGACY_CHAT_ID = "queue-before-chats";
@@ -268,6 +274,8 @@ function readChat(x: unknown): ChatRecord | null {
 	if (runIds) chat.runIds = runIds;
 	const explain = readExplain(x.explain);
 	if (explain) chat.explain = explain;
+	const mark = readMark(x.mark);
+	if (mark) chat.mark = mark;
 	return chat;
 }
 

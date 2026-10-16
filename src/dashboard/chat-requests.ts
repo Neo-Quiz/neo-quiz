@@ -150,6 +150,8 @@ export function reconcileChats(chats: readonly ChatRecord[], groups: readonly Re
 		// An Explain turn (2026-10-14) marks its chat; a chat already marked keeps its own mark.
 		const mark = g.lines[0].demande.explication?.mark;
 		if (mark && !chat.explain) chat.explain = { ...mark };
+		// An automatic Learn of a new Moodle lecture marks its chat the same way.
+		if (g.lines[0].demande.auto && !chat.mark) chat.mark = "moodle-auto";
 		if (idx >= 0) list[idx] = chat; else list.push(chat);
 		changed = true;
 	}

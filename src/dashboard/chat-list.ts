@@ -30,6 +30,8 @@ export interface ChatListItem {
 	senderName?: string;
 	/** An Explain chat (the tutor chat of a quiz): the quiz's title, shown under the chat's. */
 	explain?: { quiz: string };
+	/** A chat the app fills with automatic Learns. */
+	auto?: true;
 }
 
 export function chatListItems(chats: readonly ChatRecord[], lines: readonly LigneGeneration[], now: number, device: string = "", remote: ReadonlyArray<{ device: string; file: GenerationsFile }> = []): ChatListItem[] {
@@ -48,7 +50,7 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 	for (const c of chats) {
 		if (c.deleted) continue;
 		const s = chatSender(c.requests, c.origin);
-		items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && s.id !== device, sender: s.id, ...(s.name ? { senderName: s.name } : {}), ...(c.explain ? { explain: { quiz: c.explain.quiz } } : {}) });
+		items.set(c.id, { id: c.id, title: chatTitle(c), date: c.updatedAt, running: false, origin: c.origin, foreign: !!device && s.id !== device, sender: s.id, ...(s.name ? { senderName: s.name } : {}), ...(c.explain ? { explain: { quiz: c.explain.quiz } } : {}), ...(c.mark === "moodle-auto" ? { auto: true as const } : {}) });
 	}
 	const tombstones = new Set(chats.filter(c => c.deleted).map(c => c.id));
 	for (const l of lines) {
@@ -66,6 +68,7 @@ export function chatListItems(chats: readonly ChatRecord[], lines: readonly Lign
 		// An Explain chat whose first answer is not recorded yet: its line carries the mark.
 		const mark = l.demande.explication?.mark;
 		if (mark && !item.explain) item.explain = { quiz: mark.quiz };
+		if (l.demande.auto) item.auto = true;
 		if (isLive(l)) item.running = true;
 		item.date = Math.max(item.date, l.demande.sentAt ?? 0);
 	}

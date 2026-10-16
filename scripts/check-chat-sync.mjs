@@ -14,6 +14,10 @@ await withSrcModule("src/shared-state/chat-merge.ts", (M) => {
 	const chat = (id, updatedAt, origin, requests = [], over = {}) => ({ id, origin, createdAt: 1, updatedAt, requests, ...over });
 	const ids = (list) => list.map(c => c.id).sort();
 
+	r.check("a newer copy without the moodle-auto mark does not drop it",
+		M.mergeChats([[{ ...chat("a", 5, "pc"), mark: "moodle-auto" }], [chat("a", 6, "ph")]])[0].mark, "moodle-auto");
+	r.check("a tombstone winner carries no mark",
+		M.mergeChats([[{ ...chat("a", 5, "pc"), mark: "moodle-auto" }], [chat("a", 9, "ph", [], { deleted: true })]])[0].mark, undefined);
 	r.check("two files, different chats: both", ids(M.mergeChats([[chat("a", 1, "pc")], [chat("b", 2, "ph")]])), ["a", "b"]);
 	r.check("same id: the highest updatedAt gives the metadata",
 		M.mergeChats([[chat("a", 5, "ph", [], { title: "new" })], [chat("a", 3, "ph", [], { title: "old" })]])[0].title, "new");

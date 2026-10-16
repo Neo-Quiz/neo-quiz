@@ -17,6 +17,12 @@ await withSrcModule("src/dashboard/chat-record.ts", (C) => {
 	const req = (id, at, over = {}) => ({ id, at, from: "d1", text: "t" + id, mode: "practice", documents: [], results: [], state: "done", ...over });
 	const chat = (id, updatedAt, over = {}) => ({ id, origin: "d1", createdAt: 1, updatedAt, requests: [req("r1", 1)], ...over });
 
+	const marked = C.readChats({ v: 1, chats: [{ id: "moodle-a-1", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], mark: "moodle-auto" }] })[0];
+	r.check("the moodle-auto mark round-trips", [marked.mark, C.readChats({ v: 1, chats: [JSON.parse(JSON.stringify(marked))] })[0].mark], ["moodle-auto", "moodle-auto"]);
+	for (const bad of ["MOODLE-AUTO", "explain", 1, {}, ["moodle-auto"], null]) {
+		const c = C.readChats({ v: 1, chats: [{ id: "c-1", origin: "pc", createdAt: 1, updatedAt: 2, requests: [], mark: bad }] })[0];
+		r.check("a hostile mark is dropped, the chat kept: " + JSON.stringify(bad), [!!c, c?.mark], [true, undefined]);
+	}
 	r.check("a valid file is read back", C.readChats({ v: 1, chats: [chat("a", 5)] }).map(c => c.id), ["a"]);
 	for (const [nom, brut] of [["null", null], ["array", []], ["v2", { v: 2, chats: [chat("a", 1)] }], ["no chats", { v: 1 }], ["chats not a list", { v: 1, chats: {} }]]) {
 		r.check("unreadable file gives an empty list: " + nom, C.readChats(brut), []);

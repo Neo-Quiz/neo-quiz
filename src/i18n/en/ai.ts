@@ -503,6 +503,7 @@ export const EN_AI = {
 	"ai.side.yesterday": "Yesterday",
 	"ai.side.older": "Older",
 	"ai.side.untitled": "Untitled chat",
+	"ai.autoLearn.chatTitle": "Moodle · new lectures",
 	"ai.side.delete": "Delete this chat",
 	"ai.exam.remove": "Do not prepare for this exam",
 	"ai.exam.defaultPrompt": "Generate all the quizzes needed to cover everything that can come up in the exam “{exam}” ({module}, {date}): every notion, definition, method and classic exercise of the documents, from the basics up to the level of the exam.",

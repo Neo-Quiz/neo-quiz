@@ -33,7 +33,7 @@ export function mergeChats(perDevice: ReadonlyArray<ReadonlyArray<ChatRecord>>):
 	for (const list of copies.values()) {
 		const sorted = [...list].sort((a, b) => (wins(a, b) ? -1 : 1));
 		const winner = sorted[0];
-		if (winner.deleted) { const { runIds: _dropped, explain: _mark, ...dead } = winner; out.push({ ...dead, requests: [] }); continue; }
+		if (winner.deleted) { const { runIds: _dropped, explain: _mark, mark: _auto, ...dead } = winner; out.push({ ...dead, requests: [] }); continue; }
 		const byId = new Map<string, ChatRequest>();
 		// Winner first: its copy of a request is the one kept.
 		for (const c of sorted) for (const q of c.deleted ? [] : c.requests) if (!byId.has(q.id)) byId.set(q.id, q);
@@ -44,6 +44,9 @@ export function mergeChats(perDevice: ReadonlyArray<ReadonlyArray<ChatRecord>>):
 		// The Explain mark: the winner's, else a live copy's (an older device writes none; a tombstone carries none).
 		const explain = winner.explain ?? sorted.find(c => !c.deleted && c.explain)?.explain;
 		if (explain) merged.explain = explain; else delete merged.explain;
+		// The automatic-Learn mark follows the same rule.
+		const mark = winner.mark ?? sorted.find(c => !c.deleted && c.mark)?.mark;
+		if (mark) merged.mark = mark; else delete merged.mark;
 		out.push(merged);
 	}
 	return out;

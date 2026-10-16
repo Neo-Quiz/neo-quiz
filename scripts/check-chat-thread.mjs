@@ -87,6 +87,12 @@ await withSrcModule(["src/dashboard/chat-requests.ts", "src/dashboard/chat-recor
 	r.check("a second send: a second request in the same chat, in order of sending", deux.chats[0].requests.map(q => [q.id, q.text]), [["r1", "make quizzes"], ["r2", "again"]]);
 	const autre = R.reconcileChats(rec.chats, g(line(6, "prete", { chatId: "c2", requestId: "r9" }, quiz("Z", "z.md"))), dev, 9000);
 	r.check("another chat: another record", autre.chats.map(c => c.id), ["c1", "c2"]);
+	// An automatic Learn (2026-10-16): its line marks the chat; a chat already marked keeps its mark.
+	const autoLine = (id, over = {}) => line(id, "prete", { chatId: "moodle-a-1", requestId: "ra" + id, auto: { key: "k", relPath: "a/CM1.pdf" }, ...over }, quiz("A", "a.md"));
+	const autoRec = R.reconcileChats([], g(autoLine(1)), dev, 5000);
+	r.check("an automatic line marks its new chat moodle-auto", autoRec.chats[0].mark, "moodle-auto");
+	r.check("a chat already marked keeps its mark", R.reconcileChats(autoRec.chats, g(autoLine(2)), dev, 9000).chats[0].mark, "moodle-auto");
+	r.check("a manual line makes no mark", R.reconcileChats([], g(line(1, "prete", {}, quiz("A", "a.md"))), dev, 5000).chats[0].mark, undefined);
 	// An Explain turn (2026-10-14): the line carries the chat's mark, the record keeps it.
 	const mark = { path: "r/q.md", quiz: "Q" };
 	const expl = g(line(1, "prete", { chatId: "cx", requestId: "rx", mode: "learn", explication: { mark, context: "ctx", course: "", position: "" } }, { titre: "", chemin: "", texte: "answer" }));

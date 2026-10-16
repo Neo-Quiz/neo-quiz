@@ -730,3 +730,44 @@ await withSrcModule(["src/dashboard/file-generation.ts", "src/dashboard/usage-li
 	r.check("l'heure de reprise s'écrit « 23:00 » en français, avec le jour au-delà d'aujourd'hui", [L.formatResume(local(23, 0), now, "fr"), /12/.test(L.formatResume(local(14, 0, 12), now, "fr")) && /14:00/.test(L.formatResume(local(14, 0, 12), now, "fr"))], ["23:00", true]);
 	r.done();
 });
+
+/* THE AUTOMATIC LEARN LOG (spec 2026-10-15-moodle-auto-learn): a lecture is
+   queued once, across batches and restarts; the log is bounded; a stored log
+   is hostile. */
+await withSrcModule("src/dashboard/auto-learn-record.ts", (A) => {
+	const r = makeReporter("Automatic Learn log");
+	const f = (relPath, size = 10) => ({ relPath, size });
+	let { log, admitted } = A.admit(A.emptyLog(), [f("B2/XTI303/CM3.pdf"), f("B2/XTI303/CM3.pdf"), f("B2/XTI303/CM4.pdf")], 1000);
+	r.check("a batch with a duplicate: each lecture once", admitted.map(e => e.relPath), ["B2/XTI303/CM3.pdf", "B2/XTI303/CM4.pdf"]);
+	r.check("the same lecture in a later batch is never admitted again", A.admit(log, [f("B2/XTI303/CM3.pdf")], 2000).admitted, []);
+	r.check("case and Unicode form aside, it is the same lecture", A.admit(log, [f("b2/xti303/cm3.pdf"), f("B2/XTI303/CM3.pdf".normalize("NFD"))], 2000).admitted, []);
+	r.check("a new version (another size) is a new lecture", A.admit(log, [f("B2/XTI303/CM3.pdf", 11)], 2000).admitted.length, 1);
+	log = A.markState(log, A.autoKey("B2/XTI303/CM3.pdf", 10), "done", 3000, "R/B2/XTI303/CM3 — Learn.md");
+	log = A.markState(log, A.autoKey("B2/XTI303/CM4.pdf", 10), "failed", 3000);
+	r.check("done and failed are never queued again; only 'queued' lines missing from the queue come back",
+		[A.toRequeue(log, new Set()).length, A.toRequeue(A.admit(log, [f("B2/X/CM5.pdf")], 4000).log, new Set()).map(e => e.relPath), A.toRequeue(A.admit(log, [f("B2/X/CM5.pdf")], 4000).log, new Set([A.autoKey("B2/X/CM5.pdf", 10)])).length],
+		[0, ["B2/X/CM5.pdf"], 0]);
+	let big = A.emptyLog();
+	big = A.admit(big, [f("a/keep.pdf")], 1).log;
+	for (let i = 0; i < 600; i++) { big = A.admit(big, [f(`a/CM${i}.pdf`)], 2 + i).log; big = A.markState(big, A.autoKey(`a/CM${i}.pdf`, 10), "done", 2 + i); }
+	r.check("bounded to 500 entries; the oldest DONE go first, a queued one stays", [big.entries.length, big.entries.some(e => e.relPath === "a/keep.pdf")], [500, true]);
+	let s = A.emptyLog();
+	for (const t of [100, 200, 300]) s = A.recordStart(s, t);
+	r.check("starts since a moment", [A.startsSince(s, 0), A.startsSince(s, 150), A.startsSince(s, 400)], [3, 2, 0]);
+	r.check("at most 100 starts are kept", (() => { let x = A.emptyLog(); for (let i = 0; i < 150; i++) x = A.recordStart(x, i); return x.starts.length; })(), 100);
+	for (const [n, raw] of [["null", null], ["wrong version", { v: 2, entries: [], starts: [] }], ["entries not a list", { v: 1, entries: "x", starts: [] }]]) r.check("unreadable log (" + n + "): empty", A.readLog(raw), A.emptyLog());
+	const lu = A.readLog({ v: 1, starts: [5, "6", NaN, 7], chatId: "Bad Id", entries: [
+		{ key: A.autoKey("a/CM1.pdf", 1), relPath: "a/CM1.pdf", size: 1, state: "done", at: 1 },
+		{ key: "forged", relPath: "a/CM2.pdf", size: 1, state: "done", at: 1 },
+		{ key: A.autoKey("../x.pdf", 1), relPath: "../x.pdf", size: 1, state: "queued", at: 1 },
+		{ key: A.autoKey("a/CM3.pdf", 1), relPath: "a/CM3.pdf", size: 1, state: "running", at: 1 },
+		{ key: A.autoKey("a/CM4.pdf", 1), relPath: "a/CM4.pdf", size: 1, state: "queued", at: 1, quiz: "C:/evil.md" },
+	] });
+	r.check("a hostile log: bad entries dropped (forged key, '..', unknown state), a bad quiz path and chat id dropped, bad starts dropped",
+		[lu.entries.map(e => e.relPath), lu.entries[1]?.quiz, lu.chatId, lu.starts], [["a/CM1.pdf", "a/CM4.pdf"], undefined, undefined, [5, 7]]);
+	const chats = [{ id: "moodle-old-1", origin: "pc", createdAt: 1, updatedAt: 1, deleted: true, requests: [] }];
+	r.check("the chat id is kept while its chat lives, renewed once it is deleted",
+		[A.autoChatId({ ...A.emptyLog(), chatId: "moodle-live-1" }, chats, () => "x").chatId, A.autoChatId({ ...A.emptyLog(), chatId: "moodle-old-1" }, chats, () => "new-1").chatId, A.autoChatId(A.emptyLog(), [], () => "new-2").chatId],
+		["moodle-live-1", "moodle-new-1", "moodle-new-2"]);
+	r.done();
+});

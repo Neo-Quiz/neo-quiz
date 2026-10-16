@@ -90,16 +90,17 @@ export function poserListeChats(parent: HTMLElement): void {
 	const poserChat = (zone: HTMLElement, chat: ChatListItem): void => {
 		const actif = chat.id === activeChatId();
 		const item = ajouter(zone, "div", "qbd-ai-chat-item" + (actif ? " is-active" : "") + (chat.running ? " is-running" : ""));
+		const titre = chat.auto ? t("ai.autoLearn.chatTitle") : chat.title;
 		const ouvrir = ajouter(item, "button", "qbd-ai-chat-ouvrir");
 		ouvrir.type = "button";
-		ouvrir.title = chat.explain ? (chat.title ? chat.title + " · " : "") + chat.explain.quiz : chat.title || "";
+		ouvrir.title = chat.explain ? (titre ? titre + " · " : "") + chat.explain.quiz : titre || "";
 		/* The kind of chat: a lightbulb for an Explain chat (the tutor chat of a
 		   quiz, with the quiz's title under it), sparkles for any other. */
 		const icone = ajouter(ouvrir, "span", "qbd-chat-item-icone");
 		icone.setAttribute("aria-hidden", "true");
-		host.ui.setIcon(icone, chat.explain ? "lightbulb" : "sparkles");
+		host.ui.setIcon(icone, chat.explain ? "lightbulb" : chat.auto ? "graduation-cap" : "sparkles");
 		const textes = ajouter(ouvrir, "span", "qbd-chat-item-textes");
-		ajouter(textes, "span", "qbd-chat-item-titre", chat.title || t("ai.side.untitled"));
+		ajouter(textes, "span", "qbd-chat-item-titre", titre || t("ai.side.untitled"));
 		if (chat.explain) ajouter(textes, "span", "qbd-chat-item-quiz", chat.explain.quiz);
 		if (actif) ouvrir.setAttribute("aria-current", "true");
 		ouvrir.addEventListener("click", () => setActiveChat(chat.id));
