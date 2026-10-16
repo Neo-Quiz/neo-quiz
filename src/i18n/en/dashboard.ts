@@ -15,6 +15,10 @@ export const EN_DASHBOARD = {
 	    `nombreDeLectures`). */
 	"dashboard.common.readingsOne": "{count} reading",
 	"dashboard.common.readingsOther": "{count} readings",
+	/** Estimated time to do a quiz (src/quiz-duration.ts), plain metadata text. */
+	"dashboard.common.durationMin": "≈ {count} min",
+	"dashboard.common.durationH": "≈ {h} h",
+	"dashboard.common.durationHM": "≈ {h} h {m}",
 	/** Le mot seul, sans le nombre : pour un champ où le nombre est déjà
 	    affiché à côté (le champ personnalisé du nombre de questions). */
 	"dashboard.common.questionUnitOne": "question",

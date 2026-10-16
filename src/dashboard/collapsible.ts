@@ -98,6 +98,8 @@ export function renderCollapsibleSection(
 		defaultOpen?: boolean;
 		rowClass?: string;
 		headRow?: (row: HTMLElement) => void;
+		/** Muted text right after the count ("· ≈ 1 h 10"): no box. */
+		note?: string;
 	}
 ): HTMLElement {
 	const nodeEl = ajouter(parent, "div", "qbd-quizzes-node");
@@ -112,6 +114,10 @@ export function renderCollapsibleSection(
 	// En-tête de section — copie LITTÉRALE de StudySmarter (capture Ahmed
 	// 2026-07-18) : chevron + libellé + BADGE compteur, rien d'autre.
 	ajouter(head, "span", "qbd-quizzes-node-badge", String(total));
+	if (opts?.note) {
+		ajouter(head, "span", "qbd-count-sep qbd-quizzes-node-note");
+		ajouter(head, "span", "qbd-quizzes-node-note", opts.note);
+	}
 	if (opts?.headRow && row !== nodeEl) opts.headRow(row);
 	wireCollapseToggle(deps, nodeEl, head, chev, key, opts?.defaultOpen ?? true);
 	const body = ajouter(nodeEl, "div", "qbd-quizzes-node-body");

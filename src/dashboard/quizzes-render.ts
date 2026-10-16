@@ -18,6 +18,7 @@ import { buildRecentModuleGroups } from "./quiz-recent";
 import type { RecentGroupKey } from "./quiz-recent";
 import { moduleAccent } from "./module-color";
 import { renderCollapsibleSection, type CollapseDeps } from "./collapsible";
+import { libelleDuree } from "./question-count";
 import { suggestIcons } from "./icon-suggest";
 import { renderFolderSections } from "./folder-sections";
 import { renderEmptyFolder } from "./folder-add";
@@ -293,7 +294,8 @@ export function renderModuleDrill(
 		["tests", t("dashboard.quizzes.sectionTests"), testCards],
 	] as const) {
 		if (list.length === 0) continue;
-		const clip = renderCollapsibleSection(collapse, grid, `drill:${openModuleFolder}:${key}`, label, list.length);
+		const clip = renderCollapsibleSection(collapse, grid, `drill:${openModuleFolder}:${key}`, label, list.length,
+				{ note: libelleDuree(list.reduce((s, q) => s + (q.minutes ?? 0), 0)) || undefined });
 		const cardsEl = ajouter(clip, "div", "qbd-home-grid qbd-quizzes-drill-grid");
 		for (const quiz of list) {
 			const cardEl = renderQuizCard(cardsEl, quiz, stats[quiz.path], (q) => ctx.navigate("detail", { quiz: q }), {

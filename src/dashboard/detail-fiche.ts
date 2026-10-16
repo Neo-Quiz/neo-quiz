@@ -1,6 +1,7 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
+import { libelleDuree } from "./question-count";
 import { mathifyElement } from "../engine/mathjax";
 import { Q_TYPES } from "../editor/utils";
 import { usesMathField } from "../engine/math-input";
@@ -175,6 +176,10 @@ function renderMeta(root: HTMLElement, deps: { quiz: QuizIndexEntry; origine: Fi
 		const lectures = ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-readings");
 		ajouter(lectures, "span", undefined, t(deps.quiz.readings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: deps.quiz.readings }));
 	}
+
+	/* The estimated time, one more chip of the same line (no icon). */
+	const duree = libelleDuree(deps.quiz.minutes);
+	if (duree) ajouter(ajouter(chips, "span", "qbd-fiche-chip qbd-fiche-duration"), "span", undefined, duree);
 
 	/* D'où vient le quiz : le logo, le modèle, puis la date, sur une ligne ;
 	   l'infobulle donne l'identifiant exact. */

@@ -351,6 +351,13 @@
 
 /* Badge compteur d'en-tête de section — copie littérale StudySmarter
    (capture 2026-07-18) : petit chip carré arrondi, chiffre seul. */
+/* Total estimated time after a section's count: muted text, same size, no box. */
+.qbd-quizzes-node-note {
+	flex-shrink: 0;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+.qbd-quizzes-node-note.qbd-count-sep::before { margin: 0 2px 0 -2px; }
 .qbd-quizzes-node-badge {
 	flex-shrink: 0;
 	min-width: 18px;

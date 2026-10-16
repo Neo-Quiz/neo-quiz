@@ -6,6 +6,7 @@ import type { QuestionRole } from "../types/quiz";
 import type { Host, HostFile } from "../host/types";
 import { lireFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { nombreDeQuestions, nombreDeLectures } from "../lecture-etape";
+import { estimateQuizMinutes } from "../quiz-duration";
 import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
@@ -70,6 +71,9 @@ export interface QuizMeta {
 	    absorbées ou restées un écran (src/lecture-etape.ts `nombreDeLectures`) ;
 	    0 hors Learn. Affiché à côté de `questions`, jamais inclus dedans. */
 	readings: number;
+	/** Estimated minutes to do the quiz (src/quiz-duration.ts). Absent for an
+	    entry built elsewhere; a note whose block is unreadable has no entry. */
+	minutes?: number;
 	items: QuizItemRef[];
 	types: QuestionTypeTag[];
 	quizType: QuizTypeTag;
@@ -206,6 +210,7 @@ export function createScanner(host: Host): Scanner {
 				   l'ordonnanceur, rangé par identifiant. */
 				questions: nombreDeQuestions(questions.map(x => x.q), lecon),
 				readings: nombreDeLectures(questions.map(x => x.q), lecon),
+				minutes: estimateQuizMinutes(questions.map(x => x.q)),
 				items,
 				lecon,
 				types: Array.from(typeSet),

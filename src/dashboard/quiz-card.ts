@@ -1,6 +1,7 @@
 import { currentHost, requireHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t, currentLang } from "../i18n";
+import { libelleDuree } from "./question-count";
 import type { TransKey } from "../i18n";
 import type { QuizIndexEntry, QuizTypeTag } from "./scanner";
 import type { ModeQuiz } from "../quiz-format";
@@ -168,6 +169,12 @@ export function renderQuizCard(
 		ajouter(compte, "span", "qbd-count-sep");
 		ajouter(compte, "span", undefined,
 			t(totalReadings === 1 ? "dashboard.common.readingsOne" : "dashboard.common.readingsOther", { count: totalReadings }));
+	}
+	/* The estimated time, as one more piece of metadata text (never a pill). */
+	const duree = libelleDuree(quiz.minutes);
+	if (duree) {
+		ajouter(compte, "span", "qbd-count-sep");
+		ajouter(compte, "span", undefined, duree);
 	}
 
 	// Chemin — omis (pas masqué en CSS) quand l'appelant l'affiche déjà : dans

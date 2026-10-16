@@ -184,6 +184,25 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 	await scanner.scanFile(fichierHote);
 	r.check("hors Learn, une lecture n'est jamais une question comptée", scanner.getQuiz(fichierHote.path)?.questions, 2);
 
+	/* ESTIMATED TIME (src/quiz-duration.ts): 150 words/min of reading, +1 min
+	   for an interactive page, +30 s for a figure, 45 s a question, 15 s a
+	   flashcard, nearest 5 min, 5 min at least. */
+	const bloc = (items) => "```quiz-blocks\n[\n" + items.join(",\n") + "\n]\n```\n";
+	const qcm = (n) => Array.from({ length: n }, (_, i) => `  { title: 'Q${i}', prompt: 'p', options: ['a', 'b'], correctIndex: 0 }`);
+	const carte = (n) => Array.from({ length: n }, (_, i) => `  { title: 'C${i}', prompt: 'recto', answer: 'verso', flashcard: true }`);
+	const lecture = `  { title: 'Lire', prompt: '${"mot ".repeat(299)}', role: 'read', slice: 1, html: '<p>x</p>', passage: '![[fig.png]]' }`;
+	const minutes = async (items) => { content = bloc(items); await scanner.scanFile(fichierHote); return scanner.getQuiz(fichierHote.path)?.minutes; };
+	// 300 words = 2 min, +1 +0.5, 10 questions = 7.5 min, 8 flashcards = 2 min: 13 min -> 15.
+	r.check("estimate: reading + page + figure + 10 questions + 8 flashcards", await minutes([lecture, ...qcm(10), ...carte(8), "  { mode: 'learn' }"]), 15);
+	r.check("estimate: 7.5 min rounds up to 10", await minutes(qcm(10)), 10);
+	r.check("estimate: 6.75 min rounds down to 5", await minutes(qcm(9)), 5);
+	r.check("estimate: never under 5 min", await minutes(qcm(1)), 5);
+	r.check("estimate: 300 words alone is 2 min, so the 5 min floor", await minutes(["  { title: 'Lire', prompt: '" + "mot ".repeat(299) + "', role: 'read', slice: 1 }"]), 5);
+	r.check("estimate: 1500 words = 10 min", await minutes(["  { title: 'Lire', prompt: '" + "mot ".repeat(1499) + "', role: 'read', slice: 1 }"]), 10);
+	content = "```quiz-blocks\n[ { broken\n```\n";
+	await scanner.scanFile(fichierHote);
+	r.check("estimate: an unreadable block has no entry, so no estimate", scanner.getQuiz(fichierHote.path), null);
+
 	/* NON-RÉGRESSION — GLOSSAIRE (lot D, revue du 2026-09-27) : ajouter un
 	   glossaire à la configuration finale ne doit CHANGER ni le compte de
 	   questions ni les IDENTIFIANTS des questions déjà là. Une clé qui
