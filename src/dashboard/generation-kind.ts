@@ -39,7 +39,7 @@ function isKindChoice(value: unknown): value is KindChoice {
 }
 
 /** The first balanced `{ … }` of a text that parses (strings and escapes respected), or null. */
-function firstObject(raw: string): string | null {
+export function firstObject(raw: string): string | null {
 	for (let start = raw.indexOf("{"); start >= 0; start = raw.indexOf("{", start + 1)) {
 		let depth = 0, inStr = false, esc = false;
 		for (let i = start; i < raw.length; i++) {

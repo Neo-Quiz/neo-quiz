@@ -41,11 +41,11 @@ const DOCUMENT_EXTENSION = /\.(md|markdown|txt)$/i;
 /** Drive letters and streams (`:`), wildcards, controls (C0, DEL, C1), invisible and bidi characters
     (zero width, line/paragraph separators, directional overrides and isolates, BOM, soft hyphen),
     look-alike dots (dot leaders, ideographic full stop) and the whole fullwidth block (`．．／`). */
-const FORBIDDEN_IN_PATH = /[:<>"|?*\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2024-\u2026\u2028-\u202e\u2060-\u206f\u3002\ufeff\uff00-\uffef\ufff0-\uffff]/;
+export const FORBIDDEN_IN_PATH = /[:<>"|?*\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2024-\u2026\u2028-\u202e\u2060-\u206f\u3002\ufeff\uff00-\uffef\ufff0-\uffff]/;
 /** Names Windows reads as a device, with or without an extension (`con.md` opens the console). */
-const DEVICE_NAME = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i;
+export const DEVICE_NAME = /^(con|prn|aux|nul|conin\$|conout\$|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/i;
 /** A short 8.3 name (`PROGRA~1`) designates another file than the one written. */
-const SHORT_NAME = /~[0-9]/;
+export const SHORT_NAME = /~[0-9]/;
 /** Characters refused in a device name or a type label (controls, invisible and bidi characters). */
 export const NAME_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff0-\uffff]/;
 /** Text keeps tab, newline and carriage return; every other control character is refused. */

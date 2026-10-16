@@ -359,6 +359,11 @@ jobs:
       # prompt carries document names, never content.
       - name: Generation kind
         run: npm run check:generation-kind
+      # NEW MOODLE LECTURES BY NAME: a TD, TP, answer key or exam never makes
+      # a Learn, a hostile file list from the bridge never reaches a note path,
+      # and a broken AI verdict never counts as a lecture.
+      - name: Lecture detection
+        run: npm run check:lecture-detect
       # Composer options menu pruned to Subject only, and no tick/cross badge
       # on the question beads (color alone conveys the result).
       - name: UI pruning
