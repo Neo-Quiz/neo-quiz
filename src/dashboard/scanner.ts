@@ -127,6 +127,8 @@ export interface UnreadableQuiz {
  */
 export interface Scanner {
 	init(): Promise<void>;
+	/** Settles once the FIRST full scan has finished: before it, `getQuizzes()` is empty and says nothing about what exists. */
+	readonly ready: Promise<void>;
 	destroy(): void;
 	scanVault(): Promise<void>;
 	scanFile(file: HostFile): Promise<void>;
@@ -146,6 +148,8 @@ export function createScanner(host: Host): Scanner {
 	const listeners: Array<(quizzes: QuizIndexEntry[]) => void> = [];
 	let desabonner: (() => void) | null = null;
 	let scanning = false;
+	let marquerPret: () => void = () => {};
+	const ready = new Promise<void>(r => { marquerPret = r; });
 
 	/* ── Parse un bloc quiz-blocks pour extraire les métadonnées ── */
 	function parseQuizMeta(source: string): QuizMeta | null | typeof UNREADABLE {
@@ -263,6 +267,7 @@ export function createScanner(host: Host): Scanner {
 		}
 
 		scanning = false;
+		marquerPret();
 		notifyListeners();
 	}
 
@@ -399,6 +404,7 @@ export function createScanner(host: Host): Scanner {
 
 	return {
 		init,
+		ready,
 		destroy,
 		scanVault,
 		scanFile,

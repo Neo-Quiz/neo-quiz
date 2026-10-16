@@ -98,6 +98,16 @@ export function startAutoLearnRunner(deps: AutoLearnRunnerDeps): () => void {
 		return v;
 	});
 
+	/** The name-classification call is an AI call too: it obeys the same usage rules and daily cap as a generation (no start is recorded, no tools are used so trust is not asked). */
+	async function peutAppeler(): Promise<boolean> {
+		const s = readAutoLearnSettings(deps.settings.get().aiAutoLearn);
+		const provider = deps.settings.get().aiProvider ?? "";
+		const tool = provider === "claude-code" ? "claude" : provider === "codex" ? "codex" : null;
+		const usage = tool && (s.session.on || s.weekly.on) ? await deps.readUsage(tool).catch(() => null) : null;
+		const cur = await courant();
+		return decideGate({ settings: s, provider, trusted: true, usage, startsToday: startsSince(cur, startOfToday(deps.now())), now: deps.now() }).go;
+	}
+
 	/** The text of a lecture PDF, or null when it has none; throws when it cannot be read. */
 	async function lire(f: FreshFile): Promise<string | null> {
 		const path = host.paths.contractPath(host.paths.defaultRoot().id, f.relPath);
@@ -142,7 +152,8 @@ export function startAutoLearnRunner(deps: AutoLearnRunnerDeps): () => void {
 			const v = classifyName(f.name);
 			if (v === "ambiguous") { if (f.name.length <= MAX_NAME_FOR_CALL && !ambigus.includes(f.name)) ambigus.push(f.name); } else verdict.set(f.name, v);
 		}
-		for (let i = 0; i < ambigus.length; i += MAX_AMBIGUOUS_PER_CALL) {
+		const appeler = ambigus.length > 0 && await peutAppeler().catch(() => false);   // gate closed: ambiguous names count as "other"
+		for (let i = 0; appeler && i < ambigus.length; i += MAX_AMBIGUOUS_PER_CALL) {
 			const chunk = ambigus.slice(i, i + MAX_AMBIGUOUS_PER_CALL);
 			let res = new Map<string, "lecture" | "other">(chunk.map(n => [n, "other"]));
 			try { res = parseLectureVerdicts(await deps.classify(chunk), chunk); } catch (e) { console.warn(LOG_PREFIX, "automatic Learn: classification failed:", e); }
@@ -241,7 +252,7 @@ export function startAutoLearnRunner(deps: AutoLearnRunnerDeps): () => void {
 					if (!deps.silent()) void deps.notify(t("ai.autoLearn.readyTitle", { title: line.resultat?.titre ?? sansExtension(name) }), "", () => deps.openQuiz(chemin));
 				} else {
 					await garder(markState(await courant(), key, "failed", deps.now()));
-					notifierEchec(name, line.erreur ?? t("ai.autoLearn.readFailed"));
+					notifierEchec(name, line.erreur ?? t(line.etat === "prete" ? "ai.autoLearn.noQuiz" : "ai.autoLearn.readFailed"));
 				}
 			}
 			for (const key of disparues) {
@@ -251,7 +262,7 @@ export function startAutoLearnRunner(deps: AutoLearnRunnerDeps): () => void {
 	}
 
 	const stopQueue = deps.queue.abonner(suivre, () => false);
-	void deps.queue.pret.then(() => enOrdre(reprendre)).then(traiter);
+	void Promise.all([deps.queue.pret, deps.scanner.ready]).then(() => enOrdre(reprendre)).then(traiter);
 	const stopFresh = deps.onFresh(() => { void traiter(); });
 	return () => { stopFresh(); stopQueue(); setAutoGate(null); };
 }

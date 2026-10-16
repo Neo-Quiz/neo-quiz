@@ -40,6 +40,11 @@ await withSrcModule("src/dashboard/auto-learn-gate.ts", (G) => {
 	r.check("5 starts today: go", go({ startsToday: 5 }), { go: true });
 	r.check("the next midnight from 23:59 and from 00:00", [G.nextLocalMidnight(new Date(2026, 9, 16, 23, 59).getTime()), G.nextLocalMidnight(new Date(2026, 9, 17, 0, 0).getTime())], [new Date(2026, 9, 17).getTime(), new Date(2026, 9, 18).getTime()]);
 	r.check("an untrusted folder waits for the user (no retry time)", go({ trusted: false }), { go: false, block: { kind: "untrusted" }, retryAt: null });
+	r.check("Ollama never waits for trust (no tools)", go({ provider: "ollama", trusted: false, usage: null }), { go: true });
+	r.check("Antigravity never waits for trust (no tools)", go({ provider: "antigravity", trusted: false, usage: null }), { go: true });
+	r.check("Codex still waits for trust", go({ provider: "codex", trusted: false }), { go: false, block: { kind: "untrusted" }, retryAt: null });
+	r.check("mode off: a queued line is not started", go({ settings: { ...D, mode: "off" } }), { go: false, block: { kind: "off" }, retryAt: null });
+	r.check("a stored off block is read back", G.readGateBlock({ kind: "off" }), { kind: "off" });
 	r.check("a stored block is read back; anything else is dropped", [G.readGateBlock({ kind: "session", percent: 86 }), G.readGateBlock({ kind: "daily", count: 6 }), G.readGateBlock({ kind: "untrusted" }), G.readGateBlock({ kind: "session", percent: "86" }), G.readGateBlock({ kind: "x" }), G.readGateBlock(null)],
 		[{ kind: "session", percent: 86 }, { kind: "daily", count: 6 }, { kind: "untrusted" }, undefined, undefined, undefined]);
 	r.done();

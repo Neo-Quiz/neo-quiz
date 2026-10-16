@@ -418,7 +418,8 @@ export function creerVueFile(opts: {
 				: motif.kind === "weekly" ? t("ai.autoLearn.waitWeekly", { percent: motif.percent, when: quand })
 				: motif.kind === "daily" ? t("ai.autoLearn.waitDaily", { count: motif.count, when: quand })
 				: motif.kind === "unknown" ? t("ai.autoLearn.waitUnknown", { when: quand })
-				: t("ai.autoLearn.waitUntrusted");
+				: motif.kind === "off" ? t("ai.autoLearn.waitOff")
+					: t("ai.autoLearn.waitUntrusted");
 			ajouter(corps, "div", "qbd-ai-reponse-texte", texte);
 			const actions = ajouter(corps, "div", "qbd-ai-reponse-actions");
 			if (motif?.kind === "untrusted") bouton(actions, t("ai.autoLearn.trustFolder"), () => { void opts.file.confier(l.id); });

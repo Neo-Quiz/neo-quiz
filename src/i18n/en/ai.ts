@@ -434,6 +434,8 @@ export const EN_AI = {
 	"ai.autoLearn.waitWeekly": "Waiting: weekly usage at {percent} %, resumes at {when}",
 	"ai.autoLearn.waitDaily": "Waiting: {count} automatic Learns today, resumes at {when}",
 	"ai.autoLearn.waitUnknown": "Waiting: usage unknown, next check at {when}",
+	"ai.autoLearn.waitOff": "Automatic Learns are off",
+	"ai.autoLearn.noQuiz": "The AI answered without producing a quiz",
 	"ai.autoLearn.waitUntrusted": "Trust this folder to let it run",
 	"ai.autoLearn.readyTitle": "Learn ready: {title}",
 	"ai.autoLearn.failedTitle": "Could not generate the Learn for {title}",

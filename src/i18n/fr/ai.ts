@@ -397,6 +397,8 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.autoLearn.waitWeekly": "En attente : usage de la semaine à {percent} %, reprise à {when}",
 	"ai.autoLearn.waitDaily": "En attente : {count} Learn automatiques aujourd'hui, reprise à {when}",
 	"ai.autoLearn.waitUnknown": "En attente : usage inconnu, prochaine vérification à {when}",
+	"ai.autoLearn.waitOff": "Les Learn automatiques sont désactivés",
+	"ai.autoLearn.noQuiz": "L'IA a répondu sans produire de quiz",
 	"ai.autoLearn.waitUntrusted": "Faites confiance à ce dossier pour la lancer",
 	"ai.autoLearn.readyTitle": "Learn prêt : {title}",
 	"ai.autoLearn.failedTitle": "Impossible de générer le Learn de {title}",

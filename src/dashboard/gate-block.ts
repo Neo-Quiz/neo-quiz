@@ -5,7 +5,7 @@
    i18n dictionaries) would drag into the core what it must not know.
    `check:file-generation` holds that this file stays import-free. */
 
-export type GateBlock = { kind: "session" | "weekly"; percent: number } | { kind: "daily"; count: number } | { kind: "unknown" } | { kind: "untrusted" };
+export type GateBlock = { kind: "session" | "weekly"; percent: number } | { kind: "daily"; count: number } | { kind: "unknown" } | { kind: "untrusted" } | { kind: "off" };
 
 /** Reads back a stored block (a paused line); anything malformed is dropped. */
 export function readGateBlock(v: unknown): GateBlock | undefined {
@@ -14,6 +14,6 @@ export function readGateBlock(v: unknown): GateBlock | undefined {
 	const n = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0;
 	if ((o.kind === "session" || o.kind === "weekly") && n(o.percent)) return { kind: o.kind, percent: o.percent };
 	if (o.kind === "daily" && n(o.count)) return { kind: "daily", count: o.count };
-	if (o.kind === "unknown" || o.kind === "untrusted") return { kind: o.kind };
+	if (o.kind === "unknown" || o.kind === "untrusted" || o.kind === "off") return { kind: o.kind };
 	return undefined;
 }

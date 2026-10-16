@@ -41,6 +41,8 @@ export function readAutoLearnSettings(v: unknown): AutoLearnSettings {
 	const mode = v.mode === "off" || v.mode === "propose" || v.mode === "auto" ? v.mode : d.mode;
 	return { mode, session: readRule(v.session, d.session, AUTO_LEARN_LIMITS.session), weekly: readRule(v.weekly, d.weekly, AUTO_LEARN_LIMITS.weekly), daily: readRule(v.daily, d.daily, AUTO_LEARN_LIMITS.daily) };
 }
+/** Only Claude Code and Codex run with tools in the trusted folder; Ollama and Antigravity have no tools, so no trust to ask. */
+export const toolsApply = (provider: string): boolean => provider === "claude-code" || provider === "codex";
 export const quotaApplies = (provider: string): boolean => providerPublishesPlan(provider);
 export function windowUsage(rows: readonly UsageRow[], which: "session" | "weekly"): { percent: number; resetsAt: number | null } | null {
 	const match = rows.filter(r => which === "session"
@@ -57,7 +59,8 @@ export function nextLocalMidnight(now: number): number {
 }
 export function decideGate(i: { settings: AutoLearnSettings; provider: string; trusted: boolean; usage: UsageSnapshot | null; startsToday: number; now: number }): GateVerdict {
 	const { settings: s, now } = i;
-	if (!i.trusted) return { go: false, block: { kind: "untrusted" }, retryAt: null };
+	if (s.mode === "off") return { go: false, block: { kind: "off" }, retryAt: null };
+	if (toolsApply(i.provider) && !i.trusted) return { go: false, block: { kind: "untrusted" }, retryAt: null };
 	const blocks: { block: GateBlock; retryAt: number }[] = [];
 	if (s.daily.on && i.startsToday >= s.daily.value) blocks.push({ block: { kind: "daily", count: i.startsToday }, retryAt: nextLocalMidnight(now) });
 	if (quotaApplies(i.provider) && (s.session.on || s.weekly.on)) {

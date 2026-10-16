@@ -53,8 +53,10 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 		},
 	};
 	const scanner = createScanner(host);
-
+	const etat = () => Promise.race([scanner.ready.then(() => "pret"), new Promise(res => setTimeout(() => res("attente"), 0))]);
+	r.check("ready n'est pas tenu avant le premier scan", await etat(), "attente");
 	await scanner.init();
+	r.check("ready est tenu après le premier scan", await etat(), "pret");
 	const entry = scanner.getQuiz(fichierHote.path);
 
 	/* La configuration et le parasite ne sont pas des questions indexées : les
