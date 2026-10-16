@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Generated Learns teach the lecture from zero at its own depth (its length comes from the folder's class sessions), define each term where it first appears, explain why each wrong answer is wrong, and open with what you need to know first when the lecture assumes it.
+
 ## [1.20.114] - 2026-10-16
 
 ### Added

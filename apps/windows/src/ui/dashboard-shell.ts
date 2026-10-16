@@ -52,6 +52,7 @@ import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { lireModuleMap } from "../../../../src/dashboard/module-map-note";
 import { applyModuleOverrides, moduleForQuiz } from "../../../../src/dashboard/quiz-modules";
+import { readClassSessions } from "../../../../src/class-sessions";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
 import { closeAllSelects, createSelect, openActionMenu } from "../../../../src/dashboard/ui-select";
@@ -733,6 +734,12 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			if (premier) quizzes.openFolderOfQuiz(premier.path, () => naviguer("ai"));
 		},
 		quizFolders: () => dossiersDeQuiz(),
+		// Same folder lookup as `decrire`: by stored path, else by the folder's name.
+		lectureMinutes: (dossier) => {
+			const overrides = ctx.settings.quizzesModuleOverrides || {};
+			const ov = Object.values(overrides).find(o => o?.path === dossier) ?? overrides[dossier.split("/").pop() as string];
+			return readClassSessions(ov).minutes;
+		},
 		copyText: copierTexte,
 		relay: deps.relay,
 		// The pencil of the "/exam" tile: the Settings, on its prompt.

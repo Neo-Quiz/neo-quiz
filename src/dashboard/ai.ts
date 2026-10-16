@@ -296,6 +296,10 @@ export interface AiPageDeps {
 	 * de sa racine, pour que deux dossiers homonymes se distinguent.
 	 */
 	quizFolders?(): { path: string; name: string; icon: string; color: string; root: string }[];
+	/** The length in minutes of one class session of a folder (contract path),
+	    from its class-session settings; undefined when unknown. Absent: a Learn
+	    keeps its default depth. */
+	lectureMinutes?(dossier: string): number | undefined;
 	/** Rend un BLOC de code (commande d'installation d'un CLI) dans `host`.
 	    Sous Obsidian, le moteur Markdown de l'app : coloration Prism, style de
 	    bloc de l'utilisateur, bouton « copier » du post-processeur natif.
@@ -395,6 +399,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	const fileGen: FileGenerationApp = fileDeGeneration({
 		settings: deps.settings,
 		scanner: deps.scanner,
+		lectureMinutes: deps.lectureMinutes,
 		recordUsage: deps.usage ? (entry) => deps.usage!.record(entry) : undefined,
 	});
 	// Every conversation is saved as it goes, for the sidebar's list of chats.

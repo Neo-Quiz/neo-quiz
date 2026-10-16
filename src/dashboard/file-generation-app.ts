@@ -184,6 +184,9 @@ export type LigneGeneration = LigneFile<DemandeFile, ResultatFile>;
 export interface DepsFile {
 	settings: AiSettingsHost;
 	scanner: Scanner;
+	/** The length in minutes of one class session of a folder (contract path),
+	    from the folder's settings; absent when unknown. Sets a Learn's depth. */
+	lectureMinutes?(dossier: string): number | undefined;
 	/** Journal d'usage, quand l'hôte en tient un. Accessoire : un échec ici ne
 	    fait jamais échouer la génération. */
 	recordUsage?(entry: AiUsageEntry): Promise<void>;
@@ -457,6 +460,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				documents, plansParDocument: liens?.map(l => l?.plan), parties: d.parties,
+				lectureMinutes: d.mode === "learn" ? deps.lectureMinutes?.(dossier) : undefined,
 				/* The quiz's folder: Claude Code may read it with read-only tools
 				   once the user trusts it. Never for a request from another
 				   device: nobody at this PC asked for it. */

@@ -56,7 +56,24 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
 	/* 2026-10-14: a recommended maximum, no longer a wall: a reading may go past it when its notion needs it. */
 	r.check("Learn: a reading aims under 1800 characters, a recommended maximum it may exceed, written in the prompt",
-		[learnP.includes("aims to stay under 1800 characters: a RECOMMENDED maximum"), learnP.includes("never to pad"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("under 1800 characters")], [true, true, false]);
+		[learnP.includes("aims to stay under 1800 characters: a RECOMMENDED maximum"), learnP.includes("SPLIT it into another slice rather than lengthen the reading"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("under 1800 characters")], [true, true, false]);
+	/* 2026-10-16: a Learn teaches the lecture from zero, at the depth of the lecture. */
+	const sysL = (o) => composerPrompts("x", { mode: "learn", ...o }).systemPrompt;
+	const cap = (min) => { const m = sysL({ lectureMinutes: min }).match(/AT MOST (\d+) slices/); return m ? Number(m[1]) : null; };
+	r.check("Learn: slice cap by lecture length (absent, 60, 180, 300, 600 min and the bounds)",
+		[undefined, 60, 180, 300, 600, 15, 0, -5, NaN].map(cap), [10, 6, 9, 15, 16, 6, 10, 10, 10]);
+	r.check("Learn: every place that states the cap agrees",
+		[180, 300, undefined].map(min => { const n = cap(min); const s = sysL({ lectureMinutes: min }); return s.includes(`in at most ${n} slices`); }), [true, true, true]);
+	r.check("Test: the lecture length is ignored; the Test prompt has no slice cap",
+		[composerPrompts("x", { mode: "practice", lectureMinutes: 300 }).systemPrompt === composerPrompts("x", { mode: "practice" }).systemPrompt, /AT MOST \d+ slices/.test(composerPrompts("x", { mode: "practice", lectureMinutes: 300 }).systemPrompt)], [true, false]);
+	r.check("Learn: the lecture length sentence only when known, formatted",
+		[sysL({}).includes("This lecture lasted"), sysL({ lectureMinutes: 300 }).includes("This lecture lasted about 5 h:"), sysL({ lectureMinutes: 90 }).includes("about 1 h 30:"), sysL({ lectureMinutes: 45 }).includes("about 45 min:"),
+			sysL({ lectureMinutes: 300 }).includes("without compressing it; a small source still never gets padded")], [false, true, true, true, true]);
+	const nouvelles = ["TERMS DEFINED AT FIRST USE", "defines it in plain words right there", "PREREQUISITES STEP", "Ce qu'il faut savoir avant", "What you need to know first", "It counts in the cap below",
+		"EACH AT MOST 3 SHORT SENTENCES", "SPLIT it into another slice", "EXPLAIN IN LEARN", "ONE line PER wrong option naming the confusion", "A flashcard's \"explain\" says why its answer holds"];
+	r.check("Learn: the new teaching rules are in the prompt", nouvelles.filter(p => !sysL({}).includes(p)), []);
+	r.check("Test: none of the new Learn rules", nouvelles.filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
+	r.check("Test explain rule unchanged", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.'), true);
 	r.check("Learn: several notions in a slice become bold, unnumbered parts",
 		learnP.includes("opened by a **bold** subheading (never numbered"), true);
 	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram. */
