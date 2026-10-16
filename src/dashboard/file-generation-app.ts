@@ -53,6 +53,10 @@ import { answerLivePermission, liveToolOutput, liveTurnPlace, liveTurnRunning, l
 import type { LiveImage, LiveTurnView } from "./live-generation";
 import { transcriptOfThread } from "./live-turn";
 import { explainTurnTexts } from "./explain-chat";
+import type { AutoLine } from "./auto-learn-line";
+import { AUTO_PAUSE_PREFIX, liveDeLigne, reglagesDeLigne } from "./auto-learn-line";
+import type { GateVerdict } from "./auto-learn-gate";
+import { UNKNOWN_RETRY_MS } from "./auto-learn-gate";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
@@ -117,6 +121,10 @@ export interface DemandeFile extends DemandeTexte {
 	    is sent as it is, as a turn of the chat's live session, and the line
 	    ends with its answer as text. Never set on a request from another device. */
 	commandeCli?: boolean;
+	/** An AUTOMATIC Learn of a new Moodle lecture (spec 2026-10-15-moodle-auto-learn): nobody at this PC asked, and the lecture comes from the Internet. Always Supervised, never a live turn, gated before it starts (`setAutoGate`). */
+	auto?: AutoLine;
+	/** The class-session length of the target folder, frozen at send: an automatic line is sent outside the AI page. Wins over `DepsFile.lectureMinutes`. */
+	lectureMinutes?: number;
 }
 
 /** An Explain turn (2026-10-14): the line runs `AiClient.chat` as a tutor,
@@ -204,6 +212,8 @@ export interface FileGenerationApp {
 	reprendre(id: number): void;
 	/** A paused line: "Cancel the resume" turns it into a failed line. */
 	annulerReprise(id: number): void;
+	/** A line paused because its folder is not trusted: asks the host's trust question; trusted, the line waits its turn again. */
+	confier(id: number): Promise<void>;
 	/** Réécrit la note d'une ligne dont seul l'enregistrement a échoué. */
 	reessayerEnregistrement(id: number): void;
 	fermer(id: number): void;
@@ -239,6 +249,11 @@ export interface FileGenerationApp {
 }
 
 let instance: FileGenerationApp | null = null;
+
+export type AutoGate = (d: DemandeFile) => Promise<GateVerdict>;
+let porteAuto: AutoGate | null = null;
+/** The gate of automatic lines (the auto-learn runner registers it). Without one, an automatic line never starts: it waits as "usage unknown". */
+export function setAutoGate(g: AutoGate | null): void { porteAuto = g; }
 /** Les dépendances de l'appelant le plus récent : une coquille remontée
     apporte un nouveau catalogue, la génération suivante le lit. */
 let depsCourants: DepsFile | null = null;
@@ -359,6 +374,23 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		file = F.mettreEnPause(file, ligne.id, { fournisseur: ligne.demande.reglages.aiProvider ?? "", reprise });
 	}
 
+	/** The gate of an automatic line: true to run; false once the line is
+	    paused, or was stopped meanwhile. Fails closed: no gate, or a gate
+	    that throws, is "usage unknown". The pause is keyed `auto:<provider>`,
+	    so it holds the automatic chat only and never blocks the manual lines
+	    of that provider (a real usage-limit pause keeps the bare provider). */
+	async function passerPorte(ligne: LigneGeneration): Promise<boolean> {
+		const d = ligne.demande;
+		const inconnu = (): GateVerdict => ({ go: false, block: { kind: "unknown" }, retryAt: Date.now() + UNKNOWN_RETRY_MS });
+		let v: GateVerdict;
+		try { v = porteAuto ? await porteAuto(d) : inconnu(); } catch { v = inconnu(); }
+		if (!tourne(ligne.id)) { file = F.solder(file, ligne.id); pomper(); return false; }
+		if (v.go) return true;
+		file = F.mettreEnPause(file, ligne.id, { fournisseur: AUTO_PAUSE_PREFIX + (d.reglages.aiProvider ?? ""), reprise: v.retryAt, motif: v.block });
+		pomper();
+		return false;
+	}
+
 	function publier(): void {
 		armerReprise();
 		if (restauree && file !== derniereGardee) {
@@ -424,12 +456,15 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			pomper();
 			return;
 		}
+		// An automatic line asks its gate (usage, daily cap, trust) before anything starts.
+		if (d.auto && !(await passerPorte(ligne))) return;
 		const deps = lireDeps();
-		/* Le client lit les réglages FIGÉS de la demande par-dessus les
-		   réglages vivants : le reste (adresse Ollama, plans appris…) suit
-		   l'hôte, et `save` reste le sien. */
+		/* The client reads the request's FROZEN settings over the live ones:
+		   the rest (Ollama address, learned plans…) follows the host, and
+		   `save` stays the host's. An automatic line is forced to Supervised
+		   on top (`reglagesDeLigne`). */
 		const figes: AiSettingsHost = {
-			get: () => ({ ...deps.settings.get(), ...d.reglages }),
+			get: () => reglagesDeLigne(deps.settings.get(), d),
 			save: (patch) => deps.settings.save(patch),
 		};
 		const client = createAiClient(figes);
@@ -460,14 +495,15 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const lancer = () => client.generate(prompt, {
 				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				documents, plansParDocument: liens?.map(l => l?.plan), parties: d.parties,
-				lectureMinutes: d.mode === "learn" ? deps.lectureMinutes?.(dossier) : undefined,
+				lectureMinutes: d.mode === "learn" ? (d.lectureMinutes ?? deps.lectureMinutes?.(dossier)) : undefined,
 				/* The quiz's folder: Claude Code may read it with read-only tools
 				   once the user trusts it. Never for a request from another
 				   device: nobody at this PC asked for it. */
 				dossier: d.fromDevice ? undefined : dossier,
 				/* A turn of the chat's live session (Claude Code, Codex), under
-				   the same key as the resume: a reload finds it again. */
-				live: d.fromDevice ? undefined : { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
+				   the same key as the resume: a reload finds it again. Never for
+				   a remote or an automatic line (`liveDeLigne`). */
+				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) } : undefined,
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
@@ -618,8 +654,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	async function commandeBrute(ligne: LigneGeneration, client: AiClient): Promise<void> {
 		const d = ligne.demande;
 		try {
-			// Nobody at this PC asked for a command from another device.
-			if (d.fromDevice) throw new Error(t("ai.remote.providerNotAllowed"));
+			// Nobody at this PC asked for a command from another device, nor for an automatic line.
+			if (d.fromDevice || d.auto) throw new Error(t("ai.remote.providerNotAllowed"));
 			etapeDe(ligne.id, "redaction");
 			const transcript = transcriptVide();
 			transcripts.set(ligne.id, transcript);
@@ -694,17 +730,17 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 	}
 
-	/** Écrit la note du quiz produit. Un échec ne perd rien : la ligne passe
-	    en « échec d'enregistrement » avec son quiz, et ne relancera jamais le
-	    CLI. */
+	/** Writes the note of the quiz produced. A failure loses nothing: the
+	    line becomes a "save failed" line with its quiz, and never launches
+	    the CLI again. */
 	async function enregistrer(id: number, d: DemandeFile): Promise<void> {
 		const p = d.produit;
 		if (!p) return;
 		const deps = lireDeps();
 		if (p.lot) { await enregistrerLotDeLigne(id, d, p, p.lot, deps); return; }
-		// Le brouillon UNE FOIS (lot D) : `draft.questions` exclut déjà l'objet
-		// de configuration final — sa longueur est le compteur affiché,
-		// `p.questions.length` comptait le glossaire comme une question.
+		// The draft ONCE (batch D): `draft.questions` already leaves out the
+		// final configuration object; its length is the count shown, whereas
+		// `p.questions.length` counted the glossary as a question.
 		const draft = brouillonDe(p.questions);
 		const entree = await enregistrerQuiz({
 			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre, titreImpose: titrePreparation(d),
@@ -718,7 +754,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const titre = entree.title || entree.basename;
 		file = F.terminer(file, id, { titre, chemin: entree.path, ...compterItems(draft.questions), mode: d.mode });
 		relancerSurRepli(id, d);
-		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
+		// An automatic line is announced by its runner (a native notification).
+		if (!d.auto && !afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 
 	/** ONE PASS: one note per document. Each note written is kept in the line's
@@ -738,7 +775,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		}
 		const titre = t("ai.queue.lotSaved", { count: faits.length });
 		file = F.terminer(file, id, { titre, chemin: faits[0].chemin, questions: faits.reduce((n, f) => n + f.questions, 0), readings: faits.reduce((n, f) => n + f.readings, 0), quiz: faits.map(f => ({ titre: f.titre, chemin: f.chemin, questions: f.questions, readings: f.readings, mode: d.mode })) });
-		if (!afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
+		if (!d.auto && !afficheeQuelquePart()) currentHost().ui.notice(t("ai.queue.readyNotice", { title: titre }));
 	}
 
 	/* THE QUEUE OF BEFORE THE RELOAD, read back once. Its running line runs
@@ -795,6 +832,21 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			file = F.annulerReprise(file, id, t("ai.queue.limitCancelled"));
 			if (file === avant) return;
 			publier();
+		},
+		/* "Trust this folder" on a line its gate paused as untrusted: the
+		   host asks its own trust question (the user answers, never the
+		   page); trusted, the line waits its turn again and meets its gate
+		   once more. Anything else leaves it paused. */
+		async confier(id) {
+			const l = F.ligne(file, id);
+			const dossier = l?.demande.destination;
+			if (l?.etat !== "pause" || l.pause?.motif?.kind !== "untrusted" || !dossier) return;
+			let r: "trusted" | "refused" | "unavailable" = "unavailable";
+			try { r = (await currentHost().process?.trustFolder?.(dossier)) ?? "unavailable"; } catch { /* stays paused */ }
+			if (r !== "trusted") return;
+			const avant = file;
+			file = F.reprendre(file, id);
+			if (file !== avant) pomper();
 		},
 		reessayer(id) {
 			transcripts.delete(id);

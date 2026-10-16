@@ -405,12 +405,23 @@ export function creerVueFile(opts: {
 		}
 		if (l.etat === "pause") {
 			/* PAUSED ON A USAGE LIMIT: the clock resumes it (reset time + 30 s),
-			   the user can resume now or cancel the resume. */
+			   the user can resume now or cancel the resume. An AUTOMATIC line
+			   paused by its gate says why (`motif`); an untrusted folder gets
+			   the button that asks the trust question. */
 			host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "pause");
 			const corps = ajouter(rep, "div", "qbd-ai-reponse-corps");
 			const reprise = l.pause?.reprise ?? null;
-			ajouter(corps, "div", "qbd-ai-reponse-texte", reprise !== null ? t("ai.queue.limitPaused", { when: formatResume(reprise, Date.now(), currentLang()) }) : t("ai.queue.limitPausedManual"));
+			const motif = l.pause?.motif;
+			const quand = reprise !== null ? formatResume(reprise, Date.now(), currentLang()) : "";
+			const texte = !motif ? (reprise !== null ? t("ai.queue.limitPaused", { when: quand }) : t("ai.queue.limitPausedManual"))
+				: motif.kind === "session" ? t("ai.autoLearn.waitSession", { percent: motif.percent, when: quand })
+				: motif.kind === "weekly" ? t("ai.autoLearn.waitWeekly", { percent: motif.percent, when: quand })
+				: motif.kind === "daily" ? t("ai.autoLearn.waitDaily", { count: motif.count, when: quand })
+				: motif.kind === "unknown" ? t("ai.autoLearn.waitUnknown", { when: quand })
+				: t("ai.autoLearn.waitUntrusted");
+			ajouter(corps, "div", "qbd-ai-reponse-texte", texte);
 			const actions = ajouter(corps, "div", "qbd-ai-reponse-actions");
+			if (motif?.kind === "untrusted") bouton(actions, t("ai.autoLearn.trustFolder"), () => { void opts.file.confier(l.id); });
 			bouton(actions, t("ai.queue.limitResumeNow"), () => opts.file.reprendre(l.id));
 			bouton(actions, t("ai.queue.limitCancelResume"), () => opts.file.annulerReprise(l.id));
 			return;

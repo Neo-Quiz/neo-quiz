@@ -808,3 +808,26 @@ await withSrcModule(["apps/windows/electron/frame-export.ts", "src/engine/html-f
 	}
 	r.done();
 });
+
+/* AN AUTOMATIC LINE (spec 2026-10-15-moodle-auto-learn) can only produce the
+   Supervised form, whatever the user's mode and whatever its frozen settings
+   carry; and it never runs as a live session turn. */
+await withSrcModule(["src/dashboard/auto-learn-line.ts", "src/host/claude-outils.ts", "apps/windows/electron/gabarits-cli.ts"], (A, O, G) => {
+	const r = makeReporter("Automatic line — Supervised only");
+	const m = "a".repeat(32);
+	const teteC = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku"];
+	const auto = { key: "k", relPath: "B2/XTI303/CM3.pdf" };
+	const formes = O.MODES_AGENT.flatMap(user => [undefined, "full", "auto", "bogus"].map(frozen => {
+		const s = A.reglagesDeLigne({ aiAgentMode: user }, { reglages: frozen === undefined ? {} : { aiAgentMode: frozen }, auto });
+		return O.lireModeAgent(s.aiAgentMode);
+	}));
+	r.check("every user mode, every frozen mode: the line runs Supervised", formes, formes.map(() => "supervised"));
+	const s = A.reglagesDeLigne({ aiAgentMode: "full" }, { reglages: { aiAgentMode: "full" }, auto });
+	const tail = O.argsAgentClaude(O.lireModeAgent(s.aiAgentMode));
+	r.check("its Claude tail is exactly the read-only tools form the main process accepts",
+		[tail, G.argumentsAvecOutils("claude", [...teteC, ...tail], m), tail.includes("--dangerously-skip-permissions")], [O.ARGS_OUTILS_CLAUDE, true, false]);
+	r.check("its Codex sandbox is read-only", O.argsAgentCodex(O.lireModeAgent(s.aiAgentMode)), ["-s", "read-only"]);
+	r.check("a manual line keeps the user's mode (the forcing is not global)", O.lireModeAgent(A.reglagesDeLigne({ aiAgentMode: "full" }, { reglages: {} }).aiAgentMode), "full");
+	r.check("never a live turn: automatic or remote lines; a manual line may", [A.liveDeLigne({ auto }), A.liveDeLigne({ fromDevice: "phone" }), A.liveDeLigne({})], [false, false, true]);
+	r.done();
+});

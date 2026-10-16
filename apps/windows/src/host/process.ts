@@ -134,6 +134,12 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 			}
 			return (await pont().processus.confiance(abs, true)) === "approuve" ? "trusted" : "unavailable";
 		},
+		/* Asked by the automatic Learn gate: never opens the trust modal. */
+		async isFolderTrusted(dossier) {
+			const abs = absolu ? absolu(dossier) : null;
+			if (!abs) return false;
+			try { return (await pont().processus.confiance(abs)) === "approuve"; } catch { return false; }
+		},
 		trustedFolders() {
 			return pont().processus.confianceListe();
 		},

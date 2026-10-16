@@ -72,7 +72,8 @@ export function armerNotificationsFin(queue: { lignes(): readonly LigneGeneratio
 	const vues = new Set<number>();
 	newlyReady(vues, queue.lignes());
 	queue.abonner(() => {
-		const pretes = newlyReady(vues, queue.lignes());
+		// An automatic line is announced by its runner; `newlyReady` still marks it seen.
+		const pretes = newlyReady(vues, queue.lignes()).filter(l => !l.demande.auto);
 		if (pretes.length === 0) return;
 		const premier = readyKind(pretes[0]);
 		const extra = pretes.length - 1;

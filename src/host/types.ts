@@ -599,6 +599,12 @@ export interface HostProcess {
 	    host that has no such dialog): run without any tool, as before.
 	    Optional: a host without it never runs a CLI with tools. */
 	trustFolder?(dossier: string): Promise<"trusted" | "refused" | "unavailable">;
+	/** Is this folder (a CONTRACT path) already trusted? Never asks: no
+	    dialog, no modal. For a check made with nobody at the PC (the
+	    automatic Learn's gate, spec 2026-10-15-moodle-auto-learn): an
+	    untrusted folder stays untrusted until the user answers
+	    `trustFolder`. Optional: a host without it trusts nothing. */
+	isFolderTrusted?(dossier: string): Promise<boolean>;
 	/** The trusted folders, as disk paths to show (Settings › AI). */
 	trustedFolders?(): Promise<string[]>;
 	/** Takes one of `trustedFolders` off the list. */

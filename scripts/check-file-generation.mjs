@@ -421,9 +421,11 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const appels = [];
 	const ecrits = new Map();
 	const diagnostics = [];
+	let confiant = false;
 	hote.installHost({
 		platform: { isDesktopApp: true },
-		process: { lireCache: async () => null, diagnosticReponse: async (texte) => { diagnostics.push(texte); }, run: async (spec) => {
+		/* Trust is granted only for the automatic line's section below: before it, every call runs without tools. */
+		process: { lireCache: async () => null, trustFolder: async () => (confiant ? "trusted" : "refused"), isFolderTrusted: async () => confiant, diagnosticReponse: async (texte) => { diagnostics.push(texte); }, run: async (spec) => {
 			appels.push(spec);
 			// "!ERR:" marks an answer the CLI itself flags as an error (`is_error`).
 			const erreur = reponse.startsWith("!ERR:");
@@ -439,7 +441,8 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	});
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
 	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium", aiOutputFolder: "Quizzes" };
-	const file = app.fileDeGeneration({ settings: { get: () => ({ ...reglages }), save: async () => {} }, scanner });
+	// The LIVE settings carry Full access: an automatic line must still run Supervised.
+	const file = app.fileDeGeneration({ settings: { get: () => ({ ...reglages, aiAgentMode: "full" }), save: async () => {} }, scanner });
 	const demande = { text: "Fais un quiz", notes: noms3.map(n => ({ name: n, content: "contenu de " + n, source: "file" })), images: [], parDocument: true,
 		mode: "practice", count: null, type: "Mixte", destination: "R/Cours", reglages, categorie: "general" };
 	const attendre = async () => { for (let i = 0; i < 200 && file.lignes().some(l => l.etat === "attente" || l.etat === "cours" || l.etat === "enregistrement"); i++) await new Promise(res => setTimeout(res, 10)); };
@@ -498,6 +501,59 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const l5 = file.lignes()[0];
 	r.check("Claude Code's output limit: a clear 'too long' error, nothing more kept",
 		[l5.etat, /output limit|limite de sortie/.test(l5.erreur ?? ""), diagnostics.length - avantDiag], ["echouee", true, 1]);
+
+	/* AN AUTOMATIC LINE: gated, then run in the Supervised form in its folder. */
+	confiant = true;
+	file.fermer(file.lignes()[0].id);
+	const autoLine = { ...unSeul, mode: "learn", type: ["Mixte"], destination: "R/Cours", chatId: "moodle-test-1", auto: { key: "cours/cm1.pdf|5", relPath: "Cours/CM1.pdf" }, lectureMinutes: 90 };
+	app.setAutoGate(async () => ({ go: true }));
+	const avantAuto = appels.length;
+	file.envoyer(autoLine);
+	await attendre();
+	const argsAuto = appels[avantAuto]?.args ?? [];
+	r.check("an automatic line runs ONE call, read-only tools, in its folder",
+		[appels.length - avantAuto, argsAuto.includes("--dangerously-skip-permissions"), argsAuto.slice(argsAuto.indexOf("--tools"), argsAuto.indexOf("--tools") + 2), appels[avantAuto]?.dossier],
+		[1, false, ["--tools", "Read,Grep,Glob"], "R/Cours"]);
+	r.check("its frozen class-session length reaches the Learn prompt", /LECTURE LENGTH/.test(appels[avantAuto]?.stdin ?? ""), true);
+	file.fermer(file.lignes()[0].id);
+	/* Blocked by the gate: paused with the reason, no CLI, and a manual line of the same provider in another chat still starts. */
+	app.setAutoGate(async () => ({ go: false, block: { kind: "session", percent: 86 }, retryAt: Date.now() + 3_600_000 }));
+	const avantPause = appels.length;
+	file.envoyer(autoLine);
+	await new Promise(res => setTimeout(res, 50));
+	const pausee = file.lignes().find(l => l.demande.auto);
+	r.check("a blocked automatic line pauses with its reason and its retry time, no CLI started",
+		[pausee?.etat, pausee?.pause?.motif, pausee?.pause?.fournisseur, typeof pausee?.pause?.reprise, appels.length - avantPause], ["pause", { kind: "session", percent: 86 }, "auto:claude-code", "number", 0]);
+	file.envoyer({ ...unSeul, chatId: "manual-chat-1" });
+	await attendre();
+	r.check("the gate pause does not block a manual line of the same provider", appels.length - avantPause, 1);
+	r.check("a manual line keeps the user's mode (Full access here)", appels[avantPause]?.args.includes("--dangerously-skip-permissions"), true);
+	/* No gate registered: fail closed, paused as "usage unknown". */
+	for (const l of [...file.lignes()]) { file.annulerReprise(l.id); file.fermer(l.id); }
+	app.setAutoGate(null);
+	file.envoyer(autoLine);
+	await new Promise(res => setTimeout(res, 50));
+	r.check("no gate: the automatic line waits as 'usage unknown'", file.lignes().find(l => l.demande.auto)?.pause?.motif, { kind: "unknown" });
+	/* A gate that throws: fail closed too. */
+	for (const l of [...file.lignes()]) { file.annulerReprise(l.id); file.fermer(l.id); }
+	app.setAutoGate(async () => { throw new Error("usage read failed"); });
+	const avantJet = appels.length;
+	file.envoyer(autoLine);
+	await new Promise(res => setTimeout(res, 50));
+	r.check("a gate that throws: 'usage unknown', no CLI started", [file.lignes().find(l => l.demande.auto)?.pause?.motif, appels.length - avantJet], [{ kind: "unknown" }, 0]);
+	/* The trust button: a line paused as untrusted asks the host, then waits its turn again. */
+	for (const l of [...file.lignes()]) { file.annulerReprise(l.id); file.fermer(l.id); }
+	let porteAppels = 0;
+	app.setAutoGate(async () => (porteAppels++ === 0 ? { go: false, block: { kind: "untrusted" }, retryAt: null } : { go: true }));
+	const avantConfiance = appels.length;
+	file.envoyer(autoLine);
+	await new Promise(res => setTimeout(res, 50));
+	const nonConfiee = file.lignes().find(l => l.demande.auto);
+	r.check("an untrusted folder: paused with no retry time, no CLI", [nonConfiee?.pause?.motif, nonConfiee?.pause?.reprise, appels.length - avantConfiance], [{ kind: "untrusted" }, null, 0]);
+	await file.confier(nonConfiee.id);
+	await attendre();
+	r.check("Trust this folder: the line runs once trusted", [porteAppels, appels.length - avantConfiance], [2, 1]);
+	app.setAutoGate(null);
 	hote.uninstallHost();
 	delete globalThis.document;
 	r.done();
@@ -605,6 +661,14 @@ await withSrcModule(["src/dashboard/file-generation.ts", "src/dashboard/usage-li
 	const autres = JSON.parse(JSON.stringify(f));
 	autres.lignes.find(l => l.etat === "pause").pause = { fournisseur: 5, reprise: Infinity };
 	r.check("un fournisseur qui n'est pas du texte et une reprise infinie sont réparés à la relecture", F.ligne(F.restaurer(autres, () => false), 1).pause, { fournisseur: "", reprise: null });
+	/* The gate reason of an automatic line survives a reload; a damaged one is dropped, never guessed. */
+	const motifs = JSON.parse(JSON.stringify(f));
+	motifs.lignes.find(l => l.etat === "pause").pause = { fournisseur: "auto:codex", reprise: reset, motif: { kind: "session", percent: 86 } };
+	const motifAbime = JSON.parse(JSON.stringify(motifs));
+	motifAbime.lignes.find(l => l.etat === "pause").pause.motif = { kind: "session", percent: "86" };
+	r.check("a gate reason is read back, a damaged one is dropped",
+		[F.ligne(F.restaurer(motifs, () => false), 1).pause, F.ligne(F.restaurer(motifAbime, () => false), 1).pause],
+		[{ fournisseur: "auto:codex", reprise: reset, motif: { kind: "session", percent: 86 } }, { fournisseur: "auto:codex", reprise: reset }]);
 	const apresArret = F.reprendreEchues(F.restaurer(JSON.parse(JSON.stringify(f)), () => false), reset + 60000);
 	r.check("application fermée puis rouverte après l'heure : la ligne repart au démarrage", [apresArret.ids, F.ligne(apresArret.file, 1).etat], [[1], "attente"]);
 

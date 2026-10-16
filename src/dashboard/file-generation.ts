@@ -36,6 +36,9 @@
      hand (`reprendre`); `annulerReprise` turns it into a failed line.
 ══════════════════════════════════════════════════════════ */
 
+import type { GateBlock } from "./auto-learn-gate";
+import { readGateBlock } from "./auto-learn-gate";
+
 export type EtatLigne = "attente" | "cours" | "arret" | "enregistrement" | "prete" | "echouee" | "pause";
 
 /** What a paused line waits for. */
@@ -44,6 +47,8 @@ export interface PauseLimite {
 	readonly fournisseur: string;
 	/** Epoch ms when the window resets, null when unknown (manual resume). */
 	readonly reprise: number | null;
+	/** Why an AUTOMATIC line waits (its gate), shown on the line; absent for a usage-limit pause. */
+	readonly motif?: GateBlock;
 }
 
 /** Providers can still refuse right at the reset: the line restarts this long after. */
@@ -247,12 +252,15 @@ export function echeance<D, R>(l: LigneFile<D, R>): number | null {
 }
 
 /** A pause read back from storage: a provider that is not text becomes "",
-    a reset time that is not a finite number becomes null (manual resume). */
+    a reset time that is not a finite number becomes null (manual resume), a
+    gate reason that does not read back is dropped (`readGateBlock`). */
 function pauseRelue(p: unknown): PauseLimite {
-	const o = typeof p === "object" && p !== null ? (p as { fournisseur?: unknown; reprise?: unknown }) : {};
+	const o = typeof p === "object" && p !== null ? (p as { fournisseur?: unknown; reprise?: unknown; motif?: unknown }) : {};
+	const motif = readGateBlock(o.motif);
 	return {
 		fournisseur: typeof o.fournisseur === "string" ? o.fournisseur : "",
 		reprise: typeof o.reprise === "number" && Number.isFinite(o.reprise) ? o.reprise : null,
+		...(motif ? { motif } : {}),
 	};
 }
 
