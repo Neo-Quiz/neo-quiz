@@ -119,7 +119,12 @@ const pont: Pont = {
 	},
 
 	notification: {
-		afficher: (t, c) => ipcRenderer.invoke(CANAUX.notificationAfficher, t, c),
+		afficher: (t, c, j) => ipcRenderer.invoke(CANAUX.notificationAfficher, t, c, j),
+		surClic: rappel => {
+			const ecouteur = (_e: unknown, jeton: unknown): void => { if (typeof jeton === "string") rappel(jeton); };
+			ipcRenderer.on(CANAUX.notificationClic, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.notificationClic, ecouteur); };
+		},
 	},
 
 	systeme: {

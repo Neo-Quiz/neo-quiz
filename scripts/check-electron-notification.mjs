@@ -1,8 +1,10 @@
 /**
  * The native notification channel's rules (`electron/notification.ts`): the
- * window supplies two strings and nothing else (no icon path, no URL, no
- * action, no sound). Prevents: a compromised page flooding the desktop, or
- * smuggling control characters / huge text into a system notification.
+ * window supplies two strings and, optionally, an opaque token echoed back
+ * on a click (no icon path, no URL, no action, no sound). Prevents: a
+ * compromised page flooding the desktop, smuggling control characters /
+ * huge text into a system notification, or passing a path, URL or action
+ * off as a click token.
  *     npm run check:electron-notification
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -33,5 +35,11 @@ await withSrcModule("apps/windows/electron/notification.ts", (N) => {
 	let u = 5_000_000; const g2 = N.createNotificationGate(() => u);
 	r.check("prepare passes when allowed", N.prepareNotification(g2, "T", "b"), { title: "T", body: "b" });
 	r.check("prepare refuses over the rate; a refused call consumed the gate first", [N.prepareNotification(g2, "T", "b"), (u += 2_000, N.prepareNotification(g2, 3, 3)), N.prepareNotification(g2, "T", "b")], [null, null, null]);
+	r.check("a token is lower-case letters, digits and '-', 1 to 40 characters",
+		["n-abc-123", "a".repeat(40)].map(N.jetonNotification), ["n-abc-123", "a".repeat(40)]);
+	for (const [n, v] of [["empty", ""], ["41 chars", "a".repeat(41)], ["upper case", "N-1"], ["a path", "C:/x"], ["a url", "https://x"], ["a space", "a b"], ["a number", 3], ["an object", {}], ["undefined", undefined], ["a newline", "a\nb"]]) {
+		r.check("no token: " + n, N.jetonNotification(v), null);
+	}
+	r.check("at most 30 clickable notifications are kept", N.MAX_CLIQUABLES, 30);
 	r.done();
 });

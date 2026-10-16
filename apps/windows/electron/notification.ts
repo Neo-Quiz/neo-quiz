@@ -38,3 +38,11 @@ export function createNotificationGate(now: () => number = Date.now): { allow():
 		},
 	};
 }
+
+/** The token of a clickable notification: echoed back to the window on a click, nothing else. */
+export const JETON_NOTIFICATION = /^[a-z0-9-]{1,40}$/;
+export function jetonNotification(v: unknown): string | null {
+	return typeof v === "string" && JETON_NOTIFICATION.test(v) ? v : null;
+}
+/** Clickable notifications kept referenced (a collected one loses its click); the oldest is let go first. */
+export const MAX_CLIQUABLES = 30;

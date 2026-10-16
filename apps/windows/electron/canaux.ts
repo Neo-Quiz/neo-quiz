@@ -51,7 +51,7 @@ import { absoluDepuisContrat, contratDepuisAbsolu, creerIndex, renameDirVersAbso
 import type { EvenementSurveillant, Index } from "./index-fichiers";
 import { listerRacine, normaliser } from "./parcours";
 import { t } from "../../../src/i18n";
-import { createNotificationGate, prepareNotification } from "./notification";
+import { createNotificationGate, jetonNotification, MAX_CLIQUABLES, prepareNotification } from "./notification";
 import { validerReglagesIa } from "./garde-ia";
 import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/garde";
 import { siteVerifie, verifierSite } from "./moodle/compat";
@@ -911,13 +911,31 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		clipboard.writeText(texte);
 	});
 
-	/* Only two strings cross: no icon, URL, action or click handler comes from the page. */
+	/* Only two strings and an optional OPAQUE token cross: no icon, URL,
+	   action or click handler comes from the page. A clickable notification
+	   is kept referenced (a collected one loses its click), at most
+	   `MAX_CLIQUABLES`, the oldest let go first. */
 	const porteNotification = createNotificationGate();
-	ipcMain.handle(CANAUX.notificationAfficher, (_e, titre: unknown, corps: unknown) => {
+	const cliquables = new Set<Notification>();
+	ipcMain.handle(CANAUX.notificationAfficher, (_e, titre: unknown, corps: unknown, jeton: unknown) => {
 		if (!Notification.isSupported()) return false;
 		const propre = prepareNotification(porteNotification, titre, corps);
 		if (!propre) return false;
-		new Notification({ title: propre.title, body: propre.body, silent: false }).show();
+		const n = new Notification({ title: propre.title, body: propre.body, silent: false });
+		const j = jetonNotification(jeton);
+		if (j) {
+			cliquables.add(n);
+			if (cliquables.size > MAX_CLIQUABLES) { const ancienne = cliquables.values().next().value; if (ancienne) cliquables.delete(ancienne); }
+			/* The click only brings the window to the front and echoes the token: the page decides what it means.
+			   `premierPlan` rather than a bare `focus()`: Windows refuses the foreground to a process without focus. */
+			n.once("click", () => {
+				cliquables.delete(n);
+				deps.fenetre.premierPlan();
+				deps.envoyer(CANAUX.notificationClic, j);
+			});
+			n.once("close", () => { cliquables.delete(n); });
+		}
+		n.show();
 		return true;
 	});
 

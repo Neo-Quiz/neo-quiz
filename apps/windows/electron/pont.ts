@@ -550,11 +550,14 @@ export interface Pont {
 		fichier(nom: string, octets: Uint8Array): Promise<boolean>;
 	};
 
-	/** A native notification built by the main process from two strings only
-	    (no icon, URL or action from the page); bounded and rate-limited there
-	    (`notification.ts`). `false` when refused or unsupported. */
+	/** A native notification built by the main process from two strings
+	    (no icon, URL or action from the page) and, optionally, an OPAQUE token
+	    (`JETON_NOTIFICATION`) echoed back on a click; bounded and rate-limited
+	    there (`notification.ts`). `false` when refused or unsupported. */
 	notification?: {
-		afficher(titre: string, corps: string): Promise<boolean>;
+		afficher(titre: string, corps: string, jeton?: string): Promise<boolean>;
+		/** A clickable notification was clicked: its token (the window was brought to the front). */
+		surClic(rappel: (jeton: string) => void): () => void;
 	};
 
 	/** This computer's name and kind (Windows only; absent on the phone). No
@@ -1191,6 +1194,7 @@ export const CANAUX = {
 	frameImageCopy: "neo:frame-image/copy",
 	frameHtmlSave: "neo:frame-html/save",
 	notificationAfficher: "neo:notification/afficher",
+	notificationClic: "neo:notification/clic",
 	appareilInfos: "neo:appareil/infos",
 	syncEtatLire: "neo:sync/etat-lire",
 	syncAppairer: "neo:sync/appairer",
