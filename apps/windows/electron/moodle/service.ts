@@ -10,7 +10,7 @@ import type { Stats } from "node:fs";
 import * as path from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type {
-	ActiviteMoodle, CoursMoodle, DevoirMoodle, ModuleMoodle, EtatMoodle, FichierMoodle, ResultatRechercheMoodle, ResumeMoodle, ResumeSyncMoodle,
+	ActiviteMoodle, CoursMoodle, DevoirMoodle, ModuleMoodle, EtatMoodle, FichierMoodle, FichierNouveauMoodle, ResultatRechercheMoodle, ResumeMoodle, ResumeSyncMoodle,
 } from "../pont";
 import { CLE_REGLAGES_MOODLE } from "../pont";
 import { hoteAutorise } from "../reseau";
@@ -37,6 +37,8 @@ export const CATALOGUE_TTL = 30000;
 export const VERB_FLOOR = 1000;
 /** Followed `extra` courses (the rest of the setting is kept but not fetched). */
 export const MAX_EXTRA_SUIVIS = 50;
+/** New files of full syncs kept for the window until it takes them (the oldest go first). */
+export const MAX_NOUVEAUX = 500;
 
 export interface DepsMoodle {
 	/** The default quiz root (`C:/Neo Quiz`), read at each use. */
@@ -52,6 +54,8 @@ export interface DepsMoodle {
 	    has already bounded the path and refused executable types). */
 	ouvrirChemin(abs: string): Promise<boolean>;
 	envoyer(etat: EtatMoodle): void;
+	/** A full sync downloaded new files: tells the window to take them (`prendreNouveaux`). Absent in most tests. */
+	signalerNouveaux?(): void;
 	/** True when the connection is metered (`connexion-limitee.ts`); absent = never. Only AUTOMATIC runs ask. */
 	limitee?(): Promise<boolean>;
 	maintenant?(): number;
@@ -93,6 +97,8 @@ export interface ServiceMoodle {
 	ignorerDevoir(cmid: unknown, on: unknown): Promise<number[]>;
 	/** At app start: a first automatic check, then one every hour while the app runs. */
 	demarrerAuto(): Promise<void>;
+	/** The new files of the last FULL syncs, oldest first, at most `MAX_NOUVEAUX`; taking them clears them. */
+	prendreNouveaux(): Promise<FichierNouveauMoodle[]>;
 }
 
 interface Reglage {
@@ -154,6 +160,9 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	let dernierSync: { at: number; res: ResumeSyncMoodle } | null = null;
 	let cache: { at: number; liste: DevoirBrut[] } | null = null;
 	let arreterHoraire: (() => void) | null = null;
+	/** Fresh files of full syncs not taken by the window yet. Kept here, not pushed:
+	    the first automatic run can finish before the window listens. */
+	let enAttente: FichierNouveauMoodle[] = [];
 	let ecriture: Promise<unknown> = Promise.resolve();
 	const echecsFichiers = new Map<number, Set<string>>();
 	let catCache: { at: number; userid: number; liste: CoursChoisi[] } | null = null;
@@ -332,6 +341,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	async function deconnecter(): Promise<void> {
 		attente = null;
 		pauseLimitee = false;
+		enAttente = [];
 		jeton = null;
 		erreur = null;
 		cache = null;
@@ -514,6 +524,25 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	interface Cible { ids: number[] | null; nom?: string }
 	interface JobCours extends Job { fresh: boolean; courseId: number; code: string }
 
+	/** The fresh downloads as the window may see them: inside the quiz root, relative to it, a regular file each. */
+	async function versNouveaux(faits: readonly (JobCours & { ok: boolean })[]): Promise<FichierNouveauMoodle[]> {
+		const racine = deps.racine();
+		const out: FichierNouveauMoodle[] = [];
+		for (const o of faits) {
+			const abs = path.resolve(o.dir, o.target ?? o.file.name);
+			if (!estDans(racine, abs)) continue;
+			const rel = path.relative(path.resolve(racine), abs).split(path.sep).join("/");
+			let size: number;
+			try {
+				const st = await fs.lstat(abs);
+				if (!st.isFile()) continue;
+				size = st.size;
+			} catch { continue; }
+			out.push({ relPath: rel, code: o.code, name: path.basename(abs), size });
+		}
+		return out;
+	}
+
 	async function faireSync(cible: Cible): Promise<{ res: ResumeSyncMoodle; resume: ResumeMoodle }> {
 		const res: ResumeSyncMoodle = { nouveaux: 0, mis_a_jour: 0, echecs: 0, ignores: 0, erreur: null };
 		const resume: ResumeMoodle = { nouveaux: 0, misAJour: 0, echecs: 0, parCours: {} };
@@ -576,6 +605,16 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 					if (echecs.size < MAX_FICHIERS) echecs.add(o.file.name);
 				}
 				echecsFichiers.set(o.courseId, echecs);
+			}
+			/* Only a FULL sync (hourly check or "Sync now"): a per-course or
+			   per-file download from the Moodle page is a manual pick of past
+			   material, never a "new lecture" (spec 2026-10-15-moodle-auto-learn). */
+			if (cible.ids === null) {
+				const nouveaux = await versNouveaux(out.filter(o => o.ok && o.fresh));
+				if (nouveaux.length) {
+					enAttente = [...enAttente, ...nouveaux].slice(-MAX_NOUVEAUX);
+					try { deps.signalerNouveaux?.(); } catch { /* the window may be gone */ }
+				}
 			}
 			resume.echecs = res.echecs;
 			if (cible.ids === null) await poserEtat({ lastSync: maintenant(), summary: resume });
@@ -749,9 +788,15 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		await verifierAuto();
 	}
 
+	async function prendreNouveaux(): Promise<FichierNouveauMoodle[]> {
+		const l = enAttente;
+		enAttente = [];
+		return l;
+	}
+
 	return {
 		etat, connecter, recevoirJeton, deconnecter, cours, chercher, ajouterParUrl, favori, exclure, ajouter, retirer,
 		fichiers, module: moduleDuCours, telechargerCours, telechargerFichier, ouvrirDossier, ouvrirFichier, synchroniser, devoirs, ouvrirDevoir, deposer,
-		devoirVu, ignorerDevoir, demarrerAuto,
+		devoirVu, ignorerDevoir, demarrerAuto, prendreNouveaux,
 	};
 }

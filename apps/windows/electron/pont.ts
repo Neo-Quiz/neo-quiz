@@ -173,6 +173,18 @@ export type EvenementDisque =
  */
 /* ─────────── Moodle (main process; the token never crosses) ─────────── */
 
+/** A file a FULL Moodle sync downloaded for the first time (spec 2026-10-15-moodle-auto-learn). No URL, no token, no absolute path. */
+export interface FichierNouveauMoodle {
+	/** Path inside the default quiz root, "/" between segments ("B2 2026-2027/XTI303 - Conception/CM3 Conception.pdf"). */
+	relPath: string;
+	/** The module code of its course ("XTI303"). */
+	code: string;
+	/** The file name on disk: the last segment of `relPath`. */
+	name: string;
+	/** Bytes on disk. */
+	size: number;
+}
+
 /** What the window may know about the Moodle link. No token, no tokenised URL. */
 /** Answer of `moodle.verifierSite` (see `moodle/compat.ts` for the rule). */
 export interface VerdictSiteMoodle { compatible: boolean; sitename?: string; reason?: "unreachable" | "not-moodle" | "mobile-disabled" | "login-unsupported" }
@@ -634,6 +646,10 @@ export interface Pont {
 		/** A Moodle page link just arrived; read it with `pageDemandee()`. */
 		surPageDemandee(rappel: () => void): () => void;
 		surEtat(rappel: (etat: EtatMoodle) => void): () => void;
+		/** The new files of the last FULL syncs (hourly check or "Sync now"; never a per-course or per-file download), oldest first, at most 500, not taken yet. Taking them clears them. */
+		prendreNouveaux(): Promise<FichierNouveauMoodle[]>;
+		/** A full sync downloaded new files: read them with `prendreNouveaux()`. Nothing crosses with the signal. Absent on Android, like the whole group. */
+		surNouveaux(rappel: () => void): () => void;
 	};
 
 	/**
@@ -1221,6 +1237,9 @@ export const CANAUX = {
 	moodleOuvrirDevoir: "neo:moodle/ouvrir-devoir",
 	/** Pushed to the window: the Moodle state changed. */
 	moodleSurEtat: "neo:moodle/sur-etat",
+	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */
+	moodleNouveaux: "neo:moodle/nouveaux",
+	moodleNouveauxPrendre: "neo:moodle/nouveaux-prendre",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",

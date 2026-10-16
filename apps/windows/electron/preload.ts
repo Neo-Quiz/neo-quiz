@@ -286,6 +286,12 @@ const pont: Pont = {
 			ipcRenderer.on(CANAUX.moodleSurEtat, ecouteur);
 			return () => { ipcRenderer.off(CANAUX.moodleSurEtat, ecouteur); };
 		},
+		prendreNouveaux: () => ipcRenderer.invoke(CANAUX.moodleNouveauxPrendre),
+		surNouveaux: rappel => {
+			const ecouteur = (): void => rappel();
+			ipcRenderer.on(CANAUX.moodleNouveaux, ecouteur);
+			return () => { ipcRenderer.off(CANAUX.moodleNouveaux, ecouteur); };
+		},
 	},
 
 	miseAJour: {

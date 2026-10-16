@@ -703,6 +703,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodleDevoirVu, (_e, cmid: unknown) => deps.moodle.devoirVu(cmid));
 	ipcMain.handle(CANAUX.moodleIgnorerDevoir, (_e, cmid: unknown, on: unknown) => deps.moodle.ignorerDevoir(cmid, on));
 	ipcMain.handle(CANAUX.moodleSynchroniser, () => deps.moodle.synchroniser());
+	/* No argument crosses: the window only takes what full syncs left for it. */
+	ipcMain.handle(CANAUX.moodleNouveauxPrendre, () => deps.moodle.prendreNouveaux());
 	ipcMain.handle(CANAUX.moodleDevoirs, () => deps.moodle.devoirs());
 	ipcMain.handle(CANAUX.moodleOuvrirDevoir, (_e, cmid: unknown) => deps.moodle.ouvrirDevoir(cmid));
 

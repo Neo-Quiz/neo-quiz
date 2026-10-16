@@ -769,6 +769,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 	}
 	function newService({ root, base, store = {}, crypt = fakeCrypt(), now = Date.now, garde = ALL, planifier, autoParDefaut = false, impl = service, limites = false, budget, limitee }) {
 		const opened = [], pushes = [], chemins = [];
+		const signals = { n: 0 };
 		// The tests that exercise the automatic download say `auto: true`; every other case runs with it off.
 		if (!autoParDefaut && store.moodle && store.moodle.auto === undefined) store.moodle.auto = false;
 		const reglages = {
@@ -776,9 +777,9 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		};
 		const svc = impl.creerMoodle({
 			racine: () => base, garde, planifier, ouvrirChemin: async p => { chemins.push(p); return true; }, reglages: () => reglages, dossierDonnees: path.join(base, "..data-" + crypto.randomBytes(3).toString("hex")),
-			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), maintenant: () => now(), essai: T, essaiSansLimite: !limites, budget, limitee,
+			chiffrement: crypt, ouvrirExterne: async u => { opened.push(u); }, envoyer: e => pushes.push(e), signalerNouveaux: () => { signals.n++; }, maintenant: () => now(), essai: T, essaiSansLimite: !limites, budget, limitee,
 		});
-		return { svc, opened, pushes, store, chemins };
+		return { svc, opened, pushes, store, chemins, signals };
 	}
 	const everything = []; // every value handed to the window, across the service cases
 
@@ -864,6 +865,75 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(typeof e.lastSync, "number");
 			everything.push(cours, r, r2, devoirs, e, pushes);
 		} finally { stop(m.s); stop(other.s); }
+	});
+	/* The fresh files of a FULL sync, scenario shared by the case and its mutant:
+	   one new file, then the same file updated, then a per-course download. */
+	async function nouveauxScenario(impl) {
+		const { m, other } = await fakeMoodle();
+		const base = tmpdir();
+		fs.mkdirSync(path.join(base, "XTI302 - Admin existant"));
+		let clock = Date.now();
+		const { svc, opened, signals } = newService({ root: m.root, base, store: { moodle: { site: m.root, courses: [] } }, now: () => clock, impl });
+		const seen = {};
+		try {
+			await svc.connecter();
+			await svc.recevoirJeton(link(new URL(opened[0]).searchParams.get("passport"), TOKEN, m.root));
+			seen.avant = await svc.prendreNouveaux();
+			seen.r = await svc.synchroniser();
+			seen.signals1 = signals.n;
+			seen.pris = await svc.prendreNouveaux();
+			seen.encore = await svc.prendreNouveaux();
+			/* The teacher replaced the file: an UPDATE is not a new file. A copy
+			   under the pretty name is matched by its size, never by its date, so
+			   the update is staged on a copy under Moodle's own name, older than
+			   Moodle's date (`localStatus` then says "outdated"). */
+			const dossier = path.join(base, "XTI302 - Admin existant");
+			const brut = path.join(dossier, "XTI302-CYB-Seance2_TP_Socle_Etudiant.pdf");
+			fs.writeFileSync(brut, "12345");
+			fs.utimesSync(brut, 1, 1);
+			clock += 11000;
+			seen.r2 = await svc.synchroniser();
+			seen.apresMaj = await svc.prendreNouveaux();
+			seen.signals2 = signals.n;
+			// A per-course download (the Moodle page) is a manual pick: never handed over.
+			fs.rmSync(brut);
+			fs.rmSync(path.join(dossier, "Séance 2 - TP Socle.pdf"));
+			seen.r3 = await svc.telechargerCours(1);
+			seen.apresCours = await svc.prendreNouveaux();
+			seen.signals3 = signals.n;
+			// Signing out forgets a batch nobody took.
+			fs.rmSync(path.join(base, "XTI302 - Admin existant", "Séance 2 - TP Socle.pdf"));
+			clock += 11000;
+			seen.r4 = await svc.synchroniser();
+			await svc.deconnecter();
+			seen.apresDeconnexion = await svc.prendreNouveaux();
+			return seen;
+		} finally { stop(m.s); stop(other.s); }
+	}
+	await test("service: a full sync hands the window its FRESH files only, relative to the root, once; per-course downloads do not", async () => {
+		const s = await nouveauxScenario(service);
+		assert.deepEqual(s.avant, [], "nothing before any sync");
+		assert.equal(s.r.nouveaux, 1);
+		assert.equal(s.signals1, 1, "one signal for the run");
+		assert.deepEqual(s.pris, [{ relPath: "XTI302 - Admin existant/Séance 2 - TP Socle.pdf", code: "XTI302", name: "Séance 2 - TP Socle.pdf", size: 5 }]);
+		assert.deepEqual(s.encore, [], "taken once");
+		assert.equal(s.r2.mis_a_jour, 1);
+		assert.deepEqual(s.apresMaj, [], "an updated file is never handed over");
+		assert.equal(s.signals2, 1, "no signal without a fresh file");
+		assert.equal(s.r3.nouveaux, 1, "the per-course download did fetch the file");
+		assert.deepEqual(s.apresCours, [], "a per-course download is never handed over");
+		assert.equal(s.signals3, 1, "no signal for a per-course download");
+		assert.equal(s.r4.nouveaux, 1);
+		assert.deepEqual(s.apresDeconnexion, [], "signing out forgets the batch");
+		everything.push(s.pris);
+	});
+	await test("DISCRIMINANCE: without the `fresh` filter an updated file is handed over; without the full-sync rule a per-course download is; without the reset on sign-out the batch survives", async () => {
+		const sansFresh = await nouveauxScenario((await mutant(`${MOODLE}service.ts`, "o.ok && o.fresh", "o.ok")).mod);
+		assert.equal(sansFresh.apresMaj.length, 1, "the mutant leaks the update");
+		const sansPlein = await nouveauxScenario((await mutant(`${MOODLE}service.ts`, "if (cible.ids === null) {\n\t\t\t\tconst nouveaux", "if (true) {\n\t\t\t\tconst nouveaux")).mod);
+		assert.equal(sansPlein.apresCours.length, 1, "the mutant leaks the per-course download");
+		const sansOubli = await nouveauxScenario((await mutant(`${MOODLE}service.ts`, "\t\tenAttente = [];\n\t\tjeton = null;", "\t\tjeton = null;")).mod);
+		assert.equal(sansOubli.apresDeconnexion.length, 1, "the mutant keeps the batch after sign-out");
 	});
 	await test("service: a new course folder is created in its year folder under the default root when none starts with the code", async () => {
 		const { m, other } = await fakeMoodle();
