@@ -64,6 +64,7 @@ export const IGNORES: readonly string[] = [
 	   servers and skills, and agy runs as an agent IN a course folder, so at
 	   any depth, not only at the root. */
 	".agents",
+	".agent",
 	/* The root can be opened as an Obsidian vault. Its plugin main.js files are
 	   code Obsidian runs, so a paired device must not be able to plant one; each
 	   device keeps its own workspace. */

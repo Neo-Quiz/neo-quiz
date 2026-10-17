@@ -503,8 +503,10 @@ function agyEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	const index = step.step_index;
 	if (typeof index !== "number") return [];
 	const id = "agy-" + String(index);
-	const brut = str(step.tool_name) ?? str(rec(step.tool_info)?.name) ?? "";
+	const brut = (str(step.tool_name) ?? str(rec(step.tool_info)?.name) ?? "").slice(0, 40);
 	const name = NOMS_AGY[brut] ?? (brut || "Tool");
+	// The step names a run keeps are bounded: a stream cannot grow this map forever.
+	if (!etat.noms.has(id) && etat.noms.size >= 2000) return [];
 	const etatStep = str(step.state) ?? "";
 	if (etatStep === "ACTIVE") {
 		if (etat.noms.has(id)) return [];

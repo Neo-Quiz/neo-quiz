@@ -2285,6 +2285,21 @@ export function envOllama(base: string): Record<string, string> {
 	return { ANTHROPIC_BASE_URL: base, ANTHROPIC_AUTH_TOKEN: "ollama", ANTHROPIC_API_KEY: "" };
 }
 
+/** No inherited `ANTHROPIC_*` variable (a model, another server, a key)
+    reaches Claude Code when it runs on Ollama: only `envOllama`'s three. */
+function sansAnthropic(e: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+	for (const k of Object.keys(e)) if (k.toUpperCase().startsWith("ANTHROPIC_")) delete e[k];
+	return e;
+}
+
+/** An empty folder for agy without tools, made once per run of the app. */
+let videAgy: string | null = null;
+function dossierVideAgy(): string {
+	if (videAgy && existsSync(videAgy) && readdirSync(videAgy).length === 0) return videAgy;
+	videAgy = mkdtempSync(join(tmpdir(), "neo-quiz-agy-"));
+	return videAgy;
+}
+
 /** The base URL of a LOOPBACK http Ollama server, or null: Claude Code is
     only ever pointed at this PC's own server, never a host on the network. */
 export function ollamaLocal(url: unknown): string | null {
@@ -2401,9 +2416,12 @@ export async function run(spec: {
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
 				env: spec.tool === "claude"
-					? Object.assign(environnementEnfant(env), ENV_SORTIE_CLAUDE, spec.ollama ? envOllama(spec.ollama) : {})
+					? Object.assign(spec.ollama ? sansAnthropic(environnementEnfant(env)) : environnementEnfant(env), ENV_SORTIE_CLAUDE, spec.ollama ? envOllama(spec.ollama) : {})
 					: environnementEnfant(env),
-				cwd: images ? resolu.pieces : spec.cwd ?? dossierPersonnel(env),
+				/* agy without tools runs in an EMPTY folder of its own (2026-10-17):
+				   its plan mode writes nothing, but it still reads, and the home
+				   folder holds far more than a quiz needs. */
+				cwd: images ? resolu.pieces : spec.cwd ?? (spec.tool === "agy" ? dossierVideAgy() : dossierPersonnel(env)),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
 				surStdout: options.surStdout,

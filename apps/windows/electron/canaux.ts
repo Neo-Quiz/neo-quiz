@@ -1784,7 +1784,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   random for each call (`nouveauMarqueur`), so the replay of a line
 		   after a reload carries a new one in its tokens — the rest must be
 		   the same for an attach. */
-		const empreinte = cleReprise ? empreinteAppel((cwd ? tool + "@" + cwd : tool) + (ollama ? "+ollama" : ""), args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
+		const empreinte = cleReprise ? empreinteAppel((cwd ? tool + "@" + cwd : tool) + (ollama ? "+ollama@" + ollama : ""), args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
 		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, empreinte, surStdout ?? null) : null;
 		if (rattache) {
 			const enVolRattache = { controleur: rattache.controleur, page: expediteur, reprenable: true };
