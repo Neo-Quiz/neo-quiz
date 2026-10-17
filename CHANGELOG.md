@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- In a Moodle module, the whole row is the button: a downloaded file opens, a missing one downloads, a forum or a link opens in the browser; no more "Open" button, and every row reacts the same on hover.
+
 ## [1.21.4] - 2026-10-17
 
 ### Changed

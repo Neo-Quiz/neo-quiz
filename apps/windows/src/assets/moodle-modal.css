@@ -210,7 +210,7 @@
 .nq-moodle-modal .nqm-act-icon.is-quiz { background: color-mix(in srgb, var(--nqm-orange) 16%, transparent); color: var(--nqm-orange); }
 .nq-moodle-modal .nqm-act-icon.is-folder,
 .nq-moodle-modal .nqm-act-icon.is-resource { background: color-mix(in srgb, var(--color-cyan) 16%, transparent); color: var(--color-cyan); }
-.nq-moodle-modal .nqm-act-row.is-openable .nqm-row-name { color: var(--nqm-text); font-weight: 600; }
+.nq-moodle-modal .nqm-act-row.is-clickable .nqm-row-name { color: var(--nqm-text); font-weight: 600; }
 
 /* A PDF shows its own colour mark (file-type-icon.ts): no tinted square behind it. */
 .nq-moodle-modal .nqm-file .nqm-row-icon.has-type-img {
@@ -259,20 +259,30 @@
 	font-weight: 500;
 }
 
-.nq-moodle-modal .nqm-act-row.is-openable {
+/* ONE hover for every row that does something (a file, a link, a forum):
+   the whole row is the button (moodle-modal.ts `rendreCliquable`). */
+.nq-moodle-modal .is-clickable {
 	cursor: pointer;
 	border-radius: var(--radius-m);
 	outline: none;
 	transition: background-color 120ms ease-out;
 }
 
-.nq-moodle-modal .nqm-act-row.is-openable:hover,
-.nq-moodle-modal .nqm-act-row.is-openable:focus-visible {
-	background: var(--nqm-field);
+.nq-moodle-modal .is-clickable:hover,
+.nq-moodle-modal .is-clickable:focus-visible {
+	background: var(--nqm-hover) !important;
 }
 
-.nq-moodle-modal .nqm-act-row.is-openable:hover .nqm-row-name {
+.nq-moodle-modal .is-clickable:hover .nqm-row-name,
+.nq-moodle-modal .is-clickable:hover .nqm-row-open,
+.nq-moodle-modal .is-clickable:hover .nqm-row-type {
 	color: var(--nqm-text);
+}
+
+.nq-moodle-modal .nqm-file-mark {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 }
 
 .nq-moodle-modal .nqm-row-open {

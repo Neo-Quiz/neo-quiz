@@ -946,14 +946,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		ajouter(ligne, "div", "nqm-row-type", cle ? t(cle) : a.type);
 		/* Nothing to download (a forum, a link, a page): the row opens it on Moodle, in the browser. */
 		if (!a.fichiers.length && !a.depot && a.type !== "label") {
-			ligne.classList.add("is-openable");
-			ligne.tabIndex = 0;
-			ligne.setAttribute("role", "button");
-			ligne.setAttribute("aria-label", `${a.name} · ${t("settings.moodle.wOpenInBrowser")}`);
 			icone(ligne, "external-link", "nqm-row-open");
-			const ouvrir = (): void => { void api.ouvrirActivite(a.type, a.id).catch(() => false); };
-			ligne.addEventListener("click", ouvrir);
-			ligne.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); } });
+			rendreCliquable(ligne, `${a.name} · ${t("settings.moodle.wOpenInBrowser")}`, () => { void api.ouvrirActivite(a.type, a.id).catch(() => false); });
 		}
 		if (a.depot) peindreCarteDepot(el, a);
 		if (a.fichiers.length) {
@@ -1024,6 +1018,23 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		envoi.addEventListener("click", () => { void api.deposer(a.id); });
 	}
 
+	/** A whole row is the button (2026-10-17): no "Open" button, the row opens
+	    or downloads what it shows, and every row reacts the same to the pointer. */
+	function rendreCliquable(ligne: HTMLElement, libelle: string, faire: () => void): void {
+		ligne.classList.add("is-clickable");
+		ligne.tabIndex = 0;
+		ligne.setAttribute("role", "button");
+		ligne.setAttribute("aria-label", libelle);
+		ligne.addEventListener("click", faire);
+		ligne.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); faire(); } });
+	}
+	/** The quiet mark at the right of a clickable row: a word and an icon, never a button. */
+	function repere(action: HTMLElement, texte: string, nomIcone: string): void {
+		action.replaceChildren();
+		ajouter(action, "span", "nqm-row-type", texte);
+		icone(action, nomIcone, "nqm-row-open");
+	}
+
 	function peindreFichier(parent: HTMLElement, co: CoursMoodle, f: FichierMoodle): void {
 		const occupe = occupes.has(`${co.id}|${f.name}`);
 		const ligne = ajouter(parent, "div", `nqm-row nqm-file is-${occupe ? "busy" : f.status}`);
@@ -1045,51 +1056,45 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			ajouter(action, "span", "nqm-busy-label", t("settings.moodle.wDownloading"));
 			return;
 		}
-		if (f.status === "present") {
-			if (estPdf(f.name)) { ic.classList.add("has-type-img"); poserIconeFichier(ic, f.name); } else poser(ic, typeFichier(f.name));
-			boutonOuvrir(action, co, f);
+		if (f.status === "present" || f.status === "outdated") {
+			if (f.status === "present" && estPdf(f.name)) { ic.classList.add("has-type-img"); poserIconeFichier(ic, f.name); }
+			else poser(ic, f.status === "outdated" ? "refresh-cw" : typeFichier(f.name));
+			const marque = ajouter(action, "span", "nqm-file-mark");
+			repere(marque, t("settings.moodle.openFile"), "external-link");
+			rendreCliquable(ligne, `${shown} · ${t("settings.moodle.openFile")}`, () => ouvrirLocal(marque, co, f));
+			if (f.status === "outdated") {
+				// Updating is another action than opening: it keeps its own button.
+				ajouter(meta, "div", "nqm-file-note", t("settings.moodle.wNewerOnMoodle"));
+				const b = ajouter(action, "button", "nqm-ghost nqm-file-get");
+				b.type = "button";
+				icone(b, "refresh-cw", "nqm-btn-icon");
+				ajouter(b, "span", undefined, t("settings.moodle.wUpdate"));
+				b.addEventListener("click", e => { e.stopPropagation(); void telechargerFichier(co, f); });
+			}
 			return;
 		}
 		const echec = f.status === "failed";
-		poser(ic, echec ? "triangle-alert" : f.status === "outdated" ? "refresh-cw" : "download");
+		poser(ic, echec ? "triangle-alert" : "download");
 		if (echec) ajouter(meta, "div", "nqm-file-error", t("settings.moodle.wFileFailed"));
-		if (f.status === "outdated") {
-			ajouter(meta, "div", "nqm-file-note", t("settings.moodle.wNewerOnMoodle"));
-			boutonOuvrir(action, co, f);
-		}
-		const b = ajouter(action, "button", `nqm-ghost nqm-file-get${f.status === "missing" ? " is-accent" : ""}`);
-		b.type = "button";
-		icone(b, echec ? "rotate-ccw" : f.status === "outdated" ? "refresh-cw" : "download", "nqm-btn-icon");
-		ajouter(b, "span", undefined, t(echec ? "settings.moodle.wRetry" : f.status === "outdated" ? "settings.moodle.wUpdate" : "settings.moodle.download"));
-		b.addEventListener("click", () => { void telechargerFichier(co, f); });
+		const mot = t(echec ? "settings.moodle.wRetry" : "settings.moodle.download");
+		repere(action, mot, echec ? "rotate-ccw" : "download");
+		rendreCliquable(ligne, `${shown} · ${mot}`, () => { void telechargerFichier(co, f); });
 	}
 
-	/** Opens the local copy with the system's default application; the spinner stays 1.5 s at least,
+	/** Opens the local copy with the system's default application; "Opening..." stays 1.5 s at least,
 	    because the window of the application appears long after the system accepted the request. */
-	function boutonOuvrir(parent: HTMLElement, co: CoursMoodle, f: FichierMoodle): void {
-		const b = ajouter(parent, "button", "nqm-ghost nqm-file-open");
-		b.type = "button";
-		const repos = (): void => {
-			b.replaceChildren();
-			b.classList.remove("is-opening");
-			b.disabled = false;
-			icone(b, "external-link", "nqm-btn-icon");
-			ajouter(b, "span", undefined, t("settings.moodle.openFile"));
-		};
-		repos();
-		b.addEventListener("click", e => {
-			e.stopPropagation();
-			if (b.disabled) return;
-			b.replaceChildren();
-			b.classList.add("is-opening");
-			b.disabled = true;
-			ajouter(b, "div", "nqm-spinner");
-			ajouter(b, "span", undefined, t("settings.moodle.wOpening"));
-			void Promise.all([api.ouvrirFichier(co.id, f.name).catch(() => false), new Promise(r => setTimeout(r, 1500))]).then(([ok]) => {
-				if (estDetruit()) return;
-				repos();
-				if (!ok) dire(t("settings.moodle.wOpenFailed"), false, true);
-			});
+	let ouverture = false;
+	function ouvrirLocal(marque: HTMLElement, co: CoursMoodle, f: FichierMoodle): void {
+		if (ouverture) return;
+		ouverture = true;
+		marque.replaceChildren();
+		ajouter(marque, "div", "nqm-spinner");
+		ajouter(marque, "span", "nqm-row-type", t("settings.moodle.wOpening"));
+		void Promise.all([api.ouvrirFichier(co.id, f.name).catch(() => false), new Promise(r => setTimeout(r, 1500))]).then(([ok]) => {
+			ouverture = false;
+			if (estDetruit()) return;
+			repere(marque, t("settings.moodle.openFile"), "external-link");
+			if (!ok) dire(t("settings.moodle.wOpenFailed"), false, true);
 		});
 	}
 
