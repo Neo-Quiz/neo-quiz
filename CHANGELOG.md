@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.7] - 2026-10-17
+
 ### Changed
 
 - A Moodle link shows its whole address, https:// included.
