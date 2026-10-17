@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.6] - 2026-10-17
+
 ### Changed
 
 - Dates written in figures (a Moodle file's date, a session's time) follow the regional format of Windows, not the language of the app.
