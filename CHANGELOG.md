@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A PDF in a Moodle module sits in the same tinted square as the other icons.
+
 ## [1.21.5] - 2026-10-17
 
 ### Changed

@@ -212,9 +212,10 @@
 .nq-moodle-modal .nqm-act-icon.is-resource { background: color-mix(in srgb, var(--color-cyan) 16%, transparent); color: var(--color-cyan); }
 .nq-moodle-modal .nqm-act-row.is-clickable .nqm-row-name { color: var(--nqm-text); font-weight: 600; }
 
-/* A PDF shows its own colour mark (file-type-icon.ts): no tinted square behind it. */
+/* A PDF shows its own colour mark (file-type-icon.ts) in the same tinted square
+   as every other row, red like the mark: one shape for all the icons. */
 .nq-moodle-modal .nqm-file .nqm-row-icon.has-type-img {
-	background: transparent;
+	background: color-mix(in srgb, var(--nqm-red) 14%, transparent);
 }
 
 .nq-moodle-modal .nqm-file.is-outdated .nqm-row-icon {
