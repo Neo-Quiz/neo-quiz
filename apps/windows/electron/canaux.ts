@@ -77,7 +77,7 @@ import { autoriserHote, fetchBorne, retirerHote } from "./reseau";
 import { extensionRefusee } from "./ressources";
 import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises, argumentsAvecOutils } from "./gabarits-cli";
-import { ajouterApprouve, CLE_CONFIANCE_IA, VERSION_CONFIANCE, dossierCanonique, estApprouve, jugerDossierOutils, lireApprouves, retirerApprouve } from "./confiance-ia";
+import { ajouterApprouve, CLE_CONFIANCE_IA, VERSION_CONFIANCE, dossierCanonique, estApprouve, lireApprouves, retirerApprouve } from "./confiance-ia";
 import { creerReprises, estCleReprise } from "./resumable-runs";
 import { enregistrerCanauxLive } from "./live-canaux";
 
@@ -1632,12 +1632,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   `name` d'une erreur, et tout le contrat de `run` tient dans ce nom. */
 
 	/* ─── TRUSTED FOLDERS (2026-10-09, `confiance-ia.ts`) ───
-	   The page asks in its own modal (since 2026-10-11, see below); the main
-	   process resolves the folder, checks the perimeter and writes the answer
-	   to a settings key the generic write refuses. */
+	   Since 2026-10-17 the list no longer gates a run launched from this PC
+	   (it runs as in a terminal, see `dossierOutilsJuge`); it only answers
+	   `isFolderTrusted`, which a line nobody at this PC asked for reads. The
+	   main process still resolves the folder and writes the list to a
+	   settings key the generic write refuses. */
 	const approuves = async () => lireApprouves(await reglagesOuErreur().lire(CLE_CONFIANCE_IA));
 	/** The resolved working folder of a tools run, or `undefined` when the
-	    folder it names is not a folder, not in the perimeter, or not trusted. */
+	    folder it names is not a folder or not in the perimeter. */
 	/* AS IN A TERMINAL (2026-10-17, the owner's decision): a CLI launched from
 	   this PC runs in any folder of the perimeter, without the trust question;
 	   the folder must still resolve to a folder the app opened. The trusted

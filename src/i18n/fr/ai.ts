@@ -757,7 +757,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.err.httpStatus": "Erreur {status}",
 	"ai.err.ollamaModelMissing": "Le modèle \"{model}\" n'est pas installé.\nExécutez dans un terminal : ollama pull {model}\nModèles disponibles : {models}",
 	"ai.err.ollamaModelNotFound": "Le modèle \"{model}\" n'est pas installé.\nExécutez : ollama pull {model}",
-	"ai.err.ollamaNeedsFolder": "Ollama ne tourne en agent, par Claude Code, que dans un dossier de confiance.",
+	"ai.err.ollamaNeedsFolder": "Ollama ne tourne en agent, par Claude Code, que dans un dossier de cours.",
 	"ai.err.ollamaUnreachable": "Impossible de contacter Ollama sur {url}.\nVérifiez que le serveur est démarré (ollama serve).",
 	"ai.err.ollamaUnreachableShort": "Impossible de contacter Ollama sur {url}. Vérifiez que le serveur est démarré.",
 	"ai.err.ollamaOutOfMemory": "Mémoire insuffisante pour ce modèle{detail}.\nChoisissez un modèle plus petit dans la liste.",

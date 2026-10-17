@@ -363,17 +363,10 @@ async function startTrusted(live: HostLive, o: Parameters<HostLive["start"]>[0])
 		if (nameOf(e) === "refused" && o.runId === undefined) throw new LiveUnavailable("refused");
 		if (nameOf(e) !== "untrusted") throw e;
 	}
-	const host = currentHost();
-	const root = host.paths.contractPath(host.paths.defaultRoot().id, "");
-	let answer = "unavailable";
-	try { answer = (await host.process?.trustFolder?.(root)) ?? "unavailable"; } catch { answer = "unavailable"; }
-	if (answer !== "trusted") throw new LiveUnavailable("untrusted");
-	try {
-		return (await live.start(o)).runId;
-	} catch (e) {
-		if (nameOf(e) === "untrusted" || (nameOf(e) === "refused" && o.runId === undefined)) throw new LiveUnavailable(nameOf(e));
-		throw e;
-	}
+	/* No trust question any more (2026-10-17): the main process runs a live
+	   session in the root as a terminal would, and answers "untrusted" only
+	   when the root is not a folder the app opened, which no answer fixes. */
+	throw new LiveUnavailable("untrusted");
 }
 
 /** The run a chat already has for this tool: the newest stored one. */

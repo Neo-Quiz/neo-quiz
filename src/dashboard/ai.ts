@@ -4353,17 +4353,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   apparaître dans la ligne « envoyé » de la file. */
 			await attachPromptPaths();
 			await rattacherDocumentsHerites();
-			/* THE TRUST QUESTION AT THE SEND (2026-10-11), as Claude Code asks
-			   when it opens a folder: asked later, inside the CLI call, it came
-			   after the clarifying question and a long wait. An already trusted
-			   (or already refused) folder answers at once; any failure is "no
-			   tools", as in the call itself. */
-			if (fournisseurAgent()) {
-				/* A live session works in the Neo Quiz ROOT (2026-10-11): one
-				   trust for the whole root, asked here once. */
-				const dossier = host.live ? host.paths.contractPath(host.paths.defaultRoot().id, "") : destination || dossierParDefaut(settings().aiOutputFolder);
-				try { await host.process?.trustFolder?.(dossier); } catch (e) { console.warn(LOG_PREFIX, "trust check failed:", e); }
-			}
+			/* No trust question any more (2026-10-17): a CLI launched from this PC
+			   runs in its folder as in a terminal; the main process only checks
+			   the folder is one the app opened. */
 			const attente = await tuilesVideo.prets();
 			if (attente.ecartees > 0) {
 				host.ui.notice(t(attente.ecartees === 1 ? "ai.video.notJoinedOne" : "ai.video.notJoinedOther", { count: attente.ecartees }));

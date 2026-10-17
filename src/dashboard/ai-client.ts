@@ -1589,7 +1589,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   Otherwise `--mode plan` first: it reads and answers, never writes. */
 		const mode = lireModeAgent(settings.get().aiAgentMode);
 		const dossier = dossierOutils;
-		const outils = dossier ? await folderTrusted(requireHost("process"), dossier) : false;
+		// A line nobody at this PC asked for never gets Antigravity's tools (its `.agents` and MCP config load).
+		const outils = dossier && !neverAskTrust ? await folderTrusted(requireHost("process"), dossier) : false;
 		const fullPrompt = (outils ? consigneAvecOutils(systemPrompt, mode) : systemPrompt) + "\n\n" + userPrompt;
 		/* UNE ligne : le CLI lit un événement par ligne, et `JSON.stringify`
 		   échappe les sauts de ligne du prompt. */

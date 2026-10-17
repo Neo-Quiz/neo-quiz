@@ -609,7 +609,11 @@ export interface HostProcess {
 	    Optional: a host without it never runs a CLI with tools.
 	    A host may remember a refusal for the session, so as not to ask again
 	    on every send; `explicit` (a click on "Trust this folder") is the
-	    user's own request to be asked, and always asks again. */
+	    user's own request to be asked, and always asks again.
+	    Since 2026-10-17 the page no longer asks it before a run launched from
+	    this PC (such a run works in its folder as in a terminal); only the
+	    "Trust this folder" button of the settings still records a folder,
+	    which `isFolderTrusted` reads for a line nobody at this PC asked for. */
 	trustFolder?(dossier: string, options?: { explicit?: boolean }): Promise<"trusted" | "refused" | "unavailable">;
 	/** Is this folder (a CONTRACT path) already trusted? Never asks: no
 	    dialog, no modal. For a check made with nobody at the PC (the
