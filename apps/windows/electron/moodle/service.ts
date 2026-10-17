@@ -94,6 +94,7 @@ export interface ServiceMoodle {
 	synchroniser(): Promise<ResumeSyncMoodle>;
 	devoirs(): Promise<DevoirMoodle[]>;
 	ouvrirDevoir(cmid: unknown): Promise<boolean>;
+	ouvrirActivite(type: unknown, cmid: unknown): Promise<boolean>;
 	deposer(cmid: unknown): Promise<boolean>;
 	devoirVu(cmid: unknown): Promise<void>;
 	ignorerDevoir(cmid: unknown, on: unknown): Promise<number[]>;
@@ -826,12 +827,16 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		return visibles(liste, await reglage());
 	}
 
-	async function ouvrirDevoir(cmid: unknown): Promise<boolean> {
+	const ouvrirDevoir = (cmid: unknown): Promise<boolean> => ouvrirActivite("assign", cmid);
+	/** Opens `<site>/mod/<type>/view.php?id=<cmid>` in the browser: an activity that is
+	    not a file (forum, link, page...). Only the configured site: a link that leads
+	    outside Moodle is followed by Moodle's own page, never handed to the window. */
+	async function ouvrirActivite(type: unknown, cmid: unknown): Promise<boolean> {
 		const site = await siteAdmis();
-		if (!site || !entierPositif(cmid)) return false;
+		if (!site || !entierPositif(cmid) || typeof type !== "string" || !/^[a-z][a-z0-9_]{0,29}$/.test(type)) return false;
 		if (maintenant() - dernierOuvert < OPEN_INTERVAL) return false;
 		dernierOuvert = maintenant();
-		const url = new URL("/mod/assign/view.php", site);
+		const url = new URL(`/mod/${type}/view.php`, site);
 		url.searchParams.set("id", String(cmid));
 		await deps.ouvrirExterne(url.href);
 		return true;
@@ -888,6 +893,6 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	return {
 		etat, connecter, recevoirJeton, deconnecter, cours, chercher, ajouterParUrl, favori, exclure, ajouter, retirer,
 		fichiers, module: moduleDuCours, telechargerCours, telechargerFichier, ouvrirDossier, ouvrirFichier, synchroniser, devoirs, ouvrirDevoir, deposer,
-		devoirVu, ignorerDevoir, demarrerAuto, prendreNouveaux,
+		devoirVu, ignorerDevoir, ouvrirActivite, demarrerAuto, prendreNouveaux,
 	};
 }

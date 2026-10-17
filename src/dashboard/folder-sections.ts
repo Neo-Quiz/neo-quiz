@@ -9,6 +9,7 @@ import { freeNotePath } from "./folder-create";
 import { ajouterLien, lireContenuDossier, nomSansExtension, retirerLien, titreDepuisUrl, urlValide } from "./folder-contents";
 import { openConfirmModal } from "../editor/modals";
 import { estImage, fileIcon } from "./file-icons";
+import { poserIconeFichier } from "./file-type-icon";
 import type { ContenuDossier, LienDossier } from "./folder-contents";
 import { suivreDebord } from "./detail-fiche";
 
@@ -113,7 +114,7 @@ export function renderFolderSections(parent: HTMLElement, depsBrutes: FolderSect
 			   sur le panneau prennent le même chemin que « Ajouter des fichiers ». */
 			onDrop: (fichiers) => void ajouterDesFichiers(deps, Promise.resolve(fichiers)),
 			items: contenu.documents.map(e => ({
-				icon: fileIcon(e.name), label: nomSansExtension(e.name), meta: extensionAffichee(e.name),
+				icon: fileIcon(e.name), file: e.name, label: nomSansExtension(e.name), meta: extensionAffichee(e.name),
 				thumb: urlImage(e),
 				onOpen: () => void ouvrirDocument(deps, e),
 				onDelete: () => void confirmerSuppressionFichier(deps, e),
@@ -166,7 +167,7 @@ interface SectionSpec {
 	/** `thumb` : l'URL d'une VIGNETTE, qui prend la place de l'icône. Une
 	    image se reconnaît à ce qu'elle montre, pas à un glyphe partagé par
 	    tous les fichiers de son format. */
-	items: { icon: string; label: string; meta: string; thumb?: string | null; onOpen: () => void | Promise<unknown>;
+	items: { icon: string; /** A file's name: its type icon (`poserIconeFichier`) instead of `icon`. */ file?: string; label: string; meta: string; thumb?: string | null; onOpen: () => void | Promise<unknown>;
 		/** True when the click hands the file to the system's default app:
 		    the row then shows the "opening" state while the app starts. */
 		external?: boolean; onDelete: () => void }[];
@@ -214,7 +215,9 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 				vignette.src = it.thumb;
 				vignette.alt = "";
 				vignette.draggable = false;
-				vignette.addEventListener("error", () => { boite.replaceChildren(); host.ui.setIcon(boite, it.icon); });
+				vignette.addEventListener("error", () => { if (it.file) poserIconeFichier(boite, it.file); else host.ui.setIcon(boite, it.icon); });
+			} else if (it.file) {
+				poserIconeFichier(boite, it.file);
 			} else {
 				host.ui.setIcon(boite, it.icon);
 			}

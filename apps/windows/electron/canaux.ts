@@ -707,6 +707,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodleNouveauxPrendre, () => deps.moodle.prendreNouveaux());
 	ipcMain.handle(CANAUX.moodleDevoirs, () => deps.moodle.devoirs());
 	ipcMain.handle(CANAUX.moodleOuvrirDevoir, (_e, cmid: unknown) => deps.moodle.ouvrirDevoir(cmid));
+	ipcMain.handle(CANAUX.moodleOuvrirActivite, (_e, type: unknown, cmid: unknown) => deps.moodle.ouvrirActivite(type, cmid));
 
 	ipcMain.handle(CANAUX.ouvrir, async (_e, abs: unknown) => {
 		/* BORNÉ comme une lecture : `shell.openPath` lance l'application par

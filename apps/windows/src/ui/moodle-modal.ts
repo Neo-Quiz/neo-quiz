@@ -17,6 +17,7 @@
    activities and hand-in states the plugin read straight from Moodle.
 ══════════════════════════════════════════════════════════ */
 
+import { estPdf, poserIconeFichier } from "../../../../src/dashboard/file-type-icon";
 import { pont } from "../host/pont";
 import type {
 	ActiviteMoodle, CoursMoodle, DepotMoodle, DevoirMoodle, EtatMoodle, FichierMoodle, ModuleMoodle, ResultatRechercheMoodle,
@@ -692,7 +693,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 
 	function enteteCours(co: CoursMoodle): void {
 		const tete = entete(c, true);
-		ajouter(tete, "h2", "nqm-title", co.name);
+		/* The Moodle name starts with its internal code ("XTI306-2627PSA01 - ..."): the short code, then the name. */
+		ajouter(tete, "h2", "nqm-title", co.code ? `${co.code} · ${nomCourt(co)}` : co.name);
 		const dest = ajouter(tete, "div", "nqm-dest" + (co.folder ? "" : " is-warn"));
 		icone(dest, "folder-open", "nqm-dest-icon");
 		ajouter(dest, "span", "nqm-dest-path", co.folder ?? t("settings.moodle.wDestNone"));
@@ -725,12 +727,6 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			const el = ajouter(lst, "div", "nqm-section");
 			ajouter(el, "div", "nqm-section-name", s.name);
 			for (const a of s.activites) peindreActivite(el, co, a);
-		}
-		if (mod.externes) {
-			const ext = ajouter(c, "div", "nqm-external");
-			const titre = ajouter(ext, "div", "nqm-external-title");
-			icone(titre, "external-link", "nqm-external-icon");
-			ajouter(titre, "span", undefined, t("settings.moodle.wExternal", { n: mod.externes }));
 		}
 		pied = ajouter(c, "div", "nqm-footer");
 		const gauche = ajouter(pied, "div", "nqm-foot-tools nqm-never");
@@ -786,6 +782,17 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (a.fichiers.length > 1) ajouter(info, "div", "nqm-row-meta", t("settings.moodle.wFilesCount", { n: a.fichiers.length }));
 		const cle = TYPE_LABEL[a.type];
 		ajouter(ligne, "div", "nqm-row-type", cle ? t(cle) : a.type);
+		/* Nothing to download (a forum, a link, a page): the row opens it on Moodle, in the browser. */
+		if (!a.fichiers.length && !a.depot && a.type !== "label") {
+			ligne.classList.add("is-openable");
+			ligne.tabIndex = 0;
+			ligne.setAttribute("role", "button");
+			ligne.title = t("settings.moodle.wOpenInBrowser");
+			icone(ligne, "external-link", "nqm-row-open");
+			const ouvrir = (): void => { void api.ouvrirActivite(a.type, a.id).catch(() => false); };
+			ligne.addEventListener("click", ouvrir);
+			ligne.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); } });
+		}
 		if (a.depot) peindreCarteDepot(el, a);
 		if (a.fichiers.length) {
 			const groupe = ajouter(el, "div", "nqm-act-files");
@@ -876,7 +883,11 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			ajouter(action, "span", "nqm-busy-label", t("settings.moodle.wDownloading"));
 			return;
 		}
-		if (f.status === "present") { poser(ic, typeFichier(f.name)); boutonOuvrir(action, co, f); return; }
+		if (f.status === "present") {
+			if (estPdf(f.name)) { ic.classList.add("has-type-img"); poserIconeFichier(ic, f.name); } else poser(ic, typeFichier(f.name));
+			boutonOuvrir(action, co, f);
+			return;
+		}
 		const echec = f.status === "failed";
 		poser(ic, echec ? "triangle-alert" : f.status === "outdated" ? "refresh-cw" : "download");
 		if (echec) ajouter(meta, "div", "nqm-file-error", t("settings.moodle.wFileFailed"));

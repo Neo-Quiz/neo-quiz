@@ -200,6 +200,11 @@
 	color: var(--nqm-accent);
 }
 
+/* A PDF shows its own colour mark (file-type-icon.ts): no tinted square behind it. */
+.nq-moodle-modal .nqm-file .nqm-row-icon.has-type-img {
+	background: transparent;
+}
+
 .nq-moodle-modal .nqm-file.is-outdated .nqm-row-icon {
 	background: color-mix(in srgb, var(--nqm-orange) 16%, transparent);
 	color: var(--nqm-orange);
@@ -240,6 +245,33 @@
 .nq-moodle-modal .nqm-act-row .nqm-row-name {
 	color: var(--nqm-muted);
 	font-weight: 500;
+}
+
+.nq-moodle-modal .nqm-act-row.is-openable {
+	cursor: pointer;
+	border-radius: var(--radius-m);
+	outline: none;
+	transition: background-color 120ms ease-out;
+}
+
+.nq-moodle-modal .nqm-act-row.is-openable:hover,
+.nq-moodle-modal .nqm-act-row.is-openable:focus-visible {
+	background: var(--nqm-field);
+}
+
+.nq-moodle-modal .nqm-act-row.is-openable:hover .nqm-row-name {
+	color: var(--nqm-text);
+}
+
+.nq-moodle-modal .nqm-row-open {
+	flex: none;
+	display: inline-flex;
+	color: var(--nqm-faint);
+}
+
+.nq-moodle-modal .nqm-row-open .svg-icon {
+	width: 14px;
+	height: 14px;
 }
 
 .nq-moodle-modal .nqm-act-files {
@@ -430,36 +462,6 @@
 .nq-moodle-modal .nqm-btn-icon .svg-icon {
 	width: 16px;
 	height: 16px;
-}
-
-.nq-moodle-modal .nqm-external {
-	padding: 9px 12px;
-	border-radius: var(--radius-m);
-	background: var(--nqm-field);
-	border: 1px solid var(--nqm-border);
-	font-size: 0.78em;
-	color: var(--nqm-muted);
-}
-
-.nq-moodle-modal .nqm-external-title {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	font-weight: 500;
-}
-
-.nq-moodle-modal .nqm-external-icon .svg-icon {
-	width: 14px;
-	height: 14px;
-}
-
-.nq-moodle-modal .nqm-external ul {
-	margin: 6px 0 0;
-	padding-left: 22px;
-}
-
-.nq-moodle-modal .nqm-external a {
-	overflow-wrap: anywhere;
 }
 
 .nq-moodle-modal .nqm-footer {

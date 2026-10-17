@@ -640,6 +640,8 @@ export interface Pont {
 		devoirs(): Promise<DevoirMoodle[]>;
 		/** Opens `<site>/mod/assign/view.php?id=<cmid>` in the browser. */
 		ouvrirDevoir(cmid: number): Promise<boolean>;
+		/** Opens `<site>/mod/<type>/view.php?id=<cmid>` in the browser (an activity that is not a file). */
+		ouvrirActivite(type: string, cmid: number): Promise<boolean>;
 		/** `ouvrirDevoir` AND the course's `Rendus...` sub-folder (else the module folder) in Explorer. */
 		deposer(cmid: number): Promise<boolean>;
 		devoirVu(cmid: number): Promise<void>;
@@ -1239,6 +1241,7 @@ export const CANAUX = {
 	moodleSynchroniser: "neo:moodle/synchroniser",
 	moodleDevoirs: "neo:moodle/devoirs",
 	moodleOuvrirDevoir: "neo:moodle/ouvrir-devoir",
+	moodleOuvrirActivite: "neo:moodle/ouvrir-activite",
 	/** Pushed to the window: the Moodle state changed. */
 	moodleSurEtat: "neo:moodle/sur-etat",
 	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */

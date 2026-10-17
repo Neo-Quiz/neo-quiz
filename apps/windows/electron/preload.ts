@@ -280,6 +280,7 @@ const pont: Pont = {
 		synchroniser: () => ipcRenderer.invoke(CANAUX.moodleSynchroniser),
 		devoirs: () => ipcRenderer.invoke(CANAUX.moodleDevoirs),
 		ouvrirDevoir: cmid => ipcRenderer.invoke(CANAUX.moodleOuvrirDevoir, cmid),
+		ouvrirActivite: (type, cmid) => ipcRenderer.invoke(CANAUX.moodleOuvrirActivite, type, cmid),
 		pageDemandee: () => ipcRenderer.invoke(CANAUX.moodleLienPageLire),
 		surPageDemandee(rappel) {
 			const ecouteur = (): void => rappel();

@@ -522,3 +522,12 @@
 .qbd-unreadable-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qbd-unreadable-message { font-size: 12px; color: var(--text-muted); }
 .qbd-unreadable-open { flex: none; }
+
+/* The colour mark of a PDF (src/dashboard/file-type-icon.ts), wherever a row
+   shows a file: the size of the Lucide icon it replaces. */
+.nq-file-type-img {
+	display: block;
+	width: 18px;
+	height: 18px;
+	object-fit: contain;
+}

@@ -17,6 +17,9 @@ release notes.
 
 - A download in progress fills its row in the app menu like a progress bar instead of looking like a button.
 - The Moodle window no longer has a "Course link" button.
+- A Moodle module shows its short code and name as its title, and its forums, links and pages open on Moodle in your browser with one click.
+- "Exclude" in a Moodle module is now "Stop following".
+- A PDF shows the same red PDF icon everywhere in the app.
 
 ## [1.20.117] - 2026-10-17
 

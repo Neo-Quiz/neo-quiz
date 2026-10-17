@@ -861,6 +861,12 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(await svc.ouvrirDevoir(23), false, "opened again within 2 s: refused");
 			clock += 3000;
 			for (const bad of ["23", -1, 1.5, NaN, null, {}]) assert.equal(await svc.ouvrirDevoir(bad), false);
+			assert.equal(await svc.ouvrirActivite("forum", 31), true);
+			assert.equal(opened.at(-1), `${m.root}/mod/forum/view.php?id=31`);
+			clock += 3000;
+			for (const bad of ["../admin", "forum/../x", "Forum", "", "a".repeat(31), "url?x=1", 5, null]) assert.equal(await svc.ouvrirActivite(bad, 31), false, String(bad));
+			assert.equal(await svc.ouvrirActivite("url", "31"), false);
+			assert.equal(opened.at(-1), `${m.root}/mod/forum/view.php?id=31`, "a refused call opens nothing");
 			const e = await svc.etat();
 			assert.equal(typeof e.lastSync, "number");
 			everything.push(cours, r, r2, devoirs, e, pushes);
@@ -1700,7 +1706,7 @@ await test("the app's own files never set allowHttpForTests or `essai`", async (
 });
 await test("the bridge wiring: token files only in the main process, handlers present, setting guarded before write", async () => {
 	const canaux = await readFile("apps/windows/electron/canaux.ts", "utf8");
-	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChercher", "moodleAjouterParUrl", "moodleFavori", "moodleExclure", "moodleAjouter", "moodleRetirer", "moodleFichiers", "moodleTelechargerCours", "moodleTelechargerFichier", "moodleOuvrirDossier", "moodleOuvrirFichier", "moodleDeposer", "moodleDevoirVu", "moodleIgnorerDevoir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir"]) {
+	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChercher", "moodleAjouterParUrl", "moodleFavori", "moodleExclure", "moodleAjouter", "moodleRetirer", "moodleFichiers", "moodleTelechargerCours", "moodleTelechargerFichier", "moodleOuvrirDossier", "moodleOuvrirFichier", "moodleDeposer", "moodleDevoirVu", "moodleIgnorerDevoir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir", "moodleOuvrirActivite"]) {
 		assert.ok(canaux.includes(`CANAUX.${c},`), c);
 	}
 	assert.ok(canaux.includes("dialogueMoodle ||") && canaux.includes("dialogueMoodleFin"), "one native Moodle dialog at a time, with a pause");

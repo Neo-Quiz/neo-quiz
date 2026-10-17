@@ -12,7 +12,8 @@ import { ajouter } from "../dom";
 import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
 import { lireContenuDossier } from "./folder-contents";
-import { badgeDeFichier, couperNomAuMilieu, fileIcon } from "./file-icons";
+import { badgeDeFichier, couperNomAuMilieu } from "./file-icons";
+import { poserIconeFichier } from "./file-type-icon";
 
 /** The folder named `nom` under the root `racine`, looked for level by level
     (hidden folders, the trash and the versions skipped), at most six deep.
@@ -84,7 +85,8 @@ export function ouvrirDocumentsExam(opts: {
 					const peindre = (): void => {
 						b.classList.toggle("is-joint", joint());
 						b.setAttribute("aria-pressed", String(joint()));
-						host.ui.setIcon(icone, joint() ? "circle-check" : fileIcon(f.name));
+						if (joint()) host.ui.setIcon(icone, "circle-check");
+						else poserIconeFichier(icone, f.name);
 					};
 					const icone = ajouter(b, "span", "qbd-exam-docs-icone");
 					// The name cut in the MIDDLE: the extension always shows.
