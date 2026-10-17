@@ -1666,7 +1666,23 @@ label.nq-set-ligne {
 .nq-menu-apropos-verifier[data-actif], .nq-menu-apropos-github[data-actif] { background: var(--background-modifier-hover); color: var(--text-normal); }
 /* A ready version: the row turns to "Install" in the accent colour (menu-app.ts `peindreMaj`). */
 .nq-menu-apropos-verifier[data-maj="prete"], .nq-menu-apropos-verifier[data-maj="prete"][data-actif] { color: var(--text-accent); }
-.nq-menu-apropos-verifier[data-maj="telechargement"] { cursor: default; }
+/* A download runs by itself: the row is a progress bar, not a button. It fills
+   in blue (`--nq-maj-progres`, menu-app.ts) and never lights up under the pointer. */
+.nq-menu-apropos-verifier[data-maj="telechargement"],
+.nq-menu-apropos-verifier[data-maj="telechargement"][data-actif] {
+	cursor: default; color: var(--text-normal);
+	background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+}
+.nq-menu-apropos-verifier[data-maj="telechargement"]::before {
+	content: ""; position: absolute; inset: 0 auto 0 0; width: var(--nq-maj-progres, 0%); pointer-events: none;
+	background: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+	transition: width 300ms ease-out;
+}
+.nq-menu-apropos-verifier[data-maj="telechargement"] .nq-menu-verifier-texte { position: relative; z-index: 1; }
+.nq-menu-apropos-verifier[data-maj="telechargement"] .nq-menu-verifier-icone { z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+	.nq-menu-apropos-verifier[data-maj="telechargement"]::before { transition: none; }
+}
 /* The last install did not finish (the safety net): the row says so in the error colour. */
 .nq-menu-apropos-verifier[data-maj="inachevee"], .nq-menu-apropos-verifier[data-maj="inachevee"][data-actif] { color: var(--text-error); }
 /* Claude Code and Codex updating themselves (`cli-updates.ts`): one row each,

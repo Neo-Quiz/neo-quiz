@@ -271,7 +271,6 @@ export const EN_SETTINGS = {
 	"settings.moodle.wCheckingOne": "Checking 1 module…",
 	"settings.moodle.wCheckingMany": "Checking {n} modules…",
 	"settings.moodle.wRefresh": "Refresh",
-	"settings.moodle.wManual": "Course link",
 	"settings.moodle.wDownloadAll": "Download all ({n})",
 	"settings.moodle.wAllUpToDate": "Everything is up to date",
 	"settings.moodle.wCheckingBtn": "Checking…",
@@ -334,7 +333,4 @@ export const EN_SETTINGS = {
 	"settings.moodle.wDepHideAria": "Hide this assignment from the list to hand in",
 	"settings.moodle.wDepSend": "Hand in on Moodle",
 	"settings.moodle.wWhenAt": "{day} at {time}",
-	"settings.moodle.wUrlHint": "Paste the address of the course page. The module's folder is worked out from its code.",
-	"settings.moodle.wUrlOpen": "Open",
-	"settings.moodle.wUrlInvalid": "Invalid address: it must be a Moodle course page (course/view.php?id=…).",
 } as const;

@@ -327,6 +327,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			bouton.removeAttribute("aria-disabled");
 			bouton.removeAttribute("aria-description");
 			bouton.removeAttribute("data-etat");
+			bouton.style.removeProperty("--nq-maj-progres");
 			bouton.disabled = false;
 			libelle.textContent = libelleRepos;
 			icone.replaceChildren();
@@ -350,6 +351,8 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 			libelle.textContent = pourcent === null
 				? t("app.update.btn.downloading", { version })
 				: t("app.update.btn.progress", { version, percent: String(pourcent) });
+			/* The row fills like a progress bar: a download runs by itself, nothing to click. */
+			bouton.style.setProperty("--nq-maj-progres", `${pourcent ?? 0}%`);
 			/* Not `disabled`: it would drop the keyboard focus; the click handler ignores it. */
 			bouton.setAttribute("aria-disabled", "true");
 			const taille = tailleTelechargement(e);
@@ -358,6 +361,7 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		} else {
 			bouton.removeAttribute("aria-disabled");
 			bouton.removeAttribute("aria-description");
+			bouton.style.removeProperty("--nq-maj-progres");
 			libelle.textContent = t(phase === "prete" ? "app.update.btn.install" : "app.update.btn.download", { version });
 		}
 	}

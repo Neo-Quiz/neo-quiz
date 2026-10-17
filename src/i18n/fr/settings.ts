@@ -269,7 +269,6 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.wCheckingOne": "Vérification d'un module…",
 	"settings.moodle.wCheckingMany": "Vérification de {n} modules…",
 	"settings.moodle.wRefresh": "Actualiser",
-	"settings.moodle.wManual": "Adresse manuelle",
 	"settings.moodle.wDownloadAll": "Tout télécharger ({n})",
 	"settings.moodle.wAllUpToDate": "Tout est à jour",
 	"settings.moodle.wCheckingBtn": "Vérification…",
@@ -332,7 +331,4 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.wDepHideAria": "Masquer ce devoir de « À rendre »",
 	"settings.moodle.wDepSend": "Déposer sur Moodle",
 	"settings.moodle.wWhenAt": "{day} à {time}",
-	"settings.moodle.wUrlHint": "Colle l'adresse de la page du cours. Le dossier du module est déduit de son code.",
-	"settings.moodle.wUrlOpen": "Ouvrir",
-	"settings.moodle.wUrlInvalid": "Adresse invalide : il faut une page de cours Moodle (course/view.php?id=…).",
 };

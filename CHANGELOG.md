@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A download in progress fills its row in the app menu like a progress bar instead of looking like a button.
+- The Moodle window no longer has a "Course link" button.
+
 ## [1.20.117] - 2026-10-17
 
 ### Fixed

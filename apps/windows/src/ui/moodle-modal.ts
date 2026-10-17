@@ -36,7 +36,7 @@ const URGENT_MS = 8 * 3600 * 1000;
 /** Moodle answers a module at most once a second: a rescan right after a download waits for that. */
 const PLANCHER_MS = 1100;
 
-type Vue = "connect" | "picker" | "course" | "url" | "loading";
+type Vue = "connect" | "picker" | "course" | "loading";
 interface Analyse { state: "busy" | "ok" | "error"; mod: ModuleMoodle | null; at: number }
 
 const TYPE_ICON: Record<string, string> = {
@@ -322,7 +322,6 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const droite = ajouter(pa, "div", "nqm-foot-right");
 		const outils = ajouter(droite, "div", "nqm-foot-tools");
 		bouton(outils, "nqm-link", t("settings.moodle.wRefresh")).addEventListener("click", () => { void actualiser(true); });
-		bouton(outils, "nqm-link", t("settings.moodle.wManual")).addEventListener("click", () => peindreUrl());
 		boutonTout = bouton(droite, "nqm-primary nqm-sync-all", "");
 		boutonTout.addEventListener("click", () => { void toutTelecharger(); });
 
@@ -676,35 +675,6 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			void api.ignorerDevoir(d.cmid, true).then(undefined, () => { void chargerDevoirs().then(peindreBandeau); });
 		});
 		ligne.addEventListener("click", () => { if (co) ouvrirCours(co); });
-	}
-
-	/* ── course link ── */
-	function peindreUrl(): void {
-		vue = "url";
-		vider();
-		const tete = entete(c, true);
-		ajouter(tete, "h2", "nqm-title", t("settings.moodle.title"));
-		ajouter(tete, "p", "nqm-hint", t("settings.moodle.wUrlHint"));
-		const ligne = ajouter(c, "div", "nqm-urlrow");
-		const champUrl = ajouter(ligne, "input", "nqm-input");
-		champUrl.type = "text";
-		champUrl.spellcheck = false;
-		champUrl.placeholder = `${etat?.site || "https://moodle.example.edu"}/course/view.php?id=…`;
-		const ouvrir = bouton(ligne, "nqm-primary", t("settings.moodle.wUrlOpen"));
-		statut = ajouter(c, "div", "nqm-status");
-		statut.hidden = true;
-		const aller = (): void => {
-			const adresse = champUrl.value.trim();
-			if (!adresse) return;
-			ouvrir.disabled = true;
-			void api.ajouterParUrl(adresse).then(async co => {
-				await chargerCours();
-				ouvrirCours(cours.find(x => x.id === co.id) ?? co);
-			}, () => { ouvrir.disabled = false; dire(t("settings.moodle.wUrlInvalid"), false, true); });
-		};
-		ouvrir.addEventListener("click", aller);
-		champUrl.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); aller(); } });
-		setTimeout(() => { champUrl.focus(); }, 0);
 	}
 
 	/* ── one module ── */

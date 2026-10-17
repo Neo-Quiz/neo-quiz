@@ -121,28 +121,6 @@
 	overflow-wrap: anywhere;
 }
 
-.nq-moodle-modal .nqm-urlrow {
-	display: flex;
-	gap: 8px;
-}
-
-.nq-moodle-modal .nqm-input {
-	flex: 1;
-	min-width: 0;
-	padding: 9px 12px;
-	border: 1px solid var(--nqm-border);
-	border-radius: var(--radius-m);
-	background: var(--nqm-field);
-	color: var(--nqm-text);
-	font-family: var(--font-monospace);
-	font-size: 0.82em;
-}
-
-.nq-moodle-modal .nqm-input:focus {
-	outline: none;
-	border-color: color-mix(in srgb, var(--nqm-accent) 55%, var(--nqm-border));
-}
-
 .nq-moodle-modal .nqm-status {
 	display: flex;
 	align-items: center;
