@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.4] - 2026-10-17
+
 ### Changed
 
 - Each kind of Moodle activity has its own colour, and the links and pages that open read as live rows.
