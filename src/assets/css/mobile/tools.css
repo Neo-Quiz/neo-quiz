@@ -129,9 +129,6 @@
 	min-width: 40px;
 	min-height: 40px;
 }
-.is-mobile .qbd-ai-dest {
-	min-height: 40px;
-}
 .is-mobile .qbd-ai-composer-tools .qbd-select.qbd-provider-trigger-logo {
 	min-width: 40px;
 	min-height: 40px;

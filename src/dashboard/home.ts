@@ -5,7 +5,7 @@ import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { isFolderHidden } from "./folder-hidden";
-import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, declaredFolders, estLeSas } from "./quiz-modules";
+import { moduleForQuiz, applyModuleOverrides, buildModuleGroups, declaredFolders } from "./quiz-modules";
 import type { ModuleMap } from "./quiz-modules";
 import { moduleAccent } from "./module-color";
 import { moduleIcon } from "./module-icons";
@@ -127,16 +127,14 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const now = Date.now();
 		const todayStart = startOfDay(now);
 		const todayIso = isoLocal(now);
-		// The generated-quizzes folder is a holding area, not a course: never a
-		// folder card on the home page (its quizzes can still be resumed).
-		const groups = buildModuleGroups(quizzes, stats, map).filter(g => !estLeSas(g, ctx.generatedFolder?.()));
+		const groups = buildModuleGroups(quizzes, stats, map);
 		const folders = collectHomeFolders(ctx, groups, stats, todayIso, resumeQuiz?.path);
 		// Every upcoming exam of every folder — a folder with nothing to do
 		// today can still have its exam this week.
 		/* Built apart from the folder cards: a declared folder still EMPTY has no
 		   card, but its exam is as real as any. */
 		const examGroups = buildModuleGroups(quizzes, stats, map, declaredFolders(ctx.settings.quizzesModuleOverrides))
-			.filter(g => !estLeSas(g, ctx.generatedFolder?.()) && !outOfHome(g.folder));
+			.filter(g => !outOfHome(g.folder));
 		const exams: HomeExam[] = examGroups
 			.flatMap(group => upcomingExams(ctx.examens?.(group) ?? [], todayIso).map(exam => ({ exam, group })))
 			.sort((a, b) => a.exam.date.localeCompare(b.exam.date));
@@ -178,11 +176,9 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const total = quiz.questions || (stats && stats.totalQuestions) || 0;
 		const done = stats ? stats.questionsDone : 0;
 		const info = moduleForQuiz(quiz.path, map);
-		// The generated-quizzes folder has its own icon and accent (quizzes.ts).
-		const generated = !!info.path && info.path === ctx.generatedFolder?.();
 
 		const hero = ajouter(container, "div", "qbd-resume-hero");
-		hero.style.setProperty("--accent", moduleAccent(info, { generated }));
+		hero.style.setProperty("--accent", moduleAccent(info));
 		hero.addEventListener("click", () => ctx.openQuiz(quiz));
 
 		const text = ajouter(hero, "span", "qbd-resume-info");
@@ -196,7 +192,7 @@ export function createHomeHandlers(ctx: DashboardShellCtx): HomeHandlers {
 		const folderName = info.name || info.folder;
 		if (folderName) {
 			const folder = ajouter(meta, "span", "qbd-resume-meta-folder");
-			host.ui.setIcon(ajouter(folder, "span", "qbd-resume-meta-icon"), moduleIcon(info, { generated }));
+			host.ui.setIcon(ajouter(folder, "span", "qbd-resume-meta-icon"), moduleIcon(info));
 			ajouter(folder, "span", "qbd-resume-meta-text", folderName);
 			ajouter(meta, "span", "qbd-resume-meta-sep", "·");
 		}

@@ -305,37 +305,17 @@ export function buildFolderGroups(modules: ModuleGroup[]): FolderGroup[] {
 	return groupes.sort((a, b) => (a.parent === "" ? 1 : 0) - (b.parent === "" ? 1 : 0) || a.label.localeCompare(b.label));
 }
 
-/** The folders "My quizzes" shows: those with quizzes, those the user
+/** The folders "My quizzes" shows: those with quizzes and those the user
     DECLARED (New folder / Edit folder) even empty, except the `excluded` ones
-    (the hidden folders), and the generated-quizzes folder even empty. One
-    rule, read by the page AND by "Move to": the submenu used to offer only
-    the folders that already had a quiz (2026-09-27). */
+    (the hidden folders). One rule, read by the page AND by "Move to": the
+    submenu used to offer only the folders that already had a quiz
+    (2026-09-27). */
 export function modulesAffiches(
 	quizzes: QuizIndexEntry[],
 	stats: Record<string, QuizStatRecord>,
 	map: ModuleMap,
 	declares: string[],
 	excluded: string[],
-	sas: string | undefined,
 ): ModuleGroup[] {
-	const modules = buildModuleGroups(quizzes, stats, map, declares.filter(f => !excluded.includes(f)));
-	/* LE SAS DES QUIZ GÉNÉRÉS EXISTE MÊME VIDE : c'est là que les générations
-	   arrivent, et le vider le faisait disparaître de la page (2026-09-20).
-	   Ajouté sans quiz s'il n'y est pas déjà, avec l'override de dossier
-	   (couleur, icône) s'il en a un. */
-	if (sas && !modules.some(m => m.path === sas)) {
-		const nom = sas.split("/").pop() || sas;
-		const info = map.byFolder.get(nom);
-		modules.push({ folder: nom, name: info?.name ?? nom, ue: info?.ue ?? null, color: info?.color, icon: info?.icon, path: sas, quizzes: [], total: 0, mastered: 0 });
-		modules.sort((a, b) => a.name.localeCompare(b.name));
-	}
-	return modules;
-}
-
-/** Ce groupe est-il le SAS des quiz générés ? Par le CHEMIN, jamais par le
-    nom (`DashboardShellCtx.generatedFolder`). Un groupe sans chemin (déclaré
-    avant le 2026-09-17, sans quiz) n'est jamais le sas : le sas contient
-    toujours au moins un quiz dès qu'on le voit, donc il a toujours un chemin. */
-export function estLeSas(group: ModuleGroup, sas: string | undefined): boolean {
-	return !!sas && !!group.path && group.path === sas;
+	return buildModuleGroups(quizzes, stats, map, declares.filter(f => !excluded.includes(f)));
 }

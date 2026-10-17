@@ -90,7 +90,7 @@ await withSrcModule(["src/dashboard/relay-flow.ts", "src/dashboard/chat-requests
 			readClipboard: async () => "```quiz-blocks\n" + q + "\n```",
 			readDocument: async (rel) => rel.endsWith("gone.md") ? null : ({ name: rel.split("/").pop(), content: "DOC " + rel, bytes: new TextEncoder().encode("DOC " + rel) }),
 			save: async (e) => { saved.push(e); return entry; },
-			scanner: {}, reglages: () => ({ aiOutputFolder: "Generated" }),
+			scanner: {}, reglages: () => ({}),
 			chats: { get: () => chats, set: (l) => { chats = l; } }, ...over,
 		};
 		return { deps, saved, shared, chats: () => chats };

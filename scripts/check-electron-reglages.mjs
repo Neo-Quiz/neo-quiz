@@ -544,7 +544,7 @@ await withSrcModule("apps/windows/electron/pont.ts", async ({ CANAUX }) => {
  * dernière assertion, STATIQUE comme celle des canaux `fichiers.*`, vérifie
  * que `reglagesEcrire` appelle la garde AVANT `.ecrire(`.
  */
-await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, estDossierSortieIaValide, hoteEstPrive, validerReglagesIa }) => {
+await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourLancement, hoteEstPrive, validerReglagesIa }) => {
 	const r = makeReporter("Électron — la garde de la clé ai");
 
 	/* ── hoteEstPrive : la boucle locale, la RFC 1918, `.local`, et rien d'autre ── */
@@ -579,30 +579,16 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 		r.check("sans aiOllamaUrl, rien à admettre",
 			await valider({ aiModel: "x" }), { ok: true, admettre: null });
 	});
-	await cas(r, "aiOutputFolder accepte seulement un chemin relatif sûr", async () => {
-		const valides = ["Generated", "Quiz générés", "Cours/IA_2026"];
-		const invalides = ["", "   ", "/Generated", "C:/Generated", "../Generated", "Generated/../Privé", "Generated\\Privé", "Generated:Privé", "Generated?", "Generated//Privé", "./Generated"];
-		r.check("aiOutputFolder accepte seulement un chemin relatif sûr",
-			{
-				valides: valides.map(v => estDossierSortieIaValide?.(v)),
-				invalides: invalides.map(v => estDossierSortieIaValide?.(v)),
-			},
-			{ valides: [true, true, true], invalides: Array(11).fill(false) });
-	});
-	await cas(r, "aiOutputFolder est gardé comme une chaîne et un chemin relatif sûr", async () => {
-		const verdicts = await Promise.all([
-			valider({ aiOutputFolder: "Generated/Cours" }),
-			valider({ aiOutputFolder: 42 }),
-			valider({ aiOutputFolder: "C:/Generated" }),
-			valider({ aiOutputFolder: "Generated/../Privé" }),
-			valider({ aiOutputFolder: "Generated?" }),
-		]);
-		r.check("aiOutputFolder est gardé comme une chaîne et un chemin relatif sûr",
-			[
-				verdicts[0],
-				...verdicts.slice(1).map(v => "refus" in v && v.refus.includes("aiOutputFolder")),
-			],
-			[{ ok: true, admettre: null }, true, true, true, true]);
+	/* `aiOutputFolder` and `aiComposerDestination` are RETIRED (2026-10-17: the
+	   "Generated" folder and the composer's folder picker are gone, the AI
+	   chooses each quiz's folder). The window no longer reads them, so a value
+	   an earlier version wrote is accepted and ignored, never refused: a
+	   refusal would fail the write of EVERY `ai` setting. */
+	await cas(r, "aiOutputFolder / aiComposerDestination (retired): any value is accepted and ignored", async () => {
+		const anciennes = ["Generated", "../Privé", "C:/Generated", 42, null, "", ["x"], {}];
+		const verdicts = await Promise.all(anciennes.flatMap(v => [valider({ aiOutputFolder: v }), valider({ aiComposerDestination: v })]));
+		r.check("aiOutputFolder / aiComposerDestination (retired): any value is accepted and ignored, nothing to admit",
+			verdicts, Array(anciennes.length * 2).fill({ ok: true, admettre: null }));
 	});
 	/* `aiExamDurationMinutes` (the Generate page's Exam duration) is a RETIRED
 	   setting: a value an earlier version already wrote is ignored, whatever it
@@ -617,14 +603,14 @@ await withSrcModule("apps/windows/electron/garde-ia.ts", async ({ cheminCliPourL
 	});
 	await cas(r, "aiExamDurationMinutes (retired): the other refusals still hold beside it", async () => {
 		const [dossier, url, perimetre, hote] = await Promise.all([
-			valider({ aiExamDurationMinutes: 90, aiOutputFolder: "../Privé" }),
+			valider({ aiExamDurationMinutes: 90, aiOutputFolder: "../Privé", aiMentionExtraFolders: ["E:/ailleurs"] }),
 			valider({ aiExamDurationMinutes: 999, aiOllamaUrl: "ftp://localhost/x" }),
 			valider({ aiExamDurationMinutes: 90, aiMentionExtraFolders: ["E:/hors-perimetre"] }),
 			valider({ aiExamDurationMinutes: 90, aiOllamaUrl: "https://Attaquant.Example:8443/api" }),
 		]);
 		r.check("aiExamDurationMinutes (retired): the other refusals still hold beside it",
 			[
-				"refus" in dossier && dossier.refus.includes("aiOutputFolder"),
+				"refus" in dossier && dossier.refus.includes("E:/ailleurs"),
 				"refus" in url && url.refus.includes("aiOllamaUrl"),
 				"refus" in perimetre && perimetre.refus.includes("E:/hors-perimetre"),
 				"confirmer" in hote && hote.confirmer,

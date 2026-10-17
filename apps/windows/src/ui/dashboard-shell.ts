@@ -32,7 +32,6 @@
 import { ajouter } from "../../../../src/dom";
 import { creerHistorique } from "./historique-nav";
 import { EVENEMENT_RETOUR, prendreRetour } from "./retour-android";
-import { dossierParDefaut } from "../../../../src/dashboard/generation-demande";
 import { t } from "../../../../src/i18n";
 import { currentHost } from "../../../../src/host/current";
 import { pageGhost } from "./page-ghost";
@@ -43,7 +42,6 @@ import { createQuizzesHandlers } from "../../../../src/dashboard/quizzes";
 import { createDetailHandlers } from "../../../../src/dashboard/detail";
 import { createAiHandlers } from "../../../../src/dashboard/ai";
 import type { RelayDeps } from "../../../../src/dashboard/relay-flow";
-import { aiSettingsDefaults } from "../../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
 import { openIconPicker } from "../../../../src/dashboard/icon-picker";
 import { openCreateFolderModal } from "../../../../src/dashboard/folder-create";
@@ -543,9 +541,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				done();
 			});
 		},
-		/* Le SAS des quiz générés : le MÊME calcul que `saveGeneratedQuiz`
-		   (ai.ts, `defaultDestination`) — racine par défaut + `aiOutputFolder`.
-		   Lu à chaque appel : le réglage peut changer sans remonter la coquille. */
 		/* Ouvrir un document (PDF, image) du dossier avec l'application du
 		   système : `systeme.ouvrir` du pont, BORNÉ au périmètre par le principal
 		   et fermé aux extensions exécutables (`EXTENSIONS_EXECUTABLES`). Le
@@ -601,11 +596,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		},
 		moduleEnded: folder => finDuDossier(folder),
 		refreshMoodleLinks: pont().moodle && !currentHost().platform.isMobile ? folder => rafraichirLiensMoodle(folder) : undefined,
-		generatedFolder: () => {
-			const host = currentHost();
-			const local = deps.aiSettings.get().aiOutputFolder || aiSettingsDefaults().aiOutputFolder;
-			return host.paths.contractPath(host.paths.defaultRoot().id, local);
-		},
 		renderGroupingSelect: (container, opts) => createSelect(container, opts),
 		/* Les MÊMES bâtisseurs que le greffon (`src/dashboard.ts`), sur le
 		   même `ctx` : le menu « ⋯ » ne demande que `DashboardShellCtx` depuis
@@ -800,20 +790,18 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			if (declares.some(d => dossier === d || dossier.startsWith(d + "/"))) continue;
 			if (!vus.has(dossier)) vus.set(dossier, dossier.split("/").pop() as string);
 		}
-		/* L'icône, la couleur et la RACINE de chaque dossier, pour que le menu
-		   « Destination » les montre : deux dossiers homonymes (« Generated » dans
-		   Neo Quiz et dans Personal) étaient indiscernables (Ahmed, 2026-09-17).
-		   Même règle d'icône et d'accent que la carte du dossier (`moduleIcon`,
-		   `moduleAccent`) : une icône choisie l'emporte, le SAS des générés a son
-		   étincelle, le reste son livre. */
+		/* Each folder's icon, colour and school year, so that two folders of
+		   the same name stay distinguishable wherever they are listed. Same
+		   icon and accent rule as the folder's card (`moduleIcon`,
+		   `moduleAccent`): a chosen icon wins, otherwise the one its name
+		   suggests. */
 		function decrire(path: string, name: string): { path: string; name: string; icon: string; color: string; root: string } {
 			const overrides = ctx.settings.quizzesModuleOverrides || {};
 			const ov = Object.values(overrides).find(o => o?.path === path) ?? overrides[name];
-			const generated = path === ctx.generatedFolder?.();
 			return {
 				path, name,
-				icon: moduleIcon({ icon: ov?.icon, name, ue: ov?.ue }, { generated }),
-				color: moduleAccent({ folder: name, color: ov?.color }, { generated }),
+				icon: moduleIcon({ icon: ov?.icon, name, ue: ov?.ue }),
+				color: moduleAccent({ folder: name, color: ov?.color }),
 				/* The school year the folder sits in ("B2 2026-2027"), rather than the
 				   root's name repeated on every row; nothing outside a year folder. */
 				root: currentHost().paths.localPath(path).split("/").find(seg => YEAR_FOLDER_RE.test(seg)) ?? "",

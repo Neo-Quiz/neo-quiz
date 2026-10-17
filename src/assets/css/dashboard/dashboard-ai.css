@@ -798,7 +798,6 @@
    pill (phone-chat.ts `poserPuceModele`: the target PC's own Claude models)
    and send. The pill was hidden by this rule from the day it was added
    (2026-10-10: "it does not even let me change the model"). */
-.qbd-ai-form--phone .qbd-ai-suggestions,
 .qbd-ai-form--phone .qbd-ai-model-hint,
 .qbd-ai-form--phone .qbd-ai-composer-dest,
 .qbd-ai-form--phone .qbd-ai-composer-tools > :not(.qbd-ai-composer-send):not(.qbd-ai-model-pill) {
@@ -846,15 +845,16 @@
 		0 10px 44px -10px color-mix(in srgb, var(--interactive-accent) 32%, transparent);
 }
 
-/* Output-folder row at the top of the composer (after Monocode's "Current
-   checkout"): muted, small, left-aligned — it informs, the prompt below
-   stays the focus. The negative margin pulls the button's own padding back
-   so its icon lines up with the text of the prompt. */
+/* The row at the top of the composer, which holds the subject notice
+   (`.qbd-ai-categorie`): muted, small, left-aligned; it informs, the prompt
+   below stays the focus. Its folder chip is gone since 2026-10-17 (the AI
+   chooses each quiz's folder); the row keeps the chip's height. */
 .qbd-ai-composer-dest {
 	display: flex;
 	align-items: center;
 	min-width: 0;
-	margin: -6px 0 0 -8px;
+	min-height: 28px;
+	margin: -6px 0 0;
 }
 
 /* In the centered hero the prompt sits lower, clear of the row: there was
@@ -864,50 +864,6 @@
 .qbd-ai-stage--web .qbd-ai-composer-dest,
 .qbd-ai-stage--connexion .qbd-ai-composer-dest {
 	margin-bottom: 12px;
-}
-
-.qbd-ai-dest {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	min-width: 0;
-	max-width: 100%;
-	height: 28px;
-	padding: 0 8px;
-	border-radius: 8px;
-	background: transparent !important;
-	border: none;
-	box-shadow: none !important;
-	color: var(--text-muted);
-	font-size: 13px;
-	cursor: pointer;
-	transition: color 0.14s ease, background 0.14s ease;
-}
-
-.qbd-ai-dest:hover:not(:disabled) {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover) !important;
-}
-
-.qbd-ai-dest:disabled {
-	cursor: default;
-	opacity: 1;
-}
-
-.qbd-ai-dest-icon {
-	display: inline-flex;
-	flex-shrink: 0;
-}
-
-.qbd-ai-dest-icon svg {
-	width: 15px;
-	height: 15px;
-}
-
-.qbd-ai-dest-label {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 .qbd-ai-composer--dragover {
@@ -1036,8 +992,6 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	/* 16px plus the folder button's own 8px of padding: ~24px of air. */
-	margin-left: 16px;
 	min-width: 0;
 	padding: 0;
 	border: 0;

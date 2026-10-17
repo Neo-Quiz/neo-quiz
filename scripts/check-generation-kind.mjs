@@ -110,7 +110,7 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	r.check("clarify prompt: no trace of the kind question", ['"purpose":"kind"', 'Learn/Test/Both question', 'ask about kind when'].map(w => p.system.includes(w)), [false, false, false]);
 	r.check("clarify prompt: conversational reply for non-requests, folders offered",
 		['"reply"', 'greeting', 'small talk', 'NOT such a request', "learner's folders"].map(w => p.system.includes(w)), [true, true, true, true, true]);
-	const pf = K.clarifyPrompt("slt", [], "fr", ["XTI302", "Maths", " "]);
+	const pf = K.clarifyPrompt("slt", [], "fr", { names: ["XTI302", "Maths", " "] });
 	r.check("clarify prompt: folder names are listed (names only, blanks dropped), absent without folders", [pf.user.includes("- XTI302"), pf.user.includes("- Maths"), pf.user.split("\n- ").length - 1, p.user.includes("FOLDERS")], [true, true, 2, false]);
 	r.check("clarify prompt: does not offer ready when the count must always be asked", p.system.includes('{"ready":true}'), false);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
@@ -118,5 +118,37 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		[K.clarifyPrompt("Python", [], "fr").system.includes("write them in French, the language of the app"), K.clarifyPrompt("Python", [], "en").system.includes("write them in English, the language of the app"), K.clarifyPrompt("Python", []).system.includes("write them in English")], [true, true, true]);
 	r.check("clarify prompt: the request's own language still comes first", K.clarifyPrompt("x", [], "fr").system.includes("in the language of the request; when the request does not reveal a language"), true);
 	r.check("clarify prompt: names only, no content line without documents", K.clarifyPrompt("x", []).user.includes("ATTACHED"), false);
+
+	/* ── THE FOLDER (2026-10-17): no "Generated" folder, the AI files each quiz ── */
+	r.check("folder: a top-level folder name is read, trimmed and capped, beside the kind",
+		[K.parseClarifyAnswer('{"kind":"learn","folder":"  XTI301 - Python "}'), K.parseClarifyAnswer(JSON.stringify({ folder: "x".repeat(150) })).folder.length],
+		[{ ready: true, kind: "learn", folder: "XTI301 - Python" }, 100]);
+	r.check("folder: a folder that is not a non-empty string is ignored",
+		[K.parseClarifyAnswer('{"folder":42}'), K.parseClarifyAnswer('{"folder":"  "}')], [READY, READY]);
+	const folderQ = { header: "Dossier", question: "Où ranger ce quiz ?", multiple: false, options: [o("Python", "nouveau"), o("XTI301 - Python", "existant")], default: 0, purpose: "folder" };
+	const parsedFolder = K.parseClarifyAnswer(JSON.stringify({ kind: "learn", questions: [folderQ] }));
+	r.check("folder: a single-choice \"which folder\" question keeps its purpose", parsedFolder.questions[0].purpose, "folder");
+	r.check("folder: a multiple-choice one, or a second one, is an ordinary question",
+		[K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...folderQ, multiple: true }] })).questions[0].purpose,
+			K.parseClarifyAnswer(JSON.stringify({ questions: [folderQ, folderQ] })).questions.map(x => x.purpose ?? null)],
+		[undefined, ["folder", null]]);
+	r.check("folder: the chosen option, a typed name, or the default when skipped",
+		[K.folderFromClarifications([folderQ], [["XTI301 - Python"]]), K.folderFromClarifications([folderQ], [["  Réseaux  "]]), K.folderFromClarifications([folderQ], [[]])],
+		["XTI301 - Python", "Réseaux", "Python"]);
+	r.check("folder: no folder question, no folder", K.folderFromClarifications(qs, [["Débutant"], ["A"]]), null);
+	const libre = K.clarifyPrompt("Quiz sur les listes", ["cm1.pdf"], "fr", { names: ["XTI301 - Python", "XTI303 - Archi"] });
+	r.check("folder prompt: the learner's folders are listed, with the rule to name one or ask one \"folder\" question",
+		[libre.user.includes("THE LEARNER'S FOLDERS (names only):\n- XTI301 - Python\n- XTI303 - Archi"), libre.system.includes("\"purpose\":\"folder\""), libre.system.includes("EXACT name as listed")],
+		[true, true, true]);
+	r.check("folder prompt: no folder yet says so", K.clarifyPrompt("x", [], "en", { names: [] }).user.includes("(none yet)"), true);
+	const decide = K.clarifyPrompt("Quiz", ["cm1.pdf"], "en", { names: ["A"], decided: "XTI301 - Python" });
+	r.check("folder prompt: a decided folder is named and never asked about; the names stay for a reply",
+		[decide.system.includes("already decided (\"XTI301 - Python\")"), decide.system.includes("do NOT ask about the folder"), decide.system.includes("\"purpose\":\"folder\""), decide.system.includes("\"folder\":\"<optional"), decide.user.includes("- A")],
+		[true, true, false, false, true]);
+	const pc = K.clarifyPrompt("x", [], "en", { names: ["XTI302"], choose: false });
+	r.check("folder prompt: a request sent to the PC chooses no folder, its names stay for a reply",
+		[pc.system.includes("LEARNER'S FOLDERS"), pc.system.includes("\"purpose\":\"folder\""), pc.user.includes("- XTI302"), pc.user.includes("(none yet)")], [false, false, true, false]);
+	r.check("folder prompt: without folder information, no folder rule at all",
+		[K.clarifyPrompt("x", []).system.includes("LEARNER'S FOLDERS"), K.clarifyPrompt("x", []).user.includes("LEARNER'S FOLDERS")], [false, false]);
 	r.done();
 });

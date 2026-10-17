@@ -35,7 +35,8 @@ import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
 import type { AiUsage, AiUsageEntry } from "./usage-format";
 import type { Scanner } from "./scanner";
-import { brouillonDe, composerDemande, dossierParDefaut, enregistrerLot, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
+import { brouillonDe, composerDemande, enregistrerLot, enregistrerQuiz, lienLearn, nombreDeQuestions } from "./generation-demande";
+import { fallbackFolder, foldersOfQuizzes } from "./folder-choice-io";
 import type { DemandeTexte, QuizDuLot } from "./generation-demande";
 import * as F from "./file-generation";
 import type { FileGeneration, LigneFile } from "./file-generation";
@@ -60,13 +61,12 @@ import { UNKNOWN_RETRY_MS } from "./auto-learn-gate";
 
 /** The settings a request FREEZES when it is sent: changing the provider,
     model or effort afterwards only affects the following requests. */
-export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels" | "aiOutputFolder">;
+export type ReglagesFiges = Pick<AiSettings, "aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAntigravityLevels">;
 
 export function figerReglages(s: AiSettings): ReglagesFiges {
 	return {
 		aiProvider: s.aiProvider, aiModel: s.aiModel, aiEffort: s.aiEffort, aiCodexFast: s.aiCodexFast,
 		aiAntigravityLevels: s.aiAntigravityLevels ? { ...s.aiAntigravityLevels } : s.aiAntigravityLevels,
-		aiOutputFolder: s.aiOutputFolder,
 	};
 }
 
@@ -456,8 +456,16 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 
 	const tourne = (id: number): boolean => F.ligne(file, id)?.etat === "cours";
 
+	/** The folder a line writes into: its own, or, when nothing placed it (a
+	    request from the phone, a clarify call that failed, a line saved by an
+	    older version), the folder of its frozen subject (`fallbackFolder`),
+	    created when missing. */
+	async function dossierDeLigne(d: DemandeFile): Promise<string> {
+		return d.destination || await fallbackFolder(d.categorie, foldersOfQuizzes(lireDeps().scanner.getQuizzes?.() ?? []));
+	}
+
 	async function executer(ligne: LigneGeneration): Promise<void> {
-		const d = ligne.demande;
+		let d = ligne.demande;
 		// Defence in depth: a line from another device never launches a provider with live tools.
 		if (d.fromDevice && !remoteProviderAllowed(d.reglages.aiProvider, d.images.length)) {
 			file = F.echouer(file, ligne.id, t("ai.remote.providerNotAllowed"));
@@ -477,6 +485,14 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		// An automatic line asks its gate (usage, daily cap, trust) before anything starts.
 		if (d.auto && !(await passerPorte(ligne))) return;
 		const deps = lireDeps();
+		/* No folder yet: the fallback is resolved ONCE and kept on the line, so
+		   its CLI, its note, a retry and the chat's folder all agree. */
+		if (!d.destination && !d.explication && !d.commandeCli) {
+			const destination = await dossierDeLigne(d);
+			file = F.completer(file, ligne.id, { ...d, destination });
+			ligne = F.ligne(file, ligne.id) ?? ligne;
+			d = ligne.demande.destination ? ligne.demande : { ...d, destination };
+		}
 		/* The client reads the request's FROZEN settings over the live ones:
 		   the rest (Ollama address, learned plans…) follows the host, and
 		   `save` stays the host's. An automatic line is forced to Supervised
@@ -495,7 +511,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			etapeDe(ligne.id, d.notes.length || d.images.length ? "lecture" : "preparation");
 			const { source, prompt } = composerDemande(d);
 			const images = await encoderImages(d.images);
-			const dossier = d.destination || dossierParDefaut(d.reglages.aiOutputFolder);
+			const dossier = await dossierDeLigne(d);
 			const learn = await lienLearn(deps.scanner, d.mode, dossier, d);
 			/* ONE PASS: each document follows ITS Learn, as when it was
 			   generated alone (`lienLearn` gives none for a request over several
@@ -604,7 +620,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 	    merged and completed as a single quiz would be, then kept WITH the
 	    request before any note is written, as for one quiz. */
 	async function produireLot(ligne: LigneGeneration, d: DemandeFile, client: AiClient, deps: DepsFile, lot: { document: string; questions: unknown[]; titre?: string }[], liens: ProduitGeneration["liens"]): Promise<void> {
-		const dossier = d.destination || dossierParDefaut(d.reglages.aiOutputFolder);
+		const dossier = await dossierDeLigne(d);
 		const quiz = await Promise.all(lot.map(async q => {
 			const brut = fusionnerConfigsFinales(q.questions);
 			// Each quiz draws only from ITS document.
@@ -683,7 +699,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			const reponse = await client.chat([{ role: "user", text: d.text }], {
 				raw: true,
-				dossier: dossierParDefaut(d.reglages.aiOutputFolder),
+				// A command writes no quiz: it runs in the root, as a live session does.
+				dossier: d.destination || currentHost().paths.contractPath(currentHost().paths.defaultRoot().id, ""),
 				live: { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) },
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
@@ -719,7 +736,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			transcripts.set(ligne.id, transcript);
 			etapeDe(ligne.id, "redaction");
 			const plan = await client.planifier(d.text, prompt.slice(d.text.trim().length), d.mixte ? undefined : d.mode, {
-				dossier: d.fromDevice ? undefined : (d.destination || dossierParDefaut(d.reglages.aiOutputFolder)),
+				dossier: d.fromDevice ? undefined : await dossierDeLigne(d),
 				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) } : undefined,
 				reprise: cleReprise(ligne),
 				onTranscript: (ev) => {
@@ -766,7 +783,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const draft = brouillonDe(p.questions);
 		const entree = await enregistrerQuiz({
 			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre, titreImpose: titrePreparation(d),
-			demande: d, destination: d.destination, reglages: { ...deps.settings.get(), ...d.reglages },
+			demande: d, destination: await dossierDeLigne(d), reglages: { ...deps.settings.get(), ...d.reglages },
 			usage: p.usage, planTranches: p.planTranches, noteLearn: p.noteLearn, scanner: deps.scanner,
 		});
 		if (!entree) {
@@ -788,7 +805,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			file = F.completer(file, id, { ...maintenant, produit: { ...(maintenant.produit ?? p), faits } });
 		};
 		const faits = await enregistrerLot({
-			demande: d, lot, liens: p.liens, modeDemande: d.mode, destination: d.destination,
+			demande: d, lot, liens: p.liens, modeDemande: d.mode, destination: await dossierDeLigne(d),
 			reglages: { ...deps.settings.get(), ...d.reglages }, usage: p.usage, scanner: deps.scanner, apresChaque: garder,
 		}, p.faits ?? []);
 		if (!faits) {
@@ -863,7 +880,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const l = F.ligne(file, id);
 			if (l?.etat !== "pause" || l.pause?.motif?.kind !== "untrusted") return;
 			// The folder the line runs in, as `executer` computes it.
-			const dossier = l.demande.destination || dossierParDefaut(l.demande.reglages.aiOutputFolder);
+			const dossier = await dossierDeLigne(l.demande);
 			let r: "trusted" | "refused" | "unavailable" = "unavailable";
 			/* `explicit`: this click IS the user's intent, so a refusal given to
 			   an earlier question of the session does not answer it silently. */

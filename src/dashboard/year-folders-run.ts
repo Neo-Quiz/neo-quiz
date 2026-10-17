@@ -22,11 +22,7 @@ export async function readYearPlan(ctx: DashboardShellCtx, rootId: string, now: 
 			yearChildren[e.name] = (await host.fs.listDir(host.paths.contractPath(rootId, e.name))).map(c => c.name);
 		}
 	}
-	// The "Generated" folder never moves, whatever its name.
-	const sas = ctx.generatedFolder?.();
-	const keep = sas && host.paths.rootOf(sas)?.id === rootId && !host.paths.localPath(sas).includes("/")
-		? [host.paths.localPath(sas)] : [];
-	return planYearFolders({ entries, yearChildren, keep, now });
+	return planYearFolders({ entries, yearChildren, now });
 }
 
 export interface YearRunResult {

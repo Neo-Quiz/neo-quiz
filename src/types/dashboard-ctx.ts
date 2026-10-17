@@ -104,13 +104,9 @@ export interface AiSettings {
 	    jamais effacé, comme les réglages de la dictée. */
 	hotkeyAddNotes?: Hotkey | null;
 	aiMentionExtraFolders?: string[];
-	/** Chemin relatif persistant du dossier qui reçoit les quiz générés. */
-	aiOutputFolder?: string;
-	/** The output folder the composer's row last chose, as a contract path
-	    (`Efrei/…/XTI301`, from `quizFolders`). "" = the default folder. Read
-	    back on each arrival at « Générer », and checked against the folders
-	    that still exist (`destinationMemorisee`). */
-	aiComposerDestination?: string;
+	/* `aiOutputFolder` and `aiComposerDestination` (the "Generated" folder and
+	   the composer's folder picker) are retired since 2026-10-17: the AI
+	   chooses each quiz's folder. A value left in a settings file is ignored. */
 	/** The old Explain prompt template (2026-09-29). No longer read nor edited
 	    since 2026-10-09; a value left in a settings file is kept, ignored. */
 	aiExplainPrompt?: string;
@@ -348,15 +344,6 @@ export interface DashboardShellCtx {
 	    absolute path into a contract path (opening it as a new root when it is
 	    outside every open one) and writes the override: only it knows its roots. */
 	openExistingFolder?: (done: () => void) => void;
-	/** Le chemin du CONTRAT du dossier où atterrissent les quiz générés
-	    (`<racine par défaut>/<aiOutputFolder>`). Ce dossier est un SAS, pas
-	    une matière : sa carte porte l'icône de l'IA et ni lui ni sa page
-	    n'affichent de progression — on y range ce qui vient d'être généré,
-	    on l'en sort vers sa vraie matière. Reconnu par son CHEMIN, jamais par
-	    son nom : l'utilisateur peut renommer le réglage, et un autre dossier
-	    peut s'appeler « Generated » dans un vault. Absent = aucun dossier n'est
-	    le sas (le greffon). */
-	generatedFolder?: () => string | undefined;
 	/** When the module of this folder ended (epoch ms: its last session, from
 	    the school timetable), or null while it runs or when nothing says.
 	    The Folders page moves ended folders to an "Ended" section at the

@@ -103,20 +103,6 @@ export function estCheminAbsolu(chemin: string): boolean {
 	return /^[a-zA-Z]:[\\/]/.test(chemin) || chemin.startsWith("\\\\") || chemin.startsWith("/");
 }
 
-/**
- * Un dossier de sortie IA reste une clé RELATIVE dans une racine ouverte.
- * Le rendu le passe ensuite à `HostPaths.contractPath` : accepter ici un
- * chemin absolu, un retour `..` ou un séparateur Windows permettrait de
- * contourner cette composition et de viser ailleurs que la racine choisie.
- * Le prédicat reste pur pour que la garde soit éprouvée sans Electron ni Node.
- */
-export function estDossierSortieIaValide(valeur: unknown): valeur is string {
-	if (typeof valeur !== "string" || !valeur || valeur !== valeur.trim()) return false;
-	if (estCheminAbsolu(valeur) || /[<>:"|?*\\\u0000-\u001f]/.test(valeur)) return false;
-	const segments = valeur.split("/");
-	return segments.every(segment => !!segment && segment !== "." && !segment.includes(".."));
-}
-
 /** L'extension d'un chemin, en minuscules, ou la chaîne vide s'il n'en a pas.
     Sur le DERNIER point du NOM seul : `C:/a.b/claude` n'a pas d'extension, et
     `claude.pdf.exe` en a une — `.exe`. */
@@ -164,7 +150,10 @@ function extensionDe(chemin: string): string {
  * they pass as they are. That includes `aiExamDurationMinutes`, a REMOVED
  * setting (a test's duration is now chosen when the test starts): a value an
  * earlier version already wrote is ignored, never refused, since a refusal
- * would fail the write of EVERY `ai` setting.
+ * would fail the write of EVERY `ai` setting. Same for `aiOutputFolder` and
+ * `aiComposerDestination`, retired on 2026-10-17 (the AI now chooses each
+ * quiz's folder): the window reads neither any more, so a value left in the
+ * file is accepted and ignored.
  */
 export async function validerReglagesIa(
 	valeur: unknown,
@@ -174,13 +163,9 @@ export async function validerReglagesIa(
 	if (!valeur || typeof valeur !== "object" || Array.isArray(valeur)) {
 		return { refus: "AI settings refused: the value is not an object" };
 	}
-	const { aiOllamaUrl, aiMentionExtraFolders, aiOutputFolder } = valeur as {
-		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown; aiOutputFolder?: unknown;
+	const { aiOllamaUrl, aiMentionExtraFolders } = valeur as {
+		aiOllamaUrl?: unknown; aiMentionExtraFolders?: unknown;
 	};
-
-	if (aiOutputFolder !== undefined && !estDossierSortieIaValide(aiOutputFolder)) {
-		return { refus: "AI settings refused: aiOutputFolder must be a safe relative path" };
-	}
 
 	if (aiMentionExtraFolders !== undefined) {
 		if (!Array.isArray(aiMentionExtraFolders) || aiMentionExtraFolders.some(d => typeof d !== "string")) {

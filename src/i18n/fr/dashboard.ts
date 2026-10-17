@@ -90,7 +90,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.unreadableOpen": "Ouvrir le fichier",
 	"dashboard.quizzes.unreadableOpenFailed": "Impossible d’ouvrir le fichier",
 	"dashboard.quizzes.emptyFolderHint": "Créez un quiz, ou générez-en un à partir des documents et des notes ci-dessous.",
-	"dashboard.quizzes.emptyGeneratedHint": "Les quiz que vous générez arrivent ici.",
 
 	/* ── Les trois sections d'un dossier (folder-sections.ts) ── */
 	"dashboard.folder.documents": "Documents",

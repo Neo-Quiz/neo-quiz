@@ -23,11 +23,12 @@ import * as aiProviders from "./ai-providers";
 import type { AiUsage } from "./usage-format";
 import type { Scanner, QuizIndexEntry } from "./scanner";
 import type { QuizDraft } from "./detail-io";
-import { aiSettingsDefaults } from "./ai-settings-host";
 import { convertParsedToInternal, readModeConfig } from "../editor/convert";
 import { exportAllWithFence } from "../editor/export";
 import { ecrireFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { ensureFolder, freeNotePath } from "./folder-create";
+import { detecterCategorie } from "./categorie-quiz";
+import { fallbackFolder, foldersOfQuizzes } from "./folder-choice-io";
 import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import { findQuizModeConfigIndex } from "../quiz-utils";
@@ -160,10 +161,12 @@ export function canChooseQuizCount(documents: number, images: number): boolean {
 	return documents >= 2 && images === 0;
 }
 
-/** Le dossier par défaut, en chemin du contrat : `<racine par défaut>/<aiOutputFolder>`. */
-export function dossierParDefaut(aiOutputFolder: string | undefined): string {
-	const host = currentHost();
-	return host.paths.contractPath(host.paths.defaultRoot().id, aiOutputFolder || aiSettingsDefaults().aiOutputFolder);
+/** The folder of a request that left with none (2026-10-17: no more
+    "Generated" folder): the one named after the subject its documents and
+    text show (`fallbackFolder`), created when missing. */
+export async function dossierDeRepli(demande: { text: string; notes: readonly { name: string }[] } | null, scanner: Scanner): Promise<string> {
+	const sujet = detecterCategorie({ pieces: (demande?.notes ?? []).map(n => n.name), demande: demande?.text ?? "" });
+	return fallbackFolder(sujet, foldersOfQuizzes(scanner.getQuizzes?.() ?? []));
 }
 
 /** Practice: the Learn note of the same SOURCE in the destination folder
@@ -229,9 +232,10 @@ export interface Enregistrement {
 	    plan is named by its step: "Lists and tuples — Learn"). */
 	titreImpose?: string;
 	demande: { text: string; notes: { name: string }[] } | null;
-	/** Chemin du contrat choisi, ou "" pour le dossier par défaut. */
+	/** The chosen contract path, or "" when nothing placed the request (the
+	    subject's folder is then used, `dossierDeRepli`). */
 	destination: string;
-	/** Fournisseur, modèle, effort et dossier de sortie de CETTE génération. */
+	/** Fournisseur, modèle et effort de CETTE génération. */
 	reglages: AiSettings;
 	usage: AiUsage | null;
 	planTranches?: { slice: number; titre: string }[];
@@ -247,7 +251,7 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		if (!e.draft.questions.length) return null;
 		/* `destination` est déjà un chemin du contrat : il ne repasse pas par
 		   `contractPath`, qui le préfixerait une seconde fois. */
-		const folder = e.destination || dossierParDefaut(e.reglages.aiOutputFolder);
+		const folder = e.destination || await dossierDeRepli(e.demande, e.scanner);
 		await ensureFolder(folder);
 		/* The NAME: `<base> — Learn` / `<base> — Practice` / `<base> — Exam`,
 		   the base being the attached document (the lecture), else the model's
@@ -331,13 +335,15 @@ export interface EnregistrementLot extends Omit<Enregistrement, "draft" | "quest
     reported through `apresChaque`). */
 export async function enregistrerLot(e: EnregistrementLot, deja: readonly QuizDuLot[] = []): Promise<QuizDuLot[] | null> {
 	const faits: QuizDuLot[] = [...deja];
+	// ONE folder for the whole batch: each document alone could read as another subject.
+	const destination = e.destination || await dossierDeRepli(e.demande, e.scanner);
 	for (let i = 0; i < e.lot.length; i++) {
 		const q = e.lot[i];
 		if (faits.some(f => f.document === q.document)) continue;
 		const draft = brouillonDe(q.questions);
 		const lien = e.liens?.[i];
 		const entree = await enregistrerQuiz({
-			...e, draft, questions: q.questions, titreModele: q.titre,
+			...e, destination, draft, questions: q.questions, titreModele: q.titre,
 			demande: { text: e.demande.text, notes: [{ name: q.document }] },
 			planTranches: lien?.plan, noteLearn: lien?.note,
 		});

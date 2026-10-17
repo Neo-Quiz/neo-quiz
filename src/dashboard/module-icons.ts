@@ -55,23 +55,12 @@ export const MODULE_ICONS = [
 
 /** Icône d'un module sans choix explicite (fallback carte + aperçu modal). */
 export const DEFAULT_MODULE_ICON = "book";
-/** L'icône du SAS des quiz générés (`ctx.generatedFolder`) : la même que le
-    bouton « Générer » du rail et la carte « Créer avec l'IA » — c'est le
-    même geste vu depuis l'autre bout. */
-export const GENERATED_MODULE_ICON = "sparkles";
-
-
-/** L'icône d'un module : la sienne, sinon celle du SAS, sinon la première
-    que suggère son NOM (et son UE) — « Ethical Hacking » a son insecte,
-    « Administration système » son serveur (Ahmed, 2026-09-24) —, sinon le
-    défaut. Un nom sans mot-clé reconnu garde le livre.
-    UNE SEULE RÈGLE pour les trois lecteurs (la carte, le titre d'un dossier
-    ouvert, le modal « Modifier dossier ») — symétrique de `moduleAccent`.
-    Le modal la recalculait à la main et ignorait le SAS : il montrait un
-    livre là où la carte montrait l'étincelle, et son aperçu contredisait
-    ce que l'utilisateur avait sous les yeux (Ahmed, 2026-09-17). */
-export function moduleIcon(m: { icon?: string; name?: string; ue?: string | null }, opts?: { generated?: boolean }): string {
+/** A module's icon: its own, otherwise the first one its NAME (and its UE)
+    suggests ("Ethical Hacking" gets its bug, "Administration système" its
+    server, 2026-09-24), otherwise the default. A name with no known keyword
+    keeps the book. ONE RULE for the three readers (the card, the title of an
+    open folder, the "Edit folder" modal), symmetric with `moduleAccent`. */
+export function moduleIcon(m: { icon?: string; name?: string; ue?: string | null }): string {
 	if (m.icon) return m.icon;
-	if (opts?.generated) return GENERATED_MODULE_ICON;
 	return (m.name ? suggestIcons(m.name, m.ue ?? null, 1)[0] : undefined) || DEFAULT_MODULE_ICON;
 }

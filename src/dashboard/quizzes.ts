@@ -16,7 +16,7 @@ import { moduleAccent } from "./module-color";
 import { lireModuleMap } from "./module-map-note";
 import { markViewEnter } from "./view-enter";
 import { moduleIcon } from "./module-icons";
-import { declaredFolders, modulesAffiches, estLeSas } from "./quiz-modules";
+import { declaredFolders, modulesAffiches } from "./quiz-modules";
 import type { ModuleGroup } from "./quiz-modules";
 import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
@@ -233,7 +233,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	const ongletsMemorises = new Map<string, OngletDossier>();
 	let vuesDossier: VuesDossier | null = null;
 	/* Where the back arrow of the open folder goes instead of the grid, when the
-	   folder was opened from another page (Generate's "Generated quizzes"). One
+	   folder was opened from another page. One
 	   shot: set with the folder, dropped by the first back or any other
 	   navigation (`resetDrilldown`). */
 	let retourDossier: (() => void) | null = null;
@@ -273,7 +273,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	function renderSubjectFilter(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): void {
 		if (!ctx.renderGroupingSelect) return;
 		const presents = new Set(modulesAffiches(applyFilters(quizzes), stats, effectiveMap(),
-			declaredFolders(ctx.settings.quizzesModuleOverrides), hiddenFolders(ctx.settings.quizzesModuleOverrides), ctx.generatedFolder?.()).filter(m => !estLeSas(m, ctx.generatedFolder?.())).map(sujetDe));
+			declaredFolders(ctx.settings.quizzesModuleOverrides), hiddenFolders(ctx.settings.quizzesModuleOverrides)).map(sujetDe));
 		const sujets = CATEGORIES.filter(c => c !== "general" && presents.has(c));
 		if (sujetFiltre !== null && !sujets.includes(sujetFiltre)) sujetFiltre = null;
 		const TOUS = "";
@@ -304,31 +304,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		select.el.classList.add("qbd-quizzes-group-select", "qbd-quizzes-subject-select");
 	}
 
-	/* The "Generated quizzes" folder is no card of the grid: on a phone, a
-	   floating button opens it, with the number of quizzes it holds (0 while
-	   empty or not created yet); on a desktop, the AI page's side column does. Opening goes through `openModule`, like a card did, so
-	   the same sheet transition plays. Recognised by its PATH. */
 	/** The phone's floating buttons, on `<body>` (see `render`). */
 	let boutonsFlottants: HTMLElement[] = [];
-
-	function renderGeneratedButton(parent: HTMLElement, quizzes: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, flottant = false): HTMLElement | null {
-		const sas = ctx.generatedFolder?.();
-		if (!sas) return null;
-		const groupe = modulesAffiches(quizzes, stats, effectiveMap(), [], [], sas).find(m => estLeSas(m, sas));
-		if (!groupe) return null;
-		/* On a phone it floats at the bottom left, where StudySmarter puts its
-		   blue button (2026-10-05): the top keeps one row of filters. */
-		const btn = ajouter(parent, "button", flottant
-			? "qbd-quizzes-fab qbd-quizzes-fab--gauche"
-			: "qbd-select qbd-quizzes-group-select qbd-quizzes-subject-select qbd-quizzes-generated-btn");
-		btn.type = "button";
-		const label = ajouter(btn, "span", "qbd-select-label");
-		currentHost().ui.setIcon(ajouter(label, "span", "qbd-quizzes-subject-icon"), "sparkles");
-		ajouter(label, "span", undefined, t("ai.side.generated"));
-		ajouter(label, "span", "qbd-quizzes-node-badge", String(groupe.quizzes.length));
-		btn.addEventListener("click", () => openModule(groupe.folder));
-		return btn;
-	}
 
 	function render(container: HTMLElement): void {
 		containerRef = container;
@@ -367,16 +344,12 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			? quizzes.filter(q => moduleForQuiz(q.path, map).folder === openModuleFolder)
 			: [];
 		const openModuleInfo = openModuleFolder !== null ? map.byFolder.get(openModuleFolder) : undefined;
-		/* Le SAS des quiz générés (`ctx.generatedFolder`) : accent bleu et icône
-		   de l'IA à défaut d'un choix à la main, et pas de « maîtrisés » dans
-		   l'en-tête — même règle que sa carte et que sa page (quizzes-render.ts,
-		   `estLeSas`). Reconnu par le CHEMIN du dossier ouvert : déclaré, sinon
-		   déduit d'un quiz. C'est aussi le chemin que « Nouveau quiz » utilise. */
+		/* The PATH of the open folder: declared, else deduced from a quiz. It is
+		   the path "New quiz" writes into. */
 		const cheminOuvert = openModuleInfo?.path
 			?? (inModule.length > 0 ? moduleForQuiz(inModule[0].path, map).path : undefined);
-		const sas = !!ctx.generatedFolder && cheminOuvert !== undefined && cheminOuvert === ctx.generatedFolder();
 		const openModuleAccent = openModuleFolder !== null
-			? moduleAccent(openModuleInfo ?? { folder: openModuleFolder }, { generated: sas })
+			? moduleAccent(openModuleInfo ?? { folder: openModuleFolder })
 			: null;
 		// La lueur de l'hôte prend la couleur du dossier ouvert (null hors dossier).
 		ctx.ambiance?.(openModuleAccent);
@@ -430,7 +403,7 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   as its card does (module-card.ts): without it, a folder named after
 			   its subject ("XTI301 - Python") showed its `{ }` on the card and the
 			   default book on its own page (2026-09-29). */
-			currentHost().ui.setIcon(titleIcon, moduleIcon({ ...openModuleInfo, name: openModuleInfo?.name || openModuleFolder }, { generated: sas }));
+			currentHost().ui.setIcon(titleIcon, moduleIcon({ ...openModuleInfo, name: openModuleInfo?.name || openModuleFolder }));
 			ajouter(titleEl, "span", "qbd-quizzes-title-text", openModuleInfo?.name || openModuleFolder);
 			ajouter(titleBlock, "div", "qbd-quizzes-title-underline");
 			/* The class sessions, as muted text under the title ("6 sessions of
@@ -442,23 +415,20 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			// « Nouveau quiz » (2026-09-25) : les chiffres sont dans l'onglet
 			// Progression, et « Ajouter du contenu » est à côté de l'étape
 			// suivante, au-dessus de la grille (quizzes-render.ts).
-			if (!sas) {
-				renderOngletsDossier(ligneHaut, ongletDossier, (onglet) => {
-					ongletDossier = onglet;
-					if (openModuleFolder !== null) ongletsMemorises.set(openModuleFolder, onglet);
-					if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
-				});
-			}
+			renderOngletsDossier(ligneHaut, ongletDossier, (onglet) => {
+				ongletDossier = onglet;
+				if (openModuleFolder !== null) ongletsMemorises.set(openModuleFolder, onglet);
+				if (vuesDossier) basculerVueDossier(vuesDossier, onglet);
+			});
 			const headerActions = ajouter(header, "div", "qbd-quizzes-header-actions");
 
 			/* « Nouveau quiz », entre les onglets et le ⋯ (2026-09-26) : la
 			   barre « Ajouter du contenu » pleine largeur au-dessus de la grille
-			   est partie. Même pilule que « Nouveau dossier » de « Mes quiz ».
-			   Absent dans le sas, qui ne se remplit que par la génération. */
+			   est partie. Même pilule que « Nouveau dossier » de « Mes quiz ». */
 			/* Not while the folder is empty (2026-09-29): its options are then
 			   on the page itself (`renderEmptyFolder`, folder-add.ts). */
 			const { createQuiz } = ctx;
-			if (createQuiz && !sas && inModule.length > 0) {
+			if (createQuiz && inModule.length > 0) {
 				const nouveau = ajouter(headerActions, "button", "qbd-btn--create");
 				nouveau.type = "button";
 				currentHost().ui.setIcon(ajouter(nouveau, "span", "qbd-btn-icon"), "plus");
@@ -488,23 +458,6 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				plus.addEventListener("click", () => openModuleMenu(groupe, plus, () => { if (containerRef) render(containerRef); }, effectiveMap()));
 			}
 
-			/* LE SAS : « Générer », et non « Nouveau quiz » (demande d'Ahmed,
-			   2026-09-20). La génération est la SEULE façon dont un quiz arrive
-			   ici : les deux autres options du modal — vierge, import — écrivent
-			   dans le dossier de leur choix, jamais dans le sas. Proposer un
-			   geste qui ne remplit pas le dossier qu'on regarde est un bouton
-			   qui ment. MASQUÉ (pas grisé) si l'hôte ne sert pas « ai », même
-			   règle que le bouton de l'accueil : un bouton d'ACTION mort au clic
-			   est pire qu'absent. */
-			if (sas) {
-				if (ctx.canOpen("ai")) {
-					const genBtn = ajouter(headerActions, "button", "qbd-btn--create");
-					const genIcon = ajouter(genBtn, "span", "qbd-btn-icon");
-					currentHost().ui.setIcon(genIcon, "sparkles");
-					ajouter(genBtn, "span", undefined, t("dashboard.nav.generate"));
-					genBtn.addEventListener("click", () => ctx.navigate("ai"));
-				}
-			}
 		}
 
 		// ── Regroupement (UE / Récent) ──
@@ -540,22 +493,13 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 				onChange: (v) => { setGrouping(v as GroupingKey); render(container); }
 			});
 			groupSelect?.el.classList.add("qbd-quizzes-group-select");
-			// The Generated folder's own entry, after the two selects: it left the
-			// grid (9f6b0356), and was unreachable from Folders while this call
-			// was missing (night QA, 2026-10-01).
 			/* ON A PHONE (2026-10-05, StudySmarter's Library): the top keeps ONE
-			   row, the two filters; "Generated quizzes" floats at the bottom
-			   left and "New folder" is a round + at the bottom right. */
-			/* The floating buttons live on `<body>`: an ancestor of the page
-			   makes `position: fixed` relative to itself on a phone, and they
+			   row, the two filters; "New folder" is a round + at the bottom right.
+			   The floating button lives on `<body>`: an ancestor of the page
+			   makes `position: fixed` relative to itself on a phone, and it
 			   ended up under the last card. Removed at each render; hidden by
 			   CSS whenever the folders grid is not on screen. */
 			const mobile = phoneLayoutNow();
-			/* No "Generated quizzes" button in the desktop top bar (2026-10-17): the AI
-			   page opens that folder from its own side column. The phone keeps its
-			   floating button (its AI page has no such column). */
-			const genere = mobile ? renderGeneratedButton(document.body, quizzes, stats, true) : null;
-			if (mobile && genere) boutonsFlottants.push(genere);
 
 			if (ctx.createFolder && mobile) {
 				const fab = ajouter(document.body, "button", "qbd-quizzes-fab qbd-quizzes-fab--droite");

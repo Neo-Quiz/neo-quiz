@@ -694,11 +694,17 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   génération ; les réponses ne se perdent pas ; le prompt de clarification ne
   porte que des NOMS de documents, jamais leur contenu. Dans la CI.
 - `npm run check:relay` — le RELAIS (`src/dashboard/relay.ts`, noyau pur) : le prompt partagé à une appli IA est octet pour octet celui du PC (`composerPrompts` + `texteWeb`, Learn sauf si les mots disent un Test), et la réponse COLLÉE, non fiable, est bornée à 1 Mo avant tout parsing, refusée si elle porte le jeton d'une autre demande, si deux blocs candidats existent (jamais le premier deviné) ou si le format échoue ; clés de prototype retirées, NaN et Infinity refusés, les clés `*Html` gardées (assainies au rendu par les quatre portes). Dans la CI.
-- `npm run check:folder-suggest` — l'ordre des dossiers de destination et leurs
-  suggestions (`src/dashboard/folder-suggest.ts`) : plus récemment modifié
-  d'abord, mot de la demande apparié à travers les accents, un nom de dossier
-  devant un simple titre de fichier, mots vides sans suggestion, dossier déjà
-  choisi non re-suggéré, ordre stable entre égaux. Dans la CI.
+- `npm run check:folder-suggest` — OÙ VA UN QUIZ GÉNÉRÉ (2026-10-17 : plus de
+  dossier « Generated » ni de sélecteur de dossier dans le composer, l'IA
+  range chaque quiz). L'ordre des dossiers remis à l'appel de clarification
+  (`folder-suggest.ts`, plus récemment modifié d'abord) et le noyau pur
+  `folder-choice.ts` : un nom proposé par le modèle ou tapé ne devient jamais
+  un CHEMIN (séparateur, `..`, nom réservé Windows), un dossier existant du
+  même nom (casse et NFC ignorées) est repris au lieu d'un « X (2) », les
+  pièces jointes donnent le dossier connu le plus profond qui les contient
+  TOUTES (deux cours : aucun), un dossier neuf va dans le dossier de l'année
+  scolaire en cours (« B2 2026-2027 »), sinon à la racine. L'entrée/sortie
+  (`folder-choice-io.ts`) crée par `fs.mkdirs`. Dans la CI.
 - `npm run check:chat-record` — le format des conversations de la page
   « Générer » (`src/dashboard/chat-record.ts`) : une valeur stockée corrompue ou
   hostile ne casse pas la page (requête, résultat ou document invalide écarté

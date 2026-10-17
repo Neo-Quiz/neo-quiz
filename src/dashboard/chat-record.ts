@@ -177,9 +177,12 @@ function readClarify(x: unknown): ChatClarify | null {
 		}
 		/* Both marks are kept: the answer is read back from this record, and a
 		   lost "quizzes" mark turned "Auto" into one quiz per document while the
-		   model had been told to split by theme (2026-10-14). */
+		   model had been told to split by theme (2026-10-14). A lost "folder"
+		   mark (2026-10-17) would file the quiz by its subject instead of in the
+		   folder the learner picked. */
 		const purpose = q.multiple === true ? undefined
 			: q.purpose === "quizzes" && options.every(option => option.quizzes !== undefined) ? "quizzes" as const
+			: q.purpose === "folder" ? "folder" as const
 			: undefined;
 		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length), ...(purpose ? { purpose } : {}) });
 	}

@@ -45,7 +45,7 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 	"aiProvider" | "aiModel" | "aiEffort" | "aiCodexFast" | "aiAgentMode" | "aiAntigravityLevels" | "aiAntigravityModels" | "aiOllamaUrl" | "aiOllamaCloudKey"
 	| "aiOllamaModels" | "aiOllamaCatalog" | "aiOllamaPlansAppris" | "aiOllamaPlanCompte"
 	| "aiCanauxPayantsMasques" | "aiWebAvertissementMasque" | "aiUsageLog"
-	| "aiMentionExtraFolders" | "aiOutputFolder" | "aiComposerDestination" | "aiAutoLearn">> & { hotkeyAddFiles: Hotkey } {
+	| "aiMentionExtraFolders" | "aiAutoLearn">> & { hotkeyAddFiles: Hotkey } {
 	return {
 		// Aucun fournisseur par défaut : le choix reste la première étape.
 		aiProvider: "",
@@ -86,24 +86,5 @@ export function aiSettingsDefaults(): Required<Pick<AiSettings,
 		hotkeyAddFiles: { modifiers: ["Mod"], key: "u" },
 		// Vide par défaut : le « @ » se limite au vault tant qu'on n'ajoute rien.
 		aiMentionExtraFolders: [],
-		// Donnée persistée, donc jamais traduite : les deux hôtes écrivent au même endroit.
-		aiOutputFolder: "Generated",
-		// The composer's output folder: "" = the default one (aiOutputFolder).
-		aiComposerDestination: "",
 	};
-}
-
-/**
- * The composer's output folder to show and send on arrival: the one the user
- * last chose, if that folder still exists among the offered ones; otherwise
- * "" (the default folder). A folder deleted since, or a value written by hand,
- * falls back to the default instead of writing a quiz into a folder the
- * composer no longer shows.
- *
- * `dossiers` are the contract paths the composer offers as non-default
- * choices (`destinationOptions`, without the default row).
- */
-export function destinationMemorisee(persistee: string | undefined, dossiers: readonly string[]): string {
-	if (!persistee) return "";
-	return dossiers.includes(persistee) ? persistee : "";
 }

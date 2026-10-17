@@ -5,7 +5,7 @@ import type { TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup, ModuleMap, ModuleOverride } from "./quiz-modules";
-import { applyModuleOverrides, buildUeGroups, declaredFolders, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
+import { applyModuleOverrides, buildUeGroups, declaredFolders, modulesAffiches, moduleForQuiz } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
 import { openModuleEditModal } from "./module-edit";
@@ -324,12 +324,9 @@ async function deleteQuizCore(ctx: DashboardShellCtx, quiz: QuizIndexEntry): Pro
 }
 
 /** The folder on disk that "Delete folder" may send to the trash, or `null`:
-    never a root itself, never a folder holding the generated-quizzes folder,
-    and nothing for a group declared without a path. */
-function trashableFolder(ctx: DashboardShellCtx, group: ModuleGroup): string | null {
-	const sas = ctx.generatedFolder?.();
+    never a root itself, and nothing for a group declared without a path. */
+function trashableFolder(group: ModuleGroup): string | null {
 	if (!group.path || currentHost().paths.localPath(group.path) === "") return null;
-	if (sas && (sas === group.path || sas.startsWith(group.path + "/"))) return null;
 	return group.path;
 }
 
@@ -341,9 +338,8 @@ function trashableFolder(ctx: DashboardShellCtx, group: ModuleGroup): string | n
     with no quiz (`modulesAffiches`), so its empty card stayed on the page
     after every delete, with no gesture left to remove it. */
 export async function deleteFolder(ctx: DashboardShellCtx, group: ModuleGroup): Promise<void> {
-	if (estLeSas(group, ctx.generatedFolder?.())) return;
 	const host = currentHost();
-	const folder = trashableFolder(ctx, group);
+	const folder = trashableFolder(group);
 	const inside = (p: string): boolean => !!folder && p.startsWith(folder + "/");
 	/* A fresh undo batch: the folder itself cannot be brought back from here
 	   (it is in the trash), and Ctrl+Z must not revive an older delete. */
@@ -621,13 +617,12 @@ export async function duplicateQuiz(quiz: QuizIndexEntry): Promise<string | null
 
 /** The folders "Move to" offers for a quiz: the SAME set as the "My quizzes"
     page (`modulesAffiches`: folders with a quiz, declared folders even when
-    empty, the generated folder), minus the quiz's current folder and the
+    empty), minus the quiz's current folder and the
     hidden ones, and only those with a real path to write to. */
 export function quizMoveTargets(
 	quizzes: QuizIndexEntry[],
 	map: ModuleMap,
 	overrides: Record<string, ModuleOverride> | undefined,
-	sas: string | undefined,
 	currentFolder: string | undefined,
 ): ModuleGroup[] {
 	const masques = hiddenFolders(overrides);
@@ -635,7 +630,7 @@ export function quizMoveTargets(
 	   (idempotent) so that a caller's map without them cannot drop an empty
 	   folder, which has no quiz to give it a path. */
 	const withOverrides = applyModuleOverrides(map, overrides || {});
-	return modulesAffiches(quizzes, {}, withOverrides, declaredFolders(overrides), masques, sas)
+	return modulesAffiches(quizzes, {}, withOverrides, declaredFolders(overrides), masques)
 		.filter(g => g.path && g.path !== currentFolder && !masques.includes(g.folder));
 }
 
@@ -682,8 +677,7 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			const dossierActuel = moduleForQuiz(quiz.path, map).path;
 			// The SAME folders as the "My quizzes" page, empty ones included,
 			// hidden ones left out (as the archived ones were).
-			const sas = ctx.generatedFolder?.();
-			const groupes = quizMoveTargets(ctx.scanner.getQuizzes(), map, ctx.settings.quizzesModuleOverrides, sas, dossierActuel);
+			const groupes = quizMoveTargets(ctx.scanner.getQuizzes(), map, ctx.settings.quizzesModuleOverrides, dossierActuel);
 			/* Un SOUS-MENU ouvert au survol, flèche à droite (Ahmed, 2026-09-27),
 			   au lieu d'un second menu qui remplaçait le premier au clic. */
 			const sousItems: ActionMenuItem[] = [];
@@ -692,11 +686,10 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			const plusieursUe = ues.length > 1;
 			for (const ue of ues) {
 				for (const g of ue.modules) {
-					const generated = estLeSas(g, sas);
 					sousItems.push({
 						// L'icône et la couleur de la CARTE du dossier (2026-09-27).
-						icon: moduleIcon(g, { generated }),
-						iconColor: moduleAccent(g, { generated }),
+						icon: moduleIcon(g),
+						iconColor: moduleAccent(g),
 						label: g.name,
 						/* L'UE en INTERTITRE, à la place du filet, et plus en
 						   accessoire à droite : il mangeait la place du nom du
@@ -794,7 +787,7 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toPar
 	   did not exist and failed saying "already exists" (2026-09-27). The entry
 	   is only offered to a folder that has a path. */
 	const source = g.path;
-	if (!source || estLeSas(g, ctx.generatedFolder?.())) return false;
+	if (!source) return false;
 	const localFrom = host.paths.localPath(source);
 	// A whole ROOT (a quiz sitting at the root, `localFrom === ""`) never moves
 	// this way: the menu already hides it (2026-09-27); this second guard
@@ -844,8 +837,7 @@ export async function moveModuleTo(ctx: DashboardShellCtx, g: ModuleGroup, toPar
 /** The folders of `g`'s OWN root it may move into (spec 2026-10-15 §1): the
     root itself when `g` sits in a sub-folder, then each first-level folder of
     the root (by name) that is not a module card (no quiz directly inside),
-    never `g`'s own folder nor its current parent, never the "Generated"
-    folder, never a hidden folder. Folders are read from the host's file index
+    never `g`'s own folder nor its current parent, never a hidden folder. Folders are read from the host's file index
     (synchronous, as a menu is): an EMPTY folder has no file and is not offered. */
 export function sameRootMoveTargets(ctx: DashboardShellCtx, g: ModuleGroup): { path: string; name: string; root: boolean }[] {
 	const host = currentHost();
@@ -869,10 +861,9 @@ export function sameRootMoveTargets(ctx: DashboardShellCtx, g: ModuleGroup): { p
 	// A folder with a quiz DIRECTLY inside is a module card, never a target.
 	const cards = new Set(quizzes.map(q => q.path.slice(0, q.path.lastIndexOf("/"))));
 	const hidden = hiddenFolders(ctx.settings.quizzesModuleOverrides);
-	const sas = ctx.generatedFolder?.();
 	for (const name of [...folders].sort((a, b) => a.localeCompare(b))) {
 		const path = host.paths.contractPath(root.id, name);
-		if (path === g.path || path === parent || path === sas || cards.has(path) || hidden.includes(name)) continue;
+		if (path === g.path || path === parent || cards.has(path) || hidden.includes(name)) continue;
 		out.push({ path, name, root: false });
 	}
 	return out;
@@ -880,9 +871,6 @@ export function sameRootMoveTargets(ctx: DashboardShellCtx, g: ModuleGroup): { p
 
 export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void, map: ModuleMap): (g: ModuleGroup, anchorEl?: HTMLElement) => ActionMenuItem[] {
 	return (g, anchorEl) => {
-		/* The "Generated" folder can be neither renamed, hidden, moved nor
-		   deleted (by its PATH): it is where generations land. */
-		const fixe = estLeSas(g, ctx.generatedFolder?.());
 		const { shareQuiz } = ctx;
 		const host = currentHost();
 		const items: ActionMenuItem[] = [];
@@ -893,7 +881,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 			// A small window first: the whole folder, or a choice of its quizzes.
 			onClick: () => { openShareChooser(g, shareQuiz); },
 		});
-		if (!fixe) items.push({
+		items.push({
 			icon: "pencil",
 			label: t("dashboard.detail.edit"),
 			// Modal « Modifier dossier » calqué sur StudySmarter (nom / UE /
@@ -929,18 +917,16 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		   lives in the "Hidden" section at the bottom of My quizzes. It replaced
 		   Archive (2026-10-15). Direct both ways, no confirmation; one flag per
 		   FOLDER, so it works even when the grid shows none of its quizzes. */
-		if (!fixe) {
-			const hidden = isFolderHidden(ctx, g.folder);
-			items.push({
-				icon: hidden ? "eye" : "eye-off",
-				label: t(hidden ? "dashboard.quizzes.menuShow" : "dashboard.quizzes.menuHide"),
-				onClick: () => {
-					saveSettingsReporting(() => setFolderHidden(ctx, g.folder, !hidden));
-					host.ui.notice(t(hidden ? "dashboard.quizzes.folderShown" : "dashboard.quizzes.folderHidden", { name: g.name }));
-					rerender();
-				},
-			});
-		}
+		const hidden = isFolderHidden(ctx, g.folder);
+		items.push({
+			icon: hidden ? "eye" : "eye-off",
+			label: t(hidden ? "dashboard.quizzes.menuShow" : "dashboard.quizzes.menuHide"),
+			onClick: () => {
+				saveSettingsReporting(() => setFolderHidden(ctx, g.folder, !hidden));
+				host.ui.notice(t(hidden ? "dashboard.quizzes.folderShown" : "dashboard.quizzes.folderHidden", { name: g.name }));
+				rerender();
+			},
+		});
 		/* "Move to": the folders of the SAME root (the root itself, its
 		   first-level folders that are not module cards), then the other roots.
 		   `anchorEl` missing (a caller not updated yet): no entry, rather than a
@@ -949,7 +935,7 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 		   quiz sitting at the root, `quiz-modules.ts` then gives it
 		   `path = <rootId>`). Moving it would move the whole vault, so the entry
 		   is hidden rather than letting `moveModuleTo` fail (2026-09-27). */
-		if (!fixe && anchorEl && g.path && host.paths.localPath(g.path) !== "") {
+		if (anchorEl && g.path && host.paths.localPath(g.path) !== "") {
 			// A hover submenu, like a quiz's "Move to" (2026-09-27).
 			const rootDeG = host.paths.rootOf(g.path);
 			const cibles: { path: string; name: string; icon: string; vault?: boolean; section?: string }[] =
@@ -1008,14 +994,14 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				}, () => { void runFileGesture(async () => { await ctx.removeExtraRoot?.(racineDeG.id); }, "dashboard.quizzes.removeRootError", rerender); });
 			},
 		});
-		if (!fixe) items.push({
+		items.push({
 			icon: "trash-2",
 			label: t("dashboard.quizzes.menuDeleteFolder"),
 			danger: true,
 			onClick: () => {
 				openConfirm({
 					title: t("dashboard.quizzes.deleteFolderConfirmTitle", { name: g.name }),
-					body: t(trashableFolder(ctx, g) ? "dashboard.quizzes.deleteFolderConfirmBody" : "dashboard.quizzes.deleteFolderConfirmBodyNoDisk", { name: g.name }),
+					body: t(trashableFolder(g) ? "dashboard.quizzes.deleteFolderConfirmBody" : "dashboard.quizzes.deleteFolderConfirmBodyNoDisk", { name: g.name }),
 					cta: t("dashboard.quizzes.deleteConfirmCta"),
 					warning: true,
 				}, () => { void runFileGesture(() => deleteFolder(ctx, g), "dashboard.quizzes.deleteFolderError", rerender); });

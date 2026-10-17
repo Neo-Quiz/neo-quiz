@@ -90,19 +90,13 @@ export interface RecentModuleGroup {
 }
 
 /** Récence d'un module = la plus récente activité de SES quiz (un module
-    vide date de 0 → « plus d'un mois »). Un groupe vide est omis. Le SAS des
-    quiz générés (`sas`), quand il est vide, compte comme récent : c'est le
-    dossier qu'on vient de vider ou qui attend la prochaine génération, pas
-    un dossier oublié depuis un mois. */
+    vide date de 0 → « plus d'un mois »). Un groupe vide est omis. */
 export function buildRecentModuleGroups(
 	modules: ModuleGroup[],
 	stats: Record<string, QuizStatRecord>,
-	sas?: string
 ): RecentModuleGroup[] {
 	const now = Date.now();
-	const activity = (m: ModuleGroup) => (sas && m.path === sas && m.quizzes.length === 0)
-		? now
-		: m.quizzes.reduce((mx, q) => Math.max(mx, lastActivity(q, stats)), 0);
+	const activity = (m: ModuleGroup) => m.quizzes.reduce((mx, q) => Math.max(mx, lastActivity(q, stats)), 0);
 	const buckets: Record<RecentGroupKey, ModuleGroup[]> = {
 		"recent:7d": [], "recent:30d": [], "recent:older": []
 	};

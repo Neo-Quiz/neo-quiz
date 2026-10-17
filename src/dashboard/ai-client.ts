@@ -21,7 +21,7 @@ import { currentLang, t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
-import { clarifyPrompt } from "./generation-kind";
+import { clarifyPrompt, type ClarifyFolders } from "./generation-kind";
 import { lectureClassifyPrompt } from "./lecture-detect";
 import { READING_MAX_CHARS } from "../lecture-style";
 import { claudeResultDuFlux, createTranscriptDecoder } from "./transcript";
@@ -343,8 +343,9 @@ export interface AiClient {
 	    generates (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
 	    documents only, the lowest effort, 30 s at most. Resolves with the
 	    model's raw text (`parseClarifyAnswer` reads it); rejects on any failure,
-	    including a provider that cannot hold the exchange. */
-	clarify(request: string, documentNames: readonly string[], folderNames?: readonly string[]): Promise<string>;
+	    including a provider that cannot hold the exchange. `folders`: the
+	    learner's folder names and the folder already decided, if any. */
+	clarify(request: string, documentNames: readonly string[], folders?: ClarifyFolders): Promise<string>;
 	/** The short call that sorts ambiguous file names (`lectureClassifyPrompt`): names only, no tools, lowest effort, 30 s at most; the raw text, read by `parseLectureVerdicts`; rejects on any failure. */
 	classifyLectures(names: readonly string[]): Promise<string>;
 	abort(): void;
@@ -2378,8 +2379,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The clarify call of "Generate": same provider as the generation, same
 	    call forms (no tool, no new option), the LOWEST effort the provider
 	    offers, and 30 s at most. */
-	async function clarify(request: string, documentNames: readonly string[], folderNames: readonly string[] = []): Promise<string> {
-		const { system, user } = clarifyPrompt(request, documentNames, currentLang(), folderNames);
+	async function clarify(request: string, documentNames: readonly string[], folders?: ClarifyFolders): Promise<string> {
+		const { system, user } = clarifyPrompt(request, documentNames, currentLang(), folders);
 		return appelCourt(system, user);
 	}
 

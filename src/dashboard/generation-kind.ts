@@ -8,7 +8,10 @@
    question about the app) it answers conversationally instead and lists the
    learner's folders (`reply`). Otherwise it asks for a question count and, for
    several documents, how many quizzes; any failure leaves generation ready
-   with Learn as the fallback.
+   with Learn as the fallback. Since 2026-10-17 it also places the quiz (there
+   is no "Generated" folder any more): it names one of the learner's folders
+   (`folder`), or asks one "which folder" question (`purpose: "folder"`) whose
+   options are folder names, new ones it proposes included.
 ══════════════════════════════════════════════════════════ */
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
@@ -25,8 +28,12 @@ export interface ClarifyOption { label: string; description: string; quizzes?: Q
 /** One clarifying question, in the manner of Claude Code's AskUserQuestion: a
     short header chip, the question, 2 to 4 options, one or several answers.
     The app adds its own "write something" option. */
-export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" }
-export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice };
+export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" | "folder" }
+/** `folder`: the name of one of the learner's folders the model says fits
+    (read against the real list by the caller, never trusted as a path). */
+export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice; folder?: string };
+/** The longest folder name read from the model's answer. */
+export const MAX_FOLDER_NAME = 100;
 /** The longest conversational reply kept (characters). */
 export const MAX_REPLY = 4000;
 /** The most questions a request is asked, and the longest header chip. */
@@ -83,7 +90,9 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	if (!o || typeof o !== "object" || Array.isArray(o)) return READY;
 	const obj = o as Record<string, unknown>;
 	const kind = isKindChoice(obj.kind) ? obj.kind : undefined;
-	const ready: ClarifyAnswer = kind ? { ready: true, kind } : READY;
+	const folder = typeof obj.folder === "string" && obj.folder.trim() ? obj.folder.trim().slice(0, MAX_FOLDER_NAME) : undefined;
+	const extra = { ...(kind ? { kind } : {}), ...(folder ? { folder } : {}) };
+	const ready: ClarifyAnswer = { ready: true, ...extra };
 	// A conversational reply wins over everything else (bounded, plain text).
 	if (typeof obj.reply === "string" && obj.reply.trim()) return { reply: obj.reply.trim().slice(0, MAX_REPLY) };
 	if (!Array.isArray(obj.questions) || obj.questions.length < 1 || obj.questions.length > MAX_CLARIFY_QUESTIONS) return ready;
@@ -101,9 +110,13 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 			lues.push({ label: label.trim().slice(0, 80), description: typeof description === "string" ? description.trim().slice(0, 160) : "", ...(isQuizzesChoice(optionQuizzes) ? { quizzes: optionQuizzes } : {}) });
 		}
 		const validQuizzesQuestion = purpose === "quizzes" && multiple !== true && lues.every(option => isQuizzesChoice(option.quizzes));
-		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validQuizzesQuestion ? { purpose: "quizzes" as const } : {}) });
+		const validFolderQuestion = purpose === "folder" && multiple !== true;
+		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validQuizzesQuestion ? { purpose: "quizzes" as const } : validFolderQuestion ? { purpose: "folder" as const } : {}) });
 	}
-	return { questions, ...(kind ? { kind } : {}) };
+	// Only one "which folder" question counts: a second one is an ordinary question.
+	const premier = questions.findIndex(q => q.purpose === "folder");
+	questions.forEach((q, i) => { if (q.purpose === "folder" && i !== premier) delete q.purpose; });
+	return { questions, ...extra };
 }
 
 /** The number of quizzes asked (`"auto"`: the model decides), or `null` when
@@ -123,6 +136,20 @@ export function quizCountFromClarifications(questions: readonly ClarifyQuestion[
 		if (isQuizzesChoice(n)) return n;
 	}
 	return null;
+}
+
+/** The folder name the learner chose in the "which folder" question (an
+    option's label, or the text typed in the app's own option), or `null`
+    when no such question was asked or the answer is empty. A skipped
+    question takes its default. The caller matches it against the real
+    folders and sanitises it before creating anything. */
+export function folderFromClarifications(questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): string | null {
+	const index = questions.findIndex(question => question.purpose === "folder");
+	if (index < 0) return null;
+	const question = questions[index];
+	const selected = (answers[index] ?? []).map(s => s.trim()).filter(Boolean);
+	const name = selected[0] ?? question.options[question.default]?.label ?? question.options[0]?.label ?? "";
+	return name.trim() ? name.trim().slice(0, MAX_FOLDER_NAME) : null;
 }
 
 /** The answers as one block appended to the request: "- question" then the answer indented under it, per question; a skipped question gives its default option. */
@@ -153,10 +180,37 @@ export function sansPrecisions(text: string): string {
 	return text;
 }
 
+/** What the clarify call knows about the learner's folders (2026-10-17):
+    their names (also offered by a conversational reply), the folder the app
+    already decided (a chat's folder, an exam's, the attachments' own), and
+    whether the folder is chosen at all here (`choose: false` for a request
+    sent to the PC, which places it itself). */
+export interface ClarifyFolders {
+	/** The names of the learner's folders (most relevant first). */
+	names: readonly string[];
+	/** The folder already decided: the model must not ask about it. */
+	decided?: string;
+	/** `false`: no folder is chosen by this call. */
+	choose?: boolean;
+}
+
+/** The folder rules of the clarify prompt (exported for `check:generation-kind`). */
+export function clarifyFolderRules(folders: ClarifyFolders | undefined): string[] {
+	if (!folders || folders.choose === false) return [];
+	if (folders.decided) return [
+		`The destination folder is already decided ("${folders.decided.replace(/["\\\n\r]/g, " ").trim()}"): do NOT ask about the folder and do NOT add a top-level "folder".`,
+	];
+	return [
+		"Each quiz is saved in one of THE LEARNER'S FOLDERS (listed in the request, possibly none). When one clearly fits the request or the documents' names, add a top-level \"folder\" whose value is its EXACT name as listed, and do not ask about the folder.",
+		"When none clearly fits, ask exactly ONE single-choice question marked \"purpose\":\"folder\" asking where to save the quiz: 2 to 4 options, each a folder name as its label and one line as its description; propose short NEW folder names suited to the subject (in the language of the request, no slash, no backslash, no path), and, if an existing folder partly fits, its EXACT name; its default is 0. It counts in the 3 questions at most and comes before the optional scope or level question. Never invent an existing folder: an existing one is named exactly as listed.",
+	];
+}
+
 /** The instruction of the clarify call: English like every instruction to the
     model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */
-export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en", folderNames: readonly string[] = []): { system: string; user: string } {
+export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en", folders?: ClarifyFolders): { system: string; user: string } {
+	const choisit = !!folders && folders.choose !== false && !folders.decided;
 	const system = [
 		"You are an assistant inside Neo Quiz, a revision app that generates either a Learn (a guided path that teaches a topic step by step) or a Test (questions only). You decide which one yourself and NEVER ask the learner about it.",
 		"FIRST decide whether the message asks for a quiz or for studying material. A greeting (\"slt\", \"salut\", \"hello\"), small talk, a question about the app or \"what can you do\" is NOT such a request: answer it conversationally, briefly, in the language of the message, and offer to work on one of the learner's folders, listing the folders given below (only those names, as a short list; if none is given, invite the learner to attach a document or name a topic). Return {\"reply\":\"<your answer>\"} alone, as plain text without HTML. Never reply conversationally to a message that names a subject, a course, a module, a document or asks for a quiz.",
@@ -168,17 +222,18 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"If two or more attached documents are listed, also ask HOW MANY QUIZZES to make, simply as a number: a single-choice question marked \"purpose\":\"quizzes\" whose options are \"Auto\" {\"quizzes\":\"auto\"} first (you decide), then 1, 2 and 3 quizzes ({\"quizzes\":1}, {\"quizzes\":2}, {\"quizzes\":3}); its default is 0. The quizzes share the material of ALL the documents, split by theme; never describe them as one quiz per document.",
 		"For each of these two questions (number of questions, number of quizzes), put the option labeled exactly \"Auto\" first and set the default to index 0. \"Auto\" means you decide freely; it imposes NO numeric bound.",
 		"You may ask at most ONE optional clarifying question about scope or learner level, only when genuinely vague. Never exceed 3 questions total.",
+		...clarifyFolderRules(folders),
 		"NEVER ask what the attached documents already answer. You see only their names; if a name makes the scope clear, do not ask about scope.",
-		"You have no tools; you only see the request and the names of the attached documents.",
+		"You have no tools; you only see the request, the names of the attached documents and the names of the learner's folders.",
 		"Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
-		`- {"kind":"learn","questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
+		`- {"kind":"learn",${choisit ? "\"folder\":\"<optional: exact name of one of the learner's folders>\"," : ""}"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
-	const dossiers = folderNames.map(n => n.trim()).filter(Boolean).slice(0, 60);
+	const dossiers = (folders?.names ?? []).map(n => n.trim()).filter(Boolean).slice(0, 60);
 	const user = [
 		"THE LEARNER'S REQUEST:\n" + (request.trim() || "(empty)"),
-		dossiers.length ? "THE LEARNER'S FOLDERS (names only):\n" + dossiers.map(n => "- " + n).join("\n") : "",
+		dossiers.length ? "THE LEARNER'S FOLDERS (names only):\n" + dossiers.map(n => "- " + n).join("\n") : choisit ? "THE LEARNER'S FOLDERS (names only):\n(none yet)" : "",
 		names.length ? "ATTACHED DOCUMENTS (names only):\n" + names.map(n => "- " + n).join("\n") : "",
 	].filter(Boolean).join("\n\n---\n\n");
 	return { system, user };

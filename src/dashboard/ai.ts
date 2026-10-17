@@ -5,7 +5,7 @@ import type { ModeGeneration } from "../quiz-format";
 import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { debutDeDemande } from "./ai-sources";
-import { brouillonDe, composerDemande, decouperParFichier, dossierParDefaut, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn } from "./generation-demande";
+import { brouillonDe, composerDemande, decouperParFichier, enregistrerLot, enregistrerQuiz, lectureEnUnePasse, lienLearn } from "./generation-demande";
 import type { AttachmentSource, DemandeTexte, NoteAttachment } from "./generation-demande";
 import { fileDeGeneration, figerReglages } from "./file-generation-app";
 import type { DemandeFile, FileGenerationApp, LigneGeneration, ReglagesFiges } from "./file-generation-app";
@@ -26,15 +26,12 @@ import { nouveauJeton, texteWeb, preparerOuverture } from "./ai-web";
 import type { ResultatOuverture } from "./ai-web";
 import type { Scanner, QuizIndexEntry } from "./scanner";
 import type { StatsStore } from "./stats-store";
-import { aiSettingsDefaults, destinationMemorisee } from "./ai-settings-host";
 import type { AiSettingsHost } from "./ai-settings-host";
-import { GENERATED_MODULE_ICON } from "./module-icons";
-import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openCategoriePicker, openNotePicker, openActionMenu } from "./ui-select";
 import { mountAgentModePill } from "./agent-mode-pill";
 import { renderGeneratedGallery } from "./generated-gallery";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { categorieChoisie, categorieDuDossier, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
+import { categorieChoisie, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
 import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
@@ -56,10 +53,12 @@ import { erreurRelais } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { relativeToRoot } from "../shared-state/chat-merge";
 import { addClarify, addReply, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
-import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
-import type { FileRef, FolderRef } from "./folder-suggest";
+import { rankFolders } from "./folder-suggest";
+import type { FileRef } from "./folder-suggest";
+import { findFolderByName, folderNamesForPrompt, folderOfAttachments, type KnownFolder } from "./folder-choice";
+import { fallbackFolder, folderNamed, foldersOfQuizzes } from "./folder-choice-io";
 import { suivreDebord } from "./detail-fiche";
-import { formatClarifications, quizCountFromClarifications, parseClarifyAnswer, type QuizzesChoice } from "./generation-kind";
+import { folderFromClarifications, formatClarifications, quizCountFromClarifications, parseClarifyAnswer, type ClarifyFolders, type QuizzesChoice } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -280,17 +279,12 @@ export interface AiPageDeps {
 	openFiles?(): HostFile[];
 	usage?: AiUsageDeps;
 	/**
-	 * Les dossiers où la page peut écrire le quiz généré, en plus du dossier
-	 * par défaut (`<racine par défaut>/<aiOutputFolder>`, toujours proposé en
-	 * premier). Absente = pas de section « Destination » dans le popover des
-	 * options, et la génération écrit là où elle a toujours écrit : c'est le
-	 * cas du GREFFON, qui n'a qu'un vault ouvert et donc aucun choix à offrir.
+	 * The learner's quiz folders, among which the AI files each generated quiz
+	 * (2026-10-17, `folder-choice.ts`). Absent: the folders holding a quiz in
+	 * the catalogue.
 	 *
-	 * `path` est un chemin du CONTRAT complet (« Efrei/…/XTI301 »), le seul
-	 * que `fs.write` accepte ; c'est l'hôte qui le connaît, pas cette page.
-	 *
-	 * `icon`, `color`, `root` : l'apparence de la carte du dossier et le nom
-	 * de sa racine, pour que deux dossiers homonymes se distinguent.
+	 * `path` is a full CONTRACT path ("Efrei/…/XTI301"), the only one
+	 * `fs.write` accepts; the host knows it, not this page.
 	 */
 	quizFolders?(): { path: string; name: string; icon: string; color: string; root: string }[];
 	/** The length in minutes of one class session of a folder (contract path),
@@ -355,35 +349,28 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    runs. */
 	let attenteGenre: { text: string; documents: { name: string; path?: string; thumb?: string }[] } | null = null;
 	/** The clarifying questions asked and not answered yet, by request id: what the click
-	    needs to generate (the documents' text is only in memory). A question
+	    needs to generate (the documents' text is only in memory), and the folder
+	    already decided for it ("" while a "which folder" answer decides). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction; dossier: string }>();
 	/** The "/" menu of the composer on screen (slash-commands.ts). */
 	let commandeSlash: SlashCommandHandle | null = null;
 	/** The exam picked in the "/exam" menu: the next send is a whole
 	    preparation for it (`exam-command.ts`). Cleared once sent. */
 	let examCible: ExamCible | null = null;
 	/** The destination was set by the exam (its course folder): giving up
-	    the exam gives it back to the default folder. */
+	    the exam gives the choice back to the AI. */
 	let destinationParExam = false;
-	/* Destination du quiz généré : un chemin du CONTRAT, ou "" pour le dossier
-	   par défaut. Le CHOIX fait dans les options ou les suggestions est
-	   persisté (`aiComposerDestination`) et relu à chaque arrivée sur la page
-	   (`entrer`) ; un préréglage ou une destination d'examen ne l'est pas. */
+	/* The generated quiz's folder, a CONTRACT path. Since 2026-10-17 there is
+	   no "Generated" folder and no folder picker: a preset or an exam sets it,
+	   the chat keeps its own (`destinationDuContexte`), and otherwise the AI
+	   chooses at each send (`clarifier`, `folder-choice.ts`), which sets it
+	   for that send. "" = not decided. */
 	let destination = "";
 	/* La destination vient d'un PRÉRÉGLAGE (« Créer avec l'IA » depuis un
 	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
 	   reste du composer (spec de la file, 2026-09-26). */
 	let destinationDuPreset = false;
-	/** Repaints the output-folder row of the composer, set at each render. */
-	let paintDestination: (() => void) | null = null;
-	/** The chat the destination picker was already offered for on arrival
-	    (spec 2026-10-07): it opens once per arrival and per new chat, never
-	    again while the user types in the same chat. `entrer` clears it. */
-	let dossierProposePour: string | null = null;
-	/** The row of folder suggestions under the composer, and its debounce. */
-	let suggestionsEl: HTMLElement | null = null;
-	let suggestionsTimer = 0;
 	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
 	   déduite à l'envoi des pièces jointes, du dossier et de la demande
 	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
@@ -814,8 +801,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			dossier: exam.dossier,
 			racine: exam.racine,
 			nomDossier: exam.module,
-			/* The quizzes of a preparation go to the exam's course folder, not
-			   to "Generated": the destination follows the exam. */
+			/* The quizzes of a preparation go to the exam's course folder: the
+			   destination follows the exam. */
 			onDossier: (chemin) => {
 				exam.dossier = chemin;
 				if (examCible !== exam || destination === chemin) return;
@@ -1070,10 +1057,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function entrer(container: HTMLElement): Promise<void> {
 		stageRef = null;
 		heroShown = false;
-		dossierProposePour = null;
 		// Un préréglage (« Créer avec l'IA ») ou un dossier d'examen est posé AVANT
 		// cette arrivée (`naviguer` appelle `preset` d'abord) : il l'emporte.
-		if (!destinationDuPreset && !destinationParExam) destination = destinationMemoriseeCourante();
+		if (!destinationDuPreset && !destinationParExam) destination = "";
 		return render(container);
 	}
 
@@ -1159,9 +1145,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			}, true);
 			const galerie = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--gallery");
 			stageRef = galerie;
-			const dossier = defaultDestination();
+			/* EVERY quiz the AI generated, wherever it was filed (2026-10-17: no
+			   "Generated" folder any more): the ones whose note carries the
+			   generation frontmatter. */
 			renderGeneratedGallery(galerie, {
-				quizzes: deps.scanner.getQuizzes().filter(q => q.path.startsWith(dossier + "/")),
+				quizzes: deps.scanner.getQuizzes().filter(q => !!q.generated),
 				open: quiz => deps.navigate("detail", { quiz, entree: "generation" }),
 			});
 			return;
@@ -1760,85 +1748,23 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			document.removeEventListener("focusin", surAilleurs, true);
 		} };
 
-		/* The OUTPUT FOLDER, at the top of the composer (2026-09-29, after
-		   Monocode's "Current checkout" row): where the quiz will be written is
-		   seen before sending, not found in the options menu afterwards. A click
-		   opens the same destinations as the options menu; with a single one
-		   (the default) the row only informs and opens nothing. */
-		const destRow = ajouter(composer, "div", "qbd-ai-composer-dest");
-		const destBtn = ajouter(destRow, "button", "qbd-ai-dest");
-		destBtn.type = "button";
-		paintDestination = (): void => {
-			/* THE CHAT'S FOLDER IS FIXED (2026-10-11), as a Claude Code or
-			   MonoCode session keeps its working directory: once the chat has a
-			   message, the agent works in that folder, so the row shows it and
-			   opens nothing; another folder is a new chat. */
-			const verrou = filDuChat().length > 0;
-			if (verrou) destination = dossierDuChat() ?? destination;
-			const options = destinationOptions();
-			const current = options.find(d => d.value === destination) ?? options[0];
-			destBtn.replaceChildren();
-			/* A folder glyph and the name, nothing else (no root, no chevron):
-			   a plain folder icon rather than the module's own, tinted with its
-			   colour, so the row reads as "where it goes" at a glance. The
-			   root stays in the menu. */
-			const icon = ajouter(destBtn, "span", "qbd-ai-dest-icon");
-			host.ui.setIcon(icon, "folder");
-			if (current.color) icon.style.color = current.color;
-			ajouter(destBtn, "span", "qbd-ai-dest-label", current.label);
-			destBtn.disabled = verrou || options.length <= 1;
-			destBtn.classList.toggle("is-locked", verrou);
-			destBtn.title = verrou ? t("ai.composer.destinationLocked") : "";
-			destBtn.setAttribute("aria-label", t("ai.composer.destination", { folder: current.label }));
-			// A specific target hides the suggestions; back on the default, they come back.
-			planifierSuggestions();
-		};
-		paintDestination();
-		lireDatesDossiers();
-		destBtn.addEventListener("click", () => {
-			openActionMenu(destBtn, destinationOptions().map(d => ({
-				icon: d.icon || "folder",
-				iconColor: d.color || undefined,
-				label: d.label,
-				hint: d.sub,
-				onClick: () => {
-					destination = d.value;
-					destinationDuPreset = false;
-					memoriserDestination(d.value);
-					majAvisCategorie();
-					paintDestination?.();
-				},
-			})), { className: "qbd-menu-claude", search: t("ai.composer.destinationSearch"), limit: 6 });
-		});
-		/* Folder suggestions, under the composer; and the picker offered on
-		   arrival (like "Choose a provider"): a popover anchored to the chip,
-		   once per arrival and per new chat, only while nothing is chosen. */
-		suggestionsEl = ajouter(formCol, "div", "qbd-ai-suggestions");
-		suggestionsEl.setAttribute("aria-live", "polite");
-		if (provider && dossierProposePour !== activeChatId() && !destination && !examCible && !composerText && destinationOptions().length > 1) {
-			dossierProposePour = activeChatId();
-			/* Never over a window (the Moodle window repaints this page behind it when it
-			   declares folders): the offer would open on top of what the user is doing. */
-			window.setTimeout(() => { if (!disposed && destBtn.isConnected && !document.querySelector(".qbd-action-menu, .modal-container, .modal")) destBtn.click(); }, 450);
-		}
-		planifierSuggestions();
-		/* The SUBJECT notice (feedback #7), right of the folder since
-		   2026-09-29: "Python detected", text and icon, no badge. It is the
+		/* The SUBJECT notice (feedback #7), in the row at the top of the
+		   composer: "Python detected", text and icon, no badge. It is the
 		   control too (2026-10-12): a click opens the subject list beside it,
 		   so the options icon is gone. Shown whenever a provider is there,
-		   even with nothing detected ("Automatic"). Where the quiz goes and
-		   what it is about read together, before sending. Repainted on each
+		   even with nothing detected ("Automatic"). Repainted on each
 		   composer change (`updateGenerateBtn`). Without a provider there is
-		   no composer to choose for: no notice. */
+		   no composer to choose for: no notice. The folder chip that stood
+		   left of it is gone (2026-10-17): the AI chooses each quiz's folder. */
 		avisCategorieEl = null;
 		if (provider) {
+			const destRow = ajouter(composer, "div", "qbd-ai-composer-dest");
 			const avis = ajouter(destRow, "button", "qbd-ai-categorie");
 			avis.type = "button";
 			avis.setAttribute("aria-label", t("ai.categorie.choose"));
 			avisCategorieEl = avis;
 			majAvisCategorie();
 			avis.addEventListener("click", () => {
-				// The output folder has its own row at the top of the composer.
 				openCategoriePicker(avis, {
 					/* The subject: Automatic says what it detects, otherwise the
 					   choice forces the prompt's (feedback #7). A value that is not
@@ -1849,7 +1775,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					onCategorie: (value) => {
 						categorieChoix = estCategorie(value) ? value : null;
 						majAvisCategorie();
-						planifierSuggestions();
 					},
 				});
 			});
@@ -1969,7 +1894,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			host.ui.setIcon(croix, "x");
 			croix.addEventListener("click", () => {
 				examCible = null;
-				if (destinationParExam) { destination = destinationMemoriseeCourante(); destinationParExam = false; void render(containerRef); return; }
+				if (destinationParExam) { destination = ""; destinationParExam = false; void render(containerRef); return; }
 				peindreExamCible();
 				updateGenerateBtn(generateBtnRef);
 			});
@@ -2102,7 +2027,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		mentions = attachMentionPicker(composerInput, composer, {
 			onPickVaultFile: (path) => { void attachVaultPath(path); },
 			onPickExternalFile: (path) => { void attachExternalPath(path); },
-			getCurrentFolder: () => destination,
+			getCurrentFolder: () => destinationDuContexte(),
 			onTextReplaced: (value) => {
 				composerText = value;
 				composerCaret = composerInput.selectionStart;
@@ -3736,109 +3661,61 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		});
 	}
 
-	/** Enregistre le quiz puis ouvre sa page détail, qui porte déjà le bouton
-	    principal « Lancer ». Toujours la racine PAR DÉFAUT de l'hôte (demande
-	    d'Ahmed du 2026-09-13) : le dossier « Generated » doit rester dans
-	    C:\Neo Quiz, quelle que soit la note jointe par « @ ». */
-	/** Le dossier par défaut, en chemin du contrat : `<racine par défaut>/<aiOutputFolder>`. */
-	function defaultDestination(): string {
-		return dossierParDefaut(settings().aiOutputFolder);
+	/** The folder this send's CONTEXT already fixes: a preset ("Create with
+	    AI" from a folder) or an exam's course folder, else the chat's own
+	    folder once it has a message (an agent keeps its working folder, as a
+	    Claude Code session does). "" = the AI decides. */
+	function destinationDuContexte(): string {
+		if (destination && (destinationDuPreset || destinationParExam)) return destination;
+		return dossierDuChat() ?? "";
 	}
 
-	/** The destination the user last chose, if its folder still exists;
-	    otherwise the default (""). What an arrival or a cancelled preset falls
-	    back to. */
-	function destinationMemoriseeCourante(): string {
-		return destinationMemorisee(settings().aiComposerDestination, destinationOptions().map(o => o.value).filter(v => v !== ""));
+	/** The folder decided before any clarify call: the context's, else the
+	    deepest known folder holding every attached document. "" = undecided. */
+	function dossierDecide(notes: readonly NoteAttachment[]): string {
+		return destinationDuContexte() || folderOfAttachments(notes.map(n => n.path), dossiersConnus())?.path || "";
 	}
 
-	/** Remembers a folder the user chose in the composer's row or suggestions.
-	    A preset or an exam's folder is never remembered: it is for one send. */
-	function memoriserDestination(chemin: string): void {
-		void saveSettings({ aiComposerDestination: chemin });
+	/** The learner's folders, most recently changed first (the clarify prompt
+	    lists the first 60 names). */
+	function dossiersConnus(): KnownFolder[] {
+		const liste: KnownFolder[] = deps.quizFolders?.() ?? foldersOfQuizzes(deps.scanner.getQuizzes());
+		return rankFolders(liste.filter(d => !!d.path).map(d => ({ path: d.path, name: d.name || d.path })), fichiersDesDossiers())
+			.map(d => ({ path: d.path, name: d.name }));
 	}
 
-	/** The destinations offered by the composer's output-folder row: the
-	    default first (value `""`), then the folders the host declares. The
-	    default is removed from the others if it appears there — the same
-	    folder twice in a list of choices is a display defect, not one more
-	    option. */
-	function destinationOptions(): { value: string; label: string; icon: string; color: string; sub: string }[] {
-		const defaut = defaultDestination();
-		const racine = host.paths.defaultRoot();
-		const options = [{
-			value: "",
-			label: settings().aiOutputFolder || aiSettingsDefaults().aiOutputFolder,
-			icon: GENERATED_MODULE_ICON,
-			color: GENERATED_MODULE_ACCENT,
-			sub: "",
-		}];
-		const vus = new Set([defaut]);
-		const dossiers: { path: string; name: string; icon: string; color: string; root: string }[] = [];
-		for (const d of deps.quizFolders?.() ?? []) {
-			if (!d.path || vus.has(d.path)) continue;
-			vus.add(d.path);
-			dossiers.push(d);
+	/** The folder a send goes to once the clarify step is over: the decided
+	    one; else the folder named by the "which folder" answer (an existing
+	    one, or a new one created next to the course folders); else the folder
+	    of the request's subject. "" for a request sent to the PC: the PC
+	    places it itself. */
+	async function dossierFinal(decide: string, nomChoisi: string | null, envoi: DemandeTexte, action: ClarifyAction): Promise<string> {
+		if (decide) return decide;
+		if (action === "remote") return "";
+		const connus = dossiersConnus();
+		if (nomChoisi) {
+			try {
+				const chemin = await folderNamed(nomChoisi, connus);
+				if (chemin) return chemin;
+			} catch (e) {
+				console.warn(LOG_PREFIX, "quiz folder not created:", nomChoisi, e);
+			}
 		}
-		// Most recently changed first (the latest file change inside each folder).
-		const ordre = rankFolders(dossiers.map(d => ({ path: d.path, name: d.name || d.path })), fichiersDesDossiers(), datesDossiers);
-		for (const o of ordre) {
-			const d = dossiers.find(x => x.path === o.path);
-			if (d) options.push({ value: d.path, label: d.name || d.path, icon: d.icon, color: d.color, sub: d.root });
-		}
-		return options;
+		const sujet = categorieChoisie(categorieChoix ?? "auto", indicesCategorieDe(envoi.notes, envoi.text, ""));
+		return fallbackFolder(sujet, connus);
 	}
 
-	/** The folders' own modification dates (`HostFs.modified`), read when the
-	    composer is drawn: the menu's order follows them (most recent first). */
-	const datesDossiers = new Map<string, number>();
-	function lireDatesDossiers(): void {
-		const lire = host.fs.modified;
-		if (!lire) return;
-		for (const d of deps.quizFolders?.() ?? []) {
-			if (!d.path) continue;
-			void lire.call(host.fs, d.path).then(ms => { if (ms) datesDossiers.set(d.path, ms); }, () => undefined);
-		}
+	/** After a send: the next one decides its folder again. */
+	function oublierDestination(): void {
+		destination = "";
+		destinationDuPreset = false;
+		destinationParExam = false;
 	}
 
-	/** What the folders' recency and suggestions read: every note of the index
-	    (quizzes and documents), with its last change — in memory, no disk walk. */
+	/** What the folders' recency reads: every note of the index (quizzes and
+	    documents), with its last change — in memory, no disk walk. */
 	function fichiersDesDossiers(): FileRef[] {
 		return host.fs.listMarkdown().map(f => ({ path: f.path, mtime: f.mtime, title: f.basename }));
-	}
-
-	/** The folders a request's words match, shown under the composer as "Put it
-	    in X?" chips; one tap chooses, nothing is ever chosen on its own. Debounced
-	    250 ms: it runs on each keystroke. */
-	function planifierSuggestions(): void {
-		window.clearTimeout(suggestionsTimer);
-		suggestionsTimer = window.setTimeout(() => {
-			const el = suggestionsEl;
-			if (!el || !el.isConnected) return;
-			el.replaceChildren();
-			if (examCible || destinationParExam) return;
-			// Only while the output folder is the default one: a specific target is never second-guessed.
-			if (!suggestionsAllowed(destination, defaultDestination())) return;
-			// Only the folders of the subject the quiz would leave with ("general",
-			// nothing detected, suggests none): never a folder of another subject.
-			const memeSujet = dossierDuSujet(categorieCourante(), f => categorieDuDossier(f.path, f.name));
-			const options = destinationOptions().filter(o => o.value !== "");
-			const dossiers: FolderRef[] = options.map(o => ({ path: o.value, name: o.label }));
-			for (const d of suggestFolders(composerText, dossiers, fichiersDesDossiers(), { matches: memeSujet })) {
-				const b = ajouter(el, "button", "qbd-ai-suggest");
-				b.type = "button";
-				host.ui.setIcon(ajouter(b, "span", "qbd-ai-suggest-icone"), "folder-input");
-				ajouter(b, "span", "qbd-ai-suggest-texte", t("ai.suggest.put", { folder: d.name }));
-				b.addEventListener("click", () => {
-					destination = d.path;
-					destinationDuPreset = false;
-					memoriserDestination(d.path);
-					majAvisCategorie();
-					paintDestination?.();
-					el.replaceChildren();
-				});
-			}
-		}, 250);
 	}
 
 	/** Enregistre le quiz généré et ouvre sa page. Avec `differerNavigation`,
@@ -3908,7 +3785,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    tranches (`lienLearn`, le même que la file), retenus pour
 	    l'enregistrement de la réponse. */
 	async function preparerLienLearn(msg: SentMessage): Promise<void> {
-		const learn = await lienLearn(deps.scanner, modeGeneration, destination || defaultDestination(), msg);
+		const learn = await lienLearn(deps.scanner, modeGeneration, destination, msg);
 		planTranchesEnvoye = learn.plan;
 		noteLearnLiee = learn.note;
 	}
@@ -4007,7 +3884,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** Ce que la détection de catégorie lit d'une demande : les noms des
 	    pièces jointes, le dossier de destination, le texte. */
 	function indicesCategorie(notes: readonly { name: string }[], texte: string): IndicesCategorie {
-		return indicesCategorieDe(notes, texte, destination || dossierParDefaut(settings().aiOutputFolder));
+		return indicesCategorieDe(notes, texte, destinationDuContexte());
 	}
 
 	/** La catégorie qui partirait maintenant avec le composer. */
@@ -4024,7 +3901,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
 		majBoutonRelais();
 		majAvisCategorie();
-		planifierSuggestions();
 		if (!btn) return;
 		// Le bouton d'envoi n'apparaît qu'avec du contenu (texte/image/note),
 		// et reste désactivé tant que la génération n'est pas possible
@@ -4390,8 +4266,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			try { await clarifier(container, jointesVideo, "generate"); } finally { demarrage = false; }
 			return;
 		}
-		/* A missing clarify provider safely means Learn; /exam stays explicit. */
-		envoyerDansLaFile(capturerEnvoi(jointesVideo), commandeExam ? "exam" : "learn", { dejaVide: false });
+		/* A missing clarify provider safely means Learn; /exam stays explicit.
+		   No clarify call to place the quiz: the folder already decided, else
+		   the queue files it in the folder of its subject. */
+		const directe = capturerEnvoi(jointesVideo);
+		destination = dossierDecide(directe.notes);
+		envoyerDansLaFile(directe, commandeExam ? "exam" : "learn", { dejaVide: false });
 		render(container);
 	}
 
@@ -4548,6 +4428,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		/* One quiz per document unless the clarifying question says otherwise
 		   (2026-10-14: the composer toggle is gone, the AI asks). */
 		const seulQuiz = false;
+		/* WHERE THE QUIZ GOES (2026-10-17, `folder-choice.ts`): the folder the
+		   context or the attachments already decide; otherwise the clarify call
+		   names one of the learner's folders or asks which one. A request sent
+		   to the PC leaves without a folder: the PC places it. */
+		const connus = dossiersConnus();
+		const decide = action === "remote" ? "" : dossierDecide(envoi.notes);
+		// The names go every time: a conversational reply offers them too.
+		const noms = folderNamesForPrompt(connus);
+		const dossiersPourIa: ClarifyFolders = action === "remote" ? { names: noms, choose: false }
+			: decide ? { names: noms, decided: connus.find(d => d.path === decide)?.name ?? decide.split("/").pop() ?? decide }
+			: { names: noms };
 		/* The bubble shown while the AI prepares its questions keeps the
 		   thumbnails the composer already drew (2026-10-14): without them its
 		   cards fell back on the name and a "PDF" tag, which read as PDFs still
@@ -4558,7 +4449,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		let reponse: ClarifyAnswer = { ready: true };
 		try {
 			if (settings().aiProvider) {
-				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name), (deps.quizFolders?.() ?? []).map(d => d.name || d.path).filter(Boolean)));
+				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name), dossiersPourIa));
 			}
 		} catch (err) {
 			console.warn(LOG_PREFIX, "clarify call failed, using Learn", err);
@@ -4566,6 +4457,15 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			attenteGenre = null;
 		}
 		const genre = reponse.kind ?? "learn";
+		/* An existing folder the model named, matched against the real list
+		   (never taken as a path); with a folder decided, a "which folder"
+		   question asked anyway is dropped. */
+		const nomme = !decide && dossiersPourIa.choose !== false && reponse.folder ? findFolderByName(reponse.folder, connus)?.path ?? "" : "";
+		const dossierConnu = decide || nomme;
+		if ("questions" in reponse && (dossierConnu || dossiersPourIa.choose === false)) {
+			const restantes = reponse.questions.filter(q => q.purpose !== "folder");
+			reponse = restantes.length ? { ...reponse, questions: restantes } : { ready: true, ...(reponse.kind ? { kind: reponse.kind } : {}) };
+		}
 		if ("reply" in reponse) {
 			// Not a request for a quiz: the answer is a plain text result of the chat, nothing generates.
 			setChats(addReply(getChats(), activeChatId(), chatDevice(), Date.now(), { id: newRequestId(), text: envoi.text }, reponse.reply));
@@ -4573,10 +4473,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		} else if ("questions" in reponse) {
 			const id = newRequestId();
 			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action }));
-			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action });
+			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action, dossier: dossierConnu });
 			notifyChatsChanged();
 		} else {
-			await continuerApresClarification(envoi, envoi, genre, seulQuiz, action, newRequestId(), Date.now());
+			const dossier = await dossierFinal(dossierConnu, null, envoi, action);
+			await continuerApresClarification(envoi, envoi, genre, seulQuiz, action, newRequestId(), Date.now(), dossier);
 		}
 		render(container);
 	}
@@ -4592,7 +4493,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   document). Neither: the card could not have been offered (`reprenable`). */
 		const gardee = questionsEnAttente.get(requestId);
 		const reprise = gardee ? null : resumeSource(requete);
-		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false, action: requete.clarify.action ?? "generate" } : null);
+		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false, action: requete.clarify.action ?? "generate", dossier: "" } : null);
 		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const r = answerClarify(getChats(), chatId, requestId, reponses, Date.now());
 		if (!r.changed) return;
@@ -4604,13 +4505,21 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const genre = (requete.clarify.genre ?? attente.genre) as KindChoice;
 		const seulQuiz = quizCountFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
 		const action = gardee?.action ?? requete.clarify.action ?? "generate";
+		/* The folder: the one decided at the send (or, read back after a reload,
+		   the chat's), else the answer to "which folder" (an existing folder,
+		   or a new one with that name), else the subject's folder. */
+		const nomChoisi = folderFromClarifications(requete.clarify.questions, reponses);
+		const decide = attente.dossier || (action === "remote" ? "" : destinationDuContexte());
 		demarrage = true;
-		void continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at)
+		void dossierFinal(decide, nomChoisi, attente.envoi, action)
+			.then(dossier => continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at, dossier))
 			.catch(err => { console.warn(LOG_PREFIX, "clarification continuation failed:", err); host.ui.notice(t("ai.error.checkSettings")); })
 			.finally(() => { demarrage = false; render(containerRef); });
 	}
 
-	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, action: ClarifyAction, requestId: string, sentAt: number): Promise<void> {
+	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, action: ClarifyAction, requestId: string, sentAt: number, dossier: string): Promise<void> {
+		// The folder of THIS send (the web channel reads it again when it saves the answer).
+		destination = dossier;
 		if (action === "web") { await lancerSurSite(envoi, original, genre, seulQuiz, containerRef); return; }
 		if (action === "relay") { await partagerClarifiee(envoi, original, genre, requestId); return; }
 		if (action === "remote") { await envoyerClarifieeAuPc(envoi, original, genre, requestId); return; }
@@ -4733,7 +4642,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			fileGen.envoyer({ ...d, ...base, ...identite, mode: "learn", mixte: true, planifier: true, preparation: { examen, palier: 0, paliers: PALIERS_TEST, lot: Date.now().toString(36) } });
 			examCible = null;
 			vider();
-			if (destinationDuPreset) { destination = destinationMemoriseeCourante(); destinationDuPreset = false; }
+			oublierDestination();
 			return;
 		}
 		/* ONE PASS (2026-10-01): N quizzes = ONE line of the queue, ONE
@@ -4751,8 +4660,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			}
 		}
 		vider();
-		// Le préréglage part avec l'envoi ; un dossier CHOISI dans les options reste.
-		if (destinationDuPreset) { destination = destinationMemoriseeCourante(); destinationDuPreset = false; }
+		// The folder left with the send: the next one is decided again.
+		oublierDestination();
 	}
 
 
@@ -4820,7 +4729,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const documents = msg.parDocument && msg.notes.length >= 2 ? msg.notes.map(n => n.name) : undefined;
 		lotWebLiens = undefined;
 		if (documents) {
-			const dossier = destination || defaultDestination();
+			const dossier = destination;
 			lotWebLiens = await Promise.all(msg.notes.map(async n => {
 				const l = await lienLearn(deps.scanner, modeGeneration, dossier, { ...msg, notes: [n], parDocument: false });
 				return l.plan || l.note ? l : undefined;

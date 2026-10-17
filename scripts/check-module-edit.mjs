@@ -195,21 +195,18 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ moduleFolderFromLi
 });
 
 
-/* CE QUE LE MODAL MONTRE, et non plus seulement ce qu'il écrit. Il résolvait
-   lui-même l'icône et la teinte (`DEFAULT_MODULE_ICON`, `hashAccent`) : sur le
-   SAS des quiz générés, son aperçu affichait un livre violet quand la carte,
-   elle, montrait l'étincelle bleue (Ahmed, 2026-09-17). Les deux règles sont
-   désormais des fonctions PURES, partagées par les trois lecteurs — c'est
-   elles que ce bloc éprouve, puisque le modal n'en a plus d'autre. */
+/* WHAT THE MODAL SHOWS, not only what it writes. It used to resolve the
+   icon and tint itself (`DEFAULT_MODULE_ICON`, `hashAccent`), and its preview
+   contradicted the card (2026-09-17). Both rules are now PURE functions
+   shared by the three readers; this block tests them. The special icon of the
+   "Generated" folder is gone with that folder (2026-10-17). */
 await withSrcModule("src/dashboard/module-icons.ts", async ({ moduleIcon }) => {
 	const r = makeReporter("Module — l'icône affichée");
 	r.check("un module sans icône prend le défaut", moduleIcon({}), "book");
-	r.check("le SAS sans icône prend celle de l'IA", moduleIcon({}, { generated: true }), "sparkles");
-	r.check("une icône choisie l'emporte, même sur le SAS",
-		moduleIcon({ icon: "network" }, { generated: true }), "network");
+	r.check("une icône choisie l'emporte", moduleIcon({ icon: "network" }), "network");
 	/* Une chaîne vide vient d'un champ effacé, pas d'un choix : elle doit
 	   retomber sur le défaut comme une absence, sinon la pastille se vide. */
-	r.check("une icône vide vaut une absence", moduleIcon({ icon: "" }, { generated: true }), "sparkles");
+	r.check("une icône vide vaut une absence", moduleIcon({ icon: "" }), "book");
 	/* Sans icône choisie, le NOM décide (2026-09-24) : un livre partout ne
 	   disait rien de la matière. Noms réels des modules d'Ahmed. */
 	r.check("le nom choisit l'icône d'un module sans choix", [
@@ -302,20 +299,6 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ buildFolderGroups 
 	r.done();
 });
 
-await withSrcModule("src/dashboard/quiz-modules.ts", async ({ estLeSas }) => {
-	const r = makeReporter("Module — reconnaître le SAS");
-	const sas = "Neo Quiz/Generated";
-	r.check("le dossier dont le CHEMIN est celui du sas", estLeSas({ folder: "Generated", path: sas }, sas), true);
-	/* Le piège que le chemin évite : un dossier qui porte le même NOM ailleurs
-	   dans le vault n'est pas le sas. */
-	r.check("un homonyme ailleurs n'est pas le sas",
-		estLeSas({ folder: "Generated", path: "Autre/Generated" }, sas), false);
-	r.check("sans sas déclaré (le greffon), aucun dossier ne l'est",
-		estLeSas({ folder: "Generated", path: sas }, undefined), false);
-	r.check("un groupe sans chemin n'est jamais le sas", estLeSas({ folder: "Generated" }, sas), false);
-	r.done();
-});
-
 /* A DECLARED FOLDER IS ONE WITH A PATH (2026-10-05): an override without one
    (an archive imported as "X (2)", then deleted from the disk) kept an empty
    "X" card on the page forever, with no path and nowhere to write. */
@@ -330,11 +313,11 @@ await withSrcModule("src/dashboard/quiz-modules.ts", async ({ declaredFolders, m
 	r.check("aucun override", declaredFolders(undefined), []);
 	const map = { byFolder: new Map(), ueOrder: [] };
 	r.check("le fantôme sans chemin ne fait aucune carte",
-		modulesAffiches([], {}, map, declaredFolders(overrides), [], undefined).map(g => g.folder), ["XTI301"]);
+		modulesAffiches([], {}, map, declaredFolders(overrides), []).map(g => g.folder), ["XTI301"]);
 	/* A pathless override still dresses a folder its QUIZZES reveal: only the
 	   empty card goes, never a folder with a quiz in it. */
 	r.check("un dossier sans chemin déclaré garde sa carte s'il contient un quiz",
-		modulesAffiches([{ path: "Personal/Templates/T.md", title: "T" }], {}, map, declaredFolders(overrides), [], undefined)
+		modulesAffiches([{ path: "Personal/Templates/T.md", title: "T" }], {}, map, declaredFolders(overrides), [])
 			.map(g => g.folder).sort(), ["Templates", "XTI301"]);
 	r.done();
 });

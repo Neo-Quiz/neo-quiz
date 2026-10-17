@@ -338,7 +338,7 @@ await withSrcModule(
 	{
 		const roots = [{ id: "NeoQuiz", name: "Neo Quiz" }];
 		const paths = { roots: () => roots, rootOf: () => roots[0], defaultRoot: () => roots[0], localPath: (p) => p.split("/").slice(1).join("/"), contractPath: (id, l) => id + "/" + l };
-		const run = async (g, { onDisk = true, sas } = {}) => {
+		const run = async (g, { onDisk = true } = {}) => {
 			const trashed = [], notices = [], statsDeleted = [];
 			let saved = 0;
 			const settings = {
@@ -357,7 +357,6 @@ await withSrcModule(
 				await qm.deleteFolder({
 					settings, saveSettings: async () => { saved++; },
 					statsStore: { deleteRecord: (p) => { statsDeleted.push(p); } },
-					generatedFolder: () => sas,
 				}, g);
 			} finally {
 				hote.uninstallHost();
@@ -376,8 +375,6 @@ await withSrcModule(
 			[empty.trashed, Object.keys(empty.settings.quizzesModuleOverrides)], [[], ["Other"]]);
 		const root = await run({ folder: "NeoQuiz", name: "Neo Quiz", path: "NeoQuiz", quizzes: [] });
 		r.check("11. a root is never sent to the trash", root.trashed, []);
-		const holder = await run({ folder: "Parent", name: "Parent", path: "NeoQuiz/Parent", quizzes: [] }, { sas: "NeoQuiz/Parent/Generated" });
-		r.check("11. a folder holding the generated-quizzes folder is never trashed", holder.trashed, []);
 	}
 
 	/* ── 12. "Rename" and "Duplicate" of a quiz card (2026-10-09). A rename is a
@@ -555,7 +552,6 @@ await withSrcModule(
 				return qm.sameRootMoveTargets({
 					scanner: { getQuizzes: () => quizzes },
 					settings: { quizzesModuleOverrides: { Secret: { name: "Secret", hidden: "1" } } },
-					generatedFolder: () => "NQ/Generated",
 				}, grp).map(x => x.name);
 			} finally { hote.uninstallHost(); }
 		};
@@ -579,7 +575,7 @@ await withSrcModule(
 			Secret: { name: "Secret", path: "NQ/Secret", hidden: "1" },
 			NoPath: { name: "NoPath" },
 		};
-		const names = (ov) => qm.quizMoveTargets(quizzes, map, ov, undefined, "NQ/Alpha").map(g => g.folder);
+		const names = (ov) => qm.quizMoveTargets(quizzes, map, ov, "NQ/Alpha").map(g => g.folder);
 		r.check("14a. an empty declared folder is offered; the current, a hidden one and one without a path are not",
 			names(overrides), ["Beta", "Fresh"]);
 		r.check("14b. without the empty folder's declaration it is gone (the check discriminates)",

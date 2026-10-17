@@ -1,12 +1,10 @@
 /* ══════════════════════════════════════════════════════════
-   WHICH FOLDER A GENERATED QUIZ GOES TO — ordering and suggestions — pure
+   THE LEARNER'S FOLDERS, MOST RECENTLY TOUCHED FIRST — pure
 
-   The destination picker of Generate lists folders most recently touched
-   first (the latest change of any file inside), and while the user types a
-   request, the folders that match its words are suggested (never chosen on
-   their own). Matching is accent and case insensitive: a word of the folder
-   name first, then a word of a file title inside it; whole words and word
-   starts before a mere substring.
+   The order in which the AI page hands the learner's folders to the clarify
+   call, which files each generated quiz (`folder-choice.ts`): the latest
+   change of any file inside first. The composer's folder picker and its
+   "Put it in X?" suggestions were removed on 2026-10-17: the AI chooses.
 ══════════════════════════════════════════════════════════ */
 
 export interface FolderRef { path: string; name: string }
@@ -37,71 +35,4 @@ export function rankFolders(folders: readonly FolderRef[], files: readonly FileR
 	return folders
 		.map(f => ({ ...f, recent: Math.max(r.get(f.path) ?? 0, dates?.get(f.path) ?? 0) }))
 		.sort((a, b) => b.recent - a.recent || fold(a.name).localeCompare(fold(b.name)) || a.path.localeCompare(b.path));
-}
-
-/* Words that say nothing about a subject (FR + EN), and the words of a request
-   that ask for a quiz itself. */
-const STOP = new Set([
-	"les", "des", "une", "dans", "pour", "avec", "sur", "que", "qui", "est", "pas", "mes", "mon", "ton", "ses", "aux", "par", "plus", "tout", "tous", "comme", "faire", "fais",
-	"the", "and", "for", "with", "about", "from", "that", "this", "make", "give", "some", "all", "your", "you", "are", "was",
-	"quiz", "qcm", "test", "tests", "cours", "question", "questions", "apprendre", "learn", "teach", "explique", "explain", "exam", "examen", "controle", "practice",
-]);
-
-/** The words of a request worth matching: 3 letters or more, not a stop word. */
-export function requestWords(text: string): string[] {
-	const out: string[] = [];
-	for (const w of fold(text).split(/[^a-z0-9+#]+/)) if (w.length >= 3 && !STOP.has(w) && !out.includes(w)) out.push(w);
-	return out;
-}
-
-/** 3: a whole word or a word start of the name; 2: elsewhere in the name;
-    1: a whole word or word start of a title; 0.5: elsewhere in a title. */
-function scoreFolder(words: readonly string[], name: string, titles: readonly string[]): number {
-	const n = fold(name);
-	const nameWords = n.split(/[^a-z0-9+#]+/).filter(Boolean);
-	let best = 0;
-	for (const w of words) {
-		if (nameWords.some(x => x === w || x.startsWith(w))) best = Math.max(best, 3);
-		else if (n.includes(w)) best = Math.max(best, 2);
-		else for (const title of titles) {
-			const tt = fold(title);
-			if (tt.split(/[^a-z0-9+#]+/).some(x => x === w || x.startsWith(w))) best = Math.max(best, 1);
-			else if (tt.includes(w)) best = Math.max(best, 0.5);
-		}
-	}
-	return best;
-}
-
-/** Whether the composer may suggest folders at all: only while the output
-    folder is the default one (`""` or the default path). A specific folder
-    already chosen, or found from an attachment, is the target: no chip. */
-export function suggestionsAllowed(destination: string, defaultFolder: string): boolean {
-	return !destination || destination === defaultFolder;
-}
-
-/** The predicate of the folders of the detected subject. "general" (nothing
-    detected) matches no folder: no subject to check a folder against. */
-export function dossierDuSujet(sujet: string, sujetDuDossier: (f: FolderRef) => string): (f: FolderRef) => boolean {
-	return f => sujet !== "general" && sujetDuDossier(f) === sujet;
-}
-
-/** Up to `limit` folders whose name, then whose file titles, match the words of
-    the request: best match first, then most recently changed. `except` (the
-    folder already chosen) is never suggested. Nothing matching gives `[]`.
-    `matches` restricts the candidates to the folders of the detected subject:
-    with it, a folder is suggested even when the request has no matching word
-    (the words then only order the candidates). */
-export function suggestFolders(text: string, folders: readonly FolderRef[], files: readonly FileRef[], opts: { limit?: number; except?: string; matches?: (f: FolderRef) => boolean } = {}): RankedFolder[] {
-	const words = requestWords(text);
-	if (!words.length && !opts.matches) return [];
-	const scored: { f: RankedFolder; score: number }[] = [];
-	for (const f of rankFolders(folders, files)) {
-		if (f.path === opts.except) continue;
-		if (opts.matches && !opts.matches(f)) continue;
-		const titles = files.filter(x => x.path.startsWith(f.path + "/")).map(x => x.title);
-		const score = words.length ? scoreFolder(words, f.name, titles) : 0;
-		if (score > 0 || opts.matches) scored.push({ f, score });
-	}
-	// `rankFolders` already ordered by recency: a stable sort keeps it among equal scores.
-	return scored.sort((a, b) => b.score - a.score).slice(0, opts.limit ?? 3).map(x => x.f);
 }

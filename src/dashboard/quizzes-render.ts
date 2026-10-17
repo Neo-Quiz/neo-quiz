@@ -8,7 +8,7 @@ import type { QuizStatRecord } from "./stats-store";
 import { renderQuizCard } from "./quiz-card";
 import { renderUnreadableCards } from "./unreadable-card";
 import { renderModuleCard } from "./module-card";
-import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, declaredFolders, estLeSas, modulesAffiches } from "./quiz-modules";
+import { moduleForQuiz, buildModuleGroups, buildUeGroups, buildFolderGroups, declaredFolders, modulesAffiches } from "./quiz-modules";
 import type { ModuleMap, ModuleGroup, UeGroup } from "./quiz-modules";
 import { computeQuizState } from "./quiz-mastery";
 import { renderFolderProgress } from "./folder-progress";
@@ -88,10 +88,8 @@ function renderModuleGrid(deps: GridDeps, parent: HTMLElement, groups: ModuleGro
 			}, suggestIcons(group.name, group.ue));
 		}
 		: undefined;
-	const sas = deps.ctx.generatedFolder?.();
 	for (const g of groups) {
-		const card = renderModuleCard(grid, g, (m) => deps.openModule(m.folder), onMenu, pickIcon,
-			{ generated: estLeSas(g, sas) });
+		const card = renderModuleCard(grid, g, (m) => deps.openModule(m.folder), onMenu, pickIcon);
 		card.style.setProperty("--qbd-card-delay", entryDelay());
 	}
 }
@@ -123,10 +121,7 @@ export function renderQuizGrid(
 	    section on 2026-10-15. */
 	hiddenQuizzes: QuizIndexEntry[] = [],
 ): void {
-	/* The "Generated" folder is not a card of the grid: the page's top bar
-	   has its own button for it (quizzes.ts), and it is counted in no group. */
-	const sasCache = deps.ctx.generatedFolder?.();
-	const garde = (m: ModuleGroup): boolean => !estLeSas(m, sasCache) && (!garder || garder(m));
+	const garde = (m: ModuleGroup): boolean => !garder || garder(m);
 	treeEl.replaceChildren();
 	// Not in a folder any more: a selection made there is forgotten.
 	resetSelection();
@@ -146,9 +141,8 @@ export function renderQuizGrid(
 	// folder modals exist even without a quiz (alwaysInclude), EXCEPT hidden
 	// ones: their card lives only in the "Hidden" section (otherwise it would
 	// stay in the grid with 0 quizzes).
-	const sasVide = deps.ctx.generatedFolder?.();
 	const tous = modulesAffiches(filtered, stats, map,
-		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), hiddenList, sasVide).filter(garde);
+		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), hiddenList).filter(garde);
 	/* Ended modules (their last session is over, says the timetable) leave
 	   their group for the "Ended" section at the bottom, latest end first. */
 	const finDe = (m: ModuleGroup): number | null => deps.ctx.moduleEnded?.(m.folder) ?? null;
@@ -161,7 +155,7 @@ export function renderQuizGrid(
 	if (garder && tous.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
 
 	if (mode === "recent") {
-		for (const g of buildRecentModuleGroups(modules, stats, sasVide)) {
+		for (const g of buildRecentModuleGroups(modules, stats)) {
 			const body = renderCollapsibleSection(deps, treeEl, g.key, t(RECENT_GROUP_LABEL_KEYS[g.key]), g.modules.length, { entryDelay });
 			renderModuleGrid(deps, body, g.modules, map, entryDelay);
 		}
@@ -203,8 +197,7 @@ export function renderQuizGrid(
     son contenu, sa progression, et son planning de révisions. */
 export type OngletDossier = "contenu" | "progression" | "planning";
 
-/** Les trois vues d'un dossier ; `progression` et `planning` sont absentes
-    dans le sas. */
+/** Les trois vues d'un dossier. */
 export interface VuesDossier {
 	contenu: HTMLElement;
 	progression: HTMLElement | null;
@@ -235,9 +228,9 @@ export function renderModuleDrill(
 	const info = map.byFolder.get(openModuleFolder);
 
 	/* Le CHEMIN du dossier ouvert : déclaré, sinon déduit d'un quiz. Il sert
-	   trois fois — reconnaître le sas, lister le contenu du dossier, et rien
-	   d'autre. `undefined` pour un dossier déclaré avant le 2026-09-17 sans
-	   quiz : ni sections, ni sas, la grille seule comme avant. */
+	   à lister le contenu du dossier. `undefined` pour un dossier déclaré
+	   avant le 2026-09-17 sans quiz : ni sections, la grille seule comme
+	   avant. */
 	const cheminOuvert = info?.path ?? (inModule.length > 0 ? moduleForQuiz(inModule[0].path, map).path : undefined);
 
 	/* PLUS de retour anticipé sur un dossier sans quiz : un dossier de cours
@@ -246,24 +239,16 @@ export function renderModuleDrill(
 	   sections, et le bouton pour générer. L'état vide reste, à la place de la
 	   grille, avec la phrase qui dit quoi faire. */
 
-	/* Le SAS n'a ni onglet « Progression » ni étape suivante : on n'y
-	   progresse pas, on y passe. Reconnu par le CHEMIN du dossier ouvert,
-	   comme la carte. */
-	const sas = !!ctx.generatedFolder && cheminOuvert !== undefined && cheminOuvert === ctx.generatedFolder();
-	const accent = moduleAccent(info ?? { folder: openModuleFolder }, { generated: sas });
+	const accent = moduleAccent(info ?? { folder: openModuleFolder });
 	const layout = ajouter(treeEl, "div", "qbd-quizzes-drill-layout");
 	layout.style.setProperty("--accent", accent);
 	const principal = ajouter(layout, "div", "qbd-quizzes-drill-main");
-	if (inModule.length === 0 && !sas && cheminOuvert !== undefined && ctx.createQuiz) {
+	if (inModule.length === 0 && cheminOuvert !== undefined && ctx.createQuiz) {
 		renderEmptyFolder(principal, ctx, cheminOuvert, rerender);
 	} else if (inModule.length === 0) {
 		const empty = ajouter(principal, "div", "qbd-empty-state");
 		ajouter(empty, "p", undefined, t("dashboard.quizzes.empty"));
-		/* L'indice d'un dossier vide renvoie aux « documents et notes
-		   ci-dessous » : dans le sas, ils ne sont plus là, il dirait donc de
-		   regarder du vide. Le sas a le sien, qui dit d'où viennent ses quiz. */
-		if (sas) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyGeneratedHint"));
-		else if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
+		if (cheminOuvert !== undefined) ajouter(empty, "p", "qbd-empty-state-hint", t("dashboard.quizzes.emptyFolderHint"));
 	}
 	/* Notes whose quiz block does not parse: said, never silently dropped. They
 	   are not in `inModule`, so no counter or progress figure includes them. */
@@ -280,14 +265,11 @@ export function renderModuleDrill(
 	const ordre = inModule;
 	/* La rangée d'actions au-dessus de la grille (2026-09-25, d'après
 	   StudySmarter) : « Ajouter du contenu » à gauche, l'étape suivante à
-	   droite, à parts égales. Absente dans le sas, qui ne se remplit que par
-	   la génération (son bouton « Générer » est dans l'en-tête). */
-	if (!sas) {
-		const rangee = ajouter(principal, "div", "qbd-quizzes-drill-next");
-		principal.insertBefore(rangee, grid);
-		renderNextStep(rangee, ctx, ordre, stats);
-		if (!rangee.firstChild) rangee.remove();
-	}
+	   droite, à parts égales. */
+	const rangee = ajouter(principal, "div", "qbd-quizzes-drill-next");
+	principal.insertBefore(rangee, grid);
+	renderNextStep(rangee, ctx, ordre, stats);
+	if (!rangee.firstChild) rangee.remove();
 	/* Several cards can be selected (Ctrl+click, a long press on a phone) and
 	   shared in one archive. Only where the host can share at all. */
 	const shareQuiz = ctx.shareQuiz;
@@ -328,14 +310,9 @@ export function renderModuleDrill(
 	}
 	selection?.ready();
 
-	/* Les trois sections (Documents, Liens, Notes) sous la grille, pour tout
-	   dossier dont on connaît le chemin — SAUF LE SAS (demande d'Ahmed,
-	   2026-09-20). On avait fait l'inverse en pensant qu'on voudrait y revoir
-	   le PDF d'origine ; mais le sas ne reçoit QUE des quiz écrits par la
-	   génération, jamais un document déposé, et ses trois sections y restaient
-	   vides à demeure — trois grands cadres qui ne disent rien sous la grille.
-	   Les sources, elles, vivent dans le dossier du cours. */
-	if (cheminOuvert !== undefined && !sas) {
+	/* The three sections (Documents, Links, Notes) under the grid, for every
+	   folder whose path is known. */
+	if (cheminOuvert !== undefined) {
 		renderFolderSections(principal, { ctx, folder: cheminOuvert, rerender });
 	}
 
@@ -345,8 +322,8 @@ export function renderModuleDrill(
 		folder: openModuleFolder, name: info?.name || openModuleFolder, ue: info?.ue ?? null, path: cheminOuvert,
 		color: info?.color, icon: info?.icon, quizzes: inModule, total: inModule.length, mastered: 0,
 	};
-	const progression = sas ? null : renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, quizzes: inModule, group });
-	const planning = sas ? null : renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, quizzes: inModule, group, folder: dossier });
+	const progression = renderFolderProgress(treeEl, inModule, stats, { ctx, map, rerender, quizzes: inModule, group });
+	const planning = renderFolderPlanning(treeEl, inModule, ordre, stats, { ctx, map, rerender, quizzes: inModule, group, folder: dossier });
 	const vues: VuesDossier = { contenu: layout, progression, planning };
 	const disponibles: Record<OngletDossier, HTMLElement | null> = vues;
 	const montree = disponibles[onglet] ?? layout;

@@ -13,8 +13,9 @@
      if it is in the PC's CURRENT Claude list (`claudeModels`), else the request
      is refused with a recorded message and a notification (never replaced,
      never passed through); without `model`, the PC's own Claude default. The
-     rest (effort, destination "") is the PC's own frozen choice
-     (`figerReglages(settings())`). Types are
+     rest (effort) is the PC's own frozen choice (`figerReglages(settings())`);
+     the destination is "", so the queue files the quiz in the folder of its
+     detected subject (`fallbackFolder`, 2026-10-17). Types are
      kept only when canonical; the documents are read through the host
      (the bridge perimeter) from RELATIVE paths the validator already cleaned.
    - Exactly once: the local taken log (never synced) is written BEFORE the
@@ -155,7 +156,7 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		const demande: DemandeFile = {
 			text: req.text, notes, images: [], mode: req.mode, count: req.count ?? null,
 			type: normalizeTypes(types), destination: "", reglages: s,
-			categorie: categorieChoisie("auto", indicesCategorie(notes, req.text, s.aiOutputFolder ?? "")),
+			categorie: categorieChoisie("auto", indicesCategorie(notes, req.text, "")),
 			chatId: req.chatId, requestId: req.id, sentAt: req.at, fromDevice: req.from, ...(req.fromName ? { fromName: req.fromName } : {}),
 		};
 		deps.queue.envoyer(demande);

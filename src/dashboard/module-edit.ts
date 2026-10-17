@@ -3,7 +3,7 @@ import { ajouter } from "../dom";
 import { t, type TransKey } from "../i18n";
 import type { DashboardShellCtx } from "../types/dashboard-ctx";
 import type { QuizIndexEntry } from "./scanner";
-import { moduleForQuiz, estLeSas } from "./quiz-modules";
+import { moduleForQuiz } from "./quiz-modules";
 import type { ModuleGroup, ModuleMap, ModuleOverride } from "./quiz-modules";
 import { openActionMenu } from "./ui-select";
 import { openColorPicker } from "./color-picker";
@@ -89,11 +89,6 @@ export function openModuleEditModal(
 	let ueOverride = ctx.settings.quizzesModuleOverrides?.[group.folder]?.ue;
 	let color = group.color;
 	let icon = group.icon;
-	/* Le SAS des quiz générés se reconnaît au CHEMIN (`estLeSas`), comme la
-	   carte et le titre du dossier ouvert : c'est ce qui fait que l'aperçu
-	   d'icône et la teinte du modal montrent ce que l'utilisateur voit
-	   ailleurs, et non le défaut générique. */
-	const genere = estLeSas(group, ctx.generatedFolder?.());
 	/* The DECLARED path, read from the override and not from the group: the
 	   group's may be deduced from a quiz, and persisting it would freeze in
 	   the settings a value that is, today, recomputed on its own. Same for
@@ -138,7 +133,7 @@ export function openModuleEditModal(
 			// Accent effectif (couleur choisie sinon dérivée du nom) dès l'ouverture :
 			// il teinte l'aperçu d'icône ci-dessous ; paintDots() le met à jour quand
 			// la couleur change.
-			c.style.setProperty("--mod-color", moduleAccent({ folder: group.folder, color }, { generated: genere }));
+			c.style.setProperty("--mod-color", moduleAccent({ folder: group.folder, color }));
 
 			// ── Icône EN HAUT (au-dessus du nom, demande Ahmed 2026-07-19) : aperçu
 			// carré teinté ; clic → picker avec recherche + suggestions du module ──
@@ -147,7 +142,7 @@ export function openModuleEditModal(
 			iconBtn.type = "button";
 			iconBtn.setAttribute("aria-label", t("dashboard.quizzes.moduleEditIcon"));
 			iconBtn.title = t("dashboard.quizzes.moduleEditIcon");
-			const paintIcon = () => { iconBtn.replaceChildren(); currentHost().ui.setIcon(iconBtn, moduleIcon({ icon, name, ue }, { generated: genere })); };
+			const paintIcon = () => { iconBtn.replaceChildren(); currentHost().ui.setIcon(iconBtn, moduleIcon({ icon, name, ue })); };
 			paintIcon();
 			iconBtn.addEventListener("click", () => {
 				// Portalé au PANNEAU du modal (comme le color picker) → pas de vol
@@ -254,7 +249,7 @@ export function openModuleEditModal(
 				// comme la carte). Défaut = accent quand aucune couleur n'est choisie.
 				// L'aperçu d'icône montre l'accent EFFECTIF (couleur choisie sinon
 				// dérivée du nom) — WYSIWYG avec la carte.
-				c.style.setProperty("--mod-color", moduleAccent({ folder: group.folder, color }, { generated: genere }));
+				c.style.setProperty("--mod-color", moduleAccent({ folder: group.folder, color }));
 			};
 			paintDots();
 			// Pas de bouton « Enregistrer » : auto-save (apply() sur chaque

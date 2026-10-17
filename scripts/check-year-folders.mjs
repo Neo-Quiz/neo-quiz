@@ -164,7 +164,6 @@ await withSrcModule(["src/dashboard/year-folders.ts", "src/dashboard/year-folder
 				reviewStore: { moved: async (a, b) => { moved.push([a, b]); } },
 				movedPrefix: async (a, b) => { prefixes.push([a, b]); },
 				scanner: { getQuizzes: () => [{ path: "NQ/XTI101 - Algo/a.md" }] },
-				generatedFolder: () => "NQ/Generated",
 			};
 			const original = console.error;
 			console.error = () => {};

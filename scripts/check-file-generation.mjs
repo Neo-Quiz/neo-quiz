@@ -273,7 +273,7 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 		ui: { notice: (m) => notices.push(m) },
 	});
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p }), getQuizzes: () => [] };
-	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium" };
 	const question = { title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." };
 	const enregistrer = async (mode, docs, { destination = "R/Cours/Réseaux", noteLearn } = {}) => {
 		const questions = [question];
@@ -370,7 +370,7 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 		ui: { notice: () => {} },
 	});
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
-	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium" };
 	const q = (n) => ({ title: "Q" + n, prompt: "Énoncé " + n + " ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." });
 	const noms3 = ["CM1.pdf", "CM2.pdf", "CM3.pdf"];
 	const base = { modeDemande: "practice", destination: "R/Cours/Réseaux", reglages, usage: null, scanner };
@@ -444,7 +444,7 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 		ui: { notice: (m) => { notices.push(m); } },
 	});
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
-	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium", aiOutputFolder: "Quizzes" };
+	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium" };
 	// The LIVE settings carry Full access: an automatic line must still run Supervised.
 	const file = app.fileDeGeneration({ settings: { get: () => ({ ...reglages, aiAgentMode: "full" }), save: async () => {} }, scanner });
 	const demande = { text: "Fais un quiz", notes: noms3.map(n => ({ name: n, content: "contenu de " + n, source: "file" })), images: [], parDocument: true,
@@ -648,18 +648,18 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	r.done();
 }
 
-/* The composer's output folder survives a reload (ai-settings-host.ts):
-   the folder last chosen is read back on arrival, only while it is still
-   one of the folders offered; anything else falls back to the default (""). */
+/* No "Generated" folder and no composer folder picker any more (2026-10-17):
+   the defaults carry neither setting, and nothing in the queue or the save
+   path reads them (a value left in a settings file is ignored). */
 await withSrcModule("src/dashboard/ai-settings-host.ts", (S) => {
-	const r = makeReporter("Destination du composer — relue au retour");
-	const offerts = ["Efrei/XTI301", "Efrei/XTI302"];
-	r.check("un dossier choisi et toujours offert est relu tel quel", S.destinationMemorisee("Efrei/XTI302", offerts), "Efrei/XTI302");
-	r.check("aucun choix persisté : le dossier par défaut", S.destinationMemorisee(undefined, offerts), "");
-	r.check("un choix vide : le dossier par défaut", S.destinationMemorisee("", offerts), "");
-	r.check("un dossier supprimé depuis : retombe sur le défaut, pas écrit là", S.destinationMemorisee("Efrei/Supprime", offerts), "");
-	r.check("une valeur abîmée ou hors liste : le défaut", S.destinationMemorisee("../../Privé", offerts), "");
-	r.check("les réglages par défaut ne portent aucun choix persisté", S.aiSettingsDefaults().aiComposerDestination, "");
+	const r = makeReporter("No Generated folder: retired settings");
+	const d = S.aiSettingsDefaults();
+	r.check("the defaults carry neither aiOutputFolder nor aiComposerDestination",
+		["aiOutputFolder" in d, "aiComposerDestination" in d], [false, false]);
+	const lire = (...p) => readFileSync(join(process.cwd(), ...p), "utf8");
+	const lus = ["file-generation-app.ts", "generation-demande.ts", "ai.ts", "remote-runner.ts"]
+		.filter(f => /aiOutputFolder|aiComposerDestination/.test(lire("src", "dashboard", f)));
+	r.check("no generation path reads the retired settings", lus, []);
 	r.done();
 });
 

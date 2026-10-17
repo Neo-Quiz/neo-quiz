@@ -37,21 +37,16 @@ export function renderModuleCard(
 	   fournit le comportement (picker + persistance) car la carte n'a pas
 	   accès aux settings. */
 	onPickIcon?: (group: ModuleGroup, anchor: HTMLElement) => void,
-	/* generated (opt-in) : ce dossier est le SAS des quiz générés
-	   (`ctx.generatedFolder`). Icône de l'IA à défaut d'une icône choisie, et
-	   pas de « maîtrisés » : on n'y progresse pas, on y passe. */
-	opts?: { generated?: boolean }
 ): HTMLDivElement {
 	const card = ajouter(container, "div", "qbd-module-card");
-	if (opts?.generated) card.classList.add("qbd-module-card--generated");
 	// Accent du dossier (couleur choisie, sinon dérivée du nom) → toute la
 	// teinte de la carte se dérive de --accent en CSS.
-	card.style.setProperty("--accent", moduleAccent(group, { generated: !!opts?.generated }));
+	card.style.setProperty("--accent", moduleAccent(group));
 
 	// ── En-tête : pastille d'icône + titre coloré / sous-titre UE ──
 	const header = ajouter(card, "div", "qbd-module-card__header");
 	const iconBox = ajouter(header, "div", "qbd-module-card__icon");
-	currentHost().ui.setIcon(iconBox, moduleIcon(group, { generated: !!opts?.generated }));
+	currentHost().ui.setIcon(iconBox, moduleIcon(group));
 	if (onPickIcon) {
 		// La pastille devient un raccourci « changer l'icône » ; le clic ne doit
 		// PAS aussi entrer dans le module.
@@ -70,7 +65,7 @@ export function renderModuleCard(
 	/* Subtitle = the folder's subject (2026-10-17), in place of the teaching
 	   unit: the unit repeated the semester on every card. None for an unknown
 	   subject (the header keeps its top alignment). */
-	const sujet = opts?.generated ? "general" : categorieDuDossier(group.path ?? group.folder, group.name);
+	const sujet = categorieDuDossier(group.path ?? group.folder, group.name);
 	if (sujet !== "general") ajouter(titles, "div", "qbd-module-card__subtitle", libelleCategorie(sujet));
 
 	// ── Stats : « N quiz • N maîtrisés » (nombres en gras, séparateur discret) ──
@@ -85,10 +80,8 @@ export function renderModuleCard(
 		span.append(" " + t(key, { count: n }).replace(/^\s*\d+\s*/, ""));
 	};
 	addStat(group.total, group.total === 1 ? "dashboard.quizzes.moduleQuizzesOne" : "dashboard.quizzes.moduleQuizzesOther");
-	if (!opts?.generated) {
-		ajouter(stats, "span", "sep", "•");
-		addStat(group.mastered, group.mastered === 1 ? "dashboard.quizzes.folderMasteredOne" : "dashboard.quizzes.folderMasteredOther");
-	}
+	ajouter(stats, "span", "sep", "•");
+	addStat(group.mastered, group.mastered === 1 ? "dashboard.quizzes.folderMasteredOne" : "dashboard.quizzes.folderMasteredOther");
 
 	// ── Spacer + ligne séparatrice + pied (bouton ••• = menu existant) ──
 	ajouter(card, "div", "qbd-module-card__spacer");
