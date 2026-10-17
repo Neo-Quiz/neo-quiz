@@ -358,7 +358,8 @@ export function usageAntigravityDepuisResume(corps: unknown): UsageRow[] {
 		if (!g || typeof g !== "object") continue;
 		const nom = (g as { displayName?: unknown }).displayName;
 		const desc = (g as { description?: unknown }).description;
-		const note = typeof desc === "string" && desc.trim() ? desc.trim().slice(0, 200) : undefined;
+		// "Models within this group: Gemini Flash, Gemini Pro" → the models: one line under the name.
+		const note = typeof desc === "string" && desc.trim() ? desc.trim().replace(/^Models within this group:\s*/i, "").slice(0, 200) || undefined : undefined;
 		const seaux = (g as { buckets?: unknown }).buckets;
 		if (typeof nom !== "string" || !nom.trim() || !Array.isArray(seaux)) continue;
 		for (const b of seaux.slice(0, 6)) {

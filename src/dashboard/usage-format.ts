@@ -269,8 +269,8 @@ export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
 	const groupes = [...new Set(rows.map(r => r.group ?? ""))];
 	return rows
 		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window" || r.kind === "monthly" || (r.kind === "weekly-model" && rows.every(x => x.kind === "weekly-model")))
-		// Inside a group, the provider's own order (weekly first, as agy's `/usage`).
-		.sort((a, b) => groupes.indexOf(a.group ?? "") - groupes.indexOf(b.group ?? "") || (a.group ? 0 : span(a) - span(b)));
+		// Inside a group, the 5-hour window above the weekly one, as claude.ai shows them.
+		.sort((a, b) => groupes.indexOf(a.group ?? "") - groupes.indexOf(b.group ?? "") || span(a) - span(b));
 }
 
 /** Short window label: "5h" / "7d" ("7j" in French), translated at render time. */

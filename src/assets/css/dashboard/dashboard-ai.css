@@ -4672,6 +4672,10 @@
 }
 
 .qbd-usage-pop-group-note {
+	/* One line: the models of the group, cut with an ellipsis when too long. */
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 	margin-top: 2px;
 	font-size: 12px;
 	color: var(--text-faint);
