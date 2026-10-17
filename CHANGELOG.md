@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.9] - 2026-10-17
+
 ### Changed
 
 - "Generated quizzes" in the AI page opens a gallery of the generated quizzes right there, like claude.ai's Artifacts: one card per quiz, newest first, with its kind, what it holds and when it changed.
