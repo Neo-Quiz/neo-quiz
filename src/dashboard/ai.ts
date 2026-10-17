@@ -55,11 +55,11 @@ import type { RelayDeps, RelaySession } from "./relay-flow";
 import { erreurRelais } from "./chat-record-vue";
 import type { RelaisVue } from "./chat-record-vue";
 import { relativeToRoot } from "../shared-state/chat-merge";
-import { addClarify, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
+import { addClarify, addReply, answerClarify, resumeSource, chatOfLine, newRequestId, runningLineOfChat } from "./chat-requests";
 import { dossierDuSujet, rankFolders, suggestFolders, suggestionsAllowed } from "./folder-suggest";
 import type { FileRef, FolderRef } from "./folder-suggest";
 import { suivreDebord } from "./detail-fiche";
-import { formatClarifications, kindFromClarifications, quizCountFromClarifications, parseClarifyAnswer, type QuizzesChoice } from "./generation-kind";
+import { formatClarifications, quizCountFromClarifications, parseClarifyAnswer, type QuizzesChoice } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -4561,7 +4561,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		let reponse: ClarifyAnswer = { ready: true };
 		try {
 			if (settings().aiProvider) {
-				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name)));
+				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name), (deps.quizFolders?.() ?? []).map(d => d.name || d.path).filter(Boolean)));
 			}
 		} catch (err) {
 			console.warn(LOG_PREFIX, "clarify call failed, using Learn", err);
@@ -4569,7 +4569,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			attenteGenre = null;
 		}
 		const genre = reponse.kind ?? "learn";
-		if ("questions" in reponse) {
+		if ("reply" in reponse) {
+			// Not a request for a quiz: the answer is a plain text result of the chat, nothing generates.
+			setChats(addReply(getChats(), activeChatId(), chatDevice(), Date.now(), { id: newRequestId(), text: envoi.text }, reponse.reply));
+			notifyChatsChanged();
+		} else if ("questions" in reponse) {
 			const id = newRequestId();
 			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action }));
 			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action });
@@ -4600,7 +4604,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		notifyChatsChanged();
 		const precisions = formatClarifications(t("ai.clarify.details"), requete.clarify.questions, reponses);
 		const envoi: DemandeTexte = { ...attente.envoi, text: [attente.envoi.text.trim(), precisions].filter(Boolean).join("\n\n"), ...(precisions ? { texteAffiche: attente.envoi.text } : {}) };
-		const genre = kindFromClarifications(requete.clarify.genre ?? attente.genre, requete.clarify.questions, reponses);
+		const genre = (requete.clarify.genre ?? attente.genre) as KindChoice;
 		const seulQuiz = quizCountFromClarifications(requete.clarify.questions, reponses) ?? attente.oneQuiz;
 		const action = gardee?.action ?? requete.clarify.action ?? "generate";
 		demarrage = true;

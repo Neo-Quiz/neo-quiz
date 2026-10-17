@@ -173,14 +173,12 @@ function readClarify(x: unknown): ChatClarify | null {
 		const options: ClarifyOption[] = [];
 		for (const o of q.options) {
 			if (!isObj(o) || !isStr(o.label)) return null;
-			const kind = o.kind === "learn" || o.kind === "practice" || o.kind === "both" ? o.kind : undefined;
-			options.push({ label: o.label, description: isStr(o.description) ? o.description : "", ...(kind ? { kind } : {}), ...(isQuizzesChoice(o.quizzes) ? { quizzes: o.quizzes } : {}) });
+			options.push({ label: o.label, description: isStr(o.description) ? o.description : "", ...(isQuizzesChoice(o.quizzes) ? { quizzes: o.quizzes } : {}) });
 		}
 		/* Both marks are kept: the answer is read back from this record, and a
 		   lost "quizzes" mark turned "Auto" into one quiz per document while the
 		   model had been told to split by theme (2026-10-14). */
 		const purpose = q.multiple === true ? undefined
-			: q.purpose === "kind" && options.every(option => option.kind) ? "kind" as const
 			: q.purpose === "quizzes" && options.every(option => option.quizzes !== undefined) ? "quizzes" as const
 			: undefined;
 		questions.push({ header: isStr(q.header) ? q.header.slice(0, MAX_HEADER) : "", question: q.question, multiple: q.multiple === true, options, default: defaultIndex(q.default, options.length), ...(purpose ? { purpose } : {}) });

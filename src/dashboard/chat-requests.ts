@@ -195,6 +195,14 @@ export function addClarify(chats: readonly ChatRecord[], chatId: string, device:
 	return list;
 }
 
+/** A conversational answer to a message that asked for no quiz (a greeting, a
+    question about the app): the request is recorded with the reply as a text
+    result, exactly like any assistant answer, and nothing generates. */
+export function addReply(chats: readonly ChatRecord[], chatId: string, device: string, now: number, req: { id: string; text: string }, reply: string): ChatRecord[] {
+	const request: ChatRequest = { id: req.id, at: now, from: device, text: req.text, mode: "learn", documents: [], results: [{ kind: "text", text: reply }], state: "done" };
+	return appendRequest(chats, chatId, request, device, now);
+}
+
 /** Records the answers (one list per question). Unknown chat or request, a
     wrong number of answers, or questions already answered: nothing changes. */
 export function answerClarify(chats: readonly ChatRecord[], chatId: string, requestId: string, answers: readonly (readonly string[])[], now: number): { chats: ChatRecord[]; changed: boolean } {

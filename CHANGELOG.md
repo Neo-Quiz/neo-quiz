@@ -18,6 +18,7 @@ release notes.
 - Antigravity CLI and Ollama run as agents in a trusted folder, with the same four modes as Claude Code and Codex; Ollama models run inside Claude Code.
 - The work of Antigravity CLI (files read and written, commands) shows like that of Claude Code and Codex.
 - Antigravity CLI usage shows in the Accounts settings like Claude Code and Codex, per model group, without opening a terminal.
+- The AI page answers a greeting or a question in plain conversation and offers your folders; the AI picks Learn or Test itself.
 
 ## [1.21.13] - 2026-10-17
 
