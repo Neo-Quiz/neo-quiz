@@ -269,7 +269,7 @@ const pont: Pont = {
 		ajouter: id => ipcRenderer.invoke(CANAUX.moodleAjouter, id),
 		retirer: id => ipcRenderer.invoke(CANAUX.moodleRetirer, id),
 		fichiers: courseId => ipcRenderer.invoke(CANAUX.moodleFichiers, courseId),
-		module: courseId => ipcRenderer.invoke(CANAUX.moodleModule, courseId),
+		module: (courseId, force) => ipcRenderer.invoke(CANAUX.moodleModule, courseId, force === true),
 		telechargerCours: courseId => ipcRenderer.invoke(CANAUX.moodleTelechargerCours, courseId),
 		telechargerFichier: (courseId, name) => ipcRenderer.invoke(CANAUX.moodleTelechargerFichier, courseId, name),
 		ouvrirDossier: courseId => ipcRenderer.invoke(CANAUX.moodleOuvrirDossier, courseId),

@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Neo Quiz asks the school's Moodle far less often: what it said about a module is reused for 3 hours, even after a restart, and the automatic sync no longer runs at a start that follows another one by less than an hour. Refresh (F5) still asks right away.
+- A Moodle module shows when it was last checked instead of "up to date".
+- An exam of a Moodle module is a small pill at the end of its line; its date shows when you hover it.
+
 ## [1.20.121] - 2026-10-17
 
 ### Changed

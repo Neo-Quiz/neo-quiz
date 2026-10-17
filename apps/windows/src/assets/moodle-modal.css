@@ -753,6 +753,45 @@
 	line-height: 1.35;
 }
 
+/* An exam of the module (moodle-modal.ts `poserVolume`): a pill at the end of
+   the hours line, its date in a bubble on hover or focus. */
+.nq-moodle-modal .nqm-exam-pill {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 0 7px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--nqm-orange) 16%, transparent);
+	color: var(--nqm-orange);
+	font-weight: 600;
+	line-height: 1.6;
+	cursor: default;
+	outline: none;
+}
+
+.nq-moodle-modal .nqm-exam-pill:hover,
+.nq-moodle-modal .nqm-exam-pill:focus-visible {
+	background: color-mix(in srgb, var(--nqm-orange) 26%, transparent);
+}
+
+.nq-exam-bulle {
+	position: fixed;
+	z-index: 10000;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: 12px;
+	line-height: 1.5;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+	pointer-events: none;
+	white-space: nowrap;
+}
+
+.nq-exam-bulle::first-letter {
+	text-transform: uppercase;
+}
+
 .nq-moodle-modal .nqm-course-name {
 	flex: 1;
 	min-width: 0;

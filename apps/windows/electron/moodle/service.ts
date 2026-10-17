@@ -16,16 +16,16 @@ import type {
 import { CLE_REGLAGES_MOODLE } from "../pont";
 import { hoteAutorise } from "../reseau";
 import type { Reglages } from "../reglages";
-import { coursesByIds, listCourses, scanCourse, searchCourses } from "./api";
+import { coursesByIds, listCourses, scanCourseBrut, searchCourses } from "./api";
 import { createClient, siteInfo, MAX_FILE_BYTES, type Client, type OptionsClient } from "./client";
 import { ensembleParDefaut, estDans, dossierDepot, idDepuisUrl, suivis, type CoursChoisi } from "./cours";
-import { dejaPresent, dossierDuCours, downloadFiles, targetName, type Garde, type Job } from "./disque";
+import { applyStatus, dejaPresent, dossierDuCours, downloadFiles, targetName, type Garde, type Job } from "./disque";
 import { MoodleError, TokenError, masquer } from "./erreurs";
 import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { depuisAncien, ecrireTable, fusionner, lireTable, poser, type ListeCle, type TableListes } from "./listes";
 import { extensionRefusee } from "../ressources";
-import { allFiles, decisionAuto, depositState, launchUrl, limiter, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
+import { allFiles, decisionAuto, depositState, launchUrl, limiter, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile, type Scan } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -43,6 +43,15 @@ export const VERB_FLOOR = 1000;
     ~3 module reads per second reach the school server. */
 const ECART_VERBES: Readonly<Record<string, number>> = { module: 300 };
 export const MODULES_EN_VOL = 3;
+/** What Moodle said about a course is reused this long (kept on disk, so an app
+    restart does not ask again): opening the window, a module, a file or the
+    hand-ins never reaches the school server inside it. Refresh (F5) forces. A
+    burst of requests at every start of a development build looked like a robot
+    to the school's firewall (2026-10-17). */
+export const SCAN_TTL = 3 * 3600 * 1000;
+/** The automatic sync wants fresher news: a scan older than this is fetched again. */
+const SCAN_TTL_SYNC = AUTO_SYNC_INTERVAL - 5 * 60 * 1000;
+const MAX_SCANS = 200;
 /** Followed `extra` courses (the rest of the setting is kept but not fetched). */
 export const MAX_EXTRA_SUIVIS = 50;
 /** New files of full syncs kept for the window until it takes them (the oldest go first). */
@@ -92,7 +101,8 @@ export interface ServiceMoodle {
 	ajouter(id: unknown): Promise<number[]>;
 	retirer(id: unknown): Promise<number[]>;
 	fichiers(courseId: unknown): Promise<FichierMoodle[]>;
-	module(courseId: unknown): Promise<ModuleMoodle>;
+	/** `force` true asks Moodle now; otherwise a scan younger than `SCAN_TTL` is reused. */
+	module(courseId: unknown, force?: unknown): Promise<ModuleMoodle>;
 	telechargerCours(courseId: unknown): Promise<ResumeSyncMoodle>;
 	telechargerFichier(courseId: unknown, nom: unknown): Promise<ResumeSyncMoodle>;
 	ouvrirDossier(courseId: unknown): Promise<boolean>;
@@ -180,6 +190,43 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	let catCache: { at: number; userid: number; liste: CoursChoisi[] } | null = null;
 	const memos = new Map<string, { at: number; val: Promise<unknown> }>();
 	const modulesEnVol = limiter(MODULES_EN_VOL);
+	const fichierScans = path.join(deps.dossierDonnees, "moodle-scans.json");
+	let scans: Map<number, { at: number; brut: Scan }> | null = null;
+	let ecritureScans: Promise<unknown> = Promise.resolve();
+	async function chargerScans(): Promise<Map<number, { at: number; brut: Scan }>> {
+		if (scans) return scans;
+		const m = new Map<number, { at: number; brut: Scan }>();
+		try {
+			const v: unknown = JSON.parse(await fs.readFile(fichierScans, "utf-8"));
+			for (const [k, e] of Object.entries(v && typeof v === "object" ? v as Record<string, unknown> : {}).slice(0, MAX_SCANS)) {
+				const o = e as { at?: unknown; brut?: { sections?: unknown; external?: unknown } } | null;
+				if (!entierPositif(Number(k)) || !o || typeof o.at !== "number" || !o.brut || !Array.isArray(o.brut.sections) || !Array.isArray(o.brut.external)) continue;
+				m.set(Number(k), { at: o.at, brut: o.brut as Scan });
+			}
+		} catch { /* none yet, or unreadable: asked again */ }
+		scans = m;
+		return m;
+	}
+	/** The scan of a course with its local statuses: Moodle's answer kept on
+	    disk is reused while younger than `ttl` (0 asks Moodle now). */
+	async function scanEnCache(client: Client, id: number, dir: string | null, ttl: number): Promise<{ scan: Scan; at: number }> {
+		const m = await chargerScans();
+		const e = m.get(id);
+		if (e && ttl > 0 && maintenant() - e.at < ttl && e.at <= maintenant()) return { scan: applyStatus(structuredClone(e.brut), dir), at: e.at };
+		const brut = await scanCourseBrut(client, id);
+		const at = maintenant();
+		m.delete(id);
+		m.set(id, { at, brut: structuredClone(brut) });
+		while (m.size > MAX_SCANS) m.delete(m.keys().next().value as number);
+		const run = ecritureScans.then(async () => {
+			await fs.mkdir(deps.dossierDonnees, { recursive: true });
+			const tmp = `${fichierScans}.${process.pid}.tmp`;
+			await fs.writeFile(tmp, JSON.stringify(Object.fromEntries(m)), "utf-8");
+			await fs.rename(tmp, fichierScans);
+		});
+		ecritureScans = run.catch(e2 => console.warn(LOG_PREFIX, "Moodle: scan cache not written:", msg(e2)));
+		return { scan: applyStatus(brut, dir), at };
+	}
 	const dernierVerbe = new Map<string, number>();
 	/** Forgets what the throttle kept: after a write or a download, the next read is fresh. */
 	const oublier = (): void => {
@@ -581,7 +628,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const code = c.course.code;
 			if (!code) return [];
 			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
-			const scan = await scanCourse(client, id, dir);
+			const { scan } = await scanEnCache(client, id, dir, SCAN_TTL);
 			const echecs = echecsFichiers.get(id);
 			const out: FichierMoodle[] = [];
 			for (const sec of scan.sections) for (const a of sec.activities) for (const f of a.files) {
@@ -594,15 +641,16 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 
 	/** The course as its page shows it. Same bounds as `fichiers`; a course
 	    without a code has no folder, so its files are not offered. */
-	async function moduleDuCours(courseId: unknown): Promise<ModuleMoodle> {
+	async function moduleDuCours(courseId: unknown, forcer?: unknown): Promise<ModuleMoodle> {
 		const id = idOuErreur(courseId);
-		const vide: ModuleMoodle = { sections: [], externes: 0 };
-		return limite("module", String(id), () => modulesEnVol(async () => (await avecClient(async (client, s) => {
+		const force = forcer === true;
+		const vide: ModuleMoodle = { sections: [], externes: 0, verifieA: null };
+		return limite("module", `${id}|${force}`, () => modulesEnVol(async () => (await avecClient(async (client, s) => {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return vide;
 			const { dir, name: dossier } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
-			const scan = await scanCourse(client, id, dir);
+			const { scan, at: verifieA } = await scanEnCache(client, id, dir, force ? 0 : SCAN_TTL);
 			const echecs = echecsFichiers.get(id);
 			const ignores = (await reglage()).ignores;
 			let total = 0;
@@ -623,7 +671,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 					return { id: a.id, name: a.name, type: a.type, fichiers, depot, masque: !!a.deposit && ignores.includes(a.id) };
 				}),
 			}));
-			return { sections, externes: scan.external.length };
+			return { sections, externes: scan.external.length, verifieA };
 		})) ?? vide));
 	}
 
@@ -667,9 +715,9 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				const { dir } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
 				if (!(await deps.garde.contient(dir))) { res.echecs++; continue; }
 				// A course that fails (no access, a hostile id) is skipped; it never aborts the run.
-				let scan: Awaited<ReturnType<typeof scanCourse>>;
+				let scan: Scan;
 				try {
-					scan = await scanCourse(client, c.course.id, dir);
+					({ scan } = await scanEnCache(client, c.course.id, dir, SCAN_TTL_SYNC));
 				} catch (e) {
 					if (e instanceof TokenError) throw e;
 					res.echecs++;
@@ -781,7 +829,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			const c = await coursConnu(client, s.j.userid, id);
 			const dir = await dossierExistant(c);
 			if (!dir) return null;
-			const f = allFiles(await scanCourse(client, id, dir)).find(x => x.name === nom && (x.status === "present" || x.status === "outdated"));
+			const f = allFiles((await scanEnCache(client, id, dir, SCAN_TTL)).scan).find(x => x.name === nom && (x.status === "present" || x.status === "outdated"));
 			if (!f) return null;
 			return { dir, abs: path.resolve(dir, cheminRelatif(f)) };
 		});
@@ -827,7 +875,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 			for (const c of suivis(await catalogue(client, s.j.userid))) {
 				const code = c.course.code as string;
 				const { dir } = dossierDuCours(deps.racine(), code, c.course.name, new Date(maintenant()));
-				for (const d of pendingDeposits(await scanCourse(client, c.course.id, null))) {
+				for (const d of pendingDeposits((await scanEnCache(client, c.course.id, null, SCAN_TTL)).scan)) {
 					liste.push({ cmid: d.id, courseId: c.course.id, course: c.course.name, dossier: dir, name: d.name, state: d.state as DevoirMoodle["state"], due: d.due, remaining: d.remaining });
 				}
 			}
@@ -895,6 +943,9 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	async function demarrerAuto(): Promise<void> {
 		// The hourly check is armed once; each tick re-reads `auto`.
 		if (!arreterHoraire) arreterHoraire = planifier(() => { void verifierAuto().catch(e => console.warn(LOG_PREFIX, "Moodle: automatic check:", msg(e))); }, AUTO_SYNC_INTERVAL);
+		// Not at every start: a sync less than an hour old is enough (a development build restarts all day).
+		const { lastSync } = await lireEtat();
+		if (lastSync !== null && maintenant() - lastSync < AUTO_SYNC_INTERVAL && lastSync <= maintenant()) return;
 		await verifierAuto();
 	}
 

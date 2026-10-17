@@ -1186,6 +1186,25 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, C + ".json"), "utf8")).lists.favoris), ["42"]);
 		} finally { fin(c); }
 	});
+	await test("scan cache: a module, its files and the hand-ins reuse Moodle's answer for 3 h, across restarts; Refresh forces", async () => {
+		const c = await connecte();
+		try {
+			const contenus = () => c.m.calls.filter(x => x === "core_course_get_contents").length;
+			const avant = contenus();
+			const mod = await c.svc.module(1);
+			assert.equal(contenus(), avant + 1);
+			assert.equal(typeof mod.verifieA, "number");
+			await c.svc.module(1);
+			await c.svc.fichiers(1);
+			assert.equal(contenus(), avant + 1, "the second reading and the files come from the cache");
+			await c.svc.module(1, true);
+			assert.equal(contenus(), avant + 2, "Refresh asks Moodle");
+			assert.equal(await c.svc.module(1, "yes").then(() => contenus()), avant + 2, "only a real true forces");
+			// another service on the same data folder (an app restart): still cached
+			const dossier = fs.readdirSync(c.base).find(n => n.startsWith("..data-"));
+			assert.ok(fs.existsSync(path.join(c.base, dossier, "moodle-scans.json")));
+		} finally { fin(c); }
+	});
 	await test("service: search (<= 100 chars, courses with a code) and add by URL (the configured site only)", async () => {
 		const c = await connecte();
 		try {
@@ -1346,7 +1365,11 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 				// at start: arms the hourly timer ONCE and checks
 				fs.rmSync(dest, { recursive: true });
 				clock += 11000;
+				// not at every start: the sign-in sync is less than an hour old
 				await t.svc.demarrerAuto();
+				await new Promise(r => setTimeout(r, 100));
+				assert.equal(fs.existsSync(dest), false, "no sync at a start right after another one");
+				clock += 3600 * 1000;
 				await t.svc.demarrerAuto();
 				assert.equal(timers.length, 1, "one hourly timer");
 				assert.equal(timers[0].ms, 3600 * 1000);

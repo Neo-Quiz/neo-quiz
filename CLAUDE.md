@@ -641,7 +641,11 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   personnel, il est chiffré et ne revient JAMAIS à la fenêtre (seul son hôte) ;
   téléchargement sur le seul hôte du lien (redirections comprises), adresse
   publique, 5 Mo ; un hôte inconnu est confirmé nativement ; les séances
-  passées s'ACCUMULENT (le flux MyEfrei est une fenêtre glissante). Dans la CI.
+  passées s'ACCUMULENT (le flux MyEfrei est une fenêtre glissante). Le scan
+  d'un cours est GARDÉ sur le disque (`moodle-scans.json`, 3 h ; 55 min pour la
+  synchro auto) et la synchro du démarrage saute si la dernière a moins d'une
+  heure : des rafales à chaque relance de dev ressemblaient à un robot pour le
+  pare-feu de l'école (2026-10-17). Dans la CI.
 - `npm run check:selection` — la SÉLECTION de cartes de quiz sur la page d'un
   dossier (`src/dashboard/selection.ts`, noyau pur ; l'écran est
   `selection-view.ts`) : Ctrl/Cmd+clic ajoute ou retire, Maj+clic étend la

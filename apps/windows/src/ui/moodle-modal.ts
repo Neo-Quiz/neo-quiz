@@ -27,7 +27,7 @@ import type { HostModalHandle } from "../../../../src/host/types";
 import { currentHourCycle, currentLang, hourOptions, t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
-import { resumeLancement, span } from "./moodle-common";
+import { heure, resumeLancement, span } from "./moodle-common";
 import { declarerFavoris, noterFins } from "./moodle-dossiers";
 import { coquilleActive, repeindreCoquille } from "./dashboard-shell";
 import { codeAccent } from "../../../../src/dashboard/module-color";
@@ -207,13 +207,40 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const jour = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { weekday: "long", day: "numeric", month: "long" });
 		/* The end of a running module (an ended one says it in its badge). */
 		if (v.fin >= Date.now()) morceaux.push(t("settings.moodle.wUntil", { date: jour.format(new Date(v.fin)) }));
-		/* The exam sessions are not hours of the module: their dates, apart. */
-		if (v.epreuves.length) {
-			const dates = v.epreuves.slice(0, 2).map(ms => jour.format(new Date(ms))).join(", ");
-			morceaux.push(t(v.epreuves.length === 1 ? "settings.moodle.wExam" : "settings.moodle.wExams", { dates }));
-		}
 		return morceaux.join(" · ") || null;
 	}
+	/** The hours line of a module, and its exams as a pill at the end: the date
+	    shows when the pill is hovered or focused (an app bubble, never a native
+	    tooltip), so the line stays short. */
+	function poserVolume(parent: HTMLElement, balise: "span" | "p", classe: string, co: CoursMoodle): void {
+		const v = co.code ? volumes[co.code] : undefined;
+		const texte = texteVolume(co);
+		if (!texte && !v?.epreuves.length) return;
+		const ligne = ajouter(parent, balise, classe);
+		if (texte) ajouter(ligne, "span", undefined, texte);
+		if (!v?.epreuves.length) return;
+		const pastille = ajouter(ligne, "span", "nqm-exam-pill", t(v.epreuves.length === 1 ? "settings.moodle.wExamPill" : "settings.moodle.wExamsPill", { n: String(v.epreuves.length) }));
+		pastille.tabIndex = 0;
+		const jour = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", ...hourOptions(currentHourCycle()) });
+		const dates = v.epreuves.map(ms => jour.format(new Date(ms)));
+		pastille.setAttribute("aria-label", `${pastille.textContent}: ${dates.join(", ")}`);
+		const montrer = (): void => {
+			cacherBulle();
+			const b = ajouter(document.body, "div", "nq-exam-bulle");
+			for (const d of dates) ajouter(b, "div", undefined, d);
+			const r = pastille.getBoundingClientRect();
+			const l = b.getBoundingClientRect();
+			b.style.left = `${Math.max(8, Math.min(window.innerWidth - l.width - 8, r.left + r.width / 2 - l.width / 2))}px`;
+			b.style.top = `${r.top - l.height - 6 < 8 ? r.bottom + 6 : r.top - l.height - 6}px`;
+			bulle = b;
+		};
+		pastille.addEventListener("mouseenter", montrer);
+		pastille.addEventListener("focus", montrer);
+		pastille.addEventListener("mouseleave", cacherBulle);
+		pastille.addEventListener("blur", cacherBulle);
+	}
+	let bulle: HTMLElement | null = null;
+	function cacherBulle(): void { bulle?.remove(); bulle = null; }
 	/** The timetable says the module's last session is over: not checked when the
 	    window opens (a favourite still is; opening the module checks it). */
 	function termine(co: CoursMoodle): boolean {
@@ -260,7 +287,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			const attente = (cur?.at ?? 0) + PLANCHER_MS - Date.now();
 			if (attente > 0) await new Promise(r => setTimeout(r, attente));
 			try {
-				const mod = await api.module(co.id);
+				const mod = await api.module(co.id, force);
 				analyses.set(co.id, { state: "ok", mod, at: Date.now() });
 			} catch {
 				analyses.set(co.id, { state: "error", mod: cur?.mod ?? null, at: Date.now() });
@@ -301,6 +328,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		cartesDepot.clear();
 		arreterHorloge();
 		arreterSonde();
+		cacherBulle();
 		statut = champ = resultats = bandeau = boutonFiltre = boutonActualiser = libelleFiltre = menu = boutonTout = liste = pied = boutonCours = null;
 	}
 	function arreterSonde(): void { if (sonde) clearInterval(sonde); sonde = null; }
@@ -519,8 +547,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (!co.code) code.classList.add("is-orphan");
 		const texte = ajouter(ligne, "span", "nqm-course-text");
 		ajouter(texte, "span", "nqm-course-name", nomCourt(co));
-		const volume = texteVolume(co);
-		if (volume) ajouter(texte, "span", "nqm-course-hours", volume);
+		poserVolume(texte, "span", "nqm-course-hours", co);
 		if (co.cohorte && groupe.filter(x => x.code === co.code).length > 1) ajouter(ligne, "span", "nqm-course-cohort", co.cohorte);
 		const depot = ajouter(ligne, "span", "nqm-course-deposit");
 		const badge = ajouter(ligne, "span", "nqm-course-badge");
@@ -588,9 +615,11 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (!st.mod) { ajouter(badge, "div", "nqm-spinner"); return; }
 		const { nouveau, misAJour } = resume(st.mod);
 		if (!nouveau && !misAJour) {
+			/* When Moodle was last asked, rather than a bare "up to date": a module
+			   is no longer checked at every opening (`SCAN_TTL`). */
 			badge.classList.add("is-ok");
 			icone(badge, "check", "nqm-badge-icon");
-			ajouter(badge, "span", undefined, t("settings.moodle.wUpToDate"));
+			ajouter(badge, "span", undefined, st.mod.verifieA ? t("settings.moodle.wCheckedAt", { when: heure(st.mod.verifieA) }) : t("settings.moodle.wUpToDate"));
 			return;
 		}
 		badge.classList.add("is-new");
@@ -778,8 +807,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const tete = entete(c, true);
 		/* The Moodle name starts with its internal code ("XTI306-2627PSA01 - ..."): the short code, then the name. */
 		ajouter(tete, "h2", "nqm-title", co.code ? `${co.code} · ${nomCourt(co)}` : co.name);
-		const volume = texteVolume(co);
-		if (volume) ajouter(tete, "p", "nqm-hint nqm-course-hours", volume);
+		poserVolume(tete, "p", "nqm-hint nqm-course-hours", co);
 		const dest = ajouter(tete, "div", "nqm-dest" + (co.folder ? "" : " is-warn"));
 		icone(dest, "folder-open", "nqm-dest-icon");
 		ajouter(dest, "span", "nqm-dest-path", co.folder ?? t("settings.moodle.wDestNone"));
@@ -1060,5 +1088,5 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	};
 	document.addEventListener("keydown", surTouche, true);
 
-	return () => { document.removeEventListener("keydown", surTouche, true); arreterSonde(); arreterHorloge(); desabonner(); };
+	return () => { cacherBulle(); document.removeEventListener("keydown", surTouche, true); arreterSonde(); arreterHorloge(); desabonner(); };
 }

@@ -299,6 +299,8 @@ export interface ModuleMoodle {
 	sections: { name: string; activites: ActiviteMoodle[] }[];
 	/** Links that lead outside Moodle: only counted, never given. */
 	externes: number;
+	/** When Moodle was last asked about this course (epoch ms), null when unknown. */
+	verifieA: number | null;
 }
 export interface ResumeSyncMoodle {
 	nouveaux: number;
@@ -638,7 +640,8 @@ export interface Pont {
 		retirer(id: number): Promise<number[]>;
 		fichiers(courseId: number): Promise<FichierMoodle[]>;
 		/** The course as its page shows it: sections, activities, their files and hand-in state. */
-		module(courseId: number): Promise<ModuleMoodle>;
+		/** `force` asks Moodle now (Refresh, F5); otherwise a scan younger than 3 h is reused. */
+		module(courseId: number, force?: boolean): Promise<ModuleMoodle>;
 		telechargerCours(courseId: number): Promise<ResumeSyncMoodle>;
 		telechargerFichier(courseId: number, name: string): Promise<ResumeSyncMoodle>;
 		/** Opens the module folder in Explorer; false when it does not exist. */

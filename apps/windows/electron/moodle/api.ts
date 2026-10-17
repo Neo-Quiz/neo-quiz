@@ -33,6 +33,13 @@ export async function coursesByIds(client: Client, ids: number[]): Promise<Cours
 /** One course: content and assignments in parallel, then the submission state
     of each assignment. `dir` (the module folder, or null) sets the file statuses. */
 export async function scanCourse(client: Client, courseId: number, dir: string | null): Promise<Scan> {
+	return applyStatus(await scanCourseBrut(client, courseId), dir);
+}
+
+/** The same scan WITHOUT the local file statuses: what Moodle said, which the
+    service keeps on disk (`service.ts`, `scanEnCache`) so a window opening or an
+    app start does not ask the school server again. */
+export async function scanCourseBrut(client: Client, courseId: number): Promise<Scan> {
 	const [sections, assigns] = await Promise.all([
 		client.call("core_course_get_contents", { courseid: courseId }),
 		client.call("mod_assign_get_assignments", { "courseids[0]": courseId }),
@@ -49,5 +56,5 @@ export async function scanCourse(client: Client, courseId: number, dir: string |
 	}));
 	const tree = dedupe(flattenContents(Array.isArray(sections) ? sections : [], assignments, deposits));
 	const external = [...new Set(tree.flatMap(s => s.activities.flatMap(a => a.external)))];
-	return applyStatus({ sections: tree, external }, dir);
+	return { sections: tree, external };
 }
