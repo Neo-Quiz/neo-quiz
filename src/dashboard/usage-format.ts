@@ -277,7 +277,8 @@ export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
 export function usageShortLabel(row: UsageRow): string {
 	if (row.group) return groupeCourt(row.group) + " " + usageShortLabel({ ...row, group: undefined });
 	if (row.kind === "weekly-model") return row.modelName || t("ai.usage.allModels");
-	if (row.kind === "monthly") return t("ai.usage.shortMonth");
+	// A month in the same short form as "5h" and "7d".
+	if (row.kind === "monthly") return t("ai.usage.shortDays", { n: 30 });
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
 	if (mins >= 1440) return t("ai.usage.shortDays", { n: Math.round(mins / 1440) });
 	if (mins > 0) return t("ai.usage.shortHours", { n: Math.max(1, Math.round(mins / 60)) });
