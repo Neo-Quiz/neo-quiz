@@ -636,7 +636,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   privés mais dans `<racine>/.neo-quiz/moodle/<appareil>.json`
   (`moodle/listes.ts`) : un fichier par appareil, le geste le plus récent
   gagne, un retrait reste une pierre tombale ; l'ancienne liste privée est
-  reprise une fois, plus vieille que tout geste daté. Dans la CI.
+  reprise une fois, plus vieille que tout geste daté. Depuis le même jour,
+  l'EMPLOI DU TEMPS (`moodle/planning*.ts`) : le lien ICS porte un jeton
+  personnel, il est chiffré et ne revient JAMAIS à la fenêtre (seul son hôte) ;
+  téléchargement sur le seul hôte du lien (redirections comprises), adresse
+  publique, 5 Mo ; un hôte inconnu est confirmé nativement ; les séances
+  passées s'ACCUMULENT (le flux MyEfrei est une fenêtre glissante). Dans la CI.
 - `npm run check:selection` — la SÉLECTION de cartes de quiz sur la page d'un
   dossier (`src/dashboard/selection.ts`, noyau pur ; l'écran est
   `selection-view.ts`) : Ctrl/Cmd+clic ajoute ou retire, Maj+clic étend la

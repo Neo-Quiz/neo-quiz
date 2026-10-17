@@ -57,6 +57,8 @@ import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/
 import { siteVerifie, verifierSite } from "./moodle/compat";
 import { ECOLES } from "./moodle/ecoles";
 import type { ServiceMoodle } from "./moodle/service";
+import type { ServicePlanning } from "./moodle/planning";
+import { HOTES_PLANNING_CONNUS, lienPlanning } from "./moodle/planning-pur";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
 import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
@@ -182,6 +184,8 @@ export interface DependancesCanaux {
 	sync: GestionSync | null;
 	/** Moodle (`./moodle/service.ts`), created by `main.ts`. */
 	moodle: ServiceMoodle;
+	/** The timetable of the Moodle window (`./moodle/planning.ts`). */
+	planning: ServicePlanning;
 	/** The pairing link Windows handed to the app (`lienAppairageExterne`,
 	    already validated), forgotten once taken; `null` when there is none. */
 	prendreLienAppairage?: () => string | null;
@@ -708,6 +712,43 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodleDevoirs, () => deps.moodle.devoirs());
 	ipcMain.handle(CANAUX.moodleOuvrirDevoir, (_e, cmid: unknown) => deps.moodle.ouvrirDevoir(cmid));
 	ipcMain.handle(CANAUX.moodleOuvrirActivite, (_e, type: unknown, cmid: unknown) => deps.moodle.ouvrirActivite(type, cmid));
+	/* The timetable: the window hands a link once and never gets it back (only
+	   its host). An unknown host is asked natively, one dialog at a time, like a
+	   Moodle site: a compromised window cannot point the app anywhere silently. */
+	ipcMain.handle(CANAUX.moodlePlanningEtat, () => deps.planning.etat());
+	ipcMain.handle(CANAUX.moodlePlanningEffacer, () => deps.planning.effacer());
+	ipcMain.handle(CANAUX.moodlePlanningVolumes, (_e, codes: unknown) => deps.planning.volumes(codes));
+	ipcMain.handle(CANAUX.moodlePlanningPoser, async (_e, url: unknown) => {
+		const lien = lienPlanning(url);
+		if (!lien) return { ok: false, raison: "badlink" };
+		if (!HOTES_PLANNING_CONNUS.has(lien.hote)) {
+			if (dialogueMoodle || Date.now() - dialogueMoodleFin < 3000) return { ok: false, raison: "busy" };
+			dialogueMoodle = true;
+			const options = {
+				type: "question" as const,
+				title: t("app.planningHost.title"),
+				message: t("app.planningHost.message", { host: lien.hote }),
+				detail: t("app.planningHost.detail"),
+				buttons: [t("app.moodleHost.allow"), t("app.moodleHost.deny")],
+				defaultId: 1,
+				cancelId: 1,
+			};
+			const parent = deps.fenetreCourante();
+			let response: number;
+			try {
+				({ response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options));
+			} finally {
+				dialogueMoodle = false;
+				dialogueMoodleFin = Date.now();
+			}
+			if (response !== 0) return { ok: false, raison: "denied" };
+		}
+		try {
+			return { ok: true, etat: await deps.planning.poser(lien.url) };
+		} catch (e) {
+			return { ok: false, raison: e instanceof Error && e.message === "nostorage" ? "nostorage" : "badlink" };
+		}
+	});
 
 	ipcMain.handle(CANAUX.ouvrir, async (_e, abs: unknown) => {
 		/* BORNÉ comme une lecture : `shell.openPath` lance l'application par

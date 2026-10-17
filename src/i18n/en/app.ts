@@ -65,6 +65,9 @@ export const EN_APP = {
 	"app.moodleHost.detail": "Allow it only if it is your school's Moodle. Nothing is ever sent to it except your login and read requests.",
 	"app.moodleHost.allow": "Allow",
 	"app.moodleHost.deny": "Cancel",
+	"app.planningHost.title": "Allow this timetable site?",
+	"app.planningHost.message": "Neo Quiz will download your timetable from {host}.",
+	"app.planningHost.detail": "Allow it only if this link comes from your school. Neo Quiz only reads the calendar, it sends nothing to this site.",
 
 	/* ── Automatic update (app only) ── */
 	"app.update.size": "{done} MB / {total} MB",

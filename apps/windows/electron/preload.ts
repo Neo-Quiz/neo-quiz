@@ -281,6 +281,10 @@ const pont: Pont = {
 		devoirs: () => ipcRenderer.invoke(CANAUX.moodleDevoirs),
 		ouvrirDevoir: cmid => ipcRenderer.invoke(CANAUX.moodleOuvrirDevoir, cmid),
 		ouvrirActivite: (type, cmid) => ipcRenderer.invoke(CANAUX.moodleOuvrirActivite, type, cmid),
+		planningEtat: () => ipcRenderer.invoke(CANAUX.moodlePlanningEtat),
+		planningPoser: url => ipcRenderer.invoke(CANAUX.moodlePlanningPoser, url),
+		planningEffacer: () => ipcRenderer.invoke(CANAUX.moodlePlanningEffacer),
+		planningVolumes: codes => ipcRenderer.invoke(CANAUX.moodlePlanningVolumes, codes),
 		pageDemandee: () => ipcRenderer.invoke(CANAUX.moodleLienPageLire),
 		surPageDemandee(rappel) {
 			const ecouteur = (): void => rappel();

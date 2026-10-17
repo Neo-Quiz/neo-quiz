@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Link your school timetable (an ICS calendar link) in Settings, Moodle: each module of the Moodle window then shows its hours and sessions under its name. Sessions already past stay counted, even when the timetable stops listing them.
+
 ### Changed
 
 - A download in progress fills its row in the app menu like a progress bar instead of looking like a button.

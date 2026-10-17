@@ -275,6 +275,15 @@ export interface DepotMoodle {
 	/** Names of the submitted files. */
 	fichiers: string[];
 }
+/** The timetable of the Moodle window, as the window sees it: never the link. */
+export interface EtatPlanning {
+	/** The link's host, never the link. Null when no link is set. */
+	hote: string | null;
+	/** Last successful download (epoch ms), or null. */
+	at: number | null;
+	/** Why the last download failed (a code, never the link), or null. */
+	erreur: null | "network" | "refused" | "toolarge" | "empty" | "nostorage";
+}
 export interface ActiviteMoodle {
 	/** Course module id. */
 	id: number;
@@ -642,6 +651,13 @@ export interface Pont {
 		ouvrirDevoir(cmid: number): Promise<boolean>;
 		/** Opens `<site>/mod/<type>/view.php?id=<cmid>` in the browser (an activity that is not a file). */
 		ouvrirActivite(type: string, cmid: number): Promise<boolean>;
+		/** The timetable (ICS link) of the Moodle window: only its host ever comes back. */
+		planningEtat(): Promise<EtatPlanning>;
+		/** Stores the link (a native question first for an unknown host) and downloads it. */
+		planningPoser(url: string): Promise<{ ok: true; etat: EtatPlanning } | { ok: false; raison: "badlink" | "busy" | "denied" | "nostorage" }>;
+		planningEffacer(): Promise<EtatPlanning>;
+		/** Minutes and sessions of the timetable per module code (absent: no session found). */
+		planningVolumes(codes: string[]): Promise<Record<string, { minutes: number; seances: number }>>;
 		/** `ouvrirDevoir` AND the course's `Rendus...` sub-folder (else the module folder) in Explorer. */
 		deposer(cmid: number): Promise<boolean>;
 		devoirVu(cmid: number): Promise<void>;
@@ -1242,6 +1258,10 @@ export const CANAUX = {
 	moodleDevoirs: "neo:moodle/devoirs",
 	moodleOuvrirDevoir: "neo:moodle/ouvrir-devoir",
 	moodleOuvrirActivite: "neo:moodle/ouvrir-activite",
+	moodlePlanningEtat: "neo:moodle/planning-etat",
+	moodlePlanningPoser: "neo:moodle/planning-poser",
+	moodlePlanningEffacer: "neo:moodle/planning-effacer",
+	moodlePlanningVolumes: "neo:moodle/planning-volumes",
 	/** Pushed to the window: the Moodle state changed. */
 	moodleSurEtat: "neo:moodle/sur-etat",
 	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */

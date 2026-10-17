@@ -80,9 +80,9 @@ async function mutant(entry, from, to) {
 }
 
 const mods = [`${MOODLE}pur.ts`, `${MOODLE}noms.ts`, `${MOODLE}client.ts`, `${MOODLE}disque.ts`, `${MOODLE}api.ts`,
-	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`, `${MOODLE}adresse.ts`, "apps/windows/electron/reseau.ts", `${MOODLE}listes.ts`];
+	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`, `${MOODLE}adresse.ts`, "apps/windows/electron/reseau.ts", `${MOODLE}listes.ts`, `${MOODLE}planning-pur.ts`, `${MOODLE}planning.ts`];
 
-await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod, adresse, reseau, listesMod) => {
+await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod, adresse, reseau, listesMod, planPur, planMod) => {
 	const { TokenError, MoodleError } = erreurs;
 	const { createClient, siteInfo } = client;
 	const T = { allowHttpForTests: true };
@@ -1691,6 +1691,127 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		} finally { fin(c); }
 	});
 
+	/* ─────────── the timetable (planning-pur.ts, planning.ts) ─────────── */
+	await test("timetable link: https or webcal only, public DNS name, no user info or port, bounded", () => {
+		const { lienPlanning } = planPur;
+		assert.deepEqual(lienPlanning(" https://www.myefrei.fr/api/public/student/planning/abc "), { url: "https://www.myefrei.fr/api/public/student/planning/abc", hote: "www.myefrei.fr" });
+		assert.deepEqual(lienPlanning("webcal://cal.example.edu/x.ics"), { url: "https://cal.example.edu/x.ics", hote: "cal.example.edu" });
+		for (const bad of ["http://cal.example.edu/x.ics", "https://127.0.0.1/x", "https://localhost/x", "https://cal.local/x", "https://intranet/x",
+			"https://u:p@cal.example.edu/x", "https://cal.example.edu:8443/x", "file:///C:/x.ics", "javascript:alert(1)", "https://[::1]/x",
+			"https://cal.example.edu/" + "x".repeat(2100), "", 5, null, {}]) {
+			assert.equal(lienPlanning(bad), null, String(bad).slice(0, 60));
+		}
+	});
+	await test("timetable ICS: timed sessions read, cancelled / all-day / duplicate / overlong dropped, folded and escaped text kept", () => {
+		const { lireIcs } = planPur;
+		const ics = "\uFEFFBEGIN:VCALENDAR\r\n" + [
+			"BEGIN:VEVENT", "UID:a", "DTSTART;TZID=\"Europe/Paris:x\":20261016T090000", "DTEND;TZID=Europe/Paris:20261016T140000",
+			"SUMMARY:Introduction \\, IA", "DESCRIPTION:Code module: XTI306-2627PSA01\\nEnseignant(s): X", " suite pliée", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:a", "DTSTART;TZID=Europe/Paris:20261016T090000", "DTEND;TZID=Europe/Paris:20261016T140000", "SUMMARY:dup", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:b", "DTSTART:20261017T070000Z", "DURATION:PT1H30M", "SUMMARY:XCS-413 Droit", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:c", "DTSTART:20261018T080000Z", "DTEND:20261018T100000Z", "STATUS:CANCELLED", "SUMMARY:XTI306", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:d", "DTSTART;VALUE=DATE:20261019", "DTEND;VALUE=DATE:20261020", "SUMMARY:XTI306 holiday", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:e", "DTSTART:20261019T080000Z", "DTEND:20261020T080000Z", "SUMMARY:XTI306 exam week", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:f", "DTSTART:20261021T080000Z", "DTEND:20261021T100000", "SUMMARY:XTI306 mixed clocks", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:g", "DTSTART:20261022T100000Z", "DTEND:20261022T080000Z", "SUMMARY:XTI306 backwards", "END:VEVENT",
+			"BEGIN:VEVENT", "UID:h", "SUMMARY:<img src=x onerror=alert(1)> XTI306", "DTSTART:20261023T080000Z", "DTEND:20261023T090000Z", "END:VEVENT",
+		].join("\r\n") + "\r\nEND:VCALENDAR\r\n";
+		const s = lireIcs(ics);
+		assert.deepEqual(s.map(x => x.minutes), [300, 90, 60]);
+		assert.ok(s[0].texte.includes("Introduction , IA") && s[0].texte.includes("XTI306-2627PSA01\nEnseignant(s): Xsuite pliée"), s[0].texte);
+		assert.deepEqual(lireIcs("garbage"), []);
+		assert.deepEqual(lireIcs("BEGIN:VEVENT\nDTSTART:2026\nEND:VEVENT"), []);
+		const beaucoup = Array.from({ length: planPur.MAX_SEANCES + 50 }, (_, i) => `BEGIN:VEVENT\nUID:${i}\nDTSTART:20261016T090000Z\nDTEND:20261016T100000Z\nEND:VEVENT`).join("\n");
+		assert.equal(lireIcs(beaucoup).length, planPur.MAX_SEANCES);
+	});
+	await test("timetable history: a session that slid out of the feed stays, a later one the feed dropped goes (cancelled)", () => {
+		const { fusionnerSeances } = planPur;
+		const S = (cle, debut) => ({ texte: "XTI306", minutes: 60, debut, cle });
+		const connues = [S("a", 100), S("b", 200), S("c", 300), S("d", 400)];
+		// the new feed starts at 300: a and b fell out of the window, d is no longer listed (cancelled), e is new
+		const r = fusionnerSeances(connues, [S("c", 300), S("e", 500)]);
+		assert.deepEqual(r.map(x => x.cle), ["a", "b", "c", "e"]);
+		assert.deepEqual(fusionnerSeances(connues, []).map(x => x.cle), ["a", "b", "c", "d"], "an empty feed changes nothing");
+		const big = Array.from({ length: planPur.MAX_SEANCES + 3 }, (_, i) => S("k" + i, i));
+		const f = fusionnerSeances(big, [S("new", 1e9)]);
+		assert.equal(f.length, planPur.MAX_SEANCES);
+		assert.equal(f.at(-1).cle, "new", "the most recent are kept");
+	});
+	await test("timetable totals: a code counts as a word (suffix kept, longer code not), dash between letters and digits ignored", () => {
+		const { volumesParCode } = planPur;
+		const s = [
+			{ texte: "Code module: XTI306-2627PSA01", minutes: 300 }, { texte: "xti306 TD", minutes: 120 },
+			{ texte: "XTI3061 other", minutes: 60 }, { texte: "AXTI306 other", minutes: 60 },
+			{ texte: "Code module: XCS-413-2627PSA01", minutes: 180 }, { texte: "XTI306CYB", minutes: 30 },
+		];
+		assert.deepEqual(volumesParCode(s, ["XTI306", "XCS413", "XTI999", "X", "a.*", "XTI306"]), {
+			XTI306: { minutes: 450, seances: 3 }, XCS413: { minutes: 180, seances: 1 },
+		});
+	});
+	await test("timetable service: link encrypted and never returned, same-host redirects only, bounded, a failure keeps the cache and waits", async () => {
+		const SECRET = "s3cr3t-token-abcdef";
+		const ICS = n => "BEGIN:VCALENDAR\n" + Array.from({ length: n }, (_, i) => `BEGIN:VEVENT\nUID:${i}\nDTSTART:20261016T0${i % 9}0000Z\nDTEND:20261016T0${i % 9}3000Z\nSUMMARY:XTI306\nEND:VEVENT`).join("\n") + "\nEND:VCALENDAR\n";
+		let mode = "ok";
+		const hits = { n: 0 };
+		const { s: srv, root } = await server((req, res) => {
+			hits.n++;
+			if (mode === "ok" && req.url === `/cal/${SECRET}.ics`) { res.writeHead(200, { "content-type": "text/calendar" }); res.end(ICS(4)); return; }
+			if (mode === "same" && req.url === `/cal/${SECRET}.ics`) { res.writeHead(302, { location: "/moved.ics" }); res.end(); return; }
+			if (mode === "same" && req.url === "/moved.ics") { res.writeHead(200); res.end(ICS(2)); return; }
+			if (mode === "later") { res.writeHead(200); res.end(["BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:z", "DTSTART:20261120T080000Z", "DTEND:20261120T083000Z", "SUMMARY:XTI306", "END:VEVENT", "END:VCALENDAR"].join("\n")); return; }
+			if (mode === "off") { res.writeHead(302, { location: "http://127.0.0.2:9/x.ics" }); res.end(); return; }
+			if (mode === "big") { res.writeHead(200); res.end("x".repeat(planPur.MAX_ICS_OCTETS + 10)); return; }
+			res.writeHead(500); res.end();
+		});
+		const dir = tmpdir();
+		let clock = 1_000_000;
+		const p = planMod.creerPlanning({ dossierDonnees: dir, chiffrement: fakeCrypt(), maintenant: () => clock, essai: { http: true } });
+		try {
+			const url = `${root}/cal/${SECRET}.ics`;
+			const e = await p.poser(url);
+			assert.equal(e.hote, "127.0.0.1");
+			assert.equal(e.erreur, null);
+			assert.equal(JSON.stringify(e).includes(SECRET), false, "the window never gets the link");
+			assert.equal(fs.readFileSync(path.join(dir, "moodle-planning.bin")).toString("utf8").includes(SECRET), false, "never stored in plain text");
+			assert.equal(fs.readFileSync(path.join(dir, "moodle-planning.json"), "utf8").includes(SECRET), false, "the cache does not hold the link");
+			assert.deepEqual(await p.volumes(["XTI306", 5, "../x"]), { XTI306: { minutes: 120, seances: 4 } });
+			const n = hits.n;
+			await p.volumes(["XTI306"]);
+			assert.equal(hits.n, n, "a fresh cache is not downloaded again");
+			// stale cache + server failure: the old totals stay, the error is a code, no retry for 10 minutes
+			clock += planMod.PLANNING_TTL + 1;
+			mode = "fail";
+			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 120, seances: 4 } });
+			assert.equal((await p.etat()).erreur, "refused");
+			const n2 = hits.n;
+			await p.volumes(["XTI306"]);
+			assert.equal(hits.n, n2, "no retry right after a failure");
+			// a redirect on the same host is followed; one to another host is not
+			mode = "same";
+			clock += 11 * 60 * 1000;
+			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 60, seances: 2 } });
+			// the feed slides: it now lists only a later session; the two known ones stay in the total
+			mode = "later";
+			clock += planMod.PLANNING_TTL + 1;
+			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 90, seances: 3 } });
+			// the same link pasted again keeps the history; another link starts over
+			await p.poser(url);
+			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 90, seances: 3 } });
+			mode = "off";
+			await assert.rejects(planMod.telechargerIcs(url, { http: true }), e => e instanceof planMod.ErreurPlanning && e.code === "refused" && !e.message.includes(SECRET));
+			mode = "big";
+			await assert.rejects(planMod.telechargerIcs(url, { http: true }), e => e instanceof planMod.ErreurPlanning && e.code === "toolarge");
+			// no encryption: refused, nothing written
+			const dir2 = tmpdir();
+			const sans = planMod.creerPlanning({ dossierDonnees: dir2, chiffrement: fakeCrypt(false), essai: { http: true } });
+			await assert.rejects(sans.poser(url), e => e.code === "nostorage");
+			assert.equal(fs.existsSync(path.join(dir2, "moodle-planning.bin")), false);
+			await assert.rejects(p.poser("javascript:alert(1)"), e => e.code === "badlink");
+			assert.deepEqual(await p.effacer(), { hote: null, at: null, erreur: null });
+			assert.deepEqual(await p.volumes(["XTI306"]), {});
+		} finally { stop(srv); }
+	});
+
 });
 
 /* ─────────── the app never turns the tests-only switch on; the renderer never imports the module ─────────── */
@@ -1706,7 +1827,7 @@ await test("the app's own files never set allowHttpForTests or `essai`", async (
 });
 await test("the bridge wiring: token files only in the main process, handlers present, setting guarded before write", async () => {
 	const canaux = await readFile("apps/windows/electron/canaux.ts", "utf8");
-	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChercher", "moodleAjouterParUrl", "moodleFavori", "moodleExclure", "moodleAjouter", "moodleRetirer", "moodleFichiers", "moodleTelechargerCours", "moodleTelechargerFichier", "moodleOuvrirDossier", "moodleOuvrirFichier", "moodleDeposer", "moodleDevoirVu", "moodleIgnorerDevoir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir", "moodleOuvrirActivite"]) {
+	for (const c of ["moodleEtat", "moodleConnecter", "moodleDeconnecter", "moodleCours", "moodleChercher", "moodleAjouterParUrl", "moodleFavori", "moodleExclure", "moodleAjouter", "moodleRetirer", "moodleFichiers", "moodleTelechargerCours", "moodleTelechargerFichier", "moodleOuvrirDossier", "moodleOuvrirFichier", "moodleDeposer", "moodleDevoirVu", "moodleIgnorerDevoir", "moodleSynchroniser", "moodleDevoirs", "moodleOuvrirDevoir", "moodleOuvrirActivite", "moodlePlanningEtat", "moodlePlanningPoser", "moodlePlanningEffacer", "moodlePlanningVolumes"]) {
 		assert.ok(canaux.includes(`CANAUX.${c},`), c);
 	}
 	assert.ok(canaux.includes("dialogueMoodle ||") && canaux.includes("dialogueMoodleFin"), "one native Moodle dialog at a time, with a pause");

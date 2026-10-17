@@ -43,6 +43,9 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.moodleHost.detail": "Ne l'autorisez que s'il s'agit du Moodle de votre établissement. Rien n'y est envoyé, hormis votre connexion et des requêtes de lecture.",
 	"app.moodleHost.allow": "Autoriser",
 	"app.moodleHost.deny": "Annuler",
+	"app.planningHost.title": "Autoriser ce site d'emploi du temps ?",
+	"app.planningHost.message": "Neo Quiz téléchargera votre emploi du temps depuis {host}.",
+	"app.planningHost.detail": "Ne l'autorisez que si ce lien vient de votre établissement. Neo Quiz ne fait que lire l'agenda, il n'envoie rien à ce site.",
 
 	/* ── Mise à jour automatique (application seulement) ── */
 	"app.update.size": "{done} Mo / {total} Mo",

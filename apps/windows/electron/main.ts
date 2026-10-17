@@ -54,6 +54,7 @@ import type { EtatFenetre } from "./pont";
 import { creerGestionSync } from "./syncthing";
 import { lienDansArguments, nomSur } from "./syncthing-regles";
 import { creerMoodle } from "./moodle/service";
+import { creerPlanning } from "./moodle/planning";
 import { creerSonde, executerPowerShell } from "./connexion-limitee";
 import type { ServiceMoodle } from "./moodle/service";
 import { estLienPageMoodle, jetonDansArguments } from "./moodle/pur";
@@ -989,8 +990,18 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.moodleNouveaux);
 			},
 		});
+		/* The timetable of the Moodle window: its link is encrypted like the Moodle token. */
+		const planning = creerPlanning({
+			dossierDonnees: donnees,
+			chiffrement: {
+				disponible: () => safeStorage.isEncryptionAvailable(),
+				chiffrer: clair => safeStorage.encryptString(clair),
+				dechiffrer: chiffre => safeStorage.decryptString(chiffre),
+			},
+		});
 		const canaux = enregistrerCanaux({
 			moodle,
+			planning,
 			perimetre,
 			reglagesOuErreur,
 			code,

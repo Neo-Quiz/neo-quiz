@@ -126,6 +126,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	let vue: Vue = "loading";
 	let etat: EtatMoodle | null = null;
 	let cours: CoursMoodle[] = [];
+	/** Hours and sessions of the timetable per module code (empty without a timetable link). */
+	let volumes: Record<string, { minutes: number; seances: number }> = {};
 	let devoirs: DevoirMoodle[] = [];
 	const nouveaux = new Set<number>();
 	const trouves: ResultatRechercheMoodle[] = [];
@@ -166,6 +168,25 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	});
 
 	/* ── data ── */
+	/** The timetable's totals, painted when they arrive (a first download can take a few seconds). */
+	function chargerVolumes(): void {
+		const codes = [...new Set(cours.map(co => co.code).filter((x): x is string => !!x))];
+		if (!codes.length) return;
+		void api.planningVolumes(codes).then(v => {
+			volumes = v;
+			if (estDetruit()) return;
+			if (vue === "picker") peindreResultats();
+			else if (vue === "course") redessinerCours();
+		}, () => undefined);
+	}
+	/** "30 h · 6 sessions" for a module, or null when the timetable has none. */
+	function texteVolume(co: CoursMoodle): string | null {
+		const v = co.code ? volumes[co.code] : undefined;
+		if (!v) return null;
+		const h = Math.round(v.minutes / 6) / 10;
+		const heures = (Number.isInteger(h) ? String(h) : h.toFixed(1)).replace(".", currentLang() === "fr" ? "," : ".");
+		return t(v.seances === 1 ? "settings.moodle.wVolumeOne" : "settings.moodle.wVolume", { hours: heures, n: String(v.seances) });
+	}
 	async function chargerCours(): Promise<void> {
 		cours = await api.cours().catch(() => [] as CoursMoodle[]);
 	}
@@ -349,6 +370,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		});
 		await chargerCours();
 		if (estDetruit() || vue !== "picker") return;
+		chargerVolumes();
 		apresCours();
 		if (rescan) prescan(true);
 		await depots;
@@ -446,7 +468,10 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const code = ajouter(ligne, "span", "nqm-course-code", co.code ?? "—");
 		code.style.color = teinte(co.code);
 		if (!co.code) code.classList.add("is-orphan");
-		ajouter(ligne, "span", "nqm-course-name", nomCourt(co));
+		const texte = ajouter(ligne, "span", "nqm-course-text");
+		ajouter(texte, "span", "nqm-course-name", nomCourt(co));
+		const volume = texteVolume(co);
+		if (volume) ajouter(texte, "span", "nqm-course-hours", volume);
 		if (co.cohorte && groupe.filter(x => x.code === co.code).length > 1) ajouter(ligne, "span", "nqm-course-cohort", co.cohorte);
 		const depot = ajouter(ligne, "span", "nqm-course-deposit");
 		const badge = ajouter(ligne, "span", "nqm-course-badge");
@@ -695,6 +720,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const tete = entete(c, true);
 		/* The Moodle name starts with its internal code ("XTI306-2627PSA01 - ..."): the short code, then the name. */
 		ajouter(tete, "h2", "nqm-title", co.code ? `${co.code} · ${nomCourt(co)}` : co.name);
+		const volume = texteVolume(co);
+		if (volume) ajouter(tete, "p", "nqm-hint nqm-course-hours", volume);
 		const dest = ajouter(tete, "div", "nqm-dest" + (co.folder ? "" : " is-warn"));
 		icone(dest, "folder-open", "nqm-dest-icon");
 		ajouter(dest, "span", "nqm-dest-path", co.folder ?? t("settings.moodle.wDestNone"));

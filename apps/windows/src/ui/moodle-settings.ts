@@ -14,7 +14,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import { pont } from "../host/pont";
-import type { EcoleMoodle, EtatMoodle } from "../../electron/pont";
+import type { EcoleMoodle, EtatMoodle, EtatPlanning } from "../../electron/pont";
 import { CLE_REGLAGES_MOODLE } from "../../electron/pont";
 import { t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
@@ -45,6 +45,8 @@ export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHos
 	let planLu: { at: number; plan: Promise<YearPlan | null> } | null = null;
 
 	const racine = ajouter(page, "div", "nq-moodle");
+	/* The timetable: OUTSIDE `racine` too, or a sync push would wipe the link being typed. */
+	const zonePlanning = ajouter(page, "div", "nq-moodle-planning");
 	/* OUTSIDE `racine`: `peindre` empties it on every state push (sync progress), which would destroy the usage line. */
 	const nouveaux = ajouter(page, "div", "nq-moodle-auto");
 	const demonterAuto = mountAutoLearnSettings(nouveaux, aiSettings);
@@ -70,6 +72,47 @@ export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHos
 
 	function interrupteur(parent: HTMLElement, nom: string, valeur: boolean, surChangement: (v: boolean) => void): void {
 		interrupteurReglage(parent, nom, valeur, surChangement);
+	}
+
+	/** The timetable link (an ICS feed): each module of the Moodle window then
+	    shows its hours. The link holds a personal token: once given, the window
+	    only ever sees its host (`electron/moodle/planning.ts`). */
+	function peindrePlanning(ep: EtatPlanning): void {
+		zonePlanning.replaceChildren();
+		const sec = ajouter(zonePlanning, "section", "nq-reglages-section");
+		ajouter(sec, "h3", "nq-reglages-titre", t("settings.moodle.planning"));
+		const c = ajouter(sec, "div", "nq-set-carte");
+		if (ep.hote) {
+			const aide = ep.erreur ? t(`settings.moodle.planningErr.${ep.erreur}` as TransKey)
+				: ep.at ? t("settings.moodle.planningAt", { host: ep.hote, when: heure(ep.at) }) : ep.hote;
+			const l = ligneReglage(c, t("settings.moodle.planningLinked"), aide);
+			if (ep.erreur) l.aide.classList.add("nq-moodle-rouge");
+			boutonPlat(l.controle, t("settings.moodle.planningRemove"), () => { void api!.planningEffacer().then(peindrePlanning, () => undefined); });
+			return;
+		}
+		ligneReglage(c, t("settings.moodle.planningLink"), t("settings.moodle.planningHelp"));
+		const saisie = ajouter(c, "div", "nq-moodle-saisie");
+		const champ = ajouter(saisie, "input", "nq-set-nombre nq-moodle-site");
+		champ.type = "text";
+		champ.spellcheck = false;
+		champ.placeholder = "https://…/calendar.ics";
+		champ.setAttribute("aria-label", t("settings.moodle.planningLink"));
+		const msg = ajouter(c, "span", "nq-set-ligne-aide nq-moodle-rouge");
+		msg.hidden = true;
+		const ok = boutonPlat(saisie, t("settings.moodle.planningSave"), () => {
+			const v = champ.value.trim();
+			if (!v) return;
+			ok.disabled = true;
+			msg.hidden = true;
+			void api!.planningPoser(v).then(r => {
+				ok.disabled = false;
+				if (r.ok) { peindrePlanning(r.etat); return; }
+				if (r.raison === "denied") return;
+				msg.textContent = t(`settings.moodle.planningRefused.${r.raison}` as TransKey);
+				msg.hidden = false;
+			}, () => { ok.disabled = false; });
+		});
+		champ.addEventListener("keydown", ev => { if (ev.key === "Enter") ok.click(); });
 	}
 
 	/** Display: the Moodle button of the rail (an app preference, not the guarded `moodle` setting). */
@@ -304,5 +347,6 @@ export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHos
 
 	const desabonner = api.surEtat(() => { void rafraichir(); });
 	void rafraichir();
+	void api.planningEtat().then(ep => { if (!detruit) peindrePlanning(ep); }, () => undefined);
 	return () => { detruit = true; arreterSonde(); desabonner(); demonterAuto(); };
 }
