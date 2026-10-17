@@ -255,7 +255,7 @@ export const EN_SETTINGS = {
 	"settings.moodle.reasonMobileDisabled": "Your school has turned off mobile access, so Neo Quiz cannot sign in.",
 	"settings.moodle.reasonLoginUnsupported": "This school's sign-in method is not supported yet.",
 	"settings.moodle.wHintSignIn": "Sign in to Moodle once: your browser opens, then everything happens here. The sign-in stays valid after a restart.",
-	"settings.moodle.wHintPicker": "The modules of the year are checked each time this window opens.",
+	"settings.moodle.wHintPicker": "A module is checked at most every 3 hours. Refresh (F5) checks now.",
 	"settings.moodle.wSearchModules": "Search a module…",
 	"settings.moodle.wAllYears": "All years",
 	"settings.moodle.wAllShort": "All",

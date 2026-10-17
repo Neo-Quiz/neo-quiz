@@ -253,7 +253,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.reasonMobileDisabled": "Ton école a désactivé l'accès mobile : Neo Quiz ne peut pas s'y connecter.",
 	"settings.moodle.reasonLoginUnsupported": "La méthode de connexion de cette école n'est pas encore prise en charge.",
 	"settings.moodle.wHintSignIn": "Connecte-toi une fois à Moodle : ton navigateur s'ouvre, puis tout se fait ici. La connexion reste valable après un redémarrage.",
-	"settings.moodle.wHintPicker": "Les modules de l'année sont vérifiés à chaque ouverture.",
+	"settings.moodle.wHintPicker": "Un module est vérifié au plus toutes les 3 heures. Actualiser (F5) vérifie tout de suite.",
 	"settings.moodle.wSearchModules": "Chercher un module…",
 	"settings.moodle.wAllYears": "Toutes les années",
 	"settings.moodle.wAllShort": "Toutes",

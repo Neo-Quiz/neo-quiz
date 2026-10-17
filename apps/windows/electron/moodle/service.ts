@@ -645,7 +645,9 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		const id = idOuErreur(courseId);
 		const force = forcer === true;
 		const vide: ModuleMoodle = { sections: [], externes: 0, verifieA: null };
-		return limite("module", `${id}|${force}`, () => modulesEnVol(async () => (await avecClient(async (client, s) => {
+		/* A fresh scan in the cache is read from the disk only: no pacing for it,
+		   the spacing and the three-at-a-time limit are for the school server. */
+		const run = async (): Promise<ModuleMoodle> => (await avecClient(async (client, s) => {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return vide;
@@ -672,7 +674,11 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				}),
 			}));
 			return { sections, externes: scan.external.length, verifieA };
-		})) ?? vide));
+		})) ?? vide;
+		const m = await chargerScans();
+		const e = m.get(id);
+		if (!force && e && maintenant() - e.at < SCAN_TTL && e.at <= maintenant()) return run();
+		return limite("module", `${id}|${force}`, () => modulesEnVol(run));
 	}
 
 	interface Cible { ids: number[] | null; nom?: string }
