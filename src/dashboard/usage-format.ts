@@ -351,3 +351,15 @@ export function usageGroups(rows: UsageRow[]): { group: string | null; note: str
 	}
 	return out;
 }
+
+/** The model group of a model id, among the groups a reading has (Antigravity,
+    2026-10-17): Argon has its own weekly quota, the other Gemini models share
+    "Gemini Models", Claude and GPT-OSS share theirs. `null`: no group fits. */
+export function groupOfModel(model: string, groups: readonly string[]): string | null {
+	const m = model.toLowerCase();
+	const pick = (re: RegExp): string | null => groups.find(g => re.test(g)) ?? null;
+	if (m.includes("argon")) return pick(/argon/i);
+	if (m.startsWith("gemini")) return pick(/^gemini models?$/i) ?? groups.find(g => /gemini/i.test(g) && !/argon/i.test(g)) ?? null;
+	if (m.startsWith("claude") || m.startsWith("gpt")) return pick(/claude|gpt/i);
+	return null;
+}

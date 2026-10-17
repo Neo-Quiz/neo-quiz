@@ -7,7 +7,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-cadence.ts", "src/dashboard/codex-resets.ts"], ({ usageLevel, usageStatusRows, usageResetText, usageWindowTitle, usageRemainingPercent, usageResetIn, usageWaitText }, { newCadence, cadenceVerdict, cadenceSuccess, cadenceRateLimited }, { parseResetCredits, parseConsumeOutcome, readResetsRequest, isCreditId, spendable }) => {
+await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-cadence.ts", "src/dashboard/codex-resets.ts"], ({ usageLevel, usageStatusRows, groupOfModel, usageGroups, usageResetText, usageWindowTitle, usageRemainingPercent, usageResetIn, usageWaitText }, { newCadence, cadenceVerdict, cadenceSuccess, cadenceRateLimited }, { parseResetCredits, parseConsumeOutcome, readResetsRequest, isCreditId, spendable }) => {
 	const r = makeReporter("Usage line formats");
 
 	r.check("0 % : ok", usageLevel(0), "ok");
@@ -120,5 +120,16 @@ await withSrcModule(["src/dashboard/usage-format.ts", "src/dashboard/usage-caden
 		[{ action: "read", x: 1 }, { action: "consume", creditId: "c 1" }, { action: "consume", creditId: "c-1", method: "m" }, { action: "exec" }, [], null].map(readResetsRequest), [null, null, null, null, null, null]);
 	r.check("resets: a credit id is short and id-shaped", ["a", "A1._:-x", "x".repeat(128)].map(isCreditId).concat(["", "-a", "a b", "x".repeat(129), "a/b"].map(isCreditId)), [true, true, true, false, false, false, false, false]);
 
+	/* Antigravity (2026-10-17): the line under the composer shows the chosen model's group. */
+	const G = ["Gemini Models", "Claude and GPT models", "Gemini 4 Argon"];
+	r.check("the group of a model: Argon its own, other Gemini models theirs, Claude and GPT-OSS theirs, anything else none",
+		["gemini-4-argon-medium", "gemini-3.8-flash-high", "claude-opus-5-5-high", "gpt-oss-120b-medium", "gpt-6-luna", "", "llama3"].map(m => groupOfModel(m, G)),
+		["Gemini 4 Argon", "Gemini Models", "Claude and GPT models", "Claude and GPT models", "Claude and GPT models", null, null]);
+	r.check("no matching group in the reading: null (the line keeps every window)", [groupOfModel("gemini-4-argon-low", ["Gemini Models"]), groupOfModel("claude-x", [])], [null, null]);
+	r.check("rows grouped in order, 5-hour above weekly inside a group",
+		usageGroups(usageStatusRows([
+			{ kind: "weekly-all", group: "A", usedPercent: 1, resetsAt: null }, { kind: "session", group: "A", usedPercent: 2, resetsAt: null },
+			{ kind: "weekly-all", group: "B", usedPercent: 3, resetsAt: null }])).map(s => [s.group, s.rows.map(r => r.kind)]),
+		[["A", ["session", "weekly-all"]], ["B", ["weekly-all"]]]);
 	r.done();
 });

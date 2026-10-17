@@ -4,7 +4,7 @@ import { currentHost } from "../host/current";
 import { PROVIDERS, setBrandLogo } from "./ai-providers";
 import { cadenceRateLimited, cadenceSuccess, cadenceVerdict, newCadence } from "./usage-cadence";
 import type { Cadence } from "./usage-cadence";
-import { formatAge, usageGroups, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
+import { formatAge, groupOfModel, usageGroups, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
 import type { UsageRead } from "./usage-format";
 import type { UsageSnapshot } from "./auto-learn-gate";
 import { spendable } from "./codex-resets";
@@ -149,7 +149,9 @@ export interface UsageLine {
 	destroy(): void;
 }
 
-export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool: UsageTool) => Promise<UsageRead>): UsageLine {
+/** `model`: the composer's model, read at each drawing. The line then shows
+    only the windows of that model's group (the popover keeps them all). */
+export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool: UsageTool) => Promise<UsageRead>, model?: () => string): UsageLine {
 	const el = ajouter(parent, "div", "qbd-ai-usage-line");
 	el.setAttribute("role", "button");
 	el.tabIndex = 0;
@@ -162,7 +164,10 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	const draw = (): void => {
 		el.replaceChildren();
 		const cur = cache.get(tool);
-		const rows = cur ? usageStatusRows(cur.rows) : [];
+		const toutes = cur ? usageStatusRows(cur.rows) : [];
+		// Only the chosen model's group under the composer, when one fits.
+		const groupe = model ? groupOfModel(model(), [...new Set(toutes.map(r => r.group).filter((g): g is string => !!g))]) : null;
+		const rows = groupe ? toutes.filter(r => r.group === groupe) : toutes;
 		el.hidden = rows.length === 0;
 		if (el.hidden) closePop();
 		const now = Date.now();

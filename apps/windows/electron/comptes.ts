@@ -317,10 +317,16 @@ const AGY_CRED_SCRIPT = [
 	"'@",
 	"[Console]::Out.Write([NqAgyCred]::Read())",
 ].join("\n");
-const AGY_LOAD_URL = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
-const AGY_MODELS_URL = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
-/** The grouped 5-hour and weekly limits, as agy's `/usage` shows them. */
-const AGY_RESUME_URL = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary";
+/* WHERE AND AS WHOM (measured on 2026-10-17 by watching agy 1.4.1's own
+   requests): agy calls the "daily" Cloud Code host and names itself
+   `antigravity/cli/<version> (…)`. Only that host with a recent agy version
+   in the user agent answers the "Gemini 4 Argon" group (a separate weekly
+   quota of paid Pro plans); the plain host leaves it out. The version is the
+   one of the agy installed on THIS PC (`versionAgy`), never written here, so
+   the read keeps working for anyone as agy updates. Without it, the plain
+   host and user agent, as before. */
+const AGY_HOTE_DAILY = "https://daily-cloudcode-pa.googleapis.com/v1internal:";
+const AGY_HOTE = "https://cloudcode-pa.googleapis.com/v1internal:";
 /** A token this close to its expiry is renewed first: it must not lapse mid-request. */
 const AGY_MARGE_MS = 60_000;
 
@@ -328,7 +334,7 @@ const AGY_MARGE_MS = 60_000;
     (not signed in, unreadable). PowerShell gets only what it needs to start:
     no other variable of this process reaches it. */
 async function jetonAgy(env: NodeJS.ProcessEnv): Promise<{ jeton: string; expire: number | null } | null> {
-	const systemRoot = env.SystemRoot || "C:\Windows";
+	const systemRoot = env.SystemRoot || "C:\\Windows";
 	try {
 		const { stdout, code } = await lancer({
 			executable: join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
@@ -348,13 +354,32 @@ async function jetonAgy(env: NodeJS.ProcessEnv): Promise<{ jeton: string; expire
 	}
 }
 
+/** The version of the agy installed on this PC (`agy --version`, "1.4.1"),
+    read once per run of the app; null when agy is missing or says nothing
+    of that shape. Only digits and dots ever reach the user agent. */
+let versionAgyLue: Promise<string | null> | null = null;
+function versionAgy(env: NodeJS.ProcessEnv): Promise<string | null> {
+	versionAgyLue ??= (async () => {
+		const executable = resoudreExecutable("agy", env);
+		if (!executable) return null;
+		try {
+			const { stdout, code } = await lancer({ executable, args: ["--version"], stdin: "", timeoutMs: DELAI_MS * 2, env: environnementEnfant(env) });
+			const v = /\b(\d{1,4}\.\d{1,4}\.\d{1,6})\b/.exec(stdout)?.[1];
+			return code === 0 && v ? v : null;
+		} catch (e) {
+			return null;
+		}
+	})();
+	return versionAgyLue;
+}
+
 /** One Cloud Code call: no redirect is followed (the token goes to this URL
     only), the body is read up to 1 MB and parsed. Throws on any failure but
     an HTTP status, which is returned. */
-async function postAgy(url: string, jeton: string, corps: unknown): Promise<{ ok: true; json: unknown } | { ok: false; status: number; headers: Headers }> {
+async function postAgy(url: string, jeton: string, corps: unknown, agent = "antigravity"): Promise<{ ok: true; json: unknown } | { ok: false; status: number; headers: Headers }> {
 	const resp = await fetch(url, {
 		method: "POST",
-		headers: { "Authorization": "Bearer " + jeton, "User-Agent": "antigravity", "Content-Type": "application/json" },
+		headers: { "Authorization": "Bearer " + jeton, "User-Agent": agent, "Content-Type": "application/json" },
 		body: JSON.stringify(corps),
 		redirect: "error",
 		signal: AbortSignal.timeout(DELAI_MS * 2),
@@ -387,16 +412,28 @@ async function lireUsageAntigravity(env: NodeJS.ProcessEnv): Promise<UsageRead> 
 	}
 	if (!lu) return { rows: [], error: { kind: "unauthenticated" }, mesureAt: null };
 	try {
-		const charge = await postAgy(AGY_LOAD_URL, lu.jeton, { metadata: { ideType: "ANTIGRAVITY" } });
+		const charge = await postAgy(AGY_HOTE + "loadCodeAssist", lu.jeton, { metadata: { ideType: "ANTIGRAVITY" } });
 		if (!charge.ok) return { rows: [], error: erreurDepuisStatut(charge.status, charge.headers), mesureAt: null };
 		const p = charge.json && typeof charge.json === "object" ? (charge.json as { cloudaicompanionProject?: unknown }).cloudaicompanionProject : null;
 		const projet = typeof p === "string" ? p : p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string" ? (p as { id: string }).id : null;
-		/* The summary first (two windows per group, as agy's `/usage`); the
-		   per-model quotas when it is missing or empty. */
-		const resume = await postAgy(AGY_RESUME_URL, lu.jeton, projet ? { project: projet } : {}).catch(() => null);
-		const lignes = resume && resume.ok ? usageAntigravityDepuisResume(resume.json) : [];
+		const corps = projet ? { project: projet } : {};
+		/* The summary first, as agy's `/usage` reads it (daily host, agy's own
+		   user agent: the Argon group comes only so); then the plain host;
+		   then the per-model quotas when both are empty. */
+		const version = await versionAgy(env);
+		const resume = version
+			? await postAgy(AGY_HOTE_DAILY + "retrieveUserQuotaSummary", lu.jeton, corps, "antigravity/cli/" + version).catch(() => null)
+			: null;
+		let lignes = resume && resume.ok ? usageAntigravityDepuisResume(resume.json) : [];
+		// The daily host has been seen to leave the Gemini group out with an old version: the plain one has it.
+		if (!lignes.some(r => /gemini models/i.test(r.group ?? ""))) {
+			const simple = await postAgy(AGY_HOTE + "retrieveUserQuotaSummary", lu.jeton, corps).catch(() => null);
+			const deBase = simple && simple.ok ? usageAntigravityDepuisResume(simple.json) : [];
+			const vus = new Set(lignes.map(r => r.group));
+			lignes = [...deBase.filter(r => !vus.has(r.group)), ...lignes];
+		}
 		if (lignes.length) return { rows: lignes, error: null, mesureAt: Date.now() };
-		const modeles = await postAgy(AGY_MODELS_URL, lu.jeton, projet ? { project: projet } : {});
+		const modeles = await postAgy(AGY_HOTE + "fetchAvailableModels", lu.jeton, corps);
 		if (!modeles.ok) return { rows: [], error: erreurDepuisStatut(modeles.status, modeles.headers), mesureAt: null };
 		const rows = usageAntigravityDepuisModeles(modeles.json);
 		return rows.length ? { rows, error: null, mesureAt: Date.now() } : { rows: [], error: { kind: "unavailable" }, mesureAt: null };

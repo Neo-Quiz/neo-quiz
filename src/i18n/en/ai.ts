@@ -85,7 +85,7 @@ export const EN_AI = {
 	"ai.usage.monthlyAmount": "Monthly credits · {amount}",
 	"ai.usage.popoverTitleAntigravity": "Antigravity CLI usage",
 	"ai.usage.popoverTitleOllama": "Ollama usage",
-	"ai.usage.shortMonth": "Mo",
+	"ai.usage.shortMonth": "Credits",
 	"ai.usage.windowPlan": "Plan",
 	"ai.usage.shortHours": "{n}h",
 	"ai.usage.shortDays": "{n}d",

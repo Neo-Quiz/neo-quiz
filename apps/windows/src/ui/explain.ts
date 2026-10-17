@@ -926,7 +926,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (!outil || !lireForfait) return;
 					const place = ajouter(m.contentEl, "div", "qbd-ai-usage-slot");
 					composer.after(place);
-					ligneForfait = mountUsageLine(place, outil, (o) => lireForfait.call(host.process, o));
+					ligneForfait = mountUsageLine(place, outil, (o) => lireForfait.call(host.process, o), () => deps.settings.get().aiModel || "");
 				};
 				const peindreOutils = (): void => {
 					fournisseurBtn.replaceChildren();

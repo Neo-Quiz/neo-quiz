@@ -69,7 +69,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.usage.monthlyAmount": "Crédits du mois · {amount}",
 	"ai.usage.popoverTitleAntigravity": "Usage d'Antigravity CLI",
 	"ai.usage.popoverTitleOllama": "Usage d'Ollama",
-	"ai.usage.shortMonth": "Mois",
+	"ai.usage.shortMonth": "Crédits",
 	"ai.usage.windowPlan": "Forfait",
 	"ai.usage.shortHours": "{n}h",
 	"ai.usage.shortDays": "{n}j",

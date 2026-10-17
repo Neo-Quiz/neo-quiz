@@ -2159,7 +2159,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (planTool && readPlan) {
 			const slot = ajouter(formCol, "div", "qbd-ai-usage-slot");
 			composer.after(slot);
-			planLine = mountUsageLine(slot, planTool, (tool) => readPlan.call(host.process, tool));
+			planLine = mountUsageLine(slot, planTool, (tool) => readPlan.call(host.process, tool), () => settings().aiModel || "");
 		}
 
 		// Groupe droite : logo fournisseur, sélecteur modèle + effort, puis
