@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.123] - 2026-10-17
+
 ### Changed
 
 - The Moodle window opens at once when its modules were checked less than 3 hours ago, and its header says how often they are checked.
