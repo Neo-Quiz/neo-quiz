@@ -291,6 +291,9 @@ export interface ActionMenuOptions {
 	/** A search field at the top (its placeholder), filtering the rows by their
 	    label and hint, accents ignored; the rows then scroll under it. */
 	search?: string;
+	/** With `search`: only the first N rows show while the field is empty; a
+	    query searches them all. */
+	limit?: number;
 }
 
 /*
@@ -375,10 +378,16 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 		const liste = ajouter(menuEl, "div", "qbd-action-menu-list");
 		remplir(liste, items, true);
 		const plier = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-		champ.addEventListener("input", () => {
+		const filtrer = (): void => {
 			const q = plier(champ.value.trim());
-			for (const b of liste.querySelectorAll<HTMLElement>(".qbd-select-option")) b.hidden = !!q && !plier(b.textContent || "").includes(q);
-		});
+			let i = 0;
+			for (const b of liste.querySelectorAll<HTMLElement>(".qbd-select-option")) {
+				b.hidden = q ? !plier(b.textContent || "").includes(q) : !!options.limit && i >= options.limit;
+				i++;
+			}
+		};
+		filtrer();
+		champ.addEventListener("input", filtrer);
 		champ.addEventListener("keydown", e => {
 			if (e.key !== "Enter") return;
 			e.preventDefault();

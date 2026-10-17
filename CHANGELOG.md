@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A Moodle module page lists every session of the timetable behind its hours (day, time, length, kind, exams marked, long gaps named), so a wrong total or a hole in the school timetable shows.
+- The output folder menu lists the 6 most recently changed folders (a PDF added counts); search finds the others.
+- A hidden download button no longer leaves an empty pill in the Moodle window.
+
 ## [1.21.1] - 2026-10-17
 
 ### Changed

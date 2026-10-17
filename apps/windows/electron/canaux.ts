@@ -719,6 +719,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodlePlanningEtat, () => deps.planning.etat());
 	ipcMain.handle(CANAUX.moodlePlanningEffacer, () => deps.planning.effacer());
 	ipcMain.handle(CANAUX.moodlePlanningVolumes, (_e, codes: unknown) => deps.planning.volumes(codes));
+	ipcMain.handle(CANAUX.moodlePlanningSeances, (_e, code: unknown) => deps.planning.seances(code));
 	ipcMain.handle(CANAUX.moodlePlanningPoser, async (_e, url: unknown) => {
 		const lien = lienPlanning(url);
 		if (!lien) return { ok: false, raison: "badlink" };

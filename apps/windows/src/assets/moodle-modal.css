@@ -436,6 +436,67 @@
 	border-color: var(--background-modifier-border-hover);
 }
 
+/* A hidden element stays hidden whatever its display rule (the download button). */
+.nq-moodle-modal [hidden] {
+	display: none !important;
+}
+
+/* The detail of a module's sessions (moodle-modal.ts `poserDetailSeances`). */
+.nq-moodle-modal .nqm-sessions-toggle {
+	align-self: flex-start;
+	padding: 2px 0;
+	border: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-accent);
+	font: inherit;
+	font-size: 0.8em;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-sessions {
+	display: grid;
+	grid-template-columns: max-content max-content max-content 1fr;
+	column-gap: 14px;
+	row-gap: 2px;
+	max-height: 220px;
+	overflow-y: auto;
+	padding: 6px 10px;
+	border: 1px solid var(--nqm-border);
+	border-radius: var(--radius-m);
+	font-size: 0.8em;
+	color: var(--nqm-text);
+}
+
+.nq-moodle-modal .nqm-session {
+	display: contents;
+}
+
+.nq-moodle-modal .nqm-session.is-past > * {
+	color: var(--nqm-faint);
+}
+
+.nq-moodle-modal .nqm-session.is-exam .nqm-session-kind {
+	color: var(--nqm-orange);
+	font-weight: 600;
+}
+
+.nq-moodle-modal .nqm-session-len {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.nq-moodle-modal .nqm-session-time {
+	font-variant-numeric: tabular-nums;
+}
+
+.nq-moodle-modal .nqm-session-gap {
+	grid-column: 1 / -1;
+	padding: 2px 0;
+	color: var(--nqm-orange);
+	font-style: italic;
+}
+
 .nq-moodle-modal .nqm-primary {
 	display: inline-flex;
 	align-items: center;

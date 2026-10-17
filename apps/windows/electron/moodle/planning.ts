@@ -22,7 +22,7 @@ import { creerLookup, type Resolveur } from "./adresse";
 import type { EtatPlanning } from "../pont";
 import type { Chiffrement } from "./jeton";
 import { createHash } from "node:crypto";
-import { MAX_ICS_OCTETS, MAX_SEANCES, fusionnerSeances, lienPlanning, lireIcs, volumesParCode, type Seance, type Volume } from "./planning-pur";
+import { MAX_ICS_OCTETS, MAX_SEANCES, fusionnerSeances, lienPlanning, lireIcs, seancesDuCode, volumesParCode, type Seance, type SeanceDetail, type Volume } from "./planning-pur";
 
 export const PLANNING_TTL = 6 * 3600 * 1000;
 const TIMEOUT = 30000;
@@ -47,6 +47,8 @@ export interface ServicePlanning {
 	effacer(): Promise<EtatPlanning>;
 	/** Hours and sessions per code, downloading first when the cache is older than 6 h. */
 	volumes(codes: unknown): Promise<Record<string, Volume>>;
+	/** The sessions of one module from the cache (no download), for its detail. */
+	seances(code: unknown): Promise<SeanceDetail[]>;
 }
 
 export class ErreurPlanning extends Error {
@@ -194,5 +196,11 @@ export function creerPlanning(deps: DepsPlanning): ServicePlanning {
 		if (memo?.cle !== cle) memo = { cle, res: volumesParCode(cache.seances, liste) };
 		return memo.res;
 	}
-	return { etat, poser, effacer, volumes };
+	async function seances(code: unknown): Promise<SeanceDetail[]> {
+		if (typeof code !== "string" || !/^[A-Za-z0-9-]{2,32}$/.test(code)) return [];
+		const lien = await lireLien();
+		const cache = lien ? await lireCache() : null;
+		return lien && cache && cache.empreinte === empreinteDe(lien.url) ? seancesDuCode(cache.seances, code) : [];
+	}
+	return { etat, poser, effacer, volumes, seances };
 }

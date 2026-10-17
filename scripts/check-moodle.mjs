@@ -1770,6 +1770,20 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		assert.equal(f.length, planPur.MAX_SEANCES);
 		assert.equal(f.at(-1).cle, "new", "the most recent are kept");
 	});
+	await test("timetable detail: one module's sessions, oldest first, with their activity and the exam marked; nothing else", () => {
+		const { seancesDuCode } = planPur;
+		const S = (texte, minutes, debut) => ({ texte, minutes, debut, cle: texte + debut });
+		const d = seancesDuCode([
+			S("Python\nCode module: XTI301\nEnseignant(s): X\nActivité: CTP", 300, 2000), S("Python\nCode module: XTI301\nActivité: DE", 60, 3000),
+			S("XTI301 intro", 60, 1000), S("XTI302 other", 300, 1500),
+		], "XTI301");
+		assert.deepEqual(d, [
+			{ debut: 1000 * 60000, minutes: 60, activite: null, epreuve: false },
+			{ debut: 2000 * 60000, minutes: 300, activite: "CTP", epreuve: false },
+			{ debut: 3000 * 60000, minutes: 60, activite: "DE", epreuve: true },
+		]);
+		assert.deepEqual(seancesDuCode([], "a.*"), []);
+	});
 	await test("timetable totals: a code counts as a word (suffix kept, longer code not), dash between letters and digits ignored", () => {
 		const { volumesParCode } = planPur;
 		const S = (texte, minutes, debut) => ({ texte, minutes, debut, cle: texte });

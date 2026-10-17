@@ -243,6 +243,48 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		pastille.addEventListener("mouseleave", cacherBulle);
 		pastille.addEventListener("blur", cacherBulle);
 	}
+	/** "Detail of the sessions": every session of the timetable under the
+	    module's title, to check the total or see a gap in the school's
+	    timetable. Past sessions dimmed, exams marked, the gaps of more than
+	    two weeks between two sessions named. Text only (`ajouter`). */
+	function poserDetailSeances(parent: HTMLElement, co: CoursMoodle): void {
+		if (!co.code || !volumes[co.code]) return;
+		const code = co.code;
+		const bouton = ajouter(parent, "button", "nqm-sessions-toggle", t("settings.moodle.wSessionsDetail"));
+		bouton.type = "button";
+		bouton.setAttribute("aria-expanded", "false");
+		const liste = ajouter(parent, "div", "nqm-sessions");
+		liste.hidden = true;
+		bouton.addEventListener("click", () => {
+			const ouvrir = liste.hidden;
+			liste.hidden = !ouvrir;
+			bouton.setAttribute("aria-expanded", String(ouvrir));
+			if (!ouvrir || liste.childElementCount) return;
+			void api.planningSeances(code).then(seances => {
+				const fr = currentLang() === "fr" ? "fr-FR" : "en-US";
+				const jour = new Intl.DateTimeFormat(fr, { weekday: "short", day: "numeric", month: "short" });
+				const maintenant = Date.now();
+				let avant: number | null = null;
+				for (const s of seances) {
+					if (avant !== null && s.debut - avant > 14 * 86400000) {
+						ajouter(liste, "div", "nqm-session-gap", t("settings.moodle.wSessionsGap", { days: String(Math.round((s.debut - avant) / 86400000)) }));
+					}
+					avant = s.debut;
+					const fin = s.debut + s.minutes * 60000;
+					const ligne = ajouter(liste, "div", "nqm-session" + (fin < maintenant ? " is-past" : "") + (s.epreuve ? " is-exam" : ""));
+					/* The timetable's times are UTC (or a naive local clock): shown as
+					   the system shows a UTC instant in the user's own zone. */
+					const local = new Intl.DateTimeFormat(fr, { hour: "2-digit", minute: "2-digit", ...hourOptions(currentHourCycle()) });
+					ajouter(ligne, "span", "nqm-session-day", jour.format(new Date(s.debut)));
+					ajouter(ligne, "span", "nqm-session-time", `${local.format(new Date(s.debut))} – ${local.format(new Date(fin))}`);
+					const h = Math.round(s.minutes / 6) / 10;
+					ajouter(ligne, "span", "nqm-session-len", `${(Number.isInteger(h) ? String(h) : h.toFixed(1)).replace(".", fr === "fr-FR" ? "," : ".")} h`);
+					ajouter(ligne, "span", "nqm-session-kind", s.epreuve ? t("settings.moodle.wExamPill") : (s.activite ?? ""));
+				}
+				if (!seances.length) ajouter(liste, "div", "nqm-session-gap", t("settings.moodle.wSessionsNone"));
+			}, () => undefined);
+		});
+	}
 	let bulle: HTMLElement | null = null;
 	function cacherBulle(): void { bulle?.remove(); bulle = null; }
 	/** The timetable says the module's last session is over: not checked when the
@@ -814,6 +856,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		/* The Moodle name starts with its internal code ("XTI306-2627PSA01 - ..."): the short code, then the name. */
 		ajouter(tete, "h2", "nqm-title", co.code ? `${co.code} · ${nomCourt(co)}` : co.name);
 		poserVolume(tete, "p", "nqm-hint nqm-course-hours", co);
+		poserDetailSeances(tete, co);
 		const dest = ajouter(tete, "div", "nqm-dest" + (co.folder ? "" : " is-warn"));
 		icone(dest, "folder-open", "nqm-dest-icon");
 		ajouter(dest, "span", "nqm-dest-path", co.folder ?? t("settings.moodle.wDestNone"));

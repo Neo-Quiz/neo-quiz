@@ -1775,6 +1775,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			planifierSuggestions();
 		};
 		paintDestination();
+		lireDatesDossiers();
 		destBtn.addEventListener("click", () => {
 			openActionMenu(destBtn, destinationOptions().map(d => ({
 				icon: d.icon || "folder",
@@ -1788,7 +1789,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					majAvisCategorie();
 					paintDestination?.();
 				},
-			})), { className: "qbd-menu-claude", search: t("ai.composer.destinationSearch") });
+			})), { className: "qbd-menu-claude", search: t("ai.composer.destinationSearch"), limit: 6 });
 		});
 		/* Folder suggestions, under the composer; and the picker offered on
 		   arrival (like "Choose a provider"): a popover anchored to the chip,
@@ -3748,12 +3749,24 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			dossiers.push(d);
 		}
 		// Most recently changed first (the latest file change inside each folder).
-		const ordre = rankFolders(dossiers.map(d => ({ path: d.path, name: d.name || d.path })), fichiersDesDossiers());
+		const ordre = rankFolders(dossiers.map(d => ({ path: d.path, name: d.name || d.path })), fichiersDesDossiers(), datesDossiers);
 		for (const o of ordre) {
 			const d = dossiers.find(x => x.path === o.path);
 			if (d) options.push({ value: d.path, label: d.name || d.path, icon: d.icon, color: d.color, sub: d.root });
 		}
 		return options;
+	}
+
+	/** The folders' own modification dates (`HostFs.modified`), read when the
+	    composer is drawn: the menu's order follows them (most recent first). */
+	const datesDossiers = new Map<string, number>();
+	function lireDatesDossiers(): void {
+		const lire = host.fs.modified;
+		if (!lire) return;
+		for (const d of deps.quizFolders?.() ?? []) {
+			if (!d.path) continue;
+			void lire.call(host.fs, d.path).then(ms => { if (ms) datesDossiers.set(d.path, ms); }, () => undefined);
+		}
 	}
 
 	/** What the folders' recency and suggestions read: every note of the index

@@ -32,6 +32,8 @@ await withSrcModule(["src/dashboard/folder-suggest.ts", "src/dashboard/categorie
 		S.rankFolders(folders, files).map(x => x.name), ["XTI305 - Ethical Hacking", "XTI301 - Écosystème Python", "XTI303 - Architecture", "Generated"]);
 	r.check("order: a file in a sibling folder with a shared name prefix does not count", S.recency([F("a/b"), F("a/b2")], [f("a/b2/x.md", 50)]).get("a/b"), 0);
 	r.check("order: ties fall back on the name, accents ignored", S.rankFolders([F("x/zeta"), F("x/Éclair"), F("x/alpha")], []).map(x => x.name), ["alpha", "Éclair", "zeta"]);
+	r.check("order: a folder's own date (a PDF just added) counts when later than its notes",
+		S.rankFolders([F("a/pdfs"), F("a/notes")], [f("a/notes/x.md", 100)], new Map([["a/pdfs", 200], ["a/notes", 50]])).map(x => x.name), ["pdfs", "notes"]);
 	r.check("order: the input list is not mutated", (() => { const l = [F("a/z"), F("a/b")]; S.rankFolders(l, []); return l.map(x => x.name); })(), ["z", "b"]);
 
 	const sug = (text, opts) => S.suggestFolders(text, folders, files, opts).map(x => x.name);

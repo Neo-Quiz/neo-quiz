@@ -663,6 +663,8 @@ export interface Pont {
 		planningEffacer(): Promise<EtatPlanning>;
 		/** Minutes and sessions of the timetable per module code (absent: no session found). */
 		planningVolumes(codes: string[]): Promise<Record<string, { minutes: number; seances: number; fin: number; epreuves: number[] }>>;
+		/** Every session of one module (start, minutes, activity, exam), from the cache. */
+		planningSeances(code: string): Promise<Array<{ debut: number; minutes: number; activite: string | null; epreuve: boolean }>>;
 		/** `ouvrirDevoir` AND the course's `Rendus...` sub-folder (else the module folder) in Explorer. */
 		deposer(cmid: number): Promise<boolean>;
 		devoirVu(cmid: number): Promise<void>;
@@ -1267,6 +1269,7 @@ export const CANAUX = {
 	moodlePlanningPoser: "neo:moodle/planning-poser",
 	moodlePlanningEffacer: "neo:moodle/planning-effacer",
 	moodlePlanningVolumes: "neo:moodle/planning-volumes",
+	moodlePlanningSeances: "neo:moodle/planning-seances",
 	/** Pushed to the window: the Moodle state changed. */
 	moodleSurEtat: "neo:moodle/sur-etat",
 	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */

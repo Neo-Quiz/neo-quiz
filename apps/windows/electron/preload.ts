@@ -285,6 +285,7 @@ const pont: Pont = {
 		planningPoser: url => ipcRenderer.invoke(CANAUX.moodlePlanningPoser, url),
 		planningEffacer: () => ipcRenderer.invoke(CANAUX.moodlePlanningEffacer),
 		planningVolumes: codes => ipcRenderer.invoke(CANAUX.moodlePlanningVolumes, codes),
+		planningSeances: code => ipcRenderer.invoke(CANAUX.moodlePlanningSeances, code),
 		pageDemandee: () => ipcRenderer.invoke(CANAUX.moodleLienPageLire),
 		surPageDemandee(rappel) {
 			const ecouteur = (): void => rappel();

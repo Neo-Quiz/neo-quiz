@@ -29,11 +29,13 @@ export function recency(folders: readonly FolderRef[], files: readonly FileRef[]
 	return out;
 }
 
-/** The folders, most recently changed first; ties by name then path. */
-export function rankFolders(folders: readonly FolderRef[], files: readonly FileRef[]): RankedFolder[] {
+/** The folders, most recently changed first; ties by name then path. `dates`:
+    the folders' own modification dates (a PDF added changes the folder, not a
+    note), the later of the two counting. */
+export function rankFolders(folders: readonly FolderRef[], files: readonly FileRef[], dates?: ReadonlyMap<string, number>): RankedFolder[] {
 	const r = recency(folders, files);
 	return folders
-		.map(f => ({ ...f, recent: r.get(f.path) ?? 0 }))
+		.map(f => ({ ...f, recent: Math.max(r.get(f.path) ?? 0, dates?.get(f.path) ?? 0) }))
 		.sort((a, b) => b.recent - a.recent || fold(a.name).localeCompare(fold(b.name)) || a.path.localeCompare(b.path));
 }
 

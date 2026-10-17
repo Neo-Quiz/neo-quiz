@@ -186,3 +186,20 @@ export function volumesParCode(seances: readonly Seance[], codes: readonly strin
 	}
 	return out;
 }
+
+/** One session of a module, as its detail shows it (to check a total, or
+    spot a gap in the school's timetable): no title, no teacher, no room. */
+export interface SeanceDetail { debut: number; minutes: number; activite: string | null; epreuve: boolean }
+
+/** The sessions of `code`, oldest first, at most 200 (same matching as `volumesParCode`). */
+export function seancesDuCode(seances: readonly Seance[], code: string): SeanceDetail[] {
+	const n = normaliser(code);
+	if (!/^[A-Z0-9]{2,32}$/.test(n)) return [];
+	const re = new RegExp(`(?<![A-Z0-9])${n}(?![0-9])`);
+	return seances.filter(s => re.test(normaliser(s.texte)))
+		.sort((a, b) => a.debut - b.debut).slice(0, 200)
+		.map(s => {
+			const a = /Activit[ée]\s*:\s*([A-Za-z]{1,12})/i.exec(s.texte);
+			return { debut: s.debut * 60000, minutes: s.minutes, activite: a ? a[1].toUpperCase() : null, epreuve: estEpreuve(s.texte) };
+		});
+}
