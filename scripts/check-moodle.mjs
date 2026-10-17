@@ -80,9 +80,9 @@ async function mutant(entry, from, to) {
 }
 
 const mods = [`${MOODLE}pur.ts`, `${MOODLE}noms.ts`, `${MOODLE}client.ts`, `${MOODLE}disque.ts`, `${MOODLE}api.ts`,
-	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`, `${MOODLE}adresse.ts`, "apps/windows/electron/reseau.ts"];
+	`${MOODLE}garde.ts`, `${MOODLE}jeton.ts`, `${MOODLE}service.ts`, `${MOODLE}erreurs.ts`, `${MOODLE}cours.ts`, `${MOODLE}compat.ts`, `${MOODLE}ecoles.ts`, `${MOODLE}adresse.ts`, "apps/windows/electron/reseau.ts", `${MOODLE}listes.ts`];
 
-await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod, adresse, reseau) => {
+await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod, service, erreurs, k, compat, ecolesMod, adresse, reseau, listesMod) => {
 	const { TokenError, MoodleError } = erreurs;
 	const { createClient, siteInfo } = client;
 	const T = { allowHttpForTests: true };
@@ -1130,6 +1130,52 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			// two quick changes never lose one
 			await Promise.all([c.svc.favori(10, true), c.svc.favori(11, true), c.svc.favori(12, true)]);
 			assert.deepEqual([...c.store.moodle.favoris].sort((a, b) => a - b), [1, 10, 11, 12]);
+		} finally { fin(c); }
+	});
+	await test("shared lists (pure): latest gesture wins, a removal wins a tie, old lists carried over oldest, bad entries dropped", () => {
+		const { fusionner, depuisAncien, lireTable, poser, MAX_ENTREES } = listesMod;
+		const a = { favoris: { 1: { on: true, at: 10 }, 2: { on: true, at: 5 } } };
+		const b = { favoris: { 1: { on: false, at: 20 }, 2: { on: false, at: 5 }, 3: { on: true, at: 1 } } };
+		assert.deepEqual(fusionner([a, b]).favoris, [3], "the later removal and the tied removal both win");
+		assert.deepEqual(fusionner([b, a]).favoris, [3], "the order of the files does not matter");
+		const old = depuisAncien({ favoris: [7, 4], exclus: [] });
+		assert.deepEqual(fusionner([old]).favoris, [7, 4], "the old order is kept");
+		assert.deepEqual(fusionner([old, { favoris: { 7: { on: false, at: 1000 } } }]).favoris, [4], "any dated gesture beats the old list");
+		assert.deepEqual(old.exclus, undefined);
+		const t = lireTable({ v: 1, lists: { favoris: { 5: { on: true, at: 1 }, 0: { on: true, at: 1 }, abc: { on: true, at: 1 }, ["__proto__"]: { on: true, at: 1 }, 6: { on: "yes", at: 1 }, 8: { on: true, at: -1 }, 9: { on: true, at: NaN } }, other: { 1: { on: true, at: 1 } } } });
+		assert.deepEqual(t, { favoris: { 5: { on: true, at: 1 } } });
+		for (const bad of [null, [], "x", { lists: [] }, { lists: { favoris: [1] } }]) assert.deepEqual(fusionner([lireTable(bad)]).favoris, [], JSON.stringify(bad));
+		let big = {};
+		for (let i = 1; i <= MAX_ENTREES + 5; i++) big = poser(big, "devoirsVus", i, true, i);
+		assert.equal(Object.keys(big.devoirsVus).length, MAX_ENTREES);
+		assert.equal(big.devoirsVus["1"], undefined, "the oldest gestures go first");
+	});
+	await test("service: with a device id, the lists live in <root>/.neo-quiz/moodle/<device>.json and merge with the other devices'", async () => {
+		const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+		const c = await connecte({}, { reglages: { favoris: [1, 2] } });
+		try {
+			c.store.deviceId = A;
+			const dir = path.join(c.base, ".neo-quiz", "moodle");
+			fs.mkdirSync(dir, { recursive: true });
+			const tard = Date.now() + 60_000; // the other device's clock is ahead
+			fs.writeFileSync(path.join(dir, B + ".json"), JSON.stringify({ v: 1, lists: { favoris: { 1: { on: false, at: tard }, 9: { on: true, at: 5 } } } }));
+			fs.writeFileSync(path.join(dir, B + ".sync-conflict-20261017-120000-ABCDEFG.json"), JSON.stringify({ v: 1, lists: { favoris: { 66: { on: true, at: 5 } } } }));
+			fs.writeFileSync(path.join(dir, "big.json"), JSON.stringify({ v: 1, lists: { favoris: { 67: { on: true, at: 5 } } }, pad: "x".repeat(300 * 1024) }));
+			fs.writeFileSync(path.join(dir, "broken.json"), "{");
+			assert.deepEqual(await c.svc.favori(3, true), [2, 9, 3], "unstarred on B, starred on B, old list, new star");
+			const own = JSON.parse(fs.readFileSync(path.join(dir, A + ".json"), "utf8"));
+			assert.deepEqual(Object.keys(own.lists.favoris).sort(), ["1", "2", "3"], "the old list was carried over into this device's file");
+			assert.deepEqual(c.store.moodle.favoris, [1, 2], "the private setting is no longer written");
+			{ const r = await c.svc.favori(1, true); assert.deepEqual(r, [2, 9, 3, 1], "a new gesture wins even against a clock ahead: " + JSON.stringify(r)); }
+			assert.deepEqual(await c.svc.favori(9, false), [2, 3, 1]);
+			const l = await c.svc.cours();
+			assert.equal(l.find(x => x.id === 9)?.favori ?? false, false);
+			assert.equal(fs.readdirSync(dir).some(n => n.endsWith(".tmp")), false, "no temp file left");
+			// a second device reading for the first time writes its own file from its old list
+			const C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+			const d = newService({ root: c.m.root, base: c.base, store: { deviceId: C, moodle: { site: c.m.root, favoris: [42] } } });
+			await d.svc.etat();
+			assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(dir, C + ".json"), "utf8")).lists.favoris), ["42"]);
 		} finally { fin(c); }
 	});
 	await test("service: search (<= 100 chars, courses with a code) and add by URL (the configured site only)", async () => {

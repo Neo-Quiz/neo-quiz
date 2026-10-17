@@ -9,6 +9,7 @@ import * as fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import * as path from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
+import { isConflictCopy } from "../../../../src/review/paths";
 import type {
 	ActiviteMoodle, CoursMoodle, DevoirMoodle, ModuleMoodle, EtatMoodle, FichierMoodle, FichierNouveauMoodle, ResultatRechercheMoodle, ResumeMoodle, ResumeSyncMoodle,
 } from "../pont";
@@ -22,6 +23,7 @@ import { dejaPresent, dossierDuCours, downloadFiles, targetName, type Garde, typ
 import { MoodleError, TokenError, masquer } from "./erreurs";
 import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
+import { depuisAncien, ecrireTable, fusionner, lireTable, poser, type ListeCle, type TableListes } from "./listes";
 import { extensionRefusee } from "../ressources";
 import { allFiles, decisionAuto, depositState, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
 
@@ -112,7 +114,10 @@ interface Reglage {
 }
 interface FichierEtat { lastSync: number | null; expired: boolean; summary: ResumeMoodle | null }
 interface DevoirBrut { cmid: number; courseId: number; course: string; dossier: string; name: string; state: DevoirMoodle["state"]; due: number; remaining: number }
-type ListeCle = "favoris" | "exclus" | "extra" | "devoirsIgnores" | "devoirsVus";
+/** The app's device id (`apps/windows/src/host/device.ts`), which names this device's shared lists file. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_FICHIER_LISTES = 256 * 1024;
+const MAX_FICHIERS_LISTES = 64;
 
 const msg = (e: unknown, secret?: string): string => masquer(e instanceof Error ? e.message : String(e), secret).slice(0, 200);
 const entierPositif = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
@@ -217,11 +222,81 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		const o = await brut();
 		// No site written: the school's own. A written site that is not a plain https origin: none.
 		const site = o.site === undefined || o.site === "" ? SITE_DEFAUT : (origineSite(o.site, { http: !!deps.essai?.allowHttpForTests }) ?? "");
+		const l = await listes(o);
 		return {
 			site, auto: o.auto !== false,
-			favoris: lireListe(o.favoris), exclus: lireListe(o.exclus), extra: lireListe(o.extra),
-			ignores: lireListe(o.devoirsIgnores), vus: lireListe(o.devoirsVus),
+			favoris: l.favoris, exclus: l.exclus, extra: l.extra, ignores: l.devoirsIgnores, vus: l.devoirsVus,
 		};
+	}
+	/** The private lists of the setting: before the shared file, and without a device id. */
+	const anciennes = (o: Record<string, unknown>): Record<ListeCle, number[]> => ({
+		favoris: lireListe(o.favoris), exclus: lireListe(o.exclus), extra: lireListe(o.extra),
+		devoirsIgnores: lireListe(o.devoirsIgnores), devoirsVus: lireListe(o.devoirsVus),
+	});
+	async function appareil(): Promise<string | null> {
+		let v: unknown;
+		try { v = await deps.reglages().lire("deviceId"); } catch { return null; }
+		return typeof v === "string" && UUID.test(v) ? v : null;
+	}
+	const dossierListes = (): string => path.join(deps.racine(), ".neo-quiz", "moodle");
+	async function lireFichierListes(abs: string): Promise<TableListes | null> {
+		let st: Stats;
+		try { st = await fs.stat(abs); } catch { return null; }
+		// Present but too big or unreadable: an empty table, never a reason to start over from the old list.
+		if (!st.isFile() || st.size > MAX_FICHIER_LISTES) return {};
+		try { return lireTable(JSON.parse(await fs.readFile(abs, "utf-8"))); } catch { return {}; }
+	}
+	/** This device's file (null when it has none yet) and every other device's. */
+	async function lirePartage(id: string): Promise<{ own: TableListes | null; autres: TableListes[] }> {
+		const dir = dossierListes();
+		const ownNom = `${id}.json`;
+		const own = await lireFichierListes(path.join(dir, ownNom));
+		let noms: string[] = [];
+		try { noms = await fs.readdir(dir); } catch { /* no device has written yet */ }
+		const autres: TableListes[] = [];
+		for (const nom of noms.filter(n => n !== ownNom && n.endsWith(".json") && !n.startsWith(".") && !isConflictCopy(n)).sort().slice(0, MAX_FICHIERS_LISTES)) {
+			const t = await lireFichierListes(path.join(dir, nom));
+			if (t) autres.push(t);
+		}
+		return { own, autres };
+	}
+	async function ecrirePartage(id: string, t: TableListes): Promise<void> {
+		const dir = dossierListes();
+		await fs.mkdir(dir, { recursive: true });
+		const cible = path.join(dir, `${id}.json`);
+		const tmp = `${cible}.${process.pid}.tmp`;
+		await fs.writeFile(tmp, ecrireTable(t), "utf-8");
+		await fs.rename(tmp, cible);
+	}
+	/** One write at a time, on the same queue as the setting. */
+	function enFile<T>(fn: () => Promise<T>): Promise<T> {
+		const run = ecriture.then(fn);
+		ecriture = run.catch(() => undefined);
+		return run;
+	}
+	/** The lists every part of the service reads: the merge of every device's file, or the private ones without a device id. */
+	async function listes(o: Record<string, unknown>): Promise<Record<ListeCle, number[]>> {
+		const id = await appareil();
+		if (!id) return anciennes(o);
+		const { own, autres } = await lirePartage(id);
+		let base = own;
+		if (!base) {
+			// First read on this device: the old private list becomes its file, so the other devices see it too.
+			// Checked again inside the queue: a gesture written meanwhile must not be overwritten by the old list.
+			base = await enFile(async () => {
+				const deja = await lireFichierListes(path.join(dossierListes(), `${id}.json`));
+				if (deja) return deja;
+				const t = depuisAncien(anciennes(await brut()));
+				await ecrirePartage(id, t);
+				return t;
+			}).catch(e => {
+				console.warn(LOG_PREFIX, "Moodle: could not write the shared lists:", msg(e));
+				return depuisAncien(anciennes(o));
+			});
+		}
+		const f = fusionner([base, ...autres]);
+		for (const k of Object.keys(f) as ListeCle[]) f[k] = f[k].slice(-MAX_IDS);
+		return f;
 	}
 	/** Read-modify-write of the key, one at a time (two quick clicks never lose one). */
 	function modifier(fn: (o: Record<string, unknown>) => void): Promise<void> {
@@ -234,8 +309,24 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		ecriture = run.catch(() => undefined);
 		return run;
 	}
-	/** Adds or removes `id` in one list of the setting and returns the new list. */
+	/** Adds or removes `id` in one list and returns the new list: in this device's
+	    shared file, or in the setting when the app has no device id yet. */
 	async function basculer(cle: ListeCle, id: number, on: boolean, ancien: "refuser" | "oublier"): Promise<number[]> {
+		const appareilId = await appareil();
+		if (appareilId) {
+			return enFile(async () => {
+				const { own, autres } = await lirePartage(appareilId);
+				const base = own ?? depuisAncien(anciennes(await brut()));
+				const avant = fusionner([base, ...autres])[cle];
+				if (on && !avant.includes(id) && avant.length >= MAX_IDS && ancien === "refuser") throw new MoodleError("toomany", "Too many entries.");
+				// Later than any gesture already known for this id, whatever the other device's clock says.
+				const dejaVu = [base, ...autres].reduce((m, t) => Math.max(m, t[cle]?.[String(id)]?.at ?? 0), 0);
+				const t = poser(base, cle, id, on, Math.max(maintenant(), dejaVu + 1));
+				await ecrirePartage(appareilId, t);
+				oublier();
+				return fusionner([t, ...autres])[cle].slice(-MAX_IDS);
+			});
+		}
 		let res: number[] = [];
 		await modifier(o => {
 			let l = lireListe(o[cle]).filter(x => x !== id);

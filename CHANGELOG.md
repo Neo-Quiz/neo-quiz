@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Moodle favourites, hidden and added courses and ignored assignments are now the same on every computer that syncs your Neo Quiz folder: the latest change wins.
+
 ## [1.20.116] - 2026-10-16
 
 ### Changed

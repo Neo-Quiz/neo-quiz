@@ -631,7 +631,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   jeton ne sort jamais vers la fenêtre. Discriminance : la garde de redirection
   hors hôte et celle du passeport sont rejouées sur un MUTANT du vrai code et
   doivent alors échouer ; aucun fichier de l'app ne pose le commutateur
-  `allowHttpForTests`. Dans la CI.
+  `allowHttpForTests`. Depuis le 2026-10-17, les LISTES Moodle (favoris,
+  masqués, ajoutés, devoirs ignorés et vus) ne vivent plus dans les réglages
+  privés mais dans `<racine>/.neo-quiz/moodle/<appareil>.json`
+  (`moodle/listes.ts`) : un fichier par appareil, le geste le plus récent
+  gagne, un retrait reste une pierre tombale ; l'ancienne liste privée est
+  reprise une fois, plus vieille que tout geste daté. Dans la CI.
 - `npm run check:selection` — la SÉLECTION de cartes de quiz sur la page d'un
   dossier (`src/dashboard/selection.ts`, noyau pur ; l'écran est
   `selection-view.ts`) : Ctrl/Cmd+clic ajoute ou retire, Maj+clic étend la
