@@ -212,6 +212,8 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.openFolder": "Ouvrir le dossier",
 	"settings.moodle.exclude": "Ne plus synchroniser",
 	"settings.moodle.include": "Synchroniser à nouveau",
+	"settings.moodle.excludeHint": "Neo Quiz ne vérifiera plus ce module et ne téléchargera plus ses fichiers. Rien n'est supprimé.",
+	"settings.moodle.includeHint": "Neo Quiz vérifiera de nouveau ce module et téléchargera ses fichiers.",
 	"settings.moodle.remove": "Retirer",
 	"settings.moodle.openFile": "Ouvrir",
 	"settings.moodle.coursesEmpty": "Aucun cours à afficher.",

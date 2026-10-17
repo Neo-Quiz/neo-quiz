@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- "Stop syncing" in a Moodle module says what it does beside it.
+
 ## [1.21.8] - 2026-10-17
 
 ### Fixed

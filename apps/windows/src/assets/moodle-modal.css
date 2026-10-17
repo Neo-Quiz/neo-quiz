@@ -280,6 +280,13 @@
 	color: var(--nqm-text);
 }
 
+.nq-moodle-modal .nqm-foot-hint {
+	align-self: center;
+	color: var(--nqm-faint);
+	font-size: 0.76em;
+	max-width: 360px;
+}
+
 .nq-moodle-modal .nqm-file-mark {
 	display: inline-flex;
 	align-items: center;

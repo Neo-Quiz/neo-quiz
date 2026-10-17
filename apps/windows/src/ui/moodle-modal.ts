@@ -889,6 +889,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		pied = ajouter(c, "div", "nqm-footer");
 		const gauche = ajouter(pied, "div", "nqm-foot-tools nqm-never");
 		const excl = bouton(gauche, "nqm-ghost", t(co.exclu ? "settings.moodle.include" : "settings.moodle.exclude"));
+		// What the button does, said beside it: the label alone was not enough.
+		ajouter(gauche, "span", "nqm-foot-hint", t(co.exclu ? "settings.moodle.includeHint" : "settings.moodle.excludeHint"));
 		excl.addEventListener("click", () => {
 			void api.exclure(co.id, !co.exclu).then(async () => { await chargerCours(); courant = cours.find(x => x.id === co.id) ?? co; redessinerCours(); }, () => undefined);
 		});

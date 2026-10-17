@@ -214,6 +214,8 @@ export const EN_SETTINGS = {
 	"settings.moodle.openFolder": "Open the folder",
 	"settings.moodle.exclude": "Stop syncing",
 	"settings.moodle.include": "Sync again",
+	"settings.moodle.excludeHint": "Neo Quiz will no longer check this module nor download its files. Nothing is deleted.",
+	"settings.moodle.includeHint": "Neo Quiz checks this module and downloads its files again.",
 	"settings.moodle.remove": "Remove",
 	"settings.moodle.openFile": "Open",
 	"settings.moodle.coursesEmpty": "No course to show.",
