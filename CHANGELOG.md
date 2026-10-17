@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.120] - 2026-10-17
+
 ### Changed
 
 - A module you star in the Moodle window becomes a folder of the Folders page at once (created if Moodle has not made it yet).
