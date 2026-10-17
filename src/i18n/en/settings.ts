@@ -325,7 +325,7 @@ export const EN_SETTINGS = {
 	"settings.moodle.planningRefused.nostorage": "Secure storage is unavailable on this computer: the link is not saved.",
 	"settings.moodle.wVolume": "{hours} h · {n} sessions",
 	"settings.moodle.wVolumeOne": "{hours} h · 1 session",
-	"settings.moodle.wEnded": "Ended",
+	"settings.moodle.wEnded": "Ended {date}",
 	"settings.moodle.wOpening": "Opening…",
 	"settings.moodle.wUpdate": "Update",
 	"settings.moodle.wRetry": "Retry",

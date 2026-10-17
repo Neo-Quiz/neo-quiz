@@ -323,7 +323,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.planningRefused.nostorage": "Le stockage sécurisé est indisponible sur cet ordinateur : le lien n'est pas enregistré.",
 	"settings.moodle.wVolume": "{hours} h · {n} séances",
 	"settings.moodle.wVolumeOne": "{hours} h · 1 séance",
-	"settings.moodle.wEnded": "Terminé",
+	"settings.moodle.wEnded": "Terminé le {date}",
 	"settings.moodle.wOpening": "Ouverture…",
 	"settings.moodle.wUpdate": "Mettre à jour",
 	"settings.moodle.wRetry": "Réessayer",

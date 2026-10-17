@@ -15,6 +15,8 @@ release notes.
 
 ### Changed
 
+- Explain pages are now built in numbered steps you go through (Previous, Next), then end with one question, instead of asking you to choose before anything is shown.
+- A finished Moodle module shows the date of its last session ("Ended Wednesday, October 14").
 - The chats of the AI page and the Moodle window no longer show a system tooltip on hover.
 
 ## [1.20.118] - 2026-10-17

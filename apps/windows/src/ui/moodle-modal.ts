@@ -549,7 +549,12 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (!co.code) { badge.classList.add("is-warn"); badge.textContent = t("settings.moodle.wNoFolder"); return; }
 		const st = analyses.get(id);
 		if (!st) {
-			if (termine(co)) { badge.classList.add("is-ended"); badge.textContent = t("settings.moodle.wEnded"); }
+			const fin = co.code ? volumes[co.code]?.fin : undefined;
+			if (termine(co) && fin) {
+				badge.classList.add("is-ended");
+				const date = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { weekday: "long", day: "numeric", month: "long" }).format(new Date(fin));
+				badge.textContent = t("settings.moodle.wEnded", { date });
+			}
 			return;
 		}
 		if (st.state === "error") {
