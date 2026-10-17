@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-10-17
+
 ### Changed
 
 - A folder card shows when the folder was last modified instead of its path.
