@@ -1,11 +1,10 @@
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
-import { t } from "../i18n";
+import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { poserLogoObsidian } from "./brand-icons";
-import { couperCheminAuMilieu } from "./file-icons";
 import { moduleAccent } from "./module-color";
 import { openMenuOnRightClick } from "./quiz-card";
 
@@ -91,30 +90,28 @@ export function renderModuleCard(
 	ajouter(card, "div", "qbd-module-card__spacer");
 	ajouter(card, "div", "qbd-module-card__divider");
 	const footer = ajouter(card, "div", "qbd-module-card__footer");
-	/* LE CHEMIN, COUPÉ AU MILIEU (2026-09-27), comme un nom de fichier : la
-	   tête (racine, dossiers intermédiaires) se tronque avec ses points de
-	   suspension, la queue (le dossier lui-même) reste entière —
-	   `couperCheminAuMilieu`, file-icons.ts. Il remplace le chemin entier qui
-	   défilait en boucle depuis le 2026-09-17 : en mouvement, c'était le DÉBUT
-	   qui disparaissait, et c'est lui qui situe. La coupe est faite par le CSS
-	   (`text-overflow` sur la tête) : un chemin court tient en entier, sans
-	   mesure au rendu ni observateur de taille.
-	   Il ne réagit toujours à rien (`pointer-events: none`, CSS) : c'est la
-	   carte qui reçoit le survol et le clic. */
+	/* THE DATE THE FOLDER WAS LAST MODIFIED (2026-10-17), as the file explorer
+	   shows it: the folder's path, shown here until then, said nothing useful
+	   once every course folder sat in a year folder. Read asynchronously from
+	   the host; a host that does not know it shows nothing. The vault mark
+	   stays: it says where the folder comes from. */
 	const racine = group.path ? currentHost().paths.rootOf(group.path) : null;
 	if (group.path && racine) {
-		const chemin = ajouter(footer, "div", "qbd-module-card__path");
-		/* La pastille du vault, AVANT le chemin et hors de lui : elle dit d'où
-		   vient le dossier, elle ne fait pas partie du chemin — la laisser
-		   tronquer avec la tête serait perdre l'information. */
+		const ligne = ajouter(footer, "div", "qbd-module-card__path");
 		if (racine.vault) {
-			const marque = ajouter(chemin, "span", "qbd-module-card__path-vault");
+			const marque = ajouter(ligne, "span", "qbd-module-card__path-vault");
 			poserLogoObsidian(marque, t("dashboard.quizzes.obsidianVault"));
 		}
-		const texte = ajouter(chemin, "span", "qbd-module-card__path-texte");
-		const { tete, queue } = couperCheminAuMilieu(`${racine.name}/${currentHost().paths.localPath(group.path)}`);
-		ajouter(texte, "span", "qbd-module-card__path-tete", tete);
-		if (queue) ajouter(texte, "span", "qbd-module-card__path-queue", queue);
+		const texte = ajouter(ligne, "span", "qbd-module-card__path-texte");
+		const dateEl = ajouter(texte, "span", "qbd-module-card__path-tete");
+		void currentHost().fs.modified?.(group.path).then(ms => {
+			if (!ms) return;
+			const d = new Date(ms);
+			const autreAnnee = d.getFullYear() !== new Date().getFullYear();
+			const date = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US",
+				{ weekday: "long", day: "numeric", month: "long", ...(autreAnnee ? { year: "numeric" } : {}) }).format(d);
+			dateEl.textContent = t("dashboard.quizzes.folderModified", { date });
+		}, () => undefined);
 	}
 	if (onMenu) {
 		const moreBtn = ajouter(footer, "button", "qbd-card-more qbd-module-card__menu");

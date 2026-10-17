@@ -247,6 +247,10 @@ export interface HostFs {
 	    (`parcours.ts` n'écarte que les dossiers ignorés), `mtime` à 0 hors des
 	    `.md` — ce que `HostFile` autorise. */
 	listFiles(): HostFile[];
+	/** When a file or FOLDER was last modified (ms since the epoch), as the
+	    system's file explorer shows it; null when absent or unknown.
+	    Optional: a host without it shows no date (the folder cards). */
+	modified?(path: string): Promise<number | null>;
 	/** Les ENTRÉES d'un dossier du contrat — fichiers ET sous-dossiers, sans
 	    descendre. `dir` vide désigne la racine (le vault ; dans l'application,
 	    les dossiers ouverts eux-mêmes, un par racine). Un dossier absent OU

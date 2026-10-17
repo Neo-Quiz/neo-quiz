@@ -620,6 +620,12 @@ export function createWindowsFs(carte: CarteRacines, index: WindowsIndex): HostF
 		async exists(path) {
 			return await pont().fichiers.exists(abs(path));
 		},
+		async modified(path) {
+			try {
+				const st = await pont().fichiers.statEntree(abs(path));
+				return st ? st.mtimeMs : null;
+			} catch { return null; }
+		},
 		async size(path) {
 			try {
 				const st = await pont().fichiers.statEntree(abs(path));

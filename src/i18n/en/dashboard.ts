@@ -228,6 +228,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.menuHide": "Hide from list",
 	"dashboard.quizzes.menuShow": "Show in list",
 	"dashboard.quizzes.hiddenSection": "Hidden",
+	"dashboard.quizzes.folderModified": "Modified {date}",
 	"dashboard.quizzes.endedSection": "Ended",
 	"dashboard.quizzes.folderHidden": "“{name}” hidden, reviews paused · find it under Hidden at the bottom of the list",
 	"dashboard.quizzes.folderShown": "“{name}” is back in the list",
