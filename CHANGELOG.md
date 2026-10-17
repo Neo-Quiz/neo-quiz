@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.13] - 2026-10-17
+
 ### Changed
 
 - New Moodle lectures no longer get a Learn automatically, for now; its settings left the Moodle page.
