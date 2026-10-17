@@ -27,8 +27,10 @@ export const MAX_ENTREES = 1000;
 
 const idValide = (k: string): boolean => /^[1-9][0-9]{0,15}$/.test(k) && Number.isSafeInteger(Number(k));
 
-/** A device file read from the synced folder: anything malformed is dropped, never trusted. */
-export function lireTable(brut: unknown): TableListes {
+/** A device file read from the synced folder: anything malformed is dropped, never
+    trusted. A gesture dated after `maxAt` (a wrong clock, or a forged `at: 1e308`
+    that would win every merge and freeze the course for good) is dropped too. */
+export function lireTable(brut: unknown, maxAt = Number.MAX_SAFE_INTEGER): TableListes {
 	const out: TableListes = {};
 	if (!brut || typeof brut !== "object" || Array.isArray(brut)) return out;
 	const listes = (brut as Record<string, unknown>).lists;
@@ -42,7 +44,7 @@ export function lireTable(brut: unknown): TableListes {
 			if (n >= MAX_ENTREES) break;
 			if (!idValide(k) || !g || typeof g !== "object") continue;
 			const { on, at } = g as Record<string, unknown>;
-			if (typeof on !== "boolean" || typeof at !== "number" || !Number.isFinite(at) || at < 0) continue;
+			if (typeof on !== "boolean" || typeof at !== "number" || !Number.isFinite(at) || at < 0 || at > maxAt) continue;
 			t[k] = { on, at };
 			n++;
 		}

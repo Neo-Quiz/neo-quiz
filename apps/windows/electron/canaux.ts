@@ -622,6 +622,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	}
 	/** Same door as `garderReglagesIa`, for the Moodle site. */
 	let dialogueMoodle = false;
+	let refusPlanning = 0;
 	let dialogueMoodleFin = 0;
 	async function garderReglagesMoodle(valeur: unknown): Promise<void> {
 		const actuel = await reglagesOuErreur().lire(CLE_REGLAGES_MOODLE);
@@ -722,7 +723,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const lien = lienPlanning(url);
 		if (!lien) return { ok: false, raison: "badlink" };
 		if (!HOTES_PLANNING_CONNUS.has(lien.hote)) {
-			if (dialogueMoodle || Date.now() - dialogueMoodleFin < 3000) return { ok: false, raison: "busy" };
+			// Two refusals in a row: no new question for a minute (a window cannot keep asking).
+			if (dialogueMoodle || Date.now() - dialogueMoodleFin < 3000 || (refusPlanning >= 2 && Date.now() - dialogueMoodleFin < 60000)) return { ok: false, raison: "busy" };
 			dialogueMoodle = true;
 			const options = {
 				type: "question" as const,
@@ -741,7 +743,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				dialogueMoodle = false;
 				dialogueMoodleFin = Date.now();
 			}
-			if (response !== 0) return { ok: false, raison: "denied" };
+			if (response !== 0) { refusPlanning++; return { ok: false, raison: "denied" }; }
+			refusPlanning = 0;
 		}
 		try {
 			return { ok: true, etat: await deps.planning.poser(lien.url) };

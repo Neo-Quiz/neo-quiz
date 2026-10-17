@@ -23,6 +23,9 @@ release notes.
 - The Moodle window no longer has a "Course link" button.
 - A Moodle module shows its short code and name as its title, and its forums, links and pages open on Moodle in your browser with one click.
 - "Exclude" in a Moodle module is now "Stop following".
+- The Moodle window checks three modules at a time and skips the modules whose last session is over (marked Ended); a favourite is always checked.
+- Refresh in the Moodle window is now a button beside the year filter, and F5 refreshes too.
+- The Moodle window opens at its full size with a spinner while the courses load.
 - A PDF shows the same red PDF icon everywhere in the app.
 
 ## [1.20.117] - 2026-10-17

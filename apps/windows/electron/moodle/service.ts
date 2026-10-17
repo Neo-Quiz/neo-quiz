@@ -25,7 +25,7 @@ import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { depuisAncien, ecrireTable, fusionner, lireTable, poser, type ListeCle, type TableListes } from "./listes";
 import { extensionRefusee } from "../ressources";
-import { allFiles, decisionAuto, depositState, launchUrl, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
+import { allFiles, decisionAuto, depositState, launchUrl, limiter, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -37,6 +37,12 @@ const MAX_TEXTE = 100;
 /** The catalogue is kept this long, and a verb called twice within the floor gets the first answer. */
 export const CATALOGUE_TTL = 30000;
 export const VERB_FLOOR = 1000;
+/** The gap between two calls of a verb when it is not `VERB_FLOOR`: a module is
+    read three at a time (`MODULES_EN_VOL`), so the window's check of a year
+    of ~25 modules takes seconds, not half a minute, and still never more than
+    ~3 module reads per second reach the school server. */
+const ECART_VERBES: Readonly<Record<string, number>> = { module: 300 };
+export const MODULES_EN_VOL = 3;
 /** Followed `extra` courses (the rest of the setting is kept but not fetched). */
 export const MAX_EXTRA_SUIVIS = 50;
 /** New files of full syncs kept for the window until it takes them (the oldest go first). */
@@ -173,6 +179,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	const echecsFichiers = new Map<number, Set<string>>();
 	let catCache: { at: number; userid: number; liste: CoursChoisi[] } | null = null;
 	const memos = new Map<string, { at: number; val: Promise<unknown> }>();
+	const modulesEnVol = limiter(MODULES_EN_VOL);
 	const dernierVerbe = new Map<string, number>();
 	/** Forgets what the throttle kept: after a write or a download, the next read is fresh. */
 	const oublier = (): void => {
@@ -180,14 +187,15 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		for (const k of memos.keys()) if (!k.startsWith("telechargerCours|")) memos.delete(k);
 	};
 	/** 1 s floor per verb: the same call within the floor returns the first answer;
-	    another call of the verb waits for its turn (a page cannot hammer the school server). */
+	    another call of the verb waits for its turn, 1 s (or `ECART_VERBES`) after
+	    the previous one (a page cannot hammer the school server). */
 	function limite<T>(verbe: string, cle: string, fn: () => Promise<T>): Promise<T> {
 		if (deps.essaiSansLimite) return fn();
 		const k = verbe + "|" + cle;
 		const m = memos.get(k);
 		const t = maintenant();
 		if (m && t - m.at < VERB_FLOOR) return m.val as Promise<T>;
-		const attente = Math.max(0, (dernierVerbe.get(verbe) ?? 0) + VERB_FLOOR - t);
+		const attente = Math.max(0, (dernierVerbe.get(verbe) ?? 0) + (ECART_VERBES[verbe] ?? VERB_FLOOR) - t);
 		dernierVerbe.set(verbe, t + attente);
 		const val = (attente ? new Promise<void>(r => setTimeout(r, attente)) : Promise.resolve()).then(fn);
 		memos.set(k, { at: t + attente, val });
@@ -245,7 +253,13 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		try { st = await fs.stat(abs); } catch { return null; }
 		// Present but too big or unreadable: an empty table, never a reason to start over from the old list.
 		if (!st.isFile() || st.size > MAX_FICHIER_LISTES) return {};
-		try { return lireTable(JSON.parse(await fs.readFile(abs, "utf-8"))); } catch { return {}; }
+		try {
+			return lireTable(JSON.parse(await fs.readFile(abs, "utf-8")), maintenant() + 24 * 3600 * 1000);
+		} catch {
+			// Unreadable: kept aside once, never silently lost when this device rewrites its own file.
+			await fs.copyFile(abs, `${abs}.bad`).catch(() => undefined);
+			return {};
+		}
 	}
 	/** This device's file (null when it has none yet) and every other device's. */
 	async function lirePartage(id: string): Promise<{ own: TableListes | null; autres: TableListes[] }> {
@@ -583,7 +597,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 	async function moduleDuCours(courseId: unknown): Promise<ModuleMoodle> {
 		const id = idOuErreur(courseId);
 		const vide: ModuleMoodle = { sections: [], externes: 0 };
-		return limite("module", String(id), async () => (await avecClient(async (client, s) => {
+		return limite("module", String(id), () => modulesEnVol(async () => (await avecClient(async (client, s) => {
 			const c = await coursConnu(client, s.j.userid, id);
 			const code = c.course.code;
 			if (!code) return vide;
@@ -610,7 +624,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 				}),
 			}));
 			return { sections, externes: scan.external.length };
-		})) ?? vide);
+		})) ?? vide));
 	}
 
 	interface Cible { ids: number[] | null; nom?: string }

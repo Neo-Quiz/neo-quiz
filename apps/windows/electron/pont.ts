@@ -657,7 +657,7 @@ export interface Pont {
 		planningPoser(url: string): Promise<{ ok: true; etat: EtatPlanning } | { ok: false; raison: "badlink" | "busy" | "denied" | "nostorage" }>;
 		planningEffacer(): Promise<EtatPlanning>;
 		/** Minutes and sessions of the timetable per module code (absent: no session found). */
-		planningVolumes(codes: string[]): Promise<Record<string, { minutes: number; seances: number }>>;
+		planningVolumes(codes: string[]): Promise<Record<string, { minutes: number; seances: number; fin: number }>>;
 		/** `ouvrirDevoir` AND the course's `Rendus...` sub-folder (else the module folder) in Explorer. */
 		deposer(cmid: number): Promise<boolean>;
 		devoirVu(cmid: number): Promise<void>;

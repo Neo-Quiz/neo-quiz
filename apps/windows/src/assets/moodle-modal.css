@@ -484,12 +484,30 @@
 	animation: nqm-spin 0.7s linear infinite;
 }
 
+/* The first load (moodle-modal.ts): the window at its working size, a blue spinner in the middle. */
+.nq-moodle-modal .nqm-loading {
+	display: grid;
+	place-items: center;
+	height: min(70vh, 640px);
+}
+
+.nq-moodle-modal .nqm-loading-spinner {
+	width: 34px;
+	height: 34px;
+	border: 3px solid color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+	border-top-color: var(--interactive-accent);
+	border-radius: 50%;
+	animation: nqm-spin 0.8s linear infinite;
+}
+
 @keyframes nqm-spin {
 	to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.nq-moodle-modal .nqm-spinner { animation-duration: 2.4s; }
+	.nq-moodle-modal .nqm-loading-spinner { animation-duration: 2.4s; }
+	.nq-moodle-modal .nqm-refresh.is-busy .nqm-refresh-icon { animation: none; }
 }
 
 .nq-moodle-modal .nqm-searchbar {
@@ -532,6 +550,37 @@
 
 .nq-moodle-modal .nqm-search:focus {
 	outline: none;
+}
+
+.nq-moodle-modal .nqm-refresh {
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: none;
+	border-radius: calc(var(--radius-m) - 2px);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--nqm-muted) !important;
+	cursor: pointer;
+}
+
+.nq-moodle-modal .nqm-refresh:hover {
+	background: var(--nqm-hover) !important;
+	color: var(--nqm-text) !important;
+}
+
+.nq-moodle-modal .nqm-refresh-icon .svg-icon,
+.nq-moodle-modal .nqm-refresh-icon svg {
+	width: 15px;
+	height: 15px;
+}
+
+/* Turns while modules are being checked (moodle-modal.ts `peindrePied`). */
+.nq-moodle-modal .nqm-refresh.is-busy .nqm-refresh-icon {
+	animation: nqm-spin 1s linear infinite;
 }
 
 .nq-moodle-modal .nqm-filter {
@@ -1007,6 +1056,10 @@
 
 .nq-moodle-modal .nqm-course-badge:empty {
 	display: none;
+}
+
+.nq-moodle-modal .nqm-course-badge.is-ended {
+	color: var(--nqm-faint);
 }
 
 .nq-moodle-modal .nqm-course-badge .nqm-spinner {

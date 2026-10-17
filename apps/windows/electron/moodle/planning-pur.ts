@@ -23,7 +23,8 @@ export interface LienPlanning { url: string; hote: string }
 /** `debut`: start in minutes on a naive clock (only compared with other starts);
     `cle`: identity of the session in the feed (UID, recurrence id, start). */
 export interface Seance { texte: string; minutes: number; debut: number; cle: string }
-export interface Volume { minutes: number; seances: number }
+/** `fin`: end of the last session (epoch ms; naive local for a feed without UTC times, a few hours off at most). */
+export interface Volume { minutes: number; seances: number; fin: number }
 
 export interface OptionsLien { /** Tests only: accept `http:` and a port. */ http?: boolean }
 
@@ -151,15 +152,16 @@ const normaliser = (s: string): string => s.toUpperCase().replace(/([A-Z])[-_ ]+
     `XTI3061` does not). Codes without a session are absent. */
 export function volumesParCode(seances: readonly Seance[], codes: readonly string[]): Record<string, Volume> {
 	const out: Record<string, Volume> = {};
-	const textes = seances.map(s => ({ t: normaliser(s.texte), m: s.minutes }));
+	const textes = seances.map(s => ({ t: normaliser(s.texte), m: s.minutes, d: s.debut }));
 	for (const code of new Set(codes)) {
 		const n = normaliser(code);
 		if (!/^[A-Z0-9]{2,32}$/.test(n)) continue;
 		const re = new RegExp(`(?<![A-Z0-9])${n}(?![0-9])`);
 		let minutes = 0;
 		let nb = 0;
-		for (const s of textes) if (re.test(s.t)) { minutes += s.m; nb++; }
-		if (nb) out[code] = { minutes, seances: nb };
+		let fin = 0;
+		for (const s of textes) if (re.test(s.t)) { minutes += s.m; nb++; fin = Math.max(fin, (s.d + s.m) * 60000); }
+		if (nb) out[code] = { minutes, seances: nb, fin };
 	}
 	return out;
 }

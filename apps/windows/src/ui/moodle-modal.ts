@@ -127,12 +127,22 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	let etat: EtatMoodle | null = null;
 	let cours: CoursMoodle[] = [];
 	/** Hours and sessions of the timetable per module code (empty without a timetable link). */
-	let volumes: Record<string, { minutes: number; seances: number }> = {};
+	let volumes: Record<string, { minutes: number; seances: number; fin: number }> = {};
 	let devoirs: DevoirMoodle[] = [];
 	const nouveaux = new Set<number>();
 	const trouves: ResultatRechercheMoodle[] = [];
 	const analyses = new Map<number, Analyse>();
-	let chaine: Promise<void> = Promise.resolve();
+	/* Modules are checked three at a time (the main process paces them too, `MODULES_EN_VOL`). */
+	const PARALLELE = 3;
+	const fileAnalyses: Array<() => Promise<void>> = [];
+	let enVol = 0;
+	function pomper(): void {
+		while (enVol < PARALLELE && fileAnalyses.length) {
+			const job = fileAnalyses.shift()!;
+			enVol++;
+			void job().finally(() => { enVol--; pomper(); });
+		}
+	}
 	let filtreAnnee: string | null | undefined;
 	let rechercheFaite = false;
 	let actualise = false;
@@ -150,6 +160,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	let resultats: HTMLElement | null = null;
 	let bandeau: HTMLElement | null = null;
 	let boutonFiltre: HTMLElement | null = null;
+	let boutonActualiser: HTMLButtonElement | null = null;
 	let libelleFiltre: HTMLElement | null = null;
 	let menu: HTMLElement | null = null;
 	let boutonTout: HTMLButtonElement | null = null;
@@ -169,10 +180,10 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 
 	/* ── data ── */
 	/** The timetable's totals, painted when they arrive (a first download can take a few seconds). */
-	function chargerVolumes(): void {
+	function chargerVolumes(): Promise<void> {
 		const codes = [...new Set(cours.map(co => co.code).filter((x): x is string => !!x))];
-		if (!codes.length) return;
-		void api.planningVolumes(codes).then(v => {
+		if (!codes.length) return Promise.resolve();
+		return api.planningVolumes(codes).then(v => {
 			volumes = v;
 			if (estDetruit()) return;
 			if (vue === "picker") peindreResultats();
@@ -186,6 +197,12 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const h = Math.round(v.minutes / 6) / 10;
 		const heures = (Number.isInteger(h) ? String(h) : h.toFixed(1)).replace(".", currentLang() === "fr" ? "," : ".");
 		return t(v.seances === 1 ? "settings.moodle.wVolumeOne" : "settings.moodle.wVolume", { hours: heures, n: String(v.seances) });
+	}
+	/** The timetable says the module's last session is over: not checked when the
+	    window opens (a favourite still is; opening the module checks it). */
+	function termine(co: CoursMoodle): boolean {
+		const v = co.code ? volumes[co.code] : undefined;
+		return !co.favori && !!v && v.fin < Date.now();
 	}
 	async function chargerCours(): Promise<void> {
 		cours = await api.cours().catch(() => [] as CoursMoodle[]);
@@ -201,8 +218,11 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	async function chargerTout(): Promise<void> {
 		etat = await api.etat().catch(() => null);
 		if (estDetruit()) return;
-		if (etat?.connected && etat.state === "connected") await chargerCours();
-		else { cours = []; devoirs = []; }
+		if (etat?.connected && etat.state === "connected") {
+			await chargerCours();
+			// Before the first paint: the first check skips the modules that are over (`termine`).
+			await Promise.race([chargerVolumes(), new Promise(r => setTimeout(r, 2500))]);
+		} else { cours = []; devoirs = []; }
 	}
 	function connecte(): boolean { return !!etat && etat.connected && etat.state === "connected"; }
 
@@ -213,7 +233,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (cur?.state === "busy" || (cur && !force)) return;
 		analyses.set(co.id, { state: "busy", mod: cur?.mod ?? null, at: cur?.at ?? 0 });
 		surAnalyse(co.id);
-		chaine = chaine.then(async () => {
+		fileAnalyses.push(async () => {
 			if (estDetruit()) return;
 			const attente = (cur?.at ?? 0) + PLANCHER_MS - Date.now();
 			if (attente > 0) await new Promise(r => setTimeout(r, attente));
@@ -225,6 +245,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			}
 			if (!estDetruit()) surAnalyse(co.id);
 		});
+		pomper();
 	}
 
 	function demarrer(): void {
@@ -258,7 +279,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		cartesDepot.clear();
 		arreterHorloge();
 		arreterSonde();
-		statut = champ = resultats = bandeau = boutonFiltre = libelleFiltre = menu = boutonTout = liste = pied = boutonCours = null;
+		statut = champ = resultats = bandeau = boutonFiltre = boutonActualiser = libelleFiltre = menu = boutonTout = liste = pied = boutonCours = null;
 	}
 	function arreterSonde(): void { if (sonde) clearInterval(sonde); sonde = null; }
 	function arreterHorloge(): void { if (horloge) clearInterval(horloge); horloge = null; }
@@ -328,6 +349,13 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		champ.placeholder = t("settings.moodle.wSearchModules");
 		champ.spellcheck = false;
 		champ.setAttribute("aria-label", t("settings.moodle.wSearchModules"));
+		/* Refresh sits with the search and the year it acts on; F5 does the same (below). */
+		boutonActualiser = ajouter(barre, "button", "nqm-refresh");
+		boutonActualiser.type = "button";
+		boutonActualiser.title = t("settings.moodle.wRefreshF5");
+		boutonActualiser.setAttribute("aria-label", t("settings.moodle.wRefreshF5"));
+		icone(boutonActualiser, "refresh-cw", "nqm-refresh-icon");
+		boutonActualiser.addEventListener("click", () => { void actualiser(true); });
 		boutonFiltre = ajouter(barre, "button", "nqm-filter");
 		boutonFiltre.setAttribute("type", "button");
 		icone(boutonFiltre, "list-filter", "nqm-filter-icon");
@@ -342,8 +370,6 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const pa = ajouter(c, "div", "nqm-footer nqm-footer-split");
 		statut = ajouter(pa, "div", "nqm-status");
 		const droite = ajouter(pa, "div", "nqm-foot-right");
-		const outils = ajouter(droite, "div", "nqm-foot-tools");
-		bouton(outils, "nqm-link", t("settings.moodle.wRefresh")).addEventListener("click", () => { void actualiser(true); });
 		boutonTout = bouton(droite, "nqm-primary nqm-sync-all", "");
 		boutonTout.addEventListener("click", () => { void toutTelecharger(); });
 
@@ -370,7 +396,9 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		});
 		await chargerCours();
 		if (estDetruit() || vue !== "picker") return;
-		chargerVolumes();
+		// The timetable decides which modules are over (not checked): waited for, but never more than 2.5 s.
+		await Promise.race([chargerVolumes(), new Promise(r => setTimeout(r, 2500))]);
+		if (estDetruit() || vue !== "picker") return;
 		apresCours();
 		if (rescan) prescan(true);
 		await depots;
@@ -400,7 +428,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		prescan(false);
 	}
 	function prescan(force: boolean): void {
-		for (const co of visibles()) analyser(co, force);
+		for (const co of visibles()) if (!termine(co)) analyser(co, force);
 	}
 
 	function peindreResultats(): void {
@@ -521,7 +549,10 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (co.exclu) { badge.classList.add("is-warn"); badge.textContent = t("settings.moodle.excludedTag"); return; }
 		if (!co.code) { badge.classList.add("is-warn"); badge.textContent = t("settings.moodle.wNoFolder"); return; }
 		const st = analyses.get(id);
-		if (!st) return;
+		if (!st) {
+			if (termine(co)) { badge.classList.add("is-ended"); badge.textContent = t("settings.moodle.wEnded"); }
+			return;
+		}
 		if (st.state === "error") {
 			badge.classList.add("is-error");
 			badge.textContent = t("settings.moodle.wError");
@@ -586,6 +617,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	function peindrePied(): void {
 		if (vue !== "picker" || !boutonTout) return;
 		const verifie = visibles().filter(co => analyses.get(co.id)?.state === "busy").length;
+		boutonActualiser?.classList.toggle("is-busy", verifie > 0);
 		if (!verifie && note) dire(note);
 		else if (verifie) dire(t(verifie > 1 ? "settings.moodle.wCheckingMany" : "settings.moodle.wCheckingOne", { n: verifie }), true);
 		else if (etat?.pausedMetered) dire(t("settings.moodle.pausedMetered"));
@@ -986,7 +1018,21 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (etat === null) { peindreConnexion(); return; }
 		demarrer();
 	});
-	ajouter(c, "div", "nqm-status", t("settings.moodle.wCoursesLoading"));
+	/* The window opens at its working size with one blue spinner in the middle,
+	   not a thin "Loading..." strip that then grows into the list. */
+	const chargement = ajouter(c, "div", "nqm-loading");
+	chargement.setAttribute("role", "status");
+	chargement.setAttribute("aria-label", t("settings.moodle.wCoursesLoading"));
+	ajouter(chargement, "div", "nqm-loading-spinner");
 
-	return () => { arreterSonde(); arreterHorloge(); desabonner(); };
+	/* F5 refreshes what is on screen: the list, or the open module. */
+	const surTouche = (e: KeyboardEvent): void => {
+		if (e.key !== "F5" || e.ctrlKey || e.altKey || e.metaKey) return;
+		e.preventDefault();
+		if (vue === "picker") void actualiser(true);
+		else if (vue === "course" && courant) analyser(courant, true);
+	};
+	document.addEventListener("keydown", surTouche, true);
+
+	return () => { document.removeEventListener("keydown", surTouche, true); arreterSonde(); arreterHorloge(); desabonner(); };
 }

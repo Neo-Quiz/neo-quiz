@@ -28,7 +28,8 @@ export const PLANNING_TTL = 6 * 3600 * 1000;
 const TIMEOUT = 30000;
 const DEADLINE = 60000;
 const MAX_REDIRECTS = 3;
-const MAX_CODES = 500;
+/** A year holds ~30 modules; the cap bounds the matching work the window can ask for. */
+const MAX_CODES = 100;
 
 
 export interface DepsPlanning {
@@ -112,6 +113,7 @@ export function creerPlanning(deps: DepsPlanning): ServicePlanning {
 	let enCours: Promise<void> | null = null;
 	/** A failed download is not retried for 10 minutes: each window opening would hit the school server. */
 	let echecA = 0;
+	let memo: { cle: string; res: Record<string, Volume> } | null = null;
 
 	const empreinteDe = (url: string): string => createHash("sha256").update(url).digest("hex");
 	async function lireLien(): Promise<{ url: string; hote: string } | null> {
@@ -186,7 +188,11 @@ export function creerPlanning(deps: DepsPlanning): ServicePlanning {
 			await rafraichir();
 			cache = await lireCache();
 		}
-		return cache && cache.empreinte === empreinte ? volumesParCode(cache.seances, liste) : {};
+		if (!cache || cache.empreinte !== empreinte) return {};
+		// The same question on the same cache: the last answer (the window asks at every opening).
+		const cle = `${cache.at}|${liste.join(",")}`;
+		if (memo?.cle !== cle) memo = { cle, res: volumesParCode(cache.seances, liste) };
+		return memo.res;
 	}
 	return { etat, poser, effacer, volumes };
 }

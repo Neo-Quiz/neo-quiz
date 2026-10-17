@@ -1151,6 +1151,8 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 		const t = lireTable({ v: 1, lists: { favoris: { 5: { on: true, at: 1 }, 0: { on: true, at: 1 }, abc: { on: true, at: 1 }, ["__proto__"]: { on: true, at: 1 }, 6: { on: "yes", at: 1 }, 8: { on: true, at: -1 }, 9: { on: true, at: NaN } }, other: { 1: { on: true, at: 1 } } } });
 		assert.deepEqual(t, { favoris: { 5: { on: true, at: 1 } } });
 		for (const bad of [null, [], "x", { lists: [] }, { lists: { favoris: [1] } }]) assert.deepEqual(fusionner([lireTable(bad)]).favoris, [], JSON.stringify(bad));
+		// a forged date far in the future would win every merge for good: dropped at reading
+		assert.deepEqual(lireTable({ v: 1, lists: { favoris: { 7: { on: false, at: 1e308 }, 8: { on: false, at: 2000 } } } }, 1000), { favoris: {} });
 		let big = {};
 		for (let i = 1; i <= MAX_ENTREES + 5; i++) big = poser(big, "devoirsVus", i, true, i);
 		assert.equal(Object.keys(big.devoirsVus).length, MAX_ENTREES);
@@ -1739,17 +1741,19 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 	});
 	await test("timetable totals: a code counts as a word (suffix kept, longer code not), dash between letters and digits ignored", () => {
 		const { volumesParCode } = planPur;
+		const S = (texte, minutes, debut) => ({ texte, minutes, debut, cle: texte });
 		const s = [
-			{ texte: "Code module: XTI306-2627PSA01", minutes: 300 }, { texte: "xti306 TD", minutes: 120 },
-			{ texte: "XTI3061 other", minutes: 60 }, { texte: "AXTI306 other", minutes: 60 },
-			{ texte: "Code module: XCS-413-2627PSA01", minutes: 180 }, { texte: "XTI306CYB", minutes: 30 },
+			S("Code module: XTI306-2627PSA01", 300, 1000), S("xti306 TD", 120, 5000),
+			S("XTI3061 other", 60, 9000), S("AXTI306 other", 60, 9000),
+			S("Code module: XCS-413-2627PSA01", 180, 2000), S("XTI306CYB", 30, 3000),
 		];
 		assert.deepEqual(volumesParCode(s, ["XTI306", "XCS413", "XTI999", "X", "a.*", "XTI306"]), {
-			XTI306: { minutes: 450, seances: 3 }, XCS413: { minutes: 180, seances: 1 },
+			XTI306: { minutes: 450, seances: 3, fin: (5000 + 120) * 60000 }, XCS413: { minutes: 180, seances: 1, fin: (2000 + 180) * 60000 },
 		});
 	});
 	await test("timetable service: link encrypted and never returned, same-host redirects only, bounded, a failure keeps the cache and waits", async () => {
 		const SECRET = "s3cr3t-token-abcdef";
+		const sansFin = r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, { minutes: v.minutes, seances: v.seances }]));
 		const ICS = n => "BEGIN:VCALENDAR\n" + Array.from({ length: n }, (_, i) => `BEGIN:VEVENT\nUID:${i}\nDTSTART:20261016T0${i % 9}0000Z\nDTEND:20261016T0${i % 9}3000Z\nSUMMARY:XTI306\nEND:VEVENT`).join("\n") + "\nEND:VCALENDAR\n";
 		let mode = "ok";
 		const hits = { n: 0 };
@@ -1774,14 +1778,14 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.equal(JSON.stringify(e).includes(SECRET), false, "the window never gets the link");
 			assert.equal(fs.readFileSync(path.join(dir, "moodle-planning.bin")).toString("utf8").includes(SECRET), false, "never stored in plain text");
 			assert.equal(fs.readFileSync(path.join(dir, "moodle-planning.json"), "utf8").includes(SECRET), false, "the cache does not hold the link");
-			assert.deepEqual(await p.volumes(["XTI306", 5, "../x"]), { XTI306: { minutes: 120, seances: 4 } });
+			assert.deepEqual(sansFin(await p.volumes(["XTI306", 5, "../x"])), { XTI306: { minutes: 120, seances: 4 } });
 			const n = hits.n;
 			await p.volumes(["XTI306"]);
 			assert.equal(hits.n, n, "a fresh cache is not downloaded again");
 			// stale cache + server failure: the old totals stay, the error is a code, no retry for 10 minutes
 			clock += planMod.PLANNING_TTL + 1;
 			mode = "fail";
-			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 120, seances: 4 } });
+			assert.deepEqual(sansFin(await p.volumes(["XTI306"])), { XTI306: { minutes: 120, seances: 4 } });
 			assert.equal((await p.etat()).erreur, "refused");
 			const n2 = hits.n;
 			await p.volumes(["XTI306"]);
@@ -1789,14 +1793,14 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			// a redirect on the same host is followed; one to another host is not
 			mode = "same";
 			clock += 11 * 60 * 1000;
-			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 60, seances: 2 } });
+			assert.deepEqual(sansFin(await p.volumes(["XTI306"])), { XTI306: { minutes: 60, seances: 2 } });
 			// the feed slides: it now lists only a later session; the two known ones stay in the total
 			mode = "later";
 			clock += planMod.PLANNING_TTL + 1;
-			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 90, seances: 3 } });
+			assert.deepEqual(sansFin(await p.volumes(["XTI306"])), { XTI306: { minutes: 90, seances: 3 } });
 			// the same link pasted again keeps the history; another link starts over
 			await p.poser(url);
-			assert.deepEqual(await p.volumes(["XTI306"]), { XTI306: { minutes: 90, seances: 3 } });
+			assert.deepEqual(sansFin(await p.volumes(["XTI306"])), { XTI306: { minutes: 90, seances: 3 } });
 			mode = "off";
 			await assert.rejects(planMod.telechargerIcs(url, { http: true }), e => e instanceof planMod.ErreurPlanning && e.code === "refused" && !e.message.includes(SECRET));
 			mode = "big";
