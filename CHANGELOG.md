@@ -15,6 +15,11 @@ release notes.
 
 ### Changed
 
+- The Explain chat shows the agent mode chip (Full access...) like the AI page, and an open quiz reloads by itself, where you are, when the AI edits its note.
+- Folder cards and the "Move to" menu no longer show a vault logo.
+
+### Changed
+
 - The output folder menu of the AI page has a search field and scrolls, shows each folder's school year instead of the root's name, and no longer lists the sub-folders of a course.
 
 ## [1.21.0] - 2026-10-17

@@ -31,8 +31,7 @@ import type { AiSettingsHost } from "./ai-settings-host";
 import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openCategoriePicker, openNotePicker, openActionMenu } from "./ui-select";
-import { MODES_AGENT, lireModeAgent } from "../host/claude-outils";
-import type { ModeAgent } from "../host/claude-outils";
+import { mountAgentModePill } from "./agent-mode-pill";
 import { ouvrirMenuPlus } from "./composer-plus";
 import { categorieChoisie, categorieDuDossier, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
@@ -1510,31 +1509,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				effortBtn.type = "button";
 				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
 
-				/* THE AGENT MODE (2026-10-10), MonoCode's chip: how freely the CLI
-				   acts in the quiz's trusted folder. Read by `ai-client.ts`
-				   (`lireModeAgent`), judged again by the main process. */
-				const modeBtn = ajouter(parent, "button", "qbd-select qbd-agent-mode-trigger qbd-composer-plain");
-				modeBtn.type = "button";
-				const modeIcone = ajouter(modeBtn, "span", "qbd-agent-mode-icon");
-				const modeLabel = ajouter(modeBtn, "span", "qbd-select-label");
-				const ICONES_MODE: Record<ModeAgent, string> = { supervised: "lock", acceptEdits: "file-pen-line", auto: "sparkles", full: "shield-alert" };
-				const peindreMode = (): void => {
-					const m = lireModeAgent(settings().aiAgentMode);
-					host.ui.setIcon(modeIcone, ICONES_MODE[m]);
-					modeLabel.textContent = t(`ai.agentMode.${m}`);
-					modeBtn.classList.toggle("is-full", m === "full");
-					modeBtn.setAttribute("aria-label", t("ai.agentMode.label") + " : " + t(`ai.agentMode.${m}`));
-				};
-				peindreMode();
-				modeBtn.addEventListener("click", () => {
-					const courant = lireModeAgent(settings().aiAgentMode);
-					openActionMenu(modeBtn, MODES_AGENT.map(m => ({
-						icon: ICONES_MODE[m],
-						label: t(`ai.agentMode.${m}`),
-						sub: t(!isClaude && m === "acceptEdits" ? "ai.agentMode.acceptEditsCodexSub" : `ai.agentMode.${m}Sub`),
-						checked: m === courant,
-						onClick: () => { void saveSettings({ aiAgentMode: m }).then(peindreMode); },
-					})), { className: "qbd-agent-mode-menu" });
+				// The agent mode chip, shared with the "Explain" chat (`agent-mode-pill.ts`).
+				const { el: modeBtn, paint: peindreMode } = mountAgentModePill(parent, {
+					read: () => settings().aiAgentMode,
+					save: m => saveSettings({ aiAgentMode: m }),
+					isClaude: () => isClaude,
 				});
 
 				const EFFORT_DISPLAY: Record<string, string> = {

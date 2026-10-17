@@ -223,7 +223,6 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.menuRename": "Rename",
 	"dashboard.quizzes.menuCopyPath": "Copy path",
 	"dashboard.quizzes.menuOpenFolder": "Open folder",
-	"dashboard.quizzes.obsidianVault": "Notes folder",
 	"dashboard.quizzes.menuDelete": "Delete quiz",
 	"dashboard.quizzes.menuHide": "Hide from list",
 	"dashboard.quizzes.menuShow": "Show in list",

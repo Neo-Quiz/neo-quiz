@@ -4,7 +4,6 @@ import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
 import type { ModuleGroup } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
-import { poserLogoObsidian } from "./brand-icons";
 import { moduleAccent } from "./module-color";
 import { openMenuOnRightClick } from "./quiz-card";
 
@@ -93,15 +92,11 @@ export function renderModuleCard(
 	/* THE DATE THE FOLDER WAS LAST MODIFIED (2026-10-17), as the file explorer
 	   shows it: the folder's path, shown here until then, said nothing useful
 	   once every course folder sat in a year folder. Read asynchronously from
-	   the host; a host that does not know it shows nothing. The vault mark
-	   stays: it says where the folder comes from. */
+	   the host; a host that does not know it shows nothing. No vault mark:
+	   the plugin it pointed to is gone, and the app names no third party. */
 	const racine = group.path ? currentHost().paths.rootOf(group.path) : null;
 	if (group.path && racine) {
 		const ligne = ajouter(footer, "div", "qbd-module-card__path");
-		if (racine.vault) {
-			const marque = ajouter(ligne, "span", "qbd-module-card__path-vault");
-			poserLogoObsidian(marque, t("dashboard.quizzes.obsidianVault"));
-		}
 		const texte = ajouter(ligne, "span", "qbd-module-card__path-texte");
 		const dateEl = ajouter(texte, "span", "qbd-module-card__path-tete");
 		void currentHost().fs.modified?.(group.path).then(ms => {

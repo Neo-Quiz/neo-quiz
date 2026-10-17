@@ -185,7 +185,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.menuRename": "Renommer",
 	"dashboard.quizzes.menuCopyPath": "Copier le chemin",
 	"dashboard.quizzes.menuOpenFolder": "Ouvrir le dossier",
-	"dashboard.quizzes.obsidianVault": "Dossier de notes",
 	"dashboard.quizzes.menuDelete": "Supprimer le quiz",
 	"dashboard.quizzes.menuHide": "Masquer de la liste",
 	"dashboard.quizzes.menuShow": "Afficher dans la liste",

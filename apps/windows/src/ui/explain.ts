@@ -49,6 +49,7 @@ import { ancrerImagesCitees } from "../../../../src/explain-images";
 import type { ImageJointe } from "../../../../src/explain-images";
 import { poserImagesCitees } from "./explain-images";
 import { CARD_EDIT_MAX_CHARS, consigneEditionCarte, splitCardEdit, validateCardEdit } from "../../../../src/explain-edit";
+import { mountAgentModePill } from "../../../../src/dashboard/agent-mode-pill";
 import type { CardEditResult, CardFields } from "../../../../src/explain-edit";
 import { renderInlineText, sanitizeQuizHtml } from "../../../../src/engine/sanitizer";
 import { QUESTION_EDIT_ROOM, consigneEditionQuestion, validateQuestionEdit } from "../../../../src/question-edit";
@@ -898,6 +899,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const effortBtn = ajouter(outils, "button", "qbd-select qbd-effort-trigger qbd-composer-plain");
 				effortBtn.type = "button";
 				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
+				/* The agent mode, as on the AI page: the Explain chat runs the same
+				   agent in the same trusted folder, and may edit the quiz itself. */
+				const fournisseurAgent = (): boolean => ["claude-code", "codex"].includes(deps.settings.get().aiProvider || "");
+				const pastilleMode = mountAgentModePill(outils, {
+					read: () => deps.settings.get().aiAgentMode,
+					save: m => deps.settings.save({ aiAgentMode: m }),
+					isClaude: () => deps.settings.get().aiProvider === "claude-code",
+				});
+				pastilleMode.el.hidden = !fournisseurAgent();
 				const envoi = ajouter(outils, "button", "qbd-ai-composer-send");
 				envoi.type = "button";
 

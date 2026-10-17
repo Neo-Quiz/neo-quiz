@@ -8,7 +8,6 @@ import type { ModuleGroup, ModuleMap, ModuleOverride } from "./quiz-modules";
 import { applyModuleOverrides, buildUeGroups, declaredFolders, estLeSas, modulesAffiches, moduleForQuiz } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
-import { poserLogoObsidian } from "./brand-icons";
 import { openModuleEditModal } from "./module-edit";
 import type { ActionMenuItem } from "./ui-select";
 import { QUIZ_BLOCK_RE } from "../quiz-utils";
@@ -966,8 +965,6 @@ export function buildModuleCardMenu(ctx: DashboardShellCtx, rerender: () => void
 				label: t("dashboard.quizzes.menuMove"),
 				submenu: cibles.map(cible => ({
 					icon: cible.icon,
-					// The Obsidian logo for a vault, as at the foot of the cards.
-					renderIcon: cible.vault ? (el: HTMLElement) => { poserLogoObsidian(el, t("dashboard.quizzes.obsidianVault")); } : undefined,
 					label: cible.name,
 					section: cible.section,
 					onClick: () => {

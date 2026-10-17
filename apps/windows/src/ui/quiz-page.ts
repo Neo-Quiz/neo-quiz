@@ -184,6 +184,8 @@ export async function openQuizPage(
 	};
 	const withoutEngine = (): QuizPageHandle => ({ teardown: demonterSansMoteur, launchCancelled: false });
 
+	/** Set once the page is left: a reload from disk still pending then does nothing. */
+	let fait = false;
 	/* The questions as the engine indexes them (`data-qi`), for "Explain". */
 	let questionsJouees: Record<string, unknown>[] = [];
 	let source: string;
@@ -320,6 +322,30 @@ export async function openQuizPage(
 		questionsJouees = jouees;
 		return jouees;
 	};
+	/* THE NOTE CHANGED ON DISK (2026-10-17): the "Explain" chat runs Claude Code
+	   or Codex as an agent in the trusted folder, and it may edit the quiz file
+	   itself. The page reloads it where the learner stands, answers kept (the
+	   session snapshot); a write of this page (same text) changes nothing. */
+	const indexCourant = (): number => {
+		try {
+			const quiz = parseQuizSource(source.match(QUIZ_BLOCK_RE)?.[1] ?? "[]");
+			const config = findQuizModeConfigIndex(quiz);
+			const id = sessions?.lire(entry.path)?.courante;
+			const i = id ? idsForRawItems(quiz).indexOf(id) : -1;
+			return i < 0 ? 0 : i - (config >= 0 && config < i ? 1 : 0);
+		} catch { return 0; }
+	};
+	let relecture: Promise<void> = Promise.resolve();
+	const desabonnerDisque = currentHost().watcher.onChange(ev => {
+		if (ev.kind !== "modify" || ev.file.path !== entry.path) return;
+		relecture = relecture.then(async () => {
+			if (fait) return;
+			let texte: string;
+			try { texte = await currentHost().fs.read(entry.path); } catch { return; }
+			if (texte === source || fait) return;
+			try { await recharger(texte, indexCourant()); } catch (e) { console.warn(LOG_PREFIX + " quiz not reloaded after an outside change", e); }
+		});
+	});
 	const debrancherCitations = brancherCitations(hote, entry.path);
 	const demonterExpliquer = aiSettings && scanner && questionsJouees.length
 		? monterBoutonExpliquer(hote, {
@@ -334,7 +360,6 @@ export async function openQuizPage(
 			} : undefined,
 		})
 		: null;
-	let fait = false;
 	return {
 		launchCancelled: false,
 		teardown: () => {
@@ -344,6 +369,7 @@ export async function openQuizPage(
 			   so that its promise settles (the engine treats it as a cancel) and no
 			   modal outlives the page. */
 			setupPage?.cancelModal();
+			desabonnerDisque();
 			detachBars();
 			demonterExpliquer?.();
 			debrancherCitations();
