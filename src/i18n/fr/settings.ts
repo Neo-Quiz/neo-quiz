@@ -270,8 +270,6 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.moodle.wCheckingMany": "Vérification de {n} modules…",
 	"settings.moodle.wRefreshF5": "Actualiser (F5)",
 	"settings.moodle.wDownloadAll": "Tout télécharger ({n})",
-	"settings.moodle.wAllUpToDate": "Tout est à jour",
-	"settings.moodle.wCheckingBtn": "Vérification…",
 	"settings.moodle.wDueOne": "1 devoir à rendre",
 	"settings.moodle.wDueMany": "{n} devoirs à rendre",
 	"settings.moodle.wDueLate": "dont {n} en retard",

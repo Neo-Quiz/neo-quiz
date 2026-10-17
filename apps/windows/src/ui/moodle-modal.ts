@@ -680,20 +680,21 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const b = boutonTout;
 		b.replaceChildren();
 		if (telechargeTout) {
+			b.hidden = false;
 			b.disabled = true;
 			ajouter(b, "div", "nqm-spinner");
 			const p = etat?.progress;
 			ajouter(b, "span", undefined, p ? `${p.done} / ${p.total}` : t("settings.moodle.wDownloading"));
 			return;
 		}
+		/* Only when there is something to download: a disabled "Everything is up
+		   to date" said nothing the rows do not say already. */
 		const n = aTelecharger();
+		b.hidden = !n;
 		b.disabled = !n;
 		if (n) {
 			icone(b, "download", "nqm-btn-icon");
 			ajouter(b, "span", undefined, t("settings.moodle.wDownloadAll", { n }));
-		} else {
-			icone(b, verifie ? "loader" : "check", "nqm-btn-icon");
-			ajouter(b, "span", undefined, verifie ? t("settings.moodle.wCheckingBtn") : t("settings.moodle.wAllUpToDate"));
 		}
 	}
 
@@ -873,13 +874,11 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const occupe = !!co && fichiers.some(f => occupes.has(`${co.id}|${f.name}`)) || occupes.has(`c|${co?.id}`);
 		b.replaceChildren();
 		b.disabled = !faire || occupe || !co?.folder;
+		b.hidden = !faire && !occupe;
 		if (occupe) {
 			ajouter(b, "div", "nqm-spinner");
 			ajouter(b, "span", undefined, t("settings.moodle.wDownloading"));
-		} else if (!faire) {
-			icone(b, "check", "nqm-btn-icon");
-			ajouter(b, "span", undefined, t("settings.moodle.wAllUpToDate"));
-		} else {
+		} else if (faire) {
 			icone(b, "download", "nqm-btn-icon");
 			ajouter(b, "span", undefined, t("settings.moodle.wDownloadAll", { n: faire }));
 		}

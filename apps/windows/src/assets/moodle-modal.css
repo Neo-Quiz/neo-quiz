@@ -663,9 +663,11 @@
 	scrollbar-color: var(--nqm-border) transparent;
 }
 
+/* Icon, code and name share ONE first line of 20 px (the hours sit under the
+   name): the icon lines up with its code, whatever the row's height. */
 .nq-moodle-modal .nqm-course {
 	display: flex;
-	align-items: baseline;
+	align-items: flex-start;
 	gap: 12px;
 	width: 100%;
 	padding: 7px 10px;
@@ -691,7 +693,7 @@
 	background-color: rgb(var(--tc, 148, 163, 184));
 	-webkit-mask: var(--ic) center / contain no-repeat;
 	mask: var(--ic) center / contain no-repeat;
-	align-self: center;
+	margin-top: 2px;
 }
 
 .nq-moodle-modal .nqm-course-code {
@@ -701,6 +703,7 @@
 	font-family: "Neo Sans Std", var(--font-monospace);
 	font-weight: 700;
 	font-size: 0.84em;
+	line-height: 20px;
 	letter-spacing: 0.01em;
 }
 
@@ -798,7 +801,7 @@
 	font-family: "Neo Sans Std", var(--font-interface);
 	font-weight: 700;
 	font-size: 0.86em;
-	line-height: 1.4;
+	line-height: 20px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

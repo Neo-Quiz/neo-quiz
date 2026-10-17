@@ -272,8 +272,6 @@ export const EN_SETTINGS = {
 	"settings.moodle.wCheckingMany": "Checking {n} modules…",
 	"settings.moodle.wRefreshF5": "Refresh (F5)",
 	"settings.moodle.wDownloadAll": "Download all ({n})",
-	"settings.moodle.wAllUpToDate": "Everything is up to date",
-	"settings.moodle.wCheckingBtn": "Checking…",
 	"settings.moodle.wDueOne": "1 assignment to hand in",
 	"settings.moodle.wDueMany": "{n} assignments to hand in",
 	"settings.moodle.wDueLate": "{n} late",

@@ -16,6 +16,7 @@ release notes.
 ### Changed
 
 - A folder card shows when the folder was last modified instead of its path.
+- The Moodle window shows its "Download" button only when there is something to download, and each module icon lines up with its code.
 
 ## [1.20.123] - 2026-10-17
 
