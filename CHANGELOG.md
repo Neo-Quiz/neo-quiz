@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.14] - 2026-10-17
+
 ### Changed
 
 - AI providers launched from this PC run exactly as in a terminal: your own settings, hooks, skills and MCP servers load, and only the agent mode you pick applies; no trust question any more. Requests from another device stay without tools.
