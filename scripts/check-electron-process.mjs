@@ -1854,6 +1854,24 @@ await withSrcModule("apps/windows/electron/process.ts", async ({ environnementEn
 	r.done();
 });
 
+/* ── CLAUDE CODE ON AN OLLAMA MODEL (2026-10-17) ──
+   Claude Code is only ever pointed at THIS PC's Ollama server: a stored
+   address on the network, in https, with credentials or unreadable gives
+   null (the call is refused). Its environment sends no claude.ai login nor
+   API key there. */
+await withSrcModule("apps/windows/electron/process.ts", async ({ ollamaLocal, envOllama }) => {
+	const r = makeReporter("Électron — Claude Code sur Ollama : serveur local seulement");
+	r.check("loopback http addresses pass, as their origin; nothing stored means the default",
+		[ollamaLocal("http://localhost:11434"), ollamaLocal("http://127.0.0.1:11434/"), ollamaLocal("http://[::1]:8080"), ollamaLocal(undefined), ollamaLocal("")],
+		["http://localhost:11434", "http://127.0.0.1:11434", "http://[::1]:8080", "http://localhost:11434", "http://localhost:11434"]);
+	r.check("a network host, https, a lookalike, credentials or garbage are refused",
+		[ollamaLocal("http://192.168.1.10:11434"), ollamaLocal("https://localhost:11434"), ollamaLocal("http://localhost.evil.com"), ollamaLocal("http://a:b@localhost:11434"), ollamaLocal("http://ollama.com"), ollamaLocal("not a url"), ollamaLocal(42)],
+		[null, null, null, null, null, null, null]);
+	r.check("the environment: the local server, a placeholder token, an empty API key",
+		envOllama("http://localhost:11434"), { ANTHROPIC_BASE_URL: "http://localhost:11434", ANTHROPIC_AUTH_TOKEN: "ollama", ANTHROPIC_API_KEY: "" });
+	r.done();
+});
+
 /* ── CODEX BANKED RESETS (`codex-resets.ts`, 2026-10-09) ──
    CE QU'IL EMPÊCHE. Sur un FAUX `codex app-server` (jamais le vrai compte,
    jamais `consume` sur un vrai crédit) : le lancement est l'unique forme

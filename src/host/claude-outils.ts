@@ -93,6 +93,26 @@ export function argsAgentClaude(mode: ModeAgent): readonly string[] {
 	}
 }
 
+/* ANTIGRAVITY (2026-10-17): `agy` runs as an agent too, the owner's choice.
+   Measured on the agy of that day in a throwaway folder: `--mode plan` reads
+   and answers but writes nothing and runs nothing; `--mode accept-edits`
+   writes a file, a command is auto-denied (headless mode cannot ask);
+   `--mode auto` falls back to that default where the account lacks it;
+   `--dangerously-skip-permissions` writes and runs. The call WITHOUT tools
+   puts `--mode plan` FIRST (`ARGS_AGY_SANS_OUTILS`): the default mode wrote
+   files in the home folder it runs in. */
+export const ARGS_AGY_SANS_OUTILS: readonly string[] = ["--mode", "plan"];
+
+/** The mode options of the Antigravity call in a trusted folder, per mode. */
+export function argsAgentAntigravity(mode: ModeAgent): readonly string[] {
+	switch (mode) {
+		case "supervised": return ["--mode", "plan"];
+		case "acceptEdits": return ["--mode", "accept-edits"];
+		case "auto": return ["--mode", "auto"];
+		case "full": return ["--dangerously-skip-permissions"];
+	}
+}
+
 /** The sandbox options of the Codex call in a trusted folder, per mode. */
 export function argsAgentCodex(mode: ModeAgent): readonly string[] {
 	switch (mode) {

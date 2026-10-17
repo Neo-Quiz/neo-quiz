@@ -61,7 +61,7 @@ import type { ServicePlanning } from "./moodle/planning";
 import { HOTES_PLANNING_CONNUS, lienPlanning } from "./moodle/planning-pur";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
 import type { Perimetre } from "./perimetre";
-import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
+import { arreterDisposerPourSite, demarrerOllama, disposerPourSite, disposerPourTerminal, iconeDeType, restaurerNavigateur, verifierNavigateurVisible, erreurCli, estOutilAutorise, lancerTerminal, lireCache, lireAncre, ollamaInstalle, ollamaLocal, openPlainTerminal, poserFenetre, rectangleTerminal, run, scriptConnexion, scriptUsageTerminal } from "./process";
 import { annulerConnexionCompte, connecterCompte, deconnecterCompte, etatComptes, usageCompte } from "./comptes";
 import { ecrireDiagnostic } from "./diagnostic-reponse";
 import { codexResets } from "./codex-resets";
@@ -1743,6 +1743,21 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 				return { ok: false, nom: "refuse", message: "outils refusés : dossier non approuvé" };
 			}
 		}
+		/* CLAUDE CODE ON AN OLLAMA MODEL (2026-10-17): only an agent form of
+		   Claude Code in a folder judged above, and only toward the LOCAL
+		   Ollama server of the stored settings (`ollamaLocal`). The page says
+		   "Ollama", never where: no address crosses the bridge. */
+		let ollama: string | undefined;
+		if (s.ollama !== undefined) {
+			const reglageIa = await reglagesOuErreur().lire(CLE_REGLAGES_IA).catch(() => null);
+			const url = reglageIa && typeof reglageIa === "object" ? (reglageIa as { aiOllamaUrl?: unknown }).aiOllamaUrl : undefined;
+			const base = s.ollama === true && tool === "claude" && cwd ? ollamaLocal(url) : null;
+			if (!base) {
+				console.warn(LOG_PREFIX, "CLI refusé, Ollama hors d'un appel agent local:", tool);
+				return { ok: false, nom: "refuse", message: "Ollama refusé : appel agent local seulement" };
+			}
+			ollama = base;
+		}
 		const fichiers = Array.isArray(s.fichiers)
 			? s.fichiers
 				.filter((f): f is { nom: string; base64: string } =>
@@ -1769,7 +1784,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   random for each call (`nouveauMarqueur`), so the replay of a line
 		   after a reload carries a new one in its tokens — the rest must be
 		   the same for an attach. */
-		const empreinte = cleReprise ? empreinteAppel(cwd ? tool + "@" + cwd : tool, args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
+		const empreinte = cleReprise ? empreinteAppel((cwd ? tool + "@" + cwd : tool) + (ollama ? "+ollama" : ""), args, typeof s.stdin === "string" ? s.stdin : "", typeof s.marqueur === "string" ? s.marqueur : "") : "";
 		const rattache = cleReprise ? reprises.rattacher(expediteur, cleReprise, empreinte, surStdout ?? null) : null;
 		if (rattache) {
 			const enVolRattache = { controleur: rattache.controleur, page: expediteur, reprenable: true };
@@ -1798,6 +1813,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 					sortieFichier: typeof s.sortieFichier === "string" ? s.sortieFichier : undefined,
 					signal: controleur.signal,
 					cwd,
+					ollama,
 				}, { surStdout: emettre });
 				return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
 			} catch (e) {

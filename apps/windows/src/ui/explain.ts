@@ -901,11 +901,13 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
 				/* The agent mode, as on the AI page: the Explain chat runs the same
 				   agent in the same trusted folder, and may edit the quiz itself. */
-				const fournisseurAgent = (): boolean => ["claude-code", "codex"].includes(deps.settings.get().aiProvider || "");
+				// Antigravity and Ollama (through Claude Code) run as agents too since 2026-10-17.
+				const fournisseurAgent = (): boolean => ["claude-code", "codex", "antigravity-cli", "ollama"].includes(deps.settings.get().aiProvider || "");
 				const pastilleMode = mountAgentModePill(outils, {
 					read: () => deps.settings.get().aiAgentMode,
 					save: m => deps.settings.save({ aiAgentMode: m }),
-					isClaude: () => deps.settings.get().aiProvider === "claude-code",
+					// Only Codex's middle modes differ (an AI reviewer approves).
+					isClaude: () => deps.settings.get().aiProvider !== "codex",
 				});
 				pastilleMode.el.hidden = !fournisseurAgent();
 				const envoi = ajouter(outils, "button", "qbd-ai-composer-send");

@@ -172,6 +172,16 @@ const QUEUES_AGENT_CODEX: readonly (readonly string[])[] = [
 	["--dangerously-bypass-approvals-and-sandbox"],
 ];
 
+/** The Antigravity mode options, one per mode (measured: `claude-outils.ts`). */
+const QUEUES_AGENT_AGY: readonly (readonly string[])[] = [
+	["--mode", "plan"],
+	["--mode", "accept-edits"],
+	["--mode", "auto"],
+	["--dangerously-skip-permissions"],
+];
+/** The stream input and output of every agy generation call. */
+const FLUX_AGY: readonly string[] = ["--input-format", "stream-json", "--output-format", "stream-json"];
+
 function teteCodex(): Piece[] {
 	return ["exec", "--json", "-m", modele, "-c", (c: string) => c.startsWith("model_reasoning_effort=") && EFFORT.test(c.slice("model_reasoning_effort=".length))];
 }
@@ -186,7 +196,7 @@ function imagesCodex(images: readonly string[], jeton: (nom: string) => string):
 }
 
 /** True when `args` is a call that gives the model tools in a folder: a
-    Claude Code or Codex agent form. The caller must then also check the
+    Claude Code, Codex or Antigravity agent form. The caller must then also check the
     folder (`canaux.ts`): this says nothing of where the CLI runs, and the
     CLI then runs IN that folder. */
 export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unknown): boolean {
@@ -201,6 +211,12 @@ export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unkno
 					if (correspond(a, [...teteClaude(), ...(avecEffort ? effortClaude : []), ...queue, ...(avecPieces ? pieces : [])])) return true;
 				}
 			}
+		}
+		return false;
+	}
+	if (tool === "agy") {
+		for (const queue of QUEUES_AGENT_AGY) {
+			if (correspond(a, [...FLUX_AGY, ...queue]) || correspond(a, [...FLUX_AGY, "--model", modele, ...queue])) return true;
 		}
 		return false;
 	}
@@ -333,9 +349,14 @@ export function argumentsAutorises(tool: string, args: unknown, marqueur: unknow
 
 	switch (tool) {
 		case "agy":
+			/* An agent form, in a trusted folder (see above). Without tools,
+			   `--mode plan` comes FIRST, so the plain form can never be read as
+			   the supervised agent form (same words, other order): measured,
+			   agy's default mode wrote files in the home folder it runs in. */
 			return correspond(a, ["models"])
-				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json"])
-				|| correspond(a, ["--input-format", "stream-json", "--output-format", "stream-json", "--model", modele]);
+				|| argumentsAvecOutils(tool, a, marqueur)
+				|| correspond(a, ["--mode", "plan", ...FLUX_AGY])
+				|| correspond(a, ["--mode", "plan", ...FLUX_AGY, "--model", modele]);
 		case "claude":
 			/* No tool at all (`--tools ""`); the pictures-only form and the
 			   trusted-folder form are judged above, with their confinement.

@@ -806,6 +806,7 @@ export const EN_AI = {
 	"ai.err.httpStatus": "Error {status}",
 	"ai.err.ollamaModelMissing": "Model \"{model}\" is not installed.\nRun in a terminal: ollama pull {model}\nAvailable models: {models}",
 	"ai.err.ollamaModelNotFound": "Model \"{model}\" is not installed.\nRun: ollama pull {model}",
+	"ai.err.ollamaNeedsFolder": "Ollama runs as an agent through Claude Code only in a folder you trust.",
 	"ai.err.ollamaUnreachable": "Cannot reach Ollama at {url}.\nMake sure the server is running (ollama serve).",
 	"ai.err.ollamaUnreachableShort": "Cannot reach Ollama at {url}. Make sure the server is running.",
 	"ai.err.ollamaOutOfMemory": "Not enough memory for this model{detail}.\nPick a smaller model from the list.",

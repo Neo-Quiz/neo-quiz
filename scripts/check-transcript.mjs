@@ -243,5 +243,32 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	r.check("fallback: no guessed model elsewhere (bio, Opus 4.8 itself, Sonnet, no category)",
 		[modeleDeRepli("Opus 5.5", "bio"), modeleDeRepli("Opus 4.8", "cyber"), modeleDeRepli("Sonnet 5.5", "cyber"), modeleDeRepli("Opus 5.5", undefined)], [null, null, null, null]);
 	r.check("safeguard: a normal end is not a refusal", fold(createTranscriptDecoder("claude")(normal)).refusals ?? 0, 0);
+
+	/* ANTIGRAVITY (2026-10-17): the stream measured on agy, tool steps sent
+	   ACTIVE then DONE; a line cut by the pipe is read once. */
+	const agyLignes = [
+		{ event: "init", conversation_id: "c", init: { cwd: "C:\\q\\XTI302", tools: ["view_file"] } },
+		{ event: "step_update", step_update: { step_index: 1, state: "DONE", step_type: "agent_response" } },
+		{ event: "step_update", step_update: { step_index: 2, state: "ACTIVE", step_type: "tool", tool_name: "write_to_file", tool_info: { name: "write_to_file", parameters: { TargetFile: "C:\\q\\XTI302\\out.md" } } } },
+		{ event: "step_update", step_update: { step_index: 2, state: "DONE", step_type: "tool", tool_name: "write_to_file", tool_info: { name: "write_to_file", parameters: { TargetFile: "C:\\q\\XTI302\\out.md" } } } },
+		{ event: "step_update", step_update: { step_index: 3, state: "ERROR", step_type: "tool", tool_name: "run_command", tool_info: { name: "run_command", parameters: { CommandLine: "echo  ran\n> x" } } } },
+		{ event: "step_update", step_update: { step_index: 4, state: "ACTIVE", step_type: "tool", tool_name: "mystery_tool", tool_info: { parameters: { n: 3 } } } },
+		{ event: "result", result: { status: "SUCCESS", response: "ok" } },
+	].map(l => JSON.stringify(l) + "\n").join("");
+	const decAgy = createTranscriptDecoder("agy");
+	const coupeAgy = Math.floor(agyLignes.length / 2);
+	const evAgy = [...decAgy(agyLignes.slice(0, coupeAgy)), ...decAgy(agyLignes.slice(coupeAgy))];
+	r.check("agy: start, a Write in the folder (path made relative), a failed Shell step opened and closed, an unknown tool kept, done",
+		evAgy, [
+			{ kind: "start" },
+			{ kind: "tool", name: "Write", id: "agy-2", input: "out.md" },
+			{ kind: "toolResult", id: "agy-2", status: "ok" },
+			{ kind: "tool", name: "Shell", id: "agy-3" },
+			{ kind: "toolResult", id: "agy-3", status: "error" },
+			{ kind: "tool", name: "mystery_tool", id: "agy-4", input: "" },
+			{ kind: "done" },
+		]);
+	r.check("agy: a repeated ACTIVE line opens its step once; garbage and non-JSON lines give nothing",
+		createTranscriptDecoder("agy")(agyLignes.split("\n")[2] + "\n" + agyLignes.split("\n")[2] + "\nnot json\n{\"event\":42}\n").length, 1);
 	r.done();
 });

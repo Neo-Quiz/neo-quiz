@@ -2,7 +2,7 @@ import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
 import { jetonFichier, jetonHome, jetonPieces, jetonSortie, nouveauMarqueur } from "../host/jetons";
-import { ARGS_IMAGES_CLAUDE, argsAgentClaude, argsAgentCodex, lireModeAgent, optionInconnue } from "../host/claude-outils";
+import { ARGS_AGY_SANS_OUTILS, ARGS_IMAGES_CLAUDE, argsAgentAntigravity, argsAgentClaude, argsAgentCodex, lireModeAgent, optionInconnue } from "../host/claude-outils";
 import type { ModeAgent } from "../host/claude-outils";
 import {
 	resolveClaudeModel,
@@ -1268,6 +1268,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The folder of the running generation or plan (`GenerateOptions.dossier`):
 	    Claude Code may run in it with read-only tools once it is trusted. */
 	let dossierOutils: string | null = null;
+	/** True while `callClaudeCodeTexte` runs an OLLAMA model (`ollamaParClaude`). */
+	let viaOllama = false;
 	/** `GenerateOptions.neverAskTrust` of the running generation; false for
 	    every other call (a chat, a plan, the clarify call). */
 	let neverAskTrust = false;
@@ -1329,13 +1331,15 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		sortieFichier?: string;
 		/** The trusted folder of a read-only tools run (contract path). */
 		dossier?: string;
+		/** Claude Code on an Ollama model (the host points it at its local server). */
+		ollama?: boolean;
 	}): Promise<SortieCli> {
 		const ac = new AbortController();
 		abortCurrent = () => { aborted = true; try { ac.abort(); } catch (e) { /* déjà avorté */ } };
 		/* The live transcript: the output decoded line by line as it arrives,
 		   for the two CLIs that stream a format we read. */
 		const sink = transcriptSink;
-		const decode = sink && (spec.tool === "claude" || spec.tool === "codex") ? createTranscriptDecoder(spec.tool) : null;
+		const decode = sink ? createTranscriptDecoder(spec.tool) : null;
 		return requireHost("process").run({
 			onStdout: decode && sink ? (chunk) => { for (const ev of decode(chunk)) sink(ev); } : undefined,
 			tool: spec.tool,
@@ -1346,6 +1350,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			fichiers: spec.fichiers,
 			sortieFichier: spec.sortieFichier,
 			dossier: spec.dossier,
+			...(spec.ollama ? { ollama: true } : {}),
 			reprise: repriseBase ? `${repriseBase}-${appelsCli++}` : undefined,
 		});
 	}
@@ -1576,7 +1581,14 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 
 		const marqueur = nouveauMarqueur();
-		const fullPrompt = systemPrompt + "\n\n" + userPrompt;
+		/* AN AGENT IN THE QUIZ'S FOLDER (2026-10-17), like Claude Code and
+		   Codex: once the user trusted it, with the composer's agent mode
+		   (`argsAgentAntigravity`); the main process judges the folder again.
+		   Otherwise `--mode plan` first: it reads and answers, never writes. */
+		const mode = lireModeAgent(settings.get().aiAgentMode);
+		const dossier = dossierOutils;
+		const outils = dossier ? await folderTrusted(requireHost("process"), dossier) : false;
+		const fullPrompt = (outils ? consigneAvecOutils(systemPrompt, mode) : systemPrompt) + "\n\n" + userPrompt;
 		/* UNE ligne : le CLI lit un événement par ligne, et `JSON.stringify`
 		   échappe les sauts de ligne du prompt. */
 		const entree = JSON.stringify({ event: "user", message: { content: fullPrompt } }) + "\n";
@@ -1607,10 +1619,13 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			res = await runCli({
 				tool: "agy",
-				args: ["--input-format", "stream-json", "--output-format", "stream-json", ...(model ? ["--model", model] : [])],
+				args: outils
+					? ["--input-format", "stream-json", "--output-format", "stream-json", ...(model ? ["--model", model] : []), ...argsAgentAntigravity(mode)]
+					: [...ARGS_AGY_SANS_OUTILS, "--input-format", "stream-json", "--output-format", "stream-json", ...(model ? ["--model", model] : [])],
 				marqueur,
 				stdin: entree,
 				fichiers: [],
+				...(outils && dossier ? { dossier } : {}),
 			});
 		} catch (err) {
 			/* Une ANNULATION n'est pas une erreur (voir `callClaudeCode`). */
@@ -1699,7 +1714,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   page is a turn of the chat's Claude Code session, in the Neo Quiz
 		   root; the pictures go with the message itself. `null`: it cannot
 		   run live, the one-shot call below runs instead. */
-		const vivant = await tourVivant("claude", model, effort ?? undefined, mode, consigneAvecOutils(systemPrompt, mode) + "\n\n" + userPrompt, images);
+		// An Ollama model never runs live: the chat's session is the claude.ai account's.
+		const vivant = viaOllama ? null : await tourVivant("claude", model, effort ?? undefined, mode, consigneAvecOutils(systemPrompt, mode) + "\n\n" + userPrompt, images);
 		if (vivant) {
 			derniereSortieClaude = vivant.claudeResult ? JSON.stringify(vivant.claudeResult) : "";
 			return lireResultatClaude(vivant.claudeResult as ClaudeResult | null, model);
@@ -1713,6 +1729,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		let outils = false;
 		const proc = requireHost("process");
 		if (dossier) outils = await folderTrusted(proc, dossier);
+		// Claude Code on an Ollama model only ever runs as an agent (`ollamaParClaude`).
+		if (viaOllama && !outils) throw new Error(t("ai.err.ollamaNeedsFolder"));
 		/* Pictures without a trusted folder (2026-10-09): Read only, with the
 		   same confinement as the tools form; the main process runs it IN the
 		   attachments folder. Without a picture, no tool at all. */
@@ -1769,11 +1787,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				stdin: promptDe(avecOutils),
 				fichiers,
 				dossier: avecOutils && dossier ? dossier : undefined,
+				...(viaOllama ? { ollama: true } : {}),
 			});
 			res = await lancer(outils);
 			/* A Claude Code older than the options of the tools form says it
 			   does not know one: the same call without tools, as before. */
-			if (outils && res.code !== 0 && optionInconnue(res.stderr) && !aborted) {
+			if (outils && !viaOllama && res.code !== 0 && optionInconnue(res.stderr) && !aborted) {
 				console.warn("[quiz-blocks] Claude Code does not know the read-only tools options, running without tools:", res.stderr.trim().slice(0, 200));
 				res = await lancer(false);
 			}
@@ -2006,7 +2025,35 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		return parts.join("\n");
 	}
 
+	/** CLAUDE CODE AS OLLAMA'S AGENT (2026-10-17, the owner's choice): in a
+	    trusted folder, the Ollama model runs INSIDE Claude Code, as
+	    `ollama launch claude` does, with Claude Code's tools and the composer's
+	    agent mode; the host points Claude Code at its LOCAL Ollama server
+	    (`ollama: true`, judged again by the main process). `null`: no folder,
+	    not trusted, Ollama not on this PC or Claude Code missing — the plain
+	    HTTP call then runs, without tools, as before. */
+	async function ollamaParClaude(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[], imageInstruction?: string): Promise<string | null> {
+		const proc = currentHost().process;
+		if (!currentHost().platform.isDesktopApp || !proc || !dossierOutils) return null;
+		const url = (settings.get().aiOllamaUrl || "http://localhost:11434").trim();
+		if (!/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?\/?$/.test(url)) return null;
+		if (!/^[a-zA-Z0-9._:-]+$/.test(model)) return null;
+		if (!(await folderTrusted(proc, dossierOutils))) return null;
+		viaOllama = true;
+		try {
+			return await callClaudeCodeTexte(model, systemPrompt, userPrompt, images, null, imageInstruction);
+		} catch (e) {
+			// Claude Code is not installed: the call without tools, rather than no answer.
+			if (!aborted && e instanceof Error && e.message === t("ai.err.claudeNotInstalled")) return null;
+			throw e;
+		} finally {
+			viaOllama = false;
+		}
+	}
+
 	async function callOllama(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null): Promise<ReponseQuiz> {
+		const agent = await ollamaParClaude(model, systemPrompt, userPrompt, images);
+		if (agent !== null) return parseReponseQuiz(agent);
 		return parseOllamaResponse(await callOllamaTexte(model, systemPrompt, userPrompt, ollamaUrl, authHeaders, images, effort, true));
 	}
 
@@ -2445,6 +2492,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 				const key = (settings.get().aiOllamaCloudKey || "").trim();
 				const authHeader: Record<string, string> = key ? { "Authorization": "Bearer " + key } : {};
 				const effort = resolveEffort("ollama", settings.get().aiEffort);
+				const agent = await ollamaParClaude(model, systeme, userPrompt, options.images ?? [], "The course's pictures (figures, diagrams). Read them with the Read tool when the question needs them:");
+				if (agent !== null) return agent.trim();
 				return (await callOllamaTexte(model, systeme, userPrompt, ollamaUrl, authHeader, options.images ?? [], effort)).trim();
 			}
 			if (provider === "antigravity-cli") {

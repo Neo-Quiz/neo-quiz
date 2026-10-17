@@ -594,6 +594,11 @@ export interface HostProcess {
 		    CLI there only if the folder is still trusted and opened; any
 		    other call runs in the home folder, as before. */
 		dossier?: string;
+		/** Claude Code runs on an OLLAMA model (2026-10-17): the host points it
+		    at the LOCAL Ollama server of its own settings, never at an address
+		    from the page. Only for an agent form in a trusted folder; any other
+		    call carrying it is refused. */
+		ollama?: boolean;
 	}): Promise<{ stdout: string; stderr: string; code: number | null; sortie?: string }>;
 	/** May Claude Code work INSIDE this folder (a CONTRACT path), with
 	    read-only tools (2026-10-09)? A folder already trusted answers at

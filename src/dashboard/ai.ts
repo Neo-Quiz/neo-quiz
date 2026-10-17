@@ -1538,7 +1538,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				const { el: modeBtn, paint: peindreMode } = mountAgentModePill(parent, {
 					read: () => settings().aiAgentMode,
 					save: m => saveSettings({ aiAgentMode: m }),
-					isClaude: () => isClaude,
+					// Only Codex's middle modes differ (an AI reviewer approves).
+					isClaude: () => provider !== "codex",
 				});
 
 				const EFFORT_DISPLAY: Record<string, string> = {

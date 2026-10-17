@@ -82,6 +82,7 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 			   le principal ne voie l'appel. Le reste est recopié champ par champ —
 			   `RequeteCli` (`pont.ts`) dit exactement ce qui passe. */
 			const { signal, tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, onStdout, reprise } = spec;
+			const ollama = spec.ollama === true ? true : undefined;
 			/* The working folder crosses as a DISK path; the main process judges
 			   it again (trusted, opened) before running anything there. */
 			const dossier = spec.dossier && absolu ? absolu(spec.dossier) ?? undefined : undefined;
@@ -104,7 +105,7 @@ export function createWindowsProcess(absolu?: (contrat: string) => string | null
 				: null;
 			try {
 				const res = await pont().processus.run(
-					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, reprise, dossier },
+					{ tool, args, stdin, timeoutMs, marqueur, fichiers, sortieFichier, reprise, dossier, ollama },
 					id,
 					!!onStdout,
 				);

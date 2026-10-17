@@ -102,7 +102,7 @@ await withSrcModule("apps/windows/electron/partage.ts", ({ nomPartage, octetsPar
 /* LES ARGUMENTS D'UN CLI venus de la fenêtre (`gabarits-cli.ts`, revue de
    sécurité du 2026-09-25) : les appels RÉELS de `ai-client.ts` et
    `ai-providers.ts` passent, et une seule option de plus les fait refuser. */
-await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER, ARGS_COMPTE }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE, MODES_AGENT, argsAgentClaude, argsAgentCodex }) => {
+await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-outils.ts"], ({ argumentsAutorises, argumentsAvecOutils, argumentsImages, argumentsAppServer, ARGS_CODEX_APP_SERVER, ARGS_COMPTE }, { ARGS_OUTILS_CLAUDE, ARGS_IMAGES_CLAUDE, MODES_AGENT, argsAgentClaude, argsAgentCodex, argsAgentAntigravity, ARGS_AGY_SANS_OUTILS }) => {
 	const r = makeReporter("Arguments des CLI (liste blanche)");
 	const m = "0123456789abcdef0123456789abcdef";
 
@@ -135,7 +135,29 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 	r.check("agy models passe", argumentsAutorises("agy", ["models"], undefined), true);
 	r.check("the update of Claude Code and Codex passes, as the bare word", [argumentsAutorises("claude", ["update"], undefined), argumentsAutorises("codex", ["update"], undefined)], [true, true]);
 	r.check("no update for agy, and no update with anything added", [argumentsAutorises("agy", ["update"], undefined), argumentsAutorises("claude", ["update", "--force"], undefined), argumentsAutorises("codex", ["update", "-c", "x=1"], undefined), argumentsAutorises("claude", ["upgrade"], undefined)], [false, false, false, false]);
-	r.check("agy génération, sans et avec modèle", [argumentsAutorises("agy", agy, m), argumentsAutorises("agy", [...agy, "--model", "gemini-2.5-pro"], m)], [true, true]);
+	/* agy without tools (2026-10-17): `--mode plan` FIRST, measured to write
+	   nothing; the bare form (agy's default mode wrote files in the home
+	   folder) is refused now, as is plan mode anywhere else. */
+	r.check("agy generation without tools: plan mode first, with and without a model; the bare form is refused",
+		[argumentsAutorises("agy", [...ARGS_AGY_SANS_OUTILS, ...agy], m), argumentsAutorises("agy", [...ARGS_AGY_SANS_OUTILS, ...agy, "--model", "gemini-2.5-pro"], m),
+		 argumentsAutorises("agy", agy, m), argumentsAutorises("agy", [...agy, "--model", "gemini-2.5-pro"], m),
+		 argumentsAvecOutils("agy", [...ARGS_AGY_SANS_OUTILS, ...agy], m)],
+		[true, true, false, false, false]);
+	r.check("agy agent modes: every page form is a tools form accepted here (then judged on its folder)",
+		MODES_AGENT.flatMap(mode => [
+			argumentsAvecOutils("agy", [...agy, ...argsAgentAntigravity(mode)], m),
+			argumentsAvecOutils("agy", [...agy, "--model", "gemini-3-flash", ...argsAgentAntigravity(mode)], m),
+			argumentsAutorises("agy", [...agy, ...argsAgentAntigravity(mode)], m),
+		]), MODES_AGENT.flatMap(() => [true, true, true]));
+	r.check("agy agent modes: an extra folder, a sandbox flag, an unknown mode, a bypass added to plan, or an option as the model is refused",
+		[
+			argumentsAvecOutils("agy", [...agy, ...argsAgentAntigravity("full"), "--add-dir", "C:/"], m),
+			argumentsAvecOutils("agy", [...agy, ...argsAgentAntigravity("supervised"), "--dangerously-skip-permissions"], m),
+			argumentsAvecOutils("agy", [...agy, "--mode", "yolo"], m),
+			argumentsAvecOutils("agy", [...agy, "--model", "--dangerously-skip-permissions", "--mode", "plan"], m),
+			argumentsAvecOutils("agy", [...agy, "--mcp-config", "x", ...argsAgentAntigravity("full")], m),
+			argumentsAutorises("agy", [...agy, "--dangerously-skip-permissions", "--add-dir", "C:/"], m),
+		], [false, false, false, false, false, false]);
 	r.check("claude with no tool passes; the old unconfined Read form (home folder, user settings) is refused", [argumentsAutorises("claude", claude("claude-opus-4-1", ""), m), argumentsAutorises("claude", claude("opus[1m]", "Read"), m)], [true, false]);
 	r.check("codex, rapide ou non, avec 0 à 3 images", [argumentsAutorises("codex", codex(false, 0), m), argumentsAutorises("codex", codex(true, 1), m), argumentsAutorises("codex", codex(false, 3), m)], [true, true, true]);
 

@@ -60,6 +60,10 @@ export const IGNORES: readonly string[] = [
 	"/.claude",
 	"/.mcp.json",
 	"/.codex",
+	/* Antigravity's project config (2026-10-17): `.agents/` holds its MCP
+	   servers and skills, and agy runs as an agent IN a course folder, so at
+	   any depth, not only at the root. */
+	".agents",
 	/* The root can be opened as an Obsidian vault. Its plugin main.js files are
 	   code Obsidian runs, so a paired device must not be able to plant one; each
 	   device keeps its own workspace. */

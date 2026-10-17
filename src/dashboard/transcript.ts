@@ -22,7 +22,7 @@
    the transcript is a window on the work, never a reason to fail it.
 ══════════════════════════════════════════════════════════ */
 
-export type TranscriptTool = "claude" | "codex";
+export type TranscriptTool = "claude" | "codex" | "agy";
 
 /** The model Claude Code falls back to when its safeguards stop an answer
     (code.claude.com, model configuration, "Automatic model fallback";
@@ -482,10 +482,51 @@ function codexEvents(line: Rec): TranscriptEvent[] {
  * chunks cut anywhere, and it returns the events of every line completed
  * so far. The unfinished tail waits for the next chunk.
  */
+/* ANTIGRAVITY'S STREAM (2026-10-17, measured on that day's agy): `init`
+   (with the cwd), then `step_update` events — a tool step is sent ACTIVE,
+   then again in its final state — and a closing `result`. Its tool names are
+   mapped to the ones the work view knows; an unknown one keeps its own. */
+const NOMS_AGY: Record<string, string> = {
+	view_file: "Read", read_file: "Read", write_to_file: "Write", replace_file_content: "Edit", multi_replace_file_content: "Edit",
+	run_command: "Shell", grep_search: "Grep", find_by_name: "Glob", list_dir: "Glob", search_web: "WebSearch", read_url_content: "WebFetch",
+};
+
+function agyEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
+	const event = str(line.event);
+	if (event === "init") {
+		etat.cwd = str(rec(line.init)?.cwd) ?? "";
+		return [{ kind: "start" }];
+	}
+	if (event === "result") return [{ kind: "done" }];
+	const step = event === "step_update" ? rec(line.step_update) : null;
+	if (!step || str(step.step_type) !== "tool") return [];
+	const index = step.step_index;
+	if (typeof index !== "number") return [];
+	const id = "agy-" + String(index);
+	const brut = str(step.tool_name) ?? str(rec(step.tool_info)?.name) ?? "";
+	const name = NOMS_AGY[brut] ?? (brut || "Tool");
+	const etatStep = str(step.state) ?? "";
+	if (etatStep === "ACTIVE") {
+		if (etat.noms.has(id)) return [];
+		etat.noms.set(id, name);
+		const params = rec(rec(step.tool_info)?.parameters);
+		// The first text parameter says what the step is about: a path, a command, a pattern.
+		const valeur = params ? Object.values(params).find((v): v is string => typeof v === "string" && v.trim() !== "") ?? "" : "";
+		const input = couper(relatif(valeur, etat.cwd).replace(/\s+/g, " ").trim(), MAX_INPUT);
+		return [{ kind: "tool", name, id, input }];
+	}
+	if (etatStep === "DONE" || etatStep === "ERROR" || etatStep === "FAILED" || etatStep === "CANCELED" || etatStep === "CANCELLED") {
+		const debut: TranscriptEvent[] = etat.noms.has(id) ? [] : [{ kind: "tool", name, id }];
+		etat.noms.set(id, name);
+		return [...debut, { kind: "toolResult", id, status: etatStep === "DONE" ? "ok" : etatStep.startsWith("CANCEL") ? "refused" : "error" }];
+	}
+	return [];
+}
+
 export function createTranscriptDecoder(tool: TranscriptTool): (chunk: string) => TranscriptEvent[] {
 	let tail = "";
 	const etat: EtatDecodeur = { cwd: "", noms: new Map() };
-	const map = tool === "claude" ? (l: Rec) => claudeEvents(l, etat) : codexEvents;
+	const map = tool === "claude" ? (l: Rec) => claudeEvents(l, etat) : tool === "agy" ? (l: Rec) => agyEvents(l, etat) : codexEvents;
 	return (chunk: string): TranscriptEvent[] => {
 		tail += chunk;
 		const lines = tail.split("\n");

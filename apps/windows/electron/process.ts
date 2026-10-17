@@ -2277,6 +2277,27 @@ const OUTILS_EXCLUSIFS: ReadonlySet<string> = new Set(["agy"]);
  * démarrage (`chargerPathRegistre`), plus les emplacements connus
  * d'`environnementEnfant`.
  */
+/** Claude Code on an Ollama model (2026-10-17, as `ollama launch claude`
+    does; measured with Claude Code 2.1.302 and Ollama 0.35.1): the Anthropic
+    API of the local Ollama server, a placeholder token, and no API key, so
+    neither the claude.ai login nor a key of the environment is sent there. */
+export function envOllama(base: string): Record<string, string> {
+	return { ANTHROPIC_BASE_URL: base, ANTHROPIC_AUTH_TOKEN: "ollama", ANTHROPIC_API_KEY: "" };
+}
+
+/** The base URL of a LOOPBACK http Ollama server, or null: Claude Code is
+    only ever pointed at this PC's own server, never a host on the network. */
+export function ollamaLocal(url: unknown): string | null {
+	// Nothing stored: the app's default. Anything stored that is not text is refused.
+	if (url !== undefined && url !== null && typeof url !== "string") return null;
+	const brut = typeof url === "string" && url.trim() ? url.trim() : "http://localhost:11434";
+	let u: URL;
+	try { u = new URL(brut); } catch { return null; }
+	if (u.protocol !== "http:" || u.username || u.password) return null;
+	if (!["localhost", "127.0.0.1", "[::1]"].includes(u.hostname)) return null;
+	return u.origin;
+}
+
 export async function run(spec: {
 	tool: string;
 	args: string[];
@@ -2291,6 +2312,10 @@ export async function run(spec: {
 	    user trusted and that is inside the perimeter (`canaux.ts`). Absent:
 	    the home folder, as every call before. */
 	cwd?: string;
+	/** The LOCAL Ollama server Claude Code must use (2026-10-17), already
+	    judged by the caller (`canaux.ts`): read from the stored settings,
+	    loopback http only, and only for an agent form in a trusted folder. */
+	ollama?: string;
 }, options: {
 	env?: NodeJS.ProcessEnv;
 	/** Les deux coutures de `lancer`, transmises telles quelles. */
@@ -2375,7 +2400,9 @@ export async function run(spec: {
 				stdin: resolu.stdin,
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
-				env: spec.tool === "claude" ? Object.assign(environnementEnfant(env), ENV_SORTIE_CLAUDE) : environnementEnfant(env),
+				env: spec.tool === "claude"
+					? Object.assign(environnementEnfant(env), ENV_SORTIE_CLAUDE, spec.ollama ? envOllama(spec.ollama) : {})
+					: environnementEnfant(env),
 				cwd: images ? resolu.pieces : spec.cwd ?? dossierPersonnel(env),
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
