@@ -382,7 +382,10 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 			const q = plier(champ.value.trim());
 			let i = 0;
 			for (const b of liste.querySelectorAll<HTMLElement>(".qbd-select-option")) {
-				b.hidden = q ? !plier(b.textContent || "").includes(q) : !!options.limit && i >= options.limit;
+				// `style.display`, not `hidden`: the row's own `display: flex` wins over the attribute.
+				const cache = q ? !plier(b.textContent || "").includes(q) : !!options.limit && i >= options.limit;
+				b.style.display = cache ? "none" : "";
+				b.hidden = cache;
 				i++;
 			}
 		};

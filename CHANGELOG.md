@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The output folder menu no longer opens by itself behind the Moodle window, and it really shows only 6 folders until you search.
+
 ## [1.21.2] - 2026-10-17
 
 ### Changed

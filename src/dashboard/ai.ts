@@ -1798,7 +1798,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		suggestionsEl.setAttribute("aria-live", "polite");
 		if (provider && dossierProposePour !== activeChatId() && !destination && !examCible && !composerText && destinationOptions().length > 1) {
 			dossierProposePour = activeChatId();
-			window.setTimeout(() => { if (!disposed && destBtn.isConnected && !document.querySelector(".qbd-action-menu")) destBtn.click(); }, 450);
+			/* Never over a window (the Moodle window repaints this page behind it when it
+			   declares folders): the offer would open on top of what the user is doing. */
+			window.setTimeout(() => { if (!disposed && destBtn.isConnected && !document.querySelector(".qbd-action-menu, .modal-container, .modal")) destBtn.click(); }, 450);
 		}
 		planifierSuggestions();
 		/* The SUBJECT notice (feedback #7), right of the folder since
