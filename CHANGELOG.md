@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Each kind of Moodle activity has its own colour, and the links and pages that open read as live rows.
+- "Stop following" a Moodle module is now "Stop syncing" (and "Sync again").
+
 ## [1.21.3] - 2026-10-17
 
 ### Fixed

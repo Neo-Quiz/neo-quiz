@@ -200,6 +200,18 @@
 	color: var(--nqm-accent);
 }
 
+/* Every kind of activity has its colour (2026-10-17): with only the PDF in red,
+   it looked like the one live row of the module. */
+.nq-moodle-modal .nqm-act-icon.is-forum { background: color-mix(in srgb, var(--nqm-accent) 16%, transparent); color: var(--nqm-accent); }
+.nq-moodle-modal .nqm-act-icon.is-url { background: color-mix(in srgb, var(--nqm-green) 16%, transparent); color: var(--nqm-green); }
+.nq-moodle-modal .nqm-act-icon.is-page,
+.nq-moodle-modal .nqm-act-icon.is-book { background: color-mix(in srgb, var(--color-purple) 16%, transparent); color: var(--color-purple); }
+.nq-moodle-modal .nqm-act-icon.is-assign,
+.nq-moodle-modal .nqm-act-icon.is-quiz { background: color-mix(in srgb, var(--nqm-orange) 16%, transparent); color: var(--nqm-orange); }
+.nq-moodle-modal .nqm-act-icon.is-folder,
+.nq-moodle-modal .nqm-act-icon.is-resource { background: color-mix(in srgb, var(--color-cyan) 16%, transparent); color: var(--color-cyan); }
+.nq-moodle-modal .nqm-act-row.is-openable .nqm-row-name { color: var(--nqm-text); font-weight: 600; }
+
 /* A PDF shows its own colour mark (file-type-icon.ts): no tinted square behind it. */
 .nq-moodle-modal .nqm-file .nqm-row-icon.has-type-img {
 	background: transparent;

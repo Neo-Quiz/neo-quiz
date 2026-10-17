@@ -282,7 +282,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 					ajouter(ligne, "span", "nqm-session-kind", s.epreuve ? t("settings.moodle.wExamPill") : (s.activite ?? ""));
 				}
 				if (!seances.length) ajouter(liste, "div", "nqm-session-gap", t("settings.moodle.wSessionsNone"));
-			}, () => undefined);
+			}, () => { ajouter(liste, "div", "nqm-session-gap", t("settings.moodle.wSessionsNone")); });
 		});
 	}
 	let bulle: HTMLElement | null = null;
