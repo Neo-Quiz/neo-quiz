@@ -297,3 +297,17 @@ export function decisionAuto(auto: boolean, limitee: boolean): "run" | "off" | "
 	if (!auto) return "off";
 	return limitee ? "metered" : "run";
 }
+
+/** The address of a link activity (`url` module), as the window may show it:
+    http(s) only, no user info, at most 1000 characters, and any token-like
+    parameter removed (a Moodle link carries none, but a link pasted by a
+    teacher must never hand the window a key). Null otherwise. */
+export function lienExterne(brut: unknown): string | null {
+	if (typeof brut !== "string" || brut.length > 2000) return null;
+	let u: URL;
+	try { u = new URL(brut); } catch { return null; }
+	if ((u.protocol !== "https:" && u.protocol !== "http:") || u.username || u.password) return null;
+	for (const k of [...u.searchParams.keys()]) if (/token|key|secret|password|sesskey/i.test(k)) u.searchParams.delete(k);
+	const href = u.href;
+	return href.length <= 1000 ? href : null;
+}

@@ -294,6 +294,8 @@ export interface ActiviteMoodle {
 	depot: DepotMoodle | null;
 	/** An assignment the user hid from "to hand in" (the course page hides it too). */
 	masque: boolean;
+	/** The address of a link activity (`url`), checked by `lienExterne`; null for anything else. */
+	lien: string | null;
 }
 export interface ModuleMoodle {
 	sections: { name: string; activites: ActiviteMoodle[] }[];

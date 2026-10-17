@@ -362,6 +362,10 @@ export interface DashboardShellCtx {
 	    The Folders page moves ended folders to an "Ended" section at the
 	    bottom. Absent where there is no timetable (the phone). */
 	moduleEnded?: (folder: string) => number | null;
+	/** Rewrites the folder's `Liens Moodle.md` from the Moodle course matching
+	    it (its code); true when the note changed. Absent without Moodle (the
+	    phone: the note arrives through the sync). */
+	refreshMoodleLinks?: (folder: string) => Promise<boolean>;
 	/** Opens the Moodle window (PC only): a "Moodle" button of the Folders top bar
 	    when present. Absent on a phone and in the plugin. */
 	openMoodle?: () => void;

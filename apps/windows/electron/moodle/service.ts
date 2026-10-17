@@ -25,7 +25,7 @@ import { MAX_IDS, SITE_DEFAUT, coursValides, origineSite } from "./garde";
 import { creerMagasinJeton, type Chiffrement, type Jeton } from "./jeton";
 import { depuisAncien, ecrireTable, fusionner, lireTable, poser, type ListeCle, type TableListes } from "./listes";
 import { extensionRefusee } from "../ressources";
-import { allFiles, decisionAuto, depositState, launchUrl, limiter, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile, type Scan } from "./pur";
+import { allFiles, decisionAuto, depositState, launchUrl, lienExterne, limiter, pendingDeposits, uniqueJobs, verifyLaunchToken, withinBudget, RUN_MAX_FILES, RUN_MAX_BYTES, type Course, type MoodleFile, type Scan } from "./pur";
 
 export const LOGIN_TTL = 10 * 60 * 1000;
 export const AUTO_SYNC_INTERVAL = 3600 * 1000;
@@ -670,7 +670,7 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 							fichiers: a.deposit.files.map(f => f.name).slice(0, 20),
 						};
 					}
-					return { id: a.id, name: a.name, type: a.type, fichiers, depot, masque: !!a.deposit && ignores.includes(a.id) };
+					return { id: a.id, name: a.name, type: a.type, fichiers, depot, masque: !!a.deposit && ignores.includes(a.id), lien: a.type === "url" ? lienExterne(a.external[0]) : null };
 				}),
 			}));
 			return { sections, externes: scan.external.length, verifieA };

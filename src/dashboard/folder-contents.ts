@@ -22,6 +22,11 @@ import type { DirEntry } from "../host/types";
 ══════════════════════════════════════════════════════════ */
 
 export const LIENS_NOTE = "Liens.md";
+/** The links of the matching Moodle course, WRITTEN BY THE APP (2026-10-17):
+    on disk so that the AI working in the folder reads them like the rest, and
+    the phone gets them through the sync. Rewritten only when they change;
+    shown in the Links tab, never in Notes, never removable from there. */
+export const LIENS_MOODLE_NOTE = "Liens Moodle.md";
 
 export interface LienDossier {
 	url: string;
@@ -35,6 +40,8 @@ export interface ContenuDossier {
 	liens: LienDossier[];
 	/** L'entrée de `Liens.md` si elle existe — pour l'ouvrir, pas pour la lister. */
 	liensNote: DirEntry | null;
+	/** The links of `Liens Moodle.md` (see `LIENS_MOODLE_NOTE`). */
+	liensMoodle: LienDossier[];
 }
 
 /** Le nom sans son extension : « CM1 - Introduction.pdf » → « CM1 - Introduction ». */
@@ -66,13 +73,15 @@ export function extensionDe(nom: string): string {
 export function trierContenu(
 	entrees: readonly DirEntry[],
 	estQuiz: (path: string) => boolean,
-): { documents: DirEntry[]; notes: DirEntry[]; liensNote: DirEntry | null } {
+): { documents: DirEntry[]; notes: DirEntry[]; liensNote: DirEntry | null; liensMoodleNote: DirEntry | null } {
 	const documents: DirEntry[] = [];
 	const notes: DirEntry[] = [];
 	let liensNote: DirEntry | null = null;
+	let liensMoodleNote: DirEntry | null = null;
 	for (const e of entrees) {
 		if (e.isFolder || e.name.startsWith(".")) continue;
 		if (e.name === LIENS_NOTE) { liensNote = e; continue; }
+		if (e.name === LIENS_MOODLE_NOTE) { liensMoodleNote = e; continue; }
 		if (extensionDe(e.name) === "md") {
 			if (!estQuiz(e.path)) notes.push(e);
 			continue;
@@ -82,7 +91,7 @@ export function trierContenu(
 	const parNom = (a: DirEntry, b: DirEntry) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 	documents.sort(parNom);
 	notes.sort(parNom);
-	return { documents, notes, liensNote };
+	return { documents, notes, liensNote, liensMoodleNote };
 }
 
 /* Une puce « - [titre](url) », une puce « - url », ou une URL nue sur sa
@@ -146,7 +155,32 @@ export async function lireContenuDossier(folder: string, estQuiz: (path: string)
 		   `ajouterLien`, et c'est la valeur du DISQUE qu'on affiche. */
 		try { liens = parseLiens(await host.fs.read(tri.liensNote.path)); } catch { liens = []; }
 	}
-	return { ...tri, liens };
+	let liensMoodle: LienDossier[] = [];
+	if (tri.liensMoodleNote) {
+		try { liensMoodle = parseLiens(await host.fs.read(tri.liensMoodleNote.path)); } catch { liensMoodle = []; }
+	}
+	const { liensMoodleNote: _m, ...reste } = tri;
+	return { ...reste, liens, liensMoodle };
+}
+
+/** The text of `Liens Moodle.md`: one bullet per link, readable by a person
+    and by the AI. A `]` in a title or a `)` in an address would end the
+    Markdown link: replaced. PURE. */
+export function noteLiensMoodle(liens: readonly LienDossier[]): string {
+	const lignes = liens.map(l => `- [${l.title.replace(/[[\]]/g, m => (m === "[" ? "(" : ")")).replace(/\s+/g, " ").trim()}](${l.url.replace(/\)/g, "%29").replace(/\s/g, "%20")})`);
+	return `# Moodle\n\n${lignes.join("\n")}\n`;
+}
+
+/** Writes `Liens Moodle.md` when its links changed; true when it wrote. An empty
+    list writes nothing (the course may just be unreachable right now). */
+export async function ecrireLiensMoodle(folder: string, liens: readonly LienDossier[]): Promise<boolean> {
+	if (!liens.length) return false;
+	const host = currentHost();
+	const path = folder ? `${folder}/${LIENS_MOODLE_NOTE}` : LIENS_MOODLE_NOTE;
+	const texte = noteLiensMoodle(liens);
+	try { if (await host.fs.exists(path) && (await host.fs.read(path)) === texte) return false; } catch { /* rewritten below */ }
+	await host.fs.write(path, texte);
+	return true;
 }
 
 /** Les lignes de `texte` SANS celles qui portent le lien `url` — et rien

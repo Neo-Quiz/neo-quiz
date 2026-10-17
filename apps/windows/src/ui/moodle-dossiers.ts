@@ -17,6 +17,7 @@ import { pont } from "../host/pont";
 import { currentHost } from "../../../../src/host/current";
 import type { DashboardShellCtx } from "../../../../src/types/dashboard-ctx";
 import { ensureFolder } from "../../../../src/dashboard/folder-create";
+import { ecrireLiensMoodle } from "../../../../src/dashboard/folder-contents";
 import { saveSettingsReporting } from "../../../../src/dashboard/save-settings";
 import { suggestIcons } from "../../../../src/dashboard/icon-suggest";
 
@@ -34,6 +35,33 @@ export function finDuDossier(dossier: string, maintenant = Date.now()): number |
 	const code = codeDuDossier(dossier);
 	const fin = code ? fins.get(code) : undefined;
 	return fin !== undefined && fin < maintenant ? fin : null;
+}
+
+/* Moodle course id per module code, learnt when the Moodle window lists the
+   courses, kept in this window's storage (a convenience: lost, the Links tab
+   only waits for the next opening of the Moodle window). */
+const CLE_IDS = "nq-moodle-ids";
+function lireIds(): Record<string, number> {
+	try { const v: unknown = JSON.parse(localStorage.getItem(CLE_IDS) || "{}"); return v && typeof v === "object" ? v as Record<string, number> : {}; } catch { return {}; }
+}
+/** Remembers the course id of each code (the Moodle window passes its list). */
+export function noterCours(cours: readonly CoursMoodle[]): void {
+	const ids = lireIds();
+	for (const co of cours) if (co.code && Number.isSafeInteger(co.id)) ids[co.code] = co.id;
+	try { localStorage.setItem(CLE_IDS, JSON.stringify(ids)); } catch { /* storage refused: nothing kept */ }
+}
+/** Rewrites `Liens Moodle.md` of this folder from the link activities of its
+    Moodle course. The scan comes from the cache of the main process (no
+    request to the school while it is fresh). True when the note changed. */
+export async function rafraichirLiensMoodle(dossier: string): Promise<boolean> {
+	const api = pont().moodle;
+	const code = codeDuDossier(dossier);
+	const id = code ? lireIds()[code] : undefined;
+	if (!api || !id) return false;
+	const mod = await api.module(id).catch(() => null);
+	if (!mod) return false;
+	const liens = mod.sections.flatMap(s => s.activites.filter(a => a.lien).map(a => ({ title: a.name, url: a.lien as string })));
+	return ecrireLiensMoodle(dossier, liens);
 }
 
 /** Takes the ends of a timetable answer (the Moodle window passes its own). */

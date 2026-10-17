@@ -274,6 +274,13 @@
 	height: 14px;
 }
 
+.nq-moodle-modal .nqm-row-link {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow-wrap: normal;
+}
+
 .nq-moodle-modal .nqm-act-files {
 	margin: 2px 0 4px 26px;
 	padding-left: 10px;

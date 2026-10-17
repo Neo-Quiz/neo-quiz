@@ -28,7 +28,7 @@ import { currentHourCycle, currentLang, hourOptions, t } from "../../../../src/i
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { heure, resumeLancement, span } from "./moodle-common";
-import { declarerFavoris, noterFins } from "./moodle-dossiers";
+import { declarerFavoris, noterCours, noterFins } from "./moodle-dossiers";
 import { coquilleActive, repeindreCoquille } from "./dashboard-shell";
 import { codeAccent } from "../../../../src/dashboard/module-color";
 import { suggestIcons } from "../../../../src/dashboard/icon-suggest";
@@ -88,6 +88,10 @@ function iconeLigne(parent: HTMLElement, nom: string, code: string | null): void
 	if (!nomIcone) return;
 	currentHost().ui.setIcon(s, nomIcone);
 	s.style.color = teinte(code);
+}
+/** An address without its scheme: "drive.google.com/drive/folders/..." */
+export function lienCourt(href: string): string {
+	try { const u = new URL(href); return (u.host + u.pathname + u.search).replace(/\/$/, ""); } catch { return href; }
 }
 function typeFichier(nom: string): string {
 	const ext = (nom.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
@@ -249,6 +253,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	}
 	async function chargerCours(): Promise<void> {
 		cours = await api.cours().catch(() => [] as CoursMoodle[]);
+		noterCours(cours);
 		void favorisEnDossiers();
 	}
 	/** Every favourite is a folder of the Folders page (`moodle-dossiers.ts`). */
@@ -892,6 +897,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const info = ajouter(ligne, "div", "nqm-row-info");
 		ajouter(info, "div", "nqm-row-name", a.name);
 		if (a.fichiers.length > 1) ajouter(info, "div", "nqm-row-meta", t("settings.moodle.wFilesCount", { n: a.fichiers.length }));
+		// A link shows where it leads: site and path, cut when too long (text only).
+		if (a.lien) ajouter(info, "div", "nqm-row-meta nqm-row-link", lienCourt(a.lien));
 		const cle = TYPE_LABEL[a.type];
 		ajouter(ligne, "div", "nqm-row-type", cle ? t(cle) : a.type);
 		/* Nothing to download (a forum, a link, a page): the row opens it on Moodle, in the browser. */

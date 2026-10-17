@@ -17,6 +17,7 @@ release notes.
 
 - A folder card shows when the folder was last modified instead of its path.
 - The Moodle window shows its "Download" button only when there is something to download, and each module icon lines up with its code.
+- The links of a Moodle course show their address in the Moodle window, and land in the Links tab of the matching folder (in a "Liens Moodle.md" note the AI working in the folder can read).
 
 ## [1.20.123] - 2026-10-17
 

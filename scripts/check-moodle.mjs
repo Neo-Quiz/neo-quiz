@@ -1138,6 +1138,14 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			assert.deepEqual([...c.store.moodle.favoris].sort((a, b) => a - b), [1, 10, 11, 12]);
 		} finally { fin(c); }
 	});
+	await test("link activity address: http(s) only, no user info, token-like parameters removed", () => {
+		const { lienExterne } = pur;
+		assert.equal(lienExterne("https://drive.google.com/drive/folders/abc?usp=sharing"), "https://drive.google.com/drive/folders/abc?usp=sharing");
+		assert.equal(lienExterne("https://moodle.example.fr/x?id=3&token=SECRET&wstoken=S2&sesskey=K"), "https://moodle.example.fr/x?id=3");
+		for (const bad of ["javascript:alert(1)", "file:///C:/x", "https://u:p@site.fr/", "data:text/html,x", "x".repeat(3000), 5, null, ""]) {
+			assert.equal(lienExterne(bad), null, String(bad).slice(0, 40));
+		}
+	});
 	await test("shared lists (pure): latest gesture wins, a removal wins a tie, old lists carried over oldest, bad entries dropped", () => {
 		const { fusionner, depuisAncien, lireTable, poser, MAX_ENTREES } = listesMod;
 		const a = { favoris: { 1: { on: true, at: 10 }, 2: { on: true, at: 5 } } };

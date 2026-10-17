@@ -121,14 +121,21 @@ export function renderFolderSections(parent: HTMLElement, depsBrutes: FolderSect
 			})),
 		});
 		ajouterSection({
-			icon: "link", title: "dashboard.folder.links", count: contenu.liens.length,
+			icon: "link", title: "dashboard.folder.links", count: contenu.liens.length + contenu.liensMoodle.length,
 			emptyTitle: "dashboard.folder.linksEmptyTitle", emptyHint: "dashboard.folder.linksEmptyHint",
 			action: { icon: "plus", label: "dashboard.folder.addLink", onClick: () => ouvrirModalLien(deps) },
-			items: contenu.liens.map(l => ({
-				icon: "globe", label: l.title, meta: titreDepuisUrl(l.url),
-				onOpen: () => { window.open(l.url, "_blank"); },
-				onDelete: () => confirmerPuis(t("dashboard.folder.deleteLinkTitle", { name: l.title }), t("dashboard.folder.deleteLinkMessage"), () => retirerLeLien(deps, l)),
-			})),
+			items: [
+				...contenu.liens.map((l): SectionSpec["items"][number] => ({
+					icon: "globe", label: l.title, meta: titreDepuisUrl(l.url),
+					onOpen: () => { window.open(l.url, "_blank"); },
+					onDelete: () => confirmerPuis(t("dashboard.folder.deleteLinkTitle", { name: l.title }), t("dashboard.folder.deleteLinkMessage"), () => retirerLeLien(deps, l)),
+				})),
+				// The links of the Moodle course (`Liens Moodle.md`, written by the app): not removable here.
+				...contenu.liensMoodle.map((l): SectionSpec["items"][number] => ({
+					icon: "graduation-cap", label: l.title, meta: t("dashboard.folder.moodleLink", { site: titreDepuisUrl(l.url) }),
+					onOpen: () => { window.open(l.url, "_blank"); },
+				})),
+			],
 		});
 		ajouterSection({
 			icon: "sticky-note", title: "dashboard.folder.notes", count: contenu.notes.length,
@@ -144,6 +151,9 @@ export function renderFolderSections(parent: HTMLElement, depsBrutes: FolderSect
 		// Mesuré au prochain cadre : les onglets doivent être posés.
 		requestAnimationFrame(() => montrer(ongletParDossier.get(deps.folder) ?? 0, false));
 	};
+	/* The host refreshes `Liens Moodle.md` from the Moodle course of this folder
+	   (scan cache: no request to the school while it is fresh); a rewrite repaints. */
+	void deps.ctx.refreshMoodleLinks?.(deps.folder).then(ecrit => { if (ecrit && wrap.isConnected) deps.rerender(); }, () => undefined);
 	const memorise = dernierContenu.get(deps.folder);
 	if (memorise) peindre(memorise);
 	void lireContenuDossier(deps.folder, estQuiz).then(contenu => {
@@ -170,7 +180,7 @@ interface SectionSpec {
 	items: { icon: string; /** A file's name: its type icon (`poserIconeFichier`) instead of `icon`. */ file?: string; label: string; meta: string; thumb?: string | null; onOpen: () => void | Promise<unknown>;
 		/** True when the click hands the file to the system's default app:
 		    the row then shows the "opening" state while the app starts. */
-		external?: boolean; onDelete: () => void }[];
+		external?: boolean; /** Absent: the row cannot be removed here (a Moodle link). */ onDelete?: () => void }[];
 }
 
 function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: SectionSpec): HTMLElement {
@@ -225,11 +235,14 @@ function renderSection(parent: HTMLElement, deps: FolderSectionsDeps, spec: Sect
 			ajouter(ouvrir, "span", "qbd-folder-item-name", it.label);
 			ajouter(ouvrir, "span", "qbd-folder-item-meta", it.meta);
 			ouvrir.addEventListener("click", it.onOpen);
-			const supprimer = ajouter(item, "button", "qbd-folder-item-delete");
-			supprimer.type = "button";
-			supprimer.setAttribute("aria-label", t("dashboard.folder.deleteAction"));
-			host.ui.setIcon(supprimer, "trash-2");
-			supprimer.addEventListener("click", (e) => { e.stopPropagation(); it.onDelete(); });
+			if (it.onDelete) {
+				const suppr = it.onDelete;
+				const supprimer = ajouter(item, "button", "qbd-folder-item-delete");
+				supprimer.type = "button";
+				supprimer.setAttribute("aria-label", t("dashboard.folder.deleteAction"));
+				host.ui.setIcon(supprimer, "trash-2");
+				supprimer.addEventListener("click", (e) => { e.stopPropagation(); suppr(); });
+			}
 		}
 		if (defile) suivreDebord(liste);
 	}

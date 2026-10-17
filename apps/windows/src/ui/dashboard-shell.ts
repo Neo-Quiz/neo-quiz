@@ -73,7 +73,7 @@ import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
-import { chargerFins, finDuDossier } from "./moodle-dossiers";
+import { chargerFins, finDuDossier, rafraichirLiensMoodle } from "./moodle-dossiers";
 import { monterPointLogo } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
@@ -599,6 +599,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			return /^[a-zA-Z]:\//.test(absolu) ? absolu.replace(/\//g, "\\") : absolu;
 		},
 		moduleEnded: folder => finDuDossier(folder),
+		refreshMoodleLinks: pont().moodle && !currentHost().platform.isMobile ? folder => rafraichirLiensMoodle(folder) : undefined,
 		generatedFolder: () => {
 			const host = currentHost();
 			const local = deps.aiSettings.get().aiOutputFolder || aiSettingsDefaults().aiOutputFolder;

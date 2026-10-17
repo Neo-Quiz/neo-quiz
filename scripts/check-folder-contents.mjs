@@ -16,13 +16,13 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/folder-contents.ts", async ({ trierContenu, parseLiens, ligneDeLien, urlValide, titreDepuisUrl, cheminsAJoindre, sansLien, LIENS_NOTE }) => {
+await withSrcModule("src/dashboard/folder-contents.ts", async ({ trierContenu, parseLiens, ligneDeLien, urlValide, titreDepuisUrl, cheminsAJoindre, sansLien, LIENS_NOTE, LIENS_MOODLE_NOTE, noteLiensMoodle }) => {
 	const r = makeReporter("Contenu d'un dossier — tri, liens, sources");
 
 	const e = (name, isFolder = false) => ({ name, path: `Efrei/XTI301/${name}`, isFolder });
 	const entrees = [
 		e("TP2.pdf"), e("cm1 - Introduction.pdf"), e("Quiz Python.md"), e("TP1.md"), e("TP1", true),
-		e(".neo-quiz", true), e(".DS_Store"), e(LIENS_NOTE), e("schema.PNG"),
+		e(".neo-quiz", true), e(".DS_Store"), e(LIENS_NOTE), e("schema.PNG"), e(LIENS_MOODLE_NOTE),
 	];
 	const tri = trierContenu(entrees, (path) => path.endsWith("Quiz Python.md"));
 
@@ -30,6 +30,13 @@ await withSrcModule("src/dashboard/folder-contents.ts", async ({ trierContenu, p
 		tri.documents.map(d => d.name), ["cm1 - Introduction.pdf", "schema.PNG", "TP2.pdf"]);
 	r.check("les notes sont les .md qui ne sont PAS des quiz", tri.notes.map(n => n.name), ["TP1.md"]);
 	r.check("Liens.md est mise à part, jamais listée comme une note", tri.liensNote?.name, LIENS_NOTE);
+	r.check("Liens Moodle.md (written by the app) is set apart too, never a note nor a source", [tri.liensMoodleNote?.name, tri.notes.some(n => n.name === LIENS_MOODLE_NOTE)], [LIENS_MOODLE_NOTE, false]);
+	{
+		const liens = [{ title: "Cours / TPs [S3]", url: "https://drive.example.com/d/a(b)?x=1" }, { title: "Annonces", url: "https://moodle.example.fr/mod/url/view.php?id=4" }];
+		const relu = parseLiens(noteLiensMoodle(liens));
+		r.check("Liens Moodle.md reads back: a ] in a title or a ) in an address never breaks a link", relu.map(l => [l.title, l.url]),
+			[["Cours / TPs (S3)", "https://drive.example.com/d/a(b%29?x=1"], ["Annonces", "https://moodle.example.fr/mod/url/view.php?id=4"]]);
+	}
 	r.check("les dossiers et les fichiers cachés n'apparaissent nulle part",
 		[...tri.documents, ...tri.notes].some(x => x.isFolder || x.name.startsWith(".")), false);
 
