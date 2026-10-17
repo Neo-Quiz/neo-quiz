@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.12] - 2026-10-17
+
 ### Changed
 
 - Folder cards show their subject under the name, in place of the teaching unit.
