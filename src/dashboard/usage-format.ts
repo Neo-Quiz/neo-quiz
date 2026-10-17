@@ -29,6 +29,10 @@ export interface UsageRow {
 	modelName?: string;
 	/** kind « window » (Codex) : durée de la fenêtre, mise en mots au rendu. */
 	windowMinutes?: number;
+	/** The model group a window belongs to, as the provider names it
+	    (Antigravity's "Gemini Models", "Claude and GPT models", 2026-10-17):
+	    one provider, several groups, each with its 5-hour and weekly window. */
+	group?: string;
 	/** kind "monthly" (Ollama's included usage, 2026-10-17): the amounts as
 	    Ollama writes them, e.g. "$19.63 of $60"; a percentage of a budget in
 	    dollars says little on its own. */
@@ -258,13 +262,16 @@ export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
 	/* Antigravity's model groups (2026-10-17) keep their order and come first;
 	   Ollama's monthly credits last. */
 	const span = (r: UsageRow): number => r.kind === "weekly-model" ? 0 : r.kind === "session" ? 300 : r.kind === "weekly-all" ? 10080 : r.kind === "monthly" ? 43200 : (r.windowMinutes || Number.MAX_SAFE_INTEGER);
+	// Windows of a model group stay together, groups in the provider's order.
+	const groupes = [...new Set(rows.map(r => r.group ?? ""))];
 	return rows
 		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window" || r.kind === "monthly" || (r.kind === "weekly-model" && rows.every(x => x.kind === "weekly-model")))
-		.sort((a, b) => span(a) - span(b));
+		.sort((a, b) => groupes.indexOf(a.group ?? "") - groupes.indexOf(b.group ?? "") || span(a) - span(b));
 }
 
 /** Short window label: "5h" / "7d" ("7j" in French), translated at render time. */
 export function usageShortLabel(row: UsageRow): string {
+	if (row.group) return groupeCourt(row.group) + " " + usageShortLabel({ ...row, group: undefined });
 	if (row.kind === "weekly-model") return row.modelName || t("ai.usage.allModels");
 	if (row.kind === "monthly") return t("ai.usage.shortMonth");
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
@@ -285,7 +292,13 @@ export function usageResetText(resetsAt: number | null, now: number, lang: strin
 
 /** Window title: "5-hour limit", "Weekly limit", "3-day limit". Claude's two
     windows have fixed spans; a Codex window is named after its duration. */
+/** "Claude and GPT models" → "Claude and GPT": the word "models" says nothing in a short label. */
+function groupeCourt(g: string): string {
+	return g.replace(/\s+models?$/i, "").trim() || g;
+}
+
 export function usageWindowTitle(row: UsageRow): string {
+	if (row.group) return groupeCourt(row.group) + " · " + usageWindowTitle({ ...row, group: undefined });
 	if (row.kind === "weekly-model" || row.kind === "monthly") return usageRowLabel(row);
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
 	if (mins === 10080) return t("ai.usage.limitWeekly");

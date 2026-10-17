@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { LOG_PREFIX } from "../../../src/branding";
 import type { EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
-import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageAntigravityDepuisModeles, usageClaudeDepuisReponse, usageCodexDepuisLigne, usageOllamaDepuisCache, usageOllamaDepuisPage } from "./comptes-pur";
+import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageAntigravityDepuisModeles, usageAntigravityDepuisResume, usageClaudeDepuisReponse, usageCodexDepuisLigne, usageOllamaDepuisCache, usageOllamaDepuisPage } from "./comptes-pur";
 import type { OutilCompte } from "./comptes-pur";
 import { ARGS_COMPTE } from "./gabarits-cli";
 import { dossierPersonnel, environnementEnfant, lancer, resoudreExecutable } from "./process";
@@ -319,6 +319,8 @@ const AGY_CRED_SCRIPT = [
 ].join("\n");
 const AGY_LOAD_URL = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
 const AGY_MODELS_URL = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
+/** The grouped 5-hour and weekly limits, as agy's `/usage` shows them. */
+const AGY_RESUME_URL = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary";
 /** A token this close to its expiry is renewed first: it must not lapse mid-request. */
 const AGY_MARGE_MS = 60_000;
 
@@ -389,6 +391,11 @@ async function lireUsageAntigravity(env: NodeJS.ProcessEnv): Promise<UsageRead> 
 		if (!charge.ok) return { rows: [], error: erreurDepuisStatut(charge.status, charge.headers), mesureAt: null };
 		const p = charge.json && typeof charge.json === "object" ? (charge.json as { cloudaicompanionProject?: unknown }).cloudaicompanionProject : null;
 		const projet = typeof p === "string" ? p : p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string" ? (p as { id: string }).id : null;
+		/* The summary first (two windows per group, as agy's `/usage`); the
+		   per-model quotas when it is missing or empty. */
+		const resume = await postAgy(AGY_RESUME_URL, lu.jeton, projet ? { project: projet } : {}).catch(() => null);
+		const lignes = resume && resume.ok ? usageAntigravityDepuisResume(resume.json) : [];
+		if (lignes.length) return { rows: lignes, error: null, mesureAt: Date.now() };
 		const modeles = await postAgy(AGY_MODELS_URL, lu.jeton, projet ? { project: projet } : {});
 		if (!modeles.ok) return { rows: [], error: erreurDepuisStatut(modeles.status, modeles.headers), mesureAt: null };
 		const rows = usageAntigravityDepuisModeles(modeles.json);

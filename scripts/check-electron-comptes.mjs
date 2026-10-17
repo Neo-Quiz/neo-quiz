@@ -185,6 +185,19 @@ await withSrcModule("apps/windows/electron/comptes-pur.ts", async (m) => {
 		[{ kind: "weekly-model", modelName: "Claude & GPT-OSS", usedPercent: 100, resetsAt: Date.parse(R2) },
 		 { kind: "weekly-model", modelName: "Gemini 3 Flash", usedPercent: 0, resetsAt: null },
 		 { kind: "weekly-model", modelName: "Gemini 3.1 Pro", usedPercent: 40, resetsAt: Date.parse(R2) }]);
+	/* ─── Antigravity: the quota summary (two windows per group, as agy's /usage) ─── */
+	r.check("agy summary: one row per group and window, spent buckets keep their reset, untouched ones none",
+		m.usageAntigravityDepuisResume({ groups: [
+			{ displayName: "Gemini Models", buckets: [{ window: "weekly", remainingFraction: 1, resetTime: "2026-10-24T20:55:55Z" }, { window: "5h", remainingFraction: 1, resetTime: "2026-10-18T01:55:55Z" }] },
+			{ displayName: "Claude and GPT models", buckets: [{ window: "weekly", remainingFraction: 0.9262616, resetTime: "2026-10-24T20:00:00Z" }, { window: "5h", resetTime: "2026-10-18T01:00:00Z" }, { window: "monthly", remainingFraction: 0.5 }] },
+			{ buckets: [{ window: "5h", remainingFraction: 0.1 }] },
+		] }),
+		[{ kind: "weekly-all", group: "Gemini Models", usedPercent: 0, resetsAt: null },
+		 { kind: "session", group: "Gemini Models", usedPercent: 0, resetsAt: null },
+		 { kind: "weekly-all", group: "Claude and GPT models", usedPercent: 7.4, resetsAt: Date.parse("2026-10-24T20:00:00Z") },
+		 { kind: "session", group: "Claude and GPT models", usedPercent: 100, resetsAt: Date.parse("2026-10-18T01:00:00Z") }]);
+	r.check("agy summary: hostile shapes give no row", [m.usageAntigravityDepuisResume(null).length, m.usageAntigravityDepuisResume({ groups: "x" }).length, m.usageAntigravityDepuisResume({ groups: [{ displayName: 3, buckets: [] }] }).length], [0, 0, 0]);
+
 	/* ─── Ollama: the credits page (2026-10-17) and the status line's cache ─── */
 	const pageCredits = '<h2>Usage credits</h2><div>pro $37.76</div><p>Monthly credits</p><p>$37.76</p><p>Refills to $60 on October 21, 2026.</p><script>var x="Refills to $1 on January 1, 2020."</script><h3>Usage breakdown</h3><p>Monthly credits used</p><p>$22.24</p>';
 	const rowsCredits = m.usageOllamaDepuisPage(pageCredits, 0);

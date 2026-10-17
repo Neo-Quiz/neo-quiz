@@ -342,3 +342,36 @@ export function usageOllamaDepuisCache(cache: unknown): { rows: UsageRow[]; mesu
 	}
 	return { rows, mesureAt: rows.length ? quand : null };
 }
+
+
+/* ── ANTIGRAVITY'S QUOTA SUMMARY (2026-10-17) ──
+   `retrieveUserQuotaSummary`, the call behind agy's `/usage` panel and the
+   Antigravity app's: groups of models ("Gemini Models", "Claude and GPT
+   models"), each with a "weekly" and a "5h" bucket (`remainingFraction`,
+   `resetTime`). Within a group, models share both limits. */
+export function usageAntigravityDepuisResume(corps: unknown): UsageRow[] {
+	if (!corps || typeof corps !== "object") return [];
+	const groupes = (corps as { groups?: unknown }).groups;
+	if (!Array.isArray(groupes)) return [];
+	const rows: UsageRow[] = [];
+	for (const g of groupes.slice(0, 12)) {
+		if (!g || typeof g !== "object") continue;
+		const nom = (g as { displayName?: unknown }).displayName;
+		const seaux = (g as { buckets?: unknown }).buckets;
+		if (typeof nom !== "string" || !nom.trim() || !Array.isArray(seaux)) continue;
+		for (const b of seaux.slice(0, 6)) {
+			if (!b || typeof b !== "object") continue;
+			const fenetre = (b as { window?: unknown }).window;
+			const kind = fenetre === "5h" ? "session" : fenetre === "weekly" ? "weekly-all" : null;
+			if (!kind) continue;
+			const f = (b as { remainingFraction?: unknown }).remainingFraction;
+			const brutReset = (b as { resetTime?: unknown }).resetTime;
+			const reset = typeof brutReset === "string" && Number.isFinite(Date.parse(brutReset)) ? Date.parse(brutReset) : null;
+			// Proto JSON omits a zero fraction: a bucket without one is spent.
+			const restant = typeof f === "number" && Number.isFinite(f) ? Math.min(1, Math.max(0, f)) : 0;
+			const intact = restant >= 1;
+			rows.push({ kind, group: nom.trim().slice(0, 60), usedPercent: Math.round((1 - restant) * 1000) / 10, resetsAt: intact ? null : reset });
+		}
+	}
+	return rows;
+}
