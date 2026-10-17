@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.2] - 2026-10-17
+
 ### Changed
 
 - A Moodle module page lists every session of the timetable behind its hours (day, time, length, kind, exams marked, long gaps named), so a wrong total or a hole in the school timetable shows.
