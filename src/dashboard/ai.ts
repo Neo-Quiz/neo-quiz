@@ -32,6 +32,7 @@ import { GENERATED_MODULE_ICON } from "./module-icons";
 import { GENERATED_MODULE_ACCENT } from "./module-color";
 import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openCategoriePicker, openNotePicker, openActionMenu } from "./ui-select";
 import { mountAgentModePill } from "./agent-mode-pill";
+import { renderGeneratedGallery } from "./generated-gallery";
 import { ouvrirMenuPlus } from "./composer-plus";
 import { categorieChoisie, categorieDuDossier, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
 import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
@@ -274,9 +275,6 @@ export interface AiPageDeps {
 	upcomingExams?(): ExamCible[];
 	/** Opens the Settings on the "/exam" prompt (the pencil of its tile). Absent: no pencil. */
 	openExamPromptSettings?(): void;
-	/** Opens the page of the folder where generated quizzes are written ("Generated quizzes"
-	    of the sidebar). Absent: no such entry. */
-	openGenerated?(): void;
 	/** Les notes OUVERTES dans l'hôte (onglets Obsidian), en tête des deux
 	    pickers de notes. Absent = aucune : l'application n'a pas d'onglets. */
 	openFiles?(): HostFile[];
@@ -785,6 +783,10 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   « Générer » est à l'écran. La scène, si : la coquille la détache en
 	   peignant ailleurs. `null` = la prochaine peinture est une vraie entrée. */
 	let stageRef: HTMLElement | null = null;
+	/** The gallery of generated quizzes is on screen instead of the chat
+	    (`generated-gallery.ts`); left by a chat, "New" or another chat becoming active. */
+	let vueGeneree = false;
+	let vueGenereePour: string | null = null;
 	/* Incrémentée à chaque préréglage : la jonction en arrière-plan d'un
 	   préréglage s'arrête dès qu'un autre est posé, pour que deux dossiers ne
 	   mêlent pas leurs pièces dans un même composer. */
@@ -1103,6 +1105,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   titre s'efface, les tours s'empilent dans un fil qui défile, et le
 		   composer se range en bas. On en sort par « Nouvelle demande », ou
 		   quand la liste se vide. */
+		if (vueGeneree && vueGenereePour !== activeChatId()) vueGeneree = false;
 		const conversation = (phase === "idle" || phase === "error") && chatAContenu();
 		modeConversation = conversation;
 		/* THE SIDEBAR, on the left of the page like claude.ai's: a new chat, the
@@ -1119,7 +1122,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		host.ui.setIcon(ajouter(recherche, "span", "qbd-ai-lateral-icone"), "search");
 		ajouter(recherche, "span", undefined, t("ai.search.placeholder"));
 		recherche.addEventListener("click", ouvrirRechercheChats);
-		majNouvelle = poserNouvelleDemande(lateral, chatAContenu);
+		majNouvelle = poserNouvelleDemande(lateral, () => chatAContenu() || vueGeneree);
 		/* Phone: the Claude app's layout. The nav becomes a left drawer, the top
 		   bar carries the menu and "new conversation" (`phone-chat.ts`). */
 		if (phoneLayoutNow()) {
@@ -1127,13 +1130,18 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			const majDrawer = majNouvelle;
 			majNouvelle = () => { majDrawer(); barre.majNouveau(); };
 		}
-		if (deps.openGenerated) {
-			const genere = ajouter(lateral, "button", "qbd-ai-lateral-item");
-			genere.type = "button";
-			host.ui.setIcon(ajouter(genere, "span", "qbd-ai-lateral-icone"), "folder-open");
-			ajouter(genere, "span", undefined, t("ai.side.generated"));
-			genere.addEventListener("click", () => deps.openGenerated?.());
-		}
+		/* "Generated quizzes": a gallery IN this page, like claude.ai's "Artifacts"
+		   (2026-10-17), never a jump to the Folders page. */
+		const genere = ajouter(lateral, "button", "qbd-ai-lateral-item qbd-ai-lateral-generated" + (vueGeneree ? " is-active" : ""));
+		genere.type = "button";
+		host.ui.setIcon(ajouter(genere, "span", "qbd-ai-lateral-icone"), "shapes");
+		ajouter(genere, "span", undefined, t("ai.side.generated"));
+		if (vueGeneree) genere.setAttribute("aria-current", "page");
+		genere.addEventListener("click", () => {
+			vueGeneree = true;
+			vueGenereePour = activeChatId();
+			void render(container);
+		});
 		/* The plan of an "/exam" preparation, while it lasts (plan-sidebar.ts). */
 		poserPlan(lateral, fileGen, (chemin) => {
 			const quiz = deps.scanner.getQuiz(chemin);
@@ -1141,6 +1149,23 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			else host.ui.notice(t("ai.queue.missing"));
 		}, () => activeChatId());
 		poserListeChats(lateral);
+		if (vueGeneree) {
+			// Any other entry of the column (a chat, "New") leaves the gallery.
+			lateral.addEventListener("click", e => {
+				const cible = (e.target as Element).closest(".qbd-ai-chat-ouvrir, .qbd-ai-lateral-item");
+				if (!cible || cible.classList.contains("qbd-ai-lateral-generated")) return;
+				vueGeneree = false;
+				void render(container);
+			}, true);
+			const galerie = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--gallery");
+			stageRef = galerie;
+			const dossier = defaultDestination();
+			renderGeneratedGallery(galerie, {
+				quizzes: deps.scanner.getQuizzes().filter(q => q.path.startsWith(dossier + "/")),
+				open: quiz => deps.navigate("detail", { quiz, entree: "generation" }),
+			});
+			return;
+		}
 		const stage = ajouter(container, "div", "qbd-ai-stage qbd-ai-stage--" + phase + (conversation ? " qbd-ai-stage--conversation" : ""));
 		stageRef = stage;
 		// Zone résultat créée AVANT le composer : l'ordre DOM le met en bas.

@@ -735,17 +735,6 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		scanner: deps.scanner,
 		statsStore: deps.statsStore,
 		navigate: (vue, data) => naviguer(vue, data),
-		// "Generated quizzes": the folder where generated quizzes are written, opened on its content.
-		openGenerated: () => {
-			/* The folder is found through a quiz written in it: the folders of the
-			   page are keyed by the catalogue, not by the contract path. Nothing
-			   generated yet: the list of folders. */
-			const dossier = dossierParDefaut(deps.aiSettings.get().aiOutputFolder);
-			const premier = deps.scanner.getQuizzes().find(q => q.path.startsWith(dossier + "/"));
-			naviguer("quizzes");
-			// Its back arrow returns to Generate, not to the grid of folders.
-			if (premier) quizzes.openFolderOfQuiz(premier.path, () => naviguer("ai"));
-		},
 		quizFolders: () => dossiersDeQuiz(),
 		// Same folder lookup as `decrire`: by stored path, else by the folder's name.
 		lectureMinutes: (dossier) => lectureMinutesOfFolder(ctx.settings.quizzesModuleOverrides, dossier),

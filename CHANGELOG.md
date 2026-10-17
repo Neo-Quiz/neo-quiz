@@ -15,6 +15,14 @@ release notes.
 
 ### Changed
 
+- "Generated quizzes" in the AI page opens a gallery of the generated quizzes right there, like claude.ai's Artifacts: one card per quiz, newest first, with its kind, what it holds and when it changed.
+
+### Changed
+
+- The Folders page no longer has a "Generated quizzes" button on a computer: the AI page opens that folder from its side column.
+
+### Changed
+
 - "Stop syncing" in a Moodle module says what it does beside it.
 
 ## [1.21.8] - 2026-10-17

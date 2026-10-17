@@ -304,9 +304,9 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 		select.el.classList.add("qbd-quizzes-group-select", "qbd-quizzes-subject-select");
 	}
 
-	/* The "Generated quizzes" folder is no card of the grid: a button of the
-	   top bar opens it, with the number of quizzes it holds (0 while empty or
-	   not created yet). Opening goes through `openModule`, like a card did, so
+	/* The "Generated quizzes" folder is no card of the grid: on a phone, a
+	   floating button opens it, with the number of quizzes it holds (0 while
+	   empty or not created yet); on a desktop, the AI page's side column does. Opening goes through `openModule`, like a card did, so
 	   the same sheet transition plays. Recognised by its PATH. */
 	/** The phone's floating buttons, on `<body>` (see `render`). */
 	let boutonsFlottants: HTMLElement[] = [];
@@ -551,7 +551,10 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 			   ended up under the last card. Removed at each render; hidden by
 			   CSS whenever the folders grid is not on screen. */
 			const mobile = phoneLayoutNow();
-			const genere = renderGeneratedButton(mobile ? document.body : selects, quizzes, stats, mobile);
+			/* No "Generated quizzes" button in the desktop top bar (2026-10-17): the AI
+			   page opens that folder from its own side column. The phone keeps its
+			   floating button (its AI page has no such column). */
+			const genere = mobile ? renderGeneratedButton(document.body, quizzes, stats, true) : null;
 			if (mobile && genere) boutonsFlottants.push(genere);
 
 			if (ctx.createFolder && mobile) {

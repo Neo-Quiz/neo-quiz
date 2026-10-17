@@ -1852,3 +1852,141 @@
 	overflow: visible;
 	text-align: left;
 }
+
+/* The entry of the column on screen (the gallery of generated quizzes). */
+.qbd-ai-lateral-item.is-active {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+}
+
+/* ── The gallery of generated quizzes (generated-gallery.ts), claude.ai's "Artifacts" ── */
+.qbd-ai-stage--gallery {
+	display: block;
+	overflow-y: auto;
+	padding: 48px 40px 40px;
+}
+
+.qbd-gen-gallery {
+	width: 100%;
+	max-width: 1000px;
+	margin: 0 auto;
+	align-self: center;
+}
+
+.qbd-gen-title {
+	margin: 0 0 28px;
+	font-family: Constantia, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+	font-size: 30px;
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.qbd-gen-empty {
+	color: var(--text-muted);
+}
+
+.qbd-gen-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 20px;
+}
+
+.qbd-gen-card {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-secondary) !important;
+	box-shadow: none !important;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 120ms ease-out;
+}
+
+.qbd-gen-card:hover,
+.qbd-gen-card:focus-visible {
+	border-color: var(--text-faint);
+	outline: none;
+}
+
+.qbd-gen-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	height: 150px;
+	padding: 16px 16px 12px;
+	background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.qbd-gen-preview.is-learn {
+	background: color-mix(in srgb, var(--color-green) 9%, var(--background-primary));
+}
+
+.qbd-gen-kind {
+	align-self: flex-start;
+	padding: 1px 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+	color: var(--text-muted);
+	font-size: 11px;
+}
+
+.qbd-gen-preview-title {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	color: var(--text-normal);
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.qbd-gen-preview-meta {
+	margin-top: auto;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.qbd-gen-foot {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 14px;
+}
+
+.qbd-gen-foot-icon {
+	display: inline-flex;
+	flex: none;
+	color: var(--text-muted);
+}
+
+.qbd-gen-foot-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.qbd-gen-foot-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.qbd-gen-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-normal);
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.qbd-gen-date {
+	color: var(--text-faint);
+	font-size: 12px;
+}
