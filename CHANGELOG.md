@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The chats of the AI page and the Moodle window no longer show a system tooltip on hover.
+
 ## [1.20.118] - 2026-10-17
 
 ### Added

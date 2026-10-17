@@ -93,7 +93,8 @@ export function poserListeChats(parent: HTMLElement): void {
 		const titre = chat.auto ? t("ai.autoLearn.chatTitle") : chat.title;
 		const ouvrir = ajouter(item, "button", "qbd-ai-chat-ouvrir");
 		ouvrir.type = "button";
-		ouvrir.title = chat.explain ? (titre ? titre + " · " : "") + chat.explain.quiz : titre || "";
+		/* No native `title` tooltip on the row or its icons (2026-10-17): the
+		   system bubble covered the list on hover. Labels stay for screen readers. */
 		/* The kind of chat: a lightbulb for an Explain chat (the tutor chat of a
 		   quiz, with the quiz's title under it), sparkles for any other. */
 		const icone = ajouter(ouvrir, "span", "qbd-chat-item-icone");
@@ -109,7 +110,6 @@ export function poserListeChats(parent: HTMLElement): void {
 			const de = resolveDevice(chat.sender, originContext(), { name: chat.senderName, sender: true, runnerId: chat.origin });
 			const texte = t("ai.side.sentFrom", { device: labelOf(de) });
 			const autre = ajouter(item, "span", "qbd-ai-chat-autre");
-			autre.title = texte;
 			autre.setAttribute("role", "img");
 			autre.setAttribute("aria-label", texte);
 			host.ui.setIcon(autre, ROLE_ICON[de.role]);
@@ -117,7 +117,6 @@ export function poserListeChats(parent: HTMLElement): void {
 		if (chat.running) {
 			// A request is waiting or running in this chat: it goes on whatever is on screen.
 			const marque = ajouter(item, "span", "qbd-ai-chat-actif");
-			marque.title = t("ai.side.running");
 			marque.setAttribute("role", "img");
 			marque.setAttribute("aria-label", t("ai.side.running"));
 			host.ui.setIcon(marque, "loader");
@@ -125,7 +124,6 @@ export function poserListeChats(parent: HTMLElement): void {
 		}
 		const suppr = ajouter(item, "button", "qbd-ai-chat-suppr");
 		suppr.type = "button";
-		suppr.title = t("ai.side.delete");
 		suppr.setAttribute("aria-label", t("ai.side.delete"));
 		host.ui.setIcon(suppr, "trash-2");
 		suppr.addEventListener("click", () => {

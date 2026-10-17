@@ -352,7 +352,6 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		/* Refresh sits with the search and the year it acts on; F5 does the same (below). */
 		boutonActualiser = ajouter(barre, "button", "nqm-refresh");
 		boutonActualiser.type = "button";
-		boutonActualiser.title = t("settings.moodle.wRefreshF5");
 		boutonActualiser.setAttribute("aria-label", t("settings.moodle.wRefreshF5"));
 		icone(boutonActualiser, "refresh-cw", "nqm-refresh-icon");
 		boutonActualiser.addEventListener("click", () => { void actualiser(true); });
@@ -846,7 +845,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			ligne.classList.add("is-openable");
 			ligne.tabIndex = 0;
 			ligne.setAttribute("role", "button");
-			ligne.title = t("settings.moodle.wOpenInBrowser");
+			ligne.setAttribute("aria-label", `${a.name} · ${t("settings.moodle.wOpenInBrowser")}`);
 			icone(ligne, "external-link", "nqm-row-open");
 			const ouvrir = (): void => { void api.ouvrirActivite(a.type, a.id).catch(() => false); };
 			ligne.addEventListener("click", ouvrir);
