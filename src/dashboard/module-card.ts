@@ -67,8 +67,11 @@ export function renderModuleCard(
 	// Titre = nom du module. Fallback : un quiz sans ancêtre reconnu donne un
 	// nom vide (moduleForQuiz) — jamais de titre blanc.
 	ajouter(titles, "div", "qbd-module-card__title", group.name || t("dashboard.quizzes.noFolder"));
-	// Sous-titre = UE, omis si non résolu (l'en-tête garde son alignement haut).
-	if (group.ue) ajouter(titles, "div", "qbd-module-card__subtitle", group.ue);
+	/* Subtitle = the folder's subject (2026-10-17), in place of the teaching
+	   unit: the unit repeated the semester on every card. None for an unknown
+	   subject (the header keeps its top alignment). */
+	const sujet = opts?.generated ? "general" : categorieDuDossier(group.path ?? group.folder, group.name);
+	if (sujet !== "general") ajouter(titles, "div", "qbd-module-card__subtitle", libelleCategorie(sujet));
 
 	// ── Stats : « N quiz • N maîtrisés » (nombres en gras, séparateur discret) ──
 	const stats = ajouter(card, "div", "qbd-module-card__stats");
@@ -110,10 +113,6 @@ export function renderModuleCard(
 			dateEl.textContent = t("dashboard.quizzes.folderModified", { date });
 		}, () => undefined);
 	}
-	// The folder's subject at the bottom right, as on the cards of the gallery
-	// of generated quizzes (2026-10-17); none for an unknown subject.
-	const sujet = opts?.generated ? "general" : categorieDuDossier(group.path ?? group.folder, group.name);
-	if (sujet !== "general") ajouter(footer, "span", "qbd-module-card__topic", libelleCategorie(sujet));
 	if (onMenu) {
 		const moreBtn = ajouter(footer, "button", "qbd-card-more qbd-module-card__menu");
 		moreBtn.type = "button";
