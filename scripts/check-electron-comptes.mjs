@@ -185,6 +185,24 @@ await withSrcModule("apps/windows/electron/comptes-pur.ts", async (m) => {
 		[{ kind: "weekly-model", modelName: "Claude & GPT-OSS", usedPercent: 100, resetsAt: Date.parse(R2) },
 		 { kind: "weekly-model", modelName: "Gemini 3 Flash", usedPercent: 0, resetsAt: null },
 		 { kind: "weekly-model", modelName: "Gemini 3.1 Pro", usedPercent: 40, resetsAt: Date.parse(R2) }]);
+	/* ─── Ollama: the credits page (2026-10-17) and the status line's cache ─── */
+	const pageCredits = '<h2>Usage credits</h2><div>pro $37.76</div><p>Monthly credits</p><p>$37.76</p><p>Refills to $60 on October 21, 2026.</p><script>var x="Refills to $1 on January 1, 2020."</script><h3>Usage breakdown</h3><p>Monthly credits used</p><p>$22.24</p>';
+	const rowsCredits = m.usageOllamaDepuisPage(pageCredits, 0);
+	r.check("ollama credits page: used of the refill amount, the refill date as reset, a script's text ignored",
+		[rowsCredits.length, rowsCredits[0]?.kind, rowsCredits[0]?.amount, rowsCredits[0]?.usedPercent, rowsCredits[0]?.resetsAt === Date.parse("October 21, 2026")],
+		[1, "monthly", "$22.24 / $60", 37.1, true]);
+	r.check("ollama credits page without the used line: the limit minus the balance",
+		m.usageOllamaDepuisPage("<p>Monthly credits $40.00 Refills to $60 on October 21, 2026.</p>", 0)[0]?.amount, "$20.00 / $60");
+	r.check("ollama session and weekly windows of the older page, resets read from their words",
+		m.usageOllamaDepuisPage("<div>Session usage</div><span>19.6% used</span><p>Resets in 6 minutes.</p><div>Weekly usage</div><span>3.5% used</span><p>Resets in 3 days.</p>", 1000),
+		[{ kind: "session", usedPercent: 19.6, resetsAt: 1000 + 6 * 60000 }, { kind: "weekly-all", usedPercent: 3.5, resetsAt: 1000 + 3 * 86400000 }]);
+	r.check("ollama: a signed-out or unknown page gives no row",
+		[m.usageOllamaDepuisPage("<html><title>Sign in</title></html>", 0).length, m.usageOllamaDepuisPage("Refills to $0 on October 21, 2026.", 0).length], [0, 0]);
+	r.check("ollama cache: the monthly budget, dated by fetched_at; hostile amounts dropped",
+		[m.usageOllamaDepuisCache({ monthly: { utilization: 32.7, used: "19.63", limit: "60", resets_at: "2026-10-21T13:38:29Z" }, fetched_at: 1791143965 }),
+		 m.usageOllamaDepuisCache({ monthly: { utilization: 5, used: "<img>", limit: "60" } }).rows[0]?.amount,
+		 m.usageOllamaDepuisCache("x").rows.length],
+		[{ rows: [{ kind: "monthly", amount: "$19.63 / $60", usedPercent: 32.7, resetsAt: Date.parse("2026-10-21T13:38:29Z") }], mesureAt: 1791143965000 }, undefined, 0]);
 	r.check("a hostile or empty answer gives no row, without throwing",
 		[m.usageAntigravityDepuisModeles(null), m.usageAntigravityDepuisModeles({ models: "x" }),
 		 m.usageAntigravityDepuisModeles({ models: { "gemini-x": modele("G", { remainingFraction: "1" }) } })],

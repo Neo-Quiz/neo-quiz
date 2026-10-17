@@ -15,6 +15,8 @@ release notes.
 
 ### Changed
 
+- Every AI provider shows its usage under the composer and in the Accounts settings: Antigravity CLI per model group, Ollama its monthly credits.
+- The agent mode chip shows for Antigravity CLI and Ollama too.
 - Antigravity CLI and Ollama run as agents in a trusted folder, with the same four modes as Claude Code and Codex; Ollama models run inside Claude Code.
 - The work of Antigravity CLI (files read and written, commands) shows like that of Claude Code and Codex.
 - Antigravity CLI usage shows in the Accounts settings like Claude Code and Codex, per model group, without opening a terminal.

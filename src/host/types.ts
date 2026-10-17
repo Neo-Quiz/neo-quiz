@@ -707,7 +707,7 @@ export interface HostProcess {
 	etatComptes(outils?: EtatCompte["outil"][]): Promise<EtatCompte[]>;
 	/** The plan's quotas, for the three providers that publish them
 	    (Antigravity since 2026-10-17, per model group). */
-	usageCompte(tool: "claude" | "codex" | "agy"): Promise<UsageRead>;
+	usageCompte(tool: "claude" | "codex" | "agy" | "ollama"): Promise<UsageRead>;
 	/** Codex banked resets (desktop app only, hence optional): `read` lists
 	    them, `consume` spends one. The host judges the request. */
 	codexResets?(requete: ResetsRequest): Promise<ResetsResult>;

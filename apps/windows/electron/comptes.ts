@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { LOG_PREFIX } from "../../../src/branding";
 import type { EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
-import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageAntigravityDepuisModeles, usageClaudeDepuisReponse, usageCodexDepuisLigne } from "./comptes-pur";
+import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageAntigravityDepuisModeles, usageClaudeDepuisReponse, usageCodexDepuisLigne, usageOllamaDepuisCache, usageOllamaDepuisPage } from "./comptes-pur";
 import type { OutilCompte } from "./comptes-pur";
 import { ARGS_COMPTE } from "./gabarits-cli";
 import { dossierPersonnel, environnementEnfant, lancer, resoudreExecutable } from "./process";
@@ -409,8 +409,66 @@ function usageAntigravity(env: NodeJS.ProcessEnv): Promise<UsageRead> {
 	return lecture;
 }
 
-/** Les quotas du forfait, pour les trois fournisseurs qui les publient. */
-export async function usageCompte(outil: "claude" | "codex" | "agy", env: NodeJS.ProcessEnv = process.env): Promise<UsageRead> {
+/* ── OLLAMA USAGE (2026-10-17), the owner's status line's way ──
+   Ollama has no usage API: the page https://ollama.com/settings is read with
+   the account's session cookie, which the owner keeps in
+   `~/.claude/ollama-cookie.local` for his status line (the browsers encrypt
+   theirs). The cookie goes to ollama.com only, no redirect is followed (a
+   signed-out page redirects to the sign-in), the page is read up to 2 MB and
+   only its numbers leave (`usageOllamaDepuisPage`). Without a cookie, the
+   status line's own cache is read instead, dated by its `fetched_at`. */
+const OLLAMA_SETTINGS_URL = "https://ollama.com/settings";
+
+async function usageOllama(env: NodeJS.ProcessEnv): Promise<UsageRead> {
+	const claude = join(dossierPersonnel(env), ".claude");
+	let cookie: string | null = null;
+	try {
+		const brut = (await readFile(join(claude, "ollama-cookie.local"), "utf8")).trim();
+		// A bare value is the `__Secure-session` cookie; a line with `=` is the whole header.
+		if (brut && !/[\r\n]/.test(brut) && brut.length < 8000) cookie = brut.includes("=") ? brut : "__Secure-session=" + brut;
+	} catch (e) { /* no cookie: the cache below */ }
+	if (cookie) {
+		try {
+			const resp = await fetch(OLLAMA_SETTINGS_URL, {
+				headers: { "Cookie": cookie, "User-Agent": "Mozilla/5.0" },
+				redirect: "manual",
+				signal: AbortSignal.timeout(DELAI_MS * 3),
+			});
+			if (resp.status >= 300 && resp.status < 400) { await resp.body?.cancel().catch(() => undefined); return { rows: [], error: { kind: "unauthenticated" }, mesureAt: null }; }
+			if (!resp.ok) { await resp.body?.cancel().catch(() => undefined); return { rows: [], error: erreurDepuisStatut(resp.status, resp.headers), mesureAt: null }; }
+			const lecteur = resp.body?.getReader();
+			const morceaux: Uint8Array[] = [];
+			let taille = 0;
+			for (;;) {
+				if (!lecteur) break;
+				const { done, value } = await lecteur.read();
+				if (done) break;
+				taille += value.byteLength;
+				if (taille > 2_000_000) { await lecteur.cancel().catch(() => undefined); break; }
+				morceaux.push(value);
+			}
+			const rows = usageOllamaDepuisPage(Buffer.concat(morceaux).toString("utf8"), Date.now());
+			if (rows.length) return { rows, error: null, mesureAt: Date.now() };
+		} catch (e) { /* unreachable: the cache below, if any */ }
+	}
+	try {
+		const lu = usageOllamaDepuisCache(JSON.parse(await readFile(join(claude, "ollama-usage-cache.json"), "utf8")) as unknown);
+		if (lu.rows.length) return { rows: lu.rows, error: null, mesureAt: lu.mesureAt };
+	} catch (e) { /* no cache either */ }
+	return { rows: [], error: { kind: cookie ? "unavailable" : "unauthenticated" }, mesureAt: null };
+}
+
+/* Each Ollama read is one page load: one at a time, kept 60 s. */
+let usageOllamaGarde: { at: number; lecture: Promise<UsageRead> } | null = null;
+
+/** Les quotas du forfait, pour les quatre fournisseurs qui les publient. */
+export async function usageCompte(outil: "claude" | "codex" | "agy" | "ollama", env: NodeJS.ProcessEnv = process.env): Promise<UsageRead> {
+	if (outil === "ollama") {
+		if (usageOllamaGarde && Date.now() - usageOllamaGarde.at < 60_000) return usageOllamaGarde.lecture;
+		const lecture = usageOllama(env);
+		usageOllamaGarde = { at: Date.now(), lecture };
+		return lecture;
+	}
 	return outil === "claude" ? usageClaude(env) : outil === "codex" ? usageCodex(env) : usageAntigravity(env);
 }
 

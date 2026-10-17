@@ -24,11 +24,15 @@ import { t, hourOptions } from "../i18n";
  * lui, est une donnée de l'API — il ne se traduit pas.
  */
 export interface UsageRow {
-	kind: "session" | "weekly-all" | "weekly-model" | "window";
+	kind: "session" | "weekly-all" | "weekly-model" | "window" | "monthly";
 	/** kind « weekly-model » : nom publié par l'API (« Fable », « Opus »). */
 	modelName?: string;
 	/** kind « window » (Codex) : durée de la fenêtre, mise en mots au rendu. */
 	windowMinutes?: number;
+	/** kind "monthly" (Ollama's included usage, 2026-10-17): the amounts as
+	    Ollama writes them, e.g. "$19.63 of $60"; a percentage of a budget in
+	    dollars says little on its own. */
+	amount?: string;
 	usedPercent: number;
 	/** Fin de la fenêtre courante, en ms epoch ; null si le fournisseur ne la donne pas. */
 	resetsAt: number | null;
@@ -222,6 +226,7 @@ export function usageRowLabel(row: UsageRow): string {
 	if (row.kind === "session") return t("ai.usage.sessionCurrent");
 	if (row.kind === "weekly-all") return t("ai.usage.allModels");
 	if (row.kind === "weekly-model") return row.modelName || t("ai.usage.allModels");
+	if (row.kind === "monthly") return row.amount ? t("ai.usage.monthlyAmount", { amount: row.amount }) : t("ai.usage.monthly");
 	const mins = row.windowMinutes || 0;
 	if (mins >= 1440) return t("ai.usage.windowDays", { n: Math.round(mins / 1440) });
 	if (mins > 0) return t("ai.usage.windowHours", { n: Math.max(1, Math.round(mins / 60)) });
@@ -250,14 +255,18 @@ export function usageLevel(percent: number): UsageLevel {
     of Claude, the windows of Codex. Per-model weekly rows stay in the detail
     screen. Shortest window first. */
 export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
-	const span = (r: UsageRow): number => r.kind === "session" ? 300 : r.kind === "weekly-all" ? 10080 : (r.windowMinutes || Number.MAX_SAFE_INTEGER);
+	/* Antigravity's model groups (2026-10-17) keep their order and come first;
+	   Ollama's monthly credits last. */
+	const span = (r: UsageRow): number => r.kind === "weekly-model" ? 0 : r.kind === "session" ? 300 : r.kind === "weekly-all" ? 10080 : r.kind === "monthly" ? 43200 : (r.windowMinutes || Number.MAX_SAFE_INTEGER);
 	return rows
-		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window")
+		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window" || r.kind === "monthly" || (r.kind === "weekly-model" && rows.every(x => x.kind === "weekly-model")))
 		.sort((a, b) => span(a) - span(b));
 }
 
 /** Short window label: "5h" / "7d" ("7j" in French), translated at render time. */
 export function usageShortLabel(row: UsageRow): string {
+	if (row.kind === "weekly-model") return row.modelName || t("ai.usage.allModels");
+	if (row.kind === "monthly") return t("ai.usage.shortMonth");
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
 	if (mins >= 1440) return t("ai.usage.shortDays", { n: Math.round(mins / 1440) });
 	if (mins > 0) return t("ai.usage.shortHours", { n: Math.max(1, Math.round(mins / 60)) });
@@ -277,6 +286,7 @@ export function usageResetText(resetsAt: number | null, now: number, lang: strin
 /** Window title: "5-hour limit", "Weekly limit", "3-day limit". Claude's two
     windows have fixed spans; a Codex window is named after its duration. */
 export function usageWindowTitle(row: UsageRow): string {
+	if (row.kind === "weekly-model" || row.kind === "monthly") return usageRowLabel(row);
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
 	if (mins === 10080) return t("ai.usage.limitWeekly");
 	if (mins >= 1440) return t("ai.usage.limitDays", { n: Math.round(mins / 1440) });

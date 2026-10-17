@@ -244,3 +244,101 @@ export function usageAntigravityDepuisModeles(corps: unknown): UsageRow[] {
 		})
 		.sort((a, b) => (a.modelName ?? "").localeCompare(b.modelName ?? "") || b.usedPercent - a.usedPercent);
 }
+
+
+/* ── OLLAMA USAGE (2026-10-17), read like the owner's status line does ──
+   Ollama publishes no usage API: the numbers only live on the signed-in page
+   https://ollama.com/settings, rendered by the server. Two quota models: an
+   "Included usage" monthly budget in dollars ("$0.97 of $60 used", "Resets in
+   4 weeks", the exact instant on a `data-time` attribute), or "Session usage"
+   (5 h) and "Weekly usage" in "xx.x% used". Only the numbers leave this
+   function; the page itself (the account's settings) never does. */
+
+/** "in 6 minutes", "in 3 days" → that many ms from `maintenant`, or null. */
+export function resetOllama(texte: string | null, maintenant: number): number | null {
+	const m = /in\s+(\d+|an?|one)\s+(minute|hour|day|week|month)s?/i.exec(texte ?? "");
+	if (!m) return null;
+	const n = /^\d+$/.test(m[1]) ? Number(m[1]) : 1;
+	const unite: Record<string, number> = { minute: 60_000, hour: 3_600_000, day: 86_400_000, week: 604_800_000, month: 2_592_000_000 };
+	return maintenant + n * unite[m[2].toLowerCase()];
+}
+
+function texteBrut(html: string): string {
+	return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+}
+
+/** The usage rows of the settings page's HTML (already read, bounded). */
+export function usageOllamaDepuisPage(html: string, maintenant: number): UsageRow[] {
+	const rows: UsageRow[] = [];
+	const fenetre = (label: string, fin: number): string | null => {
+		const i = html.indexOf(label);
+		if (i === -1) return null;
+		return html.slice(i, fin > i ? fin : i + 12_000);
+	};
+	const resetDe = (t: string): string | null => /Resets (in [^.]+?)\s*\./.exec(t)?.[1] ?? null;
+	/* The CREDITS page (measured on 2026-10-17): "Monthly credits $37.76
+	   Refills to $60 on October 21, 2026." and, further down, "Monthly
+	   credits used $22.24". The used amount, else the limit minus the balance. */
+	const tout = texteBrut(html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " "));
+	const recharge = /Refills to \$\s*([\d,]+(?:\.\d+)?) on ([A-Z][a-z]+ \d{1,2}, \d{4})/.exec(tout);
+	if (recharge) {
+		const limite = Number(recharge[1].replace(/,/g, ""));
+		const utiliseTexte = /Monthly credits used \$\s*([\d,]+(?:\.\d+)?)/.exec(tout)?.[1];
+		const solde = /Monthly credits \$\s*([\d,]+(?:\.\d+)?)\s*Refills/.exec(tout)?.[1];
+		const utilise = utiliseTexte !== undefined ? Number(utiliseTexte.replace(/,/g, "")) : solde !== undefined ? limite - Number(solde.replace(/,/g, "")) : NaN;
+		if (Number.isFinite(limite) && limite > 0 && Number.isFinite(utilise) && utilise >= 0) {
+			const date = Date.parse(recharge[2]);
+			const montant = utiliseTexte ?? (Math.round(utilise * 100) / 100).toFixed(2);
+			rows.push({ kind: "monthly", amount: "$" + montant + " / $" + recharge[1], usedPercent: Math.min(100, Math.round(utilise / limite * 1000) / 10), resetsAt: Number.isFinite(date) ? date : null });
+			return rows;
+		}
+	}
+	const mensuel = fenetre("Monthly usage", html.indexOf("Models used this month"));
+	if (mensuel) {
+		const t = texteBrut(mensuel);
+		const m = /\$\s*([\d,]+(?:\.\d+)?)\s*of\s*\$\s*([\d,]+(?:\.\d+)?)\s*used/.exec(t);
+		const utilise = m ? Number(m[1].replace(/,/g, "")) : NaN;
+		const limite = m ? Number(m[2].replace(/,/g, "")) : NaN;
+		if (m && Number.isFinite(utilise) && Number.isFinite(limite) && limite > 0) {
+			const instant = /data-time="([^"]+)"[^>]*>\s*Resets/.exec(mensuel)?.[1];
+			const exact = instant && Number.isFinite(Date.parse(instant)) ? Date.parse(instant) : null;
+			rows.push({ kind: "monthly", amount: "$" + m[1] + " / $" + m[2], usedPercent: Math.round(utilise / limite * 1000) / 10, resetsAt: exact ?? resetOllama(resetDe(t), maintenant) });
+		}
+	}
+	const si = html.indexOf("Session usage");
+	const wi = html.indexOf("Weekly usage");
+	for (const [label, kind, fin] of [["Session usage", "session", wi > si ? wi : -1], ["Weekly usage", "weekly-all", -1]] as const) {
+		const f = fenetre(label, fin);
+		if (!f) continue;
+		const t = texteBrut(f);
+		const p = /([\d.]+)\s*%\s*used/.exec(t);
+		const pct = p ? Number(p[1]) : NaN;
+		if (!Number.isFinite(pct)) continue;
+		rows.push({ kind, usedPercent: Math.min(100, Math.max(0, pct)), resetsAt: resetOllama(resetDe(t), maintenant) });
+	}
+	return rows;
+}
+
+/** The rows of the status line's cache (`~/.claude/ollama-usage-cache.json`,
+    written by the owner's `ollama-usage.py`), when no cookie is at hand. */
+export function usageOllamaDepuisCache(cache: unknown): { rows: UsageRow[]; mesureAt: number | null } {
+	const vide = { rows: [], mesureAt: null };
+	if (!cache || typeof cache !== "object") return vide;
+	const c = cache as Record<string, unknown>;
+	const quand = typeof c.fetched_at === "number" && Number.isFinite(c.fetched_at) ? c.fetched_at * 1000 : null;
+	const rows: UsageRow[] = [];
+	const nombre = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+	const m = c.monthly && typeof c.monthly === "object" ? c.monthly as Record<string, unknown> : null;
+	if (m && nombre(m.utilization) !== null) {
+		const r = typeof m.resets_at === "string" && Number.isFinite(Date.parse(m.resets_at)) ? Date.parse(m.resets_at) : null;
+		const amount = typeof m.used === "string" && typeof m.limit === "string" && /^[\d.,]{1,12}$/.test(m.used) && /^[\d.,]{1,12}$/.test(m.limit) ? "$" + m.used + " / $" + m.limit : undefined;
+		rows.push({ kind: "monthly", ...(amount ? { amount } : {}), usedPercent: Math.min(100, Math.max(0, nombre(m.utilization)!)), resetsAt: r });
+	}
+	for (const [cle, kind] of [["session", "session"], ["weekly", "weekly-all"]] as const) {
+		const w = c[cle] && typeof c[cle] === "object" ? c[cle] as Record<string, unknown> : null;
+		const pct = w ? nombre(w.utilization) : null;
+		if (pct === null) continue;
+		rows.push({ kind, usedPercent: Math.min(100, Math.max(0, pct)), resetsAt: quand !== null ? resetOllama(typeof w!.reset === "string" ? w!.reset : null, quand) : null });
+	}
+	return { rows, mesureAt: rows.length ? quand : null };
+}

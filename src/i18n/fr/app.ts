@@ -154,12 +154,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.comptes.switchConfirm": "Changer de compte",
 
 	"app.comptes.usageOf": "Usage de {name}",
-	"app.comptes.usageOpen": "Ouvrir l'usage sur ollama.com",
-	"app.comptes.usageOpenFailed": "Impossible d'ouvrir ollama.com.",
-	"app.comptes.usageTerminal": "Ouvrir Antigravity CLI pour voir votre quota (/usage)",
 	"app.comptes.usageTerminalHint": "Ouverture de votre quota… s'il n'apparaît pas, tapez /usage. Quittez Antigravity quand vous avez fini.",
-	"app.comptes.usageTerminalFailed": "Impossible d'ouvrir le CLI Antigravity.",
-	"app.comptes.usageTerminalOpened": "Antigravity CLI s'ouvre dans un terminal, et votre quota y apparaît dans quelques secondes. Au tout premier lancement, il demande d'abord de le configurer.",
 	"app.comptes.agyCountdown": "Vous avez 60 secondes après l'ouverture du navigateur pour coller le code ici. Passé ce délai, appuyez sur Entrée pour obtenir un nouveau lien.",
 	"app.comptes.agyExpired": "Le lien a expiré. Appuyez sur Entrée pour un nouveau lien, ou fermez cette fenêtre.",
 	"app.comptes.usage.resetsAt": "Réinitialisation {moment}",

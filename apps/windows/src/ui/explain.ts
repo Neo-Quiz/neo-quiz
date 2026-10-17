@@ -60,7 +60,7 @@ import type { BlockRewrite } from "../../../../src/dashboard/detail-io";
 import { QUIZ_BLOCK_RE } from "../../../../src/quiz-utils";
 import { lireCours } from "./explain-cours";
 import type { Cours } from "./explain-cours";
-import { mountUsageLine } from "../../../../src/dashboard/usage-line";
+import { mountUsageLine, usageToolOf } from "../../../../src/dashboard/usage-line";
 import type { UsageLine, UsageTool } from "../../../../src/dashboard/usage-line";
 import type { HostModalHandle } from "../../../../src/host/types";
 import { creerBlocTravail } from "../../../../src/dashboard/transcript-steps";
@@ -918,7 +918,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				const lireForfait = host.process?.usageCompte;
 				let outilForfait: UsageTool | null = null;
 				const monterForfait = (): void => {
-					const outil: UsageTool | null = !lireForfait || !peutExpliquer() ? null : courant === "claude-code" ? "claude" : courant === "codex" ? "codex" : null;
+					const outil: UsageTool | null = !lireForfait || !peutExpliquer() ? null : usageToolOf(courant || "");
 					if (outil === outilForfait && (ligneForfait || !outil)) return;
 					ligneForfait?.destroy();
 					ligneForfait = null;

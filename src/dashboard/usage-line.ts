@@ -31,7 +31,14 @@ import { clearAccountMessage, drawAccount } from "./usage-account";
 const RELOAD_MS = 5 * 60000;
 const REDRAW_MS = 60000;
 
-export type UsageTool = "claude" | "codex";
+export type UsageTool = "claude" | "codex" | "agy" | "ollama";
+
+/** The usage reading of a provider of the composer, or null (2026-10-17: all four). */
+export function usageToolOf(provider: string): UsageTool | null {
+	return provider === "claude-code" ? "claude" : provider === "codex" ? "codex" : provider === "antigravity-cli" ? "agy" : provider === "ollama" ? "ollama" : null;
+}
+const PROVIDER_OF: Record<UsageTool, string> = { claude: "claude-code", codex: "codex", agy: "antigravity-cli", ollama: "ollama" };
+const TITLE_OF = { claude: "ai.usage.popoverTitleClaude", codex: "ai.usage.popoverTitleCodex", agy: "ai.usage.popoverTitleAntigravity", ollama: "ai.usage.popoverTitleOllama" } as const;
 
 interface Reading { rows: UsageRead["rows"]; at: number }
 /** Last good reading per tool, shared by every mount (the page redraws often). */
@@ -57,7 +64,8 @@ function loadEmail(tool: UsageTool, done: () => void): void {
 	if (emailEnVol.has(tool) || document.visibilityState !== "visible") return;
 	if (cur && Date.now() - cur.at < EMAIL_MS) return;
 	const proc = currentHost().process;
-	if (!proc || !currentHost().platform.isDesktopApp) return;
+	// Ollama's account is not read by the main process (its page is the usage itself).
+	if (!proc || !currentHost().platform.isDesktopApp || tool === "ollama") return;
 	emailEnVol.add(tool);
 	proc.etatComptes([tool]).then(list => {
 		const c = list.find(e => e.outil === tool);
@@ -215,13 +223,13 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		const now = Date.now();
 		const head = ajouter(pop, "div", "qbd-usage-pop-head");
 		// The very logo the composer's model picker shows (same table, same colour class).
-		const brand = PROVIDERS.find(p => p.id === (tool === "claude" ? "claude-code" : "codex"))?.logo;
+		const brand = PROVIDERS.find(p => p.id === PROVIDER_OF[tool])?.logo;
 		if (brand) {
 			const logo = ajouter(head, "span", "qbd-provider-logo qbd-provider-logo--" + brand + " qbd-usage-pop-logo");
 			setBrandLogo(logo, brand);
 		}
 		const titles = ajouter(head, "div", "qbd-usage-pop-titles");
-		ajouter(titles, "div", "qbd-usage-pop-title", t(tool === "claude" ? "ai.usage.popoverTitleClaude" : "ai.usage.popoverTitleCodex"));
+		ajouter(titles, "div", "qbd-usage-pop-title", t(TITLE_OF[tool]));
 		if (cur) ajouter(titles, "div", "qbd-usage-pop-sub", t("ai.usage.updated", { age: formatAge(cur.at, now) }));
 		const mail = emails.get(tool)?.email;
 		/* On the desktop app the e-mail line is reserved from the opening, empty

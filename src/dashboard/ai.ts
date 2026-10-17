@@ -80,7 +80,7 @@ import { attachMentionPicker } from "./mention-picker";
 import type { MentionPickerHandle } from "./mention-picker";
 import { formatTokens, formatCost, formatDuration, totalTokens } from "./usage-format";
 import type { AiUsage, AiUsageEntry, PlanUsage } from "./usage-format";
-import { mountUsageLine } from "./usage-line";
+import { mountUsageLine, usageToolOf } from "./usage-line";
 import type { UsageLine } from "./usage-line";
 import { scanPromptPaths, MAX_PROMPT_PATHS } from "./prompt-paths";
 import { createQuizPage } from "./detail";
@@ -1534,13 +1534,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				effortBtn.type = "button";
 				const effortLabel = ajouter(effortBtn, "span", "qbd-select-label qbd-effort-trigger-label");
 
-				// The agent mode chip, shared with the "Explain" chat (`agent-mode-pill.ts`).
-				const { el: modeBtn, paint: peindreMode } = mountAgentModePill(parent, {
-					read: () => settings().aiAgentMode,
-					save: m => saveSettings({ aiAgentMode: m }),
-					// Only Codex's middle modes differ (an AI reviewer approves).
-					isClaude: () => provider !== "codex",
-				});
 
 				const EFFORT_DISPLAY: Record<string, string> = {
 					low: "Low", medium: "Medium", high: "High",
@@ -2161,7 +2154,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   Only for a provider that publishes a plan, on a host that can read it. */
 		planLine?.destroy();
 		planLine = null;
-		const planTool = settings().aiProvider === "claude-code" ? "claude" : settings().aiProvider === "codex" ? "codex" : null;
+		const planTool = usageToolOf(settings().aiProvider || "");
 		const readPlan = host.process?.usageCompte;
 		if (planTool && readPlan) {
 			const slot = ajouter(formCol, "div", "qbd-ai-usage-slot");
@@ -2178,6 +2171,17 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		else {
 			buildProviderControl(composerTools);
 			if (buildModelControl) buildModelControl(composerTools);
+			/* The agent mode chip (`agent-mode-pill.ts`), for every provider that
+			   runs as an agent: Claude Code and Codex, Antigravity and Ollama
+			   (through Claude Code) since 2026-10-17. */
+			if (["claude-code", "codex", "antigravity-cli", "ollama"].includes(provider)) {
+				mountAgentModePill(composerTools, {
+					read: () => settings().aiAgentMode,
+					save: m => saveSettings({ aiAgentMode: m }),
+					// Only Codex's middle modes differ (an AI reviewer approves).
+					isClaude: () => provider !== "codex",
+				});
+			}
 		}
 		// Bouton générer dans le composer (façon bouton d'envoi claude.ai) :
 		// caché tant que le champ est vide, flèche ↑ blanche sur fond accent.

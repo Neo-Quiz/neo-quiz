@@ -21,7 +21,7 @@ import type { UsageTool } from "./usage-line";
 
 /** The command shown for a sign-in by hand: the same words the host runs
     (`ARGS_COMPTE` of the main process). */
-export const SIGN_IN_COMMAND: Record<UsageTool, string> = { claude: "claude auth login", codex: "codex login" };
+export const SIGN_IN_COMMAND: Record<"claude" | "codex", string> = { claude: "claude auth login", codex: "codex login" };
 
 type MessageKey =
 	| "ai.usage.signedIn" | "ai.usage.signedOut" | "ai.usage.signInFailed" | "ai.usage.signInExpired"
@@ -62,7 +62,7 @@ const SIGN_OUT_KEYS: Record<string, MessageKey | null> = {
 	indisponible: "ai.usage.accountUnavailable", annule: null,
 };
 
-async function signIn(tool: UsageTool, hooks: AccountHooks): Promise<void> {
+async function signIn(tool: "claude" | "codex", hooks: AccountHooks): Promise<void> {
 	const proc = currentHost().process;
 	if (!proc?.connecterCompteNavigateur) return;
 	etat.op = { tool, kind: "signin" };
@@ -77,7 +77,7 @@ async function signIn(tool: UsageTool, hooks: AccountHooks): Promise<void> {
 	hooks.redraw();
 }
 
-async function signOut(tool: UsageTool, thenSignIn: boolean, hooks: AccountHooks): Promise<void> {
+async function signOut(tool: "claude" | "codex", thenSignIn: boolean, hooks: AccountHooks): Promise<void> {
 	const proc = currentHost().process;
 	if (!proc) return;
 	etat.op = { tool, kind: "signout" };
@@ -103,7 +103,8 @@ function button(parent: HTMLElement, label: string, primary: boolean, disabled: 
 
 /** Draws the account row at the end of the popover `pop`. */
 export function drawAccount(pop: HTMLElement, tool: UsageTool, hooks: AccountHooks): void {
-	if (!canManageAccount()) return;
+	// The account buttons drive the CLI's own sign-in: Claude Code and Codex only.
+	if (!canManageAccount() || (tool !== "claude" && tool !== "codex")) return;
 	const proc = currentHost().process;
 	const sec = ajouter(pop, "div", "qbd-usage-pop-account");
 	const mine = etat.op && etat.op.tool === tool ? etat.op : null;

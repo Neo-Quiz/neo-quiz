@@ -1467,7 +1467,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	});
 
 	ipcMain.handle(CANAUX.comptesUsage, (_e, tool: unknown): Promise<UsageRead> => {
-		if (tool !== "claude" && tool !== "codex" && tool !== "agy") {
+		if (tool !== "claude" && tool !== "codex" && tool !== "agy" && tool !== "ollama") {
 			console.warn(LOG_PREFIX, "lecture de quota refusée, outil hors liste:", tool);
 			throw erreurCli("refuse", "outil hors liste : " + String(tool));
 		}

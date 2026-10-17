@@ -199,10 +199,7 @@ function actionDe(etat: EtatCompte): "installer" | "connecter" | "deconnecter" {
    `usageCompte` n'accepte que ces deux outils — le compilateur refuse déjà
    Antigravity et Ollama à l'appel, ce module n'a pas besoin de le revérifier
    lui-même au-delà de ce type. */
-type OutilAvecUsage = "claude" | "codex" | "agy";
-
-/** La page d'usage d'Ollama (session + semaine), ouverte au clic sur l'icône. */
-const OLLAMA_USAGE_URL = "https://ollama.com/settings";
+type OutilAvecUsage = "claude" | "codex" | "agy" | "ollama";
 
 const DELAI_OUVERTURE_MS = 250;
 const DELAI_FERMETURE_MS = 150;
@@ -532,31 +529,15 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 
 	/** The usage icon, left of the action, on a SIGNED-IN row only
 	    (anywhere else it would only open a failure):
-	    - Claude Code, Codex and Antigravity: hovering (or focusing) opens the
-	      popover of gauges read by the main process. Antigravity's quota, per
-	      model group, is read there since 2026-10-17; it used to open a
-	      terminal on agy's `/usage`.
-	    - Ollama: a click opens `ollama.com/settings` in the browser, the only
-	      page where Ollama shows its session and weekly usage; `/api/me` does
-	      not publish it (ollama/ollama#12532). */
+	    all four providers: hovering (or focusing) opens the popover of gauges
+	    read by the main process. Since 2026-10-17 Antigravity's quota (per
+	    model group) is read there instead of a terminal on agy's `/usage`, and
+	    Ollama's credits instead of a link to https://ollama.com/settings. */
 	function poserIconeUsage(droite: HTMLElement, etat: EtatCompte): void {
 		if (!etat.connecte) return;
 		const icone = ajouter(droite, "button", "nq-comptes-usage");
 		icone.type = "button";
 		currentHost().ui.setIcon(icone, "gauge");
-		if (etat.outil === "ollama") {
-			icone.setAttribute("aria-label", t("app.comptes.usageOpen"));
-			icone.title = t("app.comptes.usageOpen");
-			icone.addEventListener("click", () => {
-				void currentHost().shell.openUrl(OLLAMA_USAGE_URL).then((ouvert) => {
-					if (!ouvert) currentHost().ui.notice(t("app.comptes.usageOpenFailed"));
-				}).catch((e: unknown) => {
-					console.warn(LOG_PREFIX, "ouverture de l'usage Ollama impossible:", e);
-					currentHost().ui.notice(t("app.comptes.usageOpenFailed"));
-				});
-			});
-			return;
-		}
 		/* Antigravity: its quota is read like the two others since 2026-10-17
 		   (`comptes.ts` of the main process), per model group; no terminal. */
 		icone.setAttribute("aria-label", t("app.comptes.usageOf", { name: nomOutil(etat.outil) }));

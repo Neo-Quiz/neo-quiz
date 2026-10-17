@@ -206,15 +206,10 @@ export const EN_APP = {
 	   "claude" | "codex"). Quatre messages d'échec, un par `UsageReadError`
 	   (`usage-format.ts`) — aucun ne laisse le popover vide. */
 	"app.comptes.usageOf": "Usage of {name}",
-	"app.comptes.usageOpen": "Open usage on ollama.com",
-	"app.comptes.usageOpenFailed": "Could not open ollama.com.",
 	// Antigravity : son quota ne se lit que dans son REPL (`/usage`), le clic
 	// ouvre un terminal interactif. L'invite y est traduite PAR LE PRINCIPAL
 	// (`canaux.ts`) — cette clé n'est lue que pour l'info-bulle du bouton.
-	"app.comptes.usageTerminal": "Open Antigravity CLI to check your quota (/usage)",
 	"app.comptes.usageTerminalHint": "Opening your quota… if it does not appear, type /usage. Quit Antigravity when you're done.",
-	"app.comptes.usageTerminalFailed": "Could not open the Antigravity CLI.",
-	"app.comptes.usageTerminalOpened": "Antigravity CLI is opening in a terminal, and your quota appears there in a few seconds. On its very first launch it asks you to set it up first.",
 	// Antigravity n'attend que 60 secondes, EN INTERNE, sans rien dire : le
 	// script de connexion affiche ces deux textes, traduits par le principal
 	// (`canaux.ts`) — jamais un texte venu du rendu dans un script.
