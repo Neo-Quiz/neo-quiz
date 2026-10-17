@@ -73,6 +73,7 @@ import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
+import { chargerFins, finDuDossier } from "./moodle-dossiers";
 import { monterPointLogo } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
@@ -219,6 +220,12 @@ export function reglagesDeLaCoquille(): Pick<DashboardShellCtx, "settings" | "sa
 let coquilleMontee: DashboardShellCtx | null = null;
 export function coquilleActive(): DashboardShellCtx | null {
 	return coquilleMontee;
+}
+
+let repeindreMontee: (() => void) | null = null;
+/** Repaints the page on screen (the Moodle window declared a folder, or learnt the timetable). */
+export function repeindreCoquille(): void {
+	repeindreMontee?.();
 }
 
 async function enregistrerReglagesPages(): Promise<void> {
@@ -591,6 +598,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 			if (!absolu) return null;
 			return /^[a-zA-Z]:\//.test(absolu) ? absolu.replace(/\//g, "\\") : absolu;
 		},
+		moduleEnded: folder => finDuDossier(folder),
 		generatedFolder: () => {
 			const host = currentHost();
 			const local = deps.aiSettings.get().aiOutputFolder || aiSettingsDefaults().aiOutputFolder;
@@ -704,6 +712,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	};
 
 	coquilleMontee = ctx;
+	repeindreMontee = () => peindre();
+	// The timetable's ends, for the "Ended" section of the Folders page.
+	void chargerFins(ctx).then(ok => { if (ok && coquilleMontee === ctx) peindre(); });
 	const nav = createNavHandlers(ctx);
 	const home = createHomeHandlers(ctx);
 	const quizzes = createQuizzesHandlers(ctx);
@@ -1234,7 +1245,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 
 	const demonter = (): Promise<void> => {
 		if (demontage) return demontage;
-		if (coquilleMontee === ctx) coquilleMontee = null;
+		if (coquilleMontee === ctx) { coquilleMontee = null; repeindreMontee = null; }
 		document.removeEventListener("keydown", surCtrlZ);
 		document.removeEventListener("mousedown", surBoutonSouris, true);
 		document.removeEventListener("mouseup", surBoutonSouris, true);

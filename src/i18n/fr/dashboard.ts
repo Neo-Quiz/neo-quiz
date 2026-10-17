@@ -190,6 +190,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.menuHide": "Masquer de la liste",
 	"dashboard.quizzes.menuShow": "Afficher dans la liste",
 	"dashboard.quizzes.hiddenSection": "Masqués",
+	"dashboard.quizzes.endedSection": "Terminés",
 	"dashboard.quizzes.folderHidden": "« {name} » masqué, révisions en pause · il est sous Masqués, en bas de la liste",
 	"dashboard.quizzes.folderShown": "« {name} » est de retour dans la liste",
 	"dashboard.quizzes.sectionLearn": "Apprendre",

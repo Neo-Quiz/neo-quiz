@@ -357,6 +357,11 @@ export interface DashboardShellCtx {
 	    peut s'appeler « Generated » dans un vault. Absent = aucun dossier n'est
 	    le sas (le greffon). */
 	generatedFolder?: () => string | undefined;
+	/** When the module of this folder ended (epoch ms: its last session, from
+	    the school timetable), or null while it runs or when nothing says.
+	    The Folders page moves ended folders to an "Ended" section at the
+	    bottom. Absent where there is no timetable (the phone). */
+	moduleEnded?: (folder: string) => number | null;
 	/** Opens the Moodle window (PC only): a "Moodle" button of the Folders top bar
 	    when present. Absent on a phone and in the plugin. */
 	openMoodle?: () => void;

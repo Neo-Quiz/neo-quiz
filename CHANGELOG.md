@@ -13,6 +13,12 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A module you star in the Moodle window becomes a folder of the Folders page at once (created if Moodle has not made it yet).
+- Folders whose module is over (its last session is past, says your timetable) move to an "Ended" section at the bottom of the Folders page.
+- Explain pages draw what each element holds at the first step, and explain a technical English term where it first appears.
+
 ## [1.20.119] - 2026-10-17
 
 ### Changed

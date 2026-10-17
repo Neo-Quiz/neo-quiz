@@ -28,6 +28,8 @@ import { currentHourCycle, currentLang, hourOptions, t } from "../../../../src/i
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { resumeLancement, span } from "./moodle-common";
+import { declarerFavoris, noterFins } from "./moodle-dossiers";
+import { coquilleActive, repeindreCoquille } from "./dashboard-shell";
 import { codeAccent } from "../../../../src/dashboard/module-color";
 import { suggestIcons } from "../../../../src/dashboard/icon-suggest";
 
@@ -185,6 +187,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		if (!codes.length) return Promise.resolve();
 		return api.planningVolumes(codes).then(v => {
 			volumes = v;
+			noterFins(v);
+			repeindreCoquille();
 			if (estDetruit()) return;
 			if (vue === "picker") peindreResultats();
 			else if (vue === "course") redessinerCours();
@@ -206,6 +210,12 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	}
 	async function chargerCours(): Promise<void> {
 		cours = await api.cours().catch(() => [] as CoursMoodle[]);
+		void favorisEnDossiers();
+	}
+	/** Every favourite is a folder of the Folders page (`moodle-dossiers.ts`). */
+	async function favorisEnDossiers(): Promise<void> {
+		const ctx = coquilleActive();
+		if (ctx && await declarerFavoris(ctx, cours).catch(() => false)) repeindreCoquille();
 	}
 	async function chargerDevoirs(): Promise<void> {
 		devoirs = await api.devoirs().catch(() => [] as DevoirMoodle[]);
@@ -513,7 +523,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 			const on = !co.favori;
 			co.favori = on;
 			peindreResultats();
-			void api.favori(co.id, on).then(undefined, () => { co.favori = !on; peindreResultats(); });
+			void api.favori(co.id, on).then(() => { if (on) void favorisEnDossiers(); }, () => { co.favori = !on; peindreResultats(); });
 		};
 		etoile.addEventListener("click", basculer);
 		etoile.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") basculer(e); });

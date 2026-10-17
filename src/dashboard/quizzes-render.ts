@@ -147,13 +147,18 @@ export function renderQuizGrid(
 	// ones: their card lives only in the "Hidden" section (otherwise it would
 	// stay in the grid with 0 quizzes).
 	const sasVide = deps.ctx.generatedFolder?.();
-	const modules = modulesAffiches(filtered, stats, map,
+	const tous = modulesAffiches(filtered, stats, map,
 		declaredFolders(deps.ctx.settings.quizzesModuleOverrides), hiddenList, sasVide).filter(garde);
-	if (!garder && modules.length === 0 && hiddenList.length === 0) {
+	/* Ended modules (their last session is over, says the timetable) leave
+	   their group for the "Ended" section at the bottom, latest end first. */
+	const finDe = (m: ModuleGroup): number | null => deps.ctx.moduleEnded?.(m.folder) ?? null;
+	const termines = tous.filter(m => finDe(m) !== null).sort((a, b) => (finDe(b) ?? 0) - (finDe(a) ?? 0));
+	const modules = tous.filter(m => finDe(m) === null);
+	if (!garder && tous.length === 0 && hiddenList.length === 0) {
 		ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.empty"));
 		return;
 	}
-	if (garder && modules.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
+	if (garder && tous.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
 
 	if (mode === "recent") {
 		for (const g of buildRecentModuleGroups(modules, stats, sasVide)) {
@@ -171,6 +176,11 @@ export function renderQuizGrid(
 		// Axe UE (défaut) : en-tête d'UE repliable, cartes de module dessous ;
 		// « Sans UE » (modules non résolus) en dernier (garanti par buildUeGroups).
 		for (const ue of buildUeGroups(modules, map)) renderUeGroup(deps, treeEl, ue, map, entryDelay);
+	}
+
+	if (termines.length > 0) {
+		const body = renderCollapsibleSection(deps, treeEl, "ended:", t("dashboard.quizzes.endedSection"), termines.length, { entryDelay });
+		renderModuleGrid(deps, body, termines, map, entryDelay);
 	}
 
 	/* "Hidden" at the foot of the grid (every axis), collapsed by default,
