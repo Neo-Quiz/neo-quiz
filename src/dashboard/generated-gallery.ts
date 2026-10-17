@@ -2,15 +2,19 @@ import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
+import { detecterCategorie } from "./categorie-quiz";
+import { topicArt } from "./topic-art";
 
 /* ══════════════════════════════════════════════════════════
    THE GENERATED QUIZZES, A GALLERY INSIDE THE AI PAGE (2026-10-17)
 
-   "Generated quizzes" in the AI page's side column no longer leaves for the
-   Folders page: like "Artifacts" on claude.ai, the side column stays, its
-   entry is highlighted, and the page shows a title over a grid of cards. A
-   card is a preview (its kind, its title, what it holds) above its name and
-   the date it was last changed; a click opens the quiz. Most recent first.
+   Modelled on claude.ai's "Artifacts" page: a serif title, a row of tabs
+   (All · Learn · Test) with the search field on the right, then a grid of
+   cards, newest first. A card shows a flat illustration of the quiz's
+   subject (`topic-art.ts`, like claude.ai's "Create" tiles), a small icon square
+   straddling the preview's bottom edge, then the quiz's name and "Learn ·
+   Modified 3 h ago". A click opens the quiz. The side column of the AI page
+   stays on screen, its entry highlighted.
 ══════════════════════════════════════════════════════════ */
 
 export interface GeneratedGalleryDeps {
@@ -18,6 +22,12 @@ export interface GeneratedGalleryDeps {
 	open: (quiz: QuizIndexEntry) => void;
 	now?: number;
 }
+
+type Onglet = "all" | "learn" | "test";
+/** The tab and the search, kept while the app runs (the page repaints often). */
+let onglet: Onglet = "all";
+let recherche = "";
+const plier = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** "Modified 2 h ago" under a day, "Modified Oct 12" after (the year when not this one). */
 function modifie(ms: number, now: number): string {
@@ -34,29 +44,62 @@ export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalle
 	const now = deps.now ?? Date.now();
 	const page = ajouter(parent, "div", "qbd-gen-gallery");
 	ajouter(page, "h1", "qbd-gen-title", t("ai.side.generated"));
-	const tries = [...deps.quizzes].sort((a, b) => b.mtime - a.mtime);
-	if (!tries.length) {
-		ajouter(page, "p", "qbd-gen-empty", t("ai.gallery.empty"));
-		return;
-	}
+
+	// Tabs on the left, the search on the right (claude.ai's toolbar).
+	const barre = ajouter(page, "div", "qbd-gen-toolbar");
+	const onglets = ajouter(barre, "div", "qbd-gen-tabs");
+	onglets.setAttribute("role", "tablist");
+	const cherche = ajouter(barre, "label", "qbd-gen-search");
+	host.ui.setIcon(ajouter(cherche, "span", "qbd-gen-search-icon"), "search");
+	const champ = ajouter(cherche, "input", "qbd-gen-search-input");
+	champ.type = "search";
+	champ.placeholder = t("ai.gallery.search");
+	champ.setAttribute("aria-label", t("ai.gallery.search"));
+	champ.value = recherche;
+
 	const grille = ajouter(page, "div", "qbd-gen-grid");
-	for (const q of tries) {
-		const carte = ajouter(grille, "button", "qbd-gen-card");
-		carte.type = "button";
-		carte.setAttribute("aria-label", q.title);
-		// The preview: the kind as a small label, the title large, what it holds.
-		const apercu = ajouter(carte, "div", "qbd-gen-preview is-" + q.mode);
-		ajouter(apercu, "span", "qbd-gen-kind", t(q.mode === "learn" ? "ai.gallery.kindLearn" : "ai.gallery.kindTest"));
-		ajouter(apercu, "span", "qbd-gen-preview-title", q.title);
-		const contenu: string[] = [t(q.questions === 1 ? "ai.gallery.question" : "ai.gallery.questions", { n: String(q.questions) })];
-		if (q.readings) contenu.push(t(q.readings === 1 ? "ai.gallery.reading" : "ai.gallery.readings", { n: String(q.readings) }));
-		if (q.minutes) contenu.push(t("ai.gallery.minutes", { n: String(q.minutes) }));
-		ajouter(apercu, "span", "qbd-gen-preview-meta", contenu.join(" · "));
-		const pied = ajouter(carte, "div", "qbd-gen-foot");
-		host.ui.setIcon(ajouter(pied, "span", "qbd-gen-foot-icon"), q.mode === "learn" ? "book-open" : "list-checks");
-		const textes = ajouter(pied, "div", "qbd-gen-foot-text");
-		ajouter(textes, "span", "qbd-gen-name", q.title);
-		ajouter(textes, "span", "qbd-gen-date", modifie(q.mtime, now));
-		carte.addEventListener("click", () => deps.open(q));
+	const vide = ajouter(page, "p", "qbd-gen-empty");
+	const tries = [...deps.quizzes].sort((a, b) => b.mtime - a.mtime);
+
+	const boutons = new Map<Onglet, HTMLButtonElement>();
+	for (const [cle, libelle] of [["all", "ai.gallery.tabAll"], ["learn", "ai.gallery.kindLearn"], ["test", "ai.gallery.kindTest"]] as const) {
+		const b = ajouter(onglets, "button", "qbd-gen-tab");
+		b.type = "button";
+		b.setAttribute("role", "tab");
+		b.textContent = t(libelle);
+		b.addEventListener("click", () => { onglet = cle; peindre(); });
+		boutons.set(cle, b);
 	}
+
+	const peindre = (): void => {
+		for (const [cle, b] of boutons) {
+			b.classList.toggle("is-active", cle === onglet);
+			b.setAttribute("aria-selected", String(cle === onglet));
+		}
+		grille.replaceChildren();
+		const q = plier(recherche.trim());
+		const visibles = tries.filter(x => (onglet === "all" || (onglet === "learn") === (x.mode === "learn")) && (!q || plier(x.title).includes(q)));
+		vide.textContent = deps.quizzes.length === 0 ? t("ai.gallery.empty") : visibles.length === 0 ? t("ai.gallery.noMatch") : "";
+		vide.hidden = visibles.length > 0;
+		for (const x of visibles) carte(x);
+	};
+
+	const carte = (q: QuizIndexEntry): void => {
+		const learn = q.mode === "learn";
+		const c = ajouter(grille, "button", "qbd-gen-card");
+		c.type = "button";
+		c.setAttribute("aria-label", q.title);
+		// The preview: a flat illustration of the quiz's subject (`topic-art.ts`).
+		const apercu = ajouter(c, "div", "qbd-gen-preview");
+		const sujet = detecterCategorie({ pieces: q.generated?.source ? [q.generated.source] : [], demande: q.title });
+		apercu.appendChild(topicArt(sujet));
+		host.ui.setIcon(ajouter(apercu, "span", "qbd-gen-badge"), learn ? "book-open" : "list-checks");
+		const pied = ajouter(c, "div", "qbd-gen-foot");
+		ajouter(pied, "span", "qbd-gen-name", q.title);
+		ajouter(pied, "span", "qbd-gen-date", `${t(learn ? "ai.gallery.kindLearn" : "ai.gallery.kindTest")} · ${modifie(q.mtime, now)}`);
+		c.addEventListener("click", () => deps.open(q));
+	};
+
+	champ.addEventListener("input", () => { recherche = champ.value; peindre(); });
+	peindre();
 }

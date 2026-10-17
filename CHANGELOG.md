@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The gallery of generated quizzes has tabs (All, Learn, Test) and a search field, and each card shows a small illustration of its subject (code, maths, networks, security...).
+
 ## [1.21.9] - 2026-10-17
 
 ### Changed
