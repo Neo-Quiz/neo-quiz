@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.122] - 2026-10-17
+
 ### Changed
 
 - Neo Quiz asks the school's Moodle far less often: what it said about a module is reused for 3 hours, even after a restart, and the automatic sync no longer runs at a start that follows another one by less than an hour. Refresh (F5) still asks right away.
