@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.119] - 2026-10-17
+
 ### Changed
 
 - Explain pages are now built in numbered steps you go through (Previous, Next), then end with one question, instead of asking you to choose before anything is shown.
