@@ -89,10 +89,6 @@ function iconeLigne(parent: HTMLElement, nom: string, code: string | null): void
 	currentHost().ui.setIcon(s, nomIcone);
 	s.style.color = teinte(code);
 }
-/** An address without its scheme: "drive.google.com/drive/folders/..." */
-export function lienCourt(href: string): string {
-	try { const u = new URL(href); return (u.host + u.pathname + u.search).replace(/\/$/, ""); } catch { return href; }
-}
 function typeFichier(nom: string): string {
 	const ext = (nom.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
 	if (/^\.(zip|rar|7z|tar|gz)$/.test(ext)) return "file-archive";
@@ -940,8 +936,8 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const info = ajouter(ligne, "div", "nqm-row-info");
 		ajouter(info, "div", "nqm-row-name", a.name);
 		if (a.fichiers.length > 1) ajouter(info, "div", "nqm-row-meta", t("settings.moodle.wFilesCount", { n: a.fichiers.length }));
-		// A link shows where it leads: site and path, cut when too long (text only).
-		if (a.lien) ajouter(info, "div", "nqm-row-meta nqm-row-link", lienCourt(a.lien));
+		// A link shows where it leads, the whole address as the browser has it (text only).
+		if (a.lien) ajouter(info, "div", "nqm-row-meta nqm-row-link", a.lien);
 		const cle = TYPE_LABEL[a.type];
 		ajouter(ligne, "div", "nqm-row-type", cle ? t(cle) : a.type);
 		/* Nothing to download (a forum, a link, a page): the row opens it on Moodle, in the browser. */
