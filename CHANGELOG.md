@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- A link of a Moodle course opens its own address directly, without asking to sign in to Moodle first.
+
 ## [1.21.7] - 2026-10-17
 
 ### Changed

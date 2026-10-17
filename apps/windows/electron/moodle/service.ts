@@ -904,10 +904,26 @@ export function creerMoodle(deps: DepsMoodle): ServiceMoodle {
 		if (!site || !entierPositif(cmid) || typeof type !== "string" || !/^[a-z][a-z0-9_]{0,29}$/.test(type)) return false;
 		if (maintenant() - dernierOuvert < OPEN_INTERVAL) return false;
 		dernierOuvert = maintenant();
+		/* A LINK opens its own address (2026-10-17): through Moodle's page it asked
+		   the browser to sign in to Moodle first, for a public site. The address
+		   comes from the scan this process keeps, never from the window. */
+		if (type === "url") {
+			const direct = lienDeLActivite(await chargerScans(), cmid);
+			if (direct && new URL(direct).protocol === "https:") { await deps.ouvrirExterne(direct); return true; }
+		}
 		const url = new URL(`/mod/${type}/view.php`, site);
 		url.searchParams.set("id", String(cmid));
 		await deps.ouvrirExterne(url.href);
 		return true;
+	}
+	/** The checked address of the link activity `cmid` in the kept scans, or null. */
+	function lienDeLActivite(m: Map<number, { at: number; brut: Scan }>, cmid: number): string | null {
+		for (const { brut } of m.values()) {
+			for (const sec of brut.sections) for (const a of sec.activities) {
+				if (a.id === cmid && a.type === "url") return lienExterne(a.external[0]);
+			}
+		}
+		return null;
 	}
 	/** Hand in, like the plugin: the assignment page in the browser AND the
 	    `Rendus...` sub-folder of the module (else the module folder) in Explorer. */

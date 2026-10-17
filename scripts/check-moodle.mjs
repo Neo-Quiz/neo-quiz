@@ -759,6 +759,7 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 						{ type: "file", filename: "Dehors.pdf", filesize: 5, fileurl: `${other.root}/x.pdf`, timemodified: 1 },
 					] },
 					{ id: 23, name: "Rendu TP1", modname: "assign", uservisible: true },
+					{ id: 22, name: "Site du cours", modname: "url", uservisible: true, contents: [{ type: "url", fileurl: "https://docs.python.org/" }] },
 				] }],
 				mod_assign_get_assignments: { courses: [{ id: 1, assignments: p.get("courseids[0]") === "1" ? [{ id: 900, cmid: 23, duedate: due, cutoffdate: 0 }] : [] }] },
 				mod_assign_get_submission_status: { lastattempt: { submission: { status: "new" } } },
@@ -867,6 +868,14 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			for (const bad of ["../admin", "forum/../x", "Forum", "", "a".repeat(31), "url?x=1", 5, null]) assert.equal(await svc.ouvrirActivite(bad, 31), false, String(bad));
 			assert.equal(await svc.ouvrirActivite("url", "31"), false);
 			assert.equal(opened.at(-1), `${m.root}/mod/forum/view.php?id=31`, "a refused call opens nothing");
+			// a LINK opens its own address from the kept scan (no Moodle sign-in for a public site);
+			// one that no kept scan knows falls back on its Moodle page
+			clock += 3000;
+			assert.equal(await svc.ouvrirActivite("url", 22), true);
+			assert.equal(opened.at(-1), "https://docs.python.org/");
+			clock += 3000;
+			assert.equal(await svc.ouvrirActivite("url", 999), true);
+			assert.equal(opened.at(-1), `${m.root}/mod/url/view.php?id=999`);
 			const e = await svc.etat();
 			assert.equal(typeof e.lastSync, "number");
 			everything.push(cours, r, r2, devoirs, e, pushes);
