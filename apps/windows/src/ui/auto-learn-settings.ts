@@ -1,4 +1,5 @@
-/* SETTINGS › MOODLE › New lectures: the automatic Learn preference (mode, the
+/* ARCHIVED on 2026-10-17 with the automatic Learns (see `main.ts`): mounted nowhere.
+   SETTINGS › MOODLE › New lectures: the automatic Learn preference (mode, the
    usage limits). Painted once at mount from the stored setting; every change
    saves the whole `aiAutoLearn` value. The tool is NOT chosen here: it is the
    model of the AI page composer, shown read-only with its live usage line. */

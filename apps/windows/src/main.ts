@@ -39,19 +39,13 @@ import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-run
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
 import { addFailedRequest } from "../../../src/dashboard/chat-requests";
 import { getChats, setChats } from "../../../src/dashboard/chat-store";
-import { chatDevice, setActiveChat } from "../../../src/dashboard/chat-session";
-import { startAutoLearnRunner } from "../../../src/dashboard/auto-learn-runner";
-import { readAutoLog, writeAutoLog } from "../../../src/dashboard/auto-learn-store";
-import { USAGE_MAX_AGE_MS } from "../../../src/dashboard/auto-learn-gate";
-import { readUsageFresh } from "../../../src/dashboard/usage-line";
-import { createAiClient } from "../../../src/dashboard/ai-client";
-import { lectureMinutesOfFolder } from "../../../src/class-sessions";
+import { chatDevice } from "../../../src/dashboard/chat-session";
 import { enregistrerQuiz } from "../../../src/dashboard/generation-demande";
 import { readRelayDocument } from "../../../src/dashboard/relay-flow";
 import type { RelayDeps } from "../../../src/dashboard/relay-flow";
 import { absoluteInRoot } from "../../../src/shared-state/chat-merge";
 import { notifyPc } from "./host/notify";
-import { armerNotificationsFin, chargerSilence, silenceActif } from "./ui/notif-fin";
+import { armerNotificationsFin, chargerSilence } from "./ui/notif-fin";
 import { ecrireReglage, lireReglage } from "./host/folder";
 import { setOwnDeviceName, setPairedPeers, setPeerConnected } from "../../../src/dashboard/remote-generations";
 import { startChatSync } from "../../../src/dashboard/chat-sync";
@@ -60,7 +54,7 @@ import { creerSessionsApp } from "./review/sessions";
 import { createSharedSessions } from "./host/shared-sessions";
 import type { SessionsApp } from "./review/sessions";
 import { createRenameDetector } from "../../../src/review/rename-match";
-import { adopterOverrides, chargerReglagesPages, coquilleActive, overridesPartages, monterDashboard, reglagesDeLaCoquille, reprendre } from "./ui/dashboard-shell";
+import { adopterOverrides, chargerReglagesPages, overridesPartages, monterDashboard, reglagesDeLaCoquille, reprendre } from "./ui/dashboard-shell";
 import { chargerReprise } from "./ui/reprise";
 import { aiSettingsDefaults } from "../../../src/dashboard/ai-settings-host";
 import type { AiSettingsHost } from "../../../src/dashboard/ai-settings-host";
@@ -667,7 +661,6 @@ async function demarrer(): Promise<void> {
 		   ask for a scan. */
 		let remoteScan: (() => void) | null = null;
 		let stopRemote: (() => void) | null = null;
-		let stopAutoLearn: (() => void) | null = null;
 		/* This PC's device file (name, kind, Claude models): written at start and
 		   only when its content changes; `check()` is a local comparison, so the
 		   60 s pass below costs no write while nothing changed. */
@@ -693,23 +686,12 @@ async function demarrer(): Promise<void> {
 			stopGenerations = publishGenerations({ queue, write: f => chatFiles.writeGenerations(f), device: idAppareil });
 			if (estMobile()) return;
 			armerNotificationsFin(queue);
-			/* New Moodle lectures get their Learn (spec 2026-10-15-moodle-auto-learn). PC only: the PC downloads, the phone receives the Learn by sync. */
-			const moodleApi = pont().moodle;
-			if (moodleApi) stopAutoLearn = startAutoLearnRunner({
-				queue, settings: reglagesIa, scanner,
-				takeFresh: () => moodleApi.prendreNouveaux(),
-				onFresh: cb => moodleApi.surNouveaux(cb),
-				lectureMinutes: folder => lectureMinutesOfFolder(reglagesDeLaCoquille().settings.quizzesModuleOverrides, folder),
-				notify: (title, body, onClick) => notifyPc(title, body, onClick),
-				silent: () => silenceActif(),
-				openQuiz: p => { const q = scanner.getQuiz(p); if (q) coquilleActive()?.navigate("detail", { quiz: q }); else currentHost().ui.notice(t("ai.card.missing")); },
-				openChat: id => { setActiveChat(id); coquilleActive()?.navigate("ai"); },
-				readLog: readAutoLog, writeLog: writeAutoLog, chats: () => getChats(),
-				readUsage: tool => readUsageFresh(tool, o => requireHost("process").usageCompte(o), USAGE_MAX_AGE_MS),
-				isTrusted: f => currentHost().process?.isFolderTrusted?.(f) ?? Promise.resolve(false),
-				classify: names => createAiClient(reglagesIa).classifyLectures(names),
-				now: () => Date.now(),
-			});
+			/* AUTOMATIC LEARNS OF NEW MOODLE LECTURES: ARCHIVED on 2026-10-17, to be
+			   reworked later. The runner is no longer started and its settings left
+			   the Moodle page; its modules stay in the repository, dormant
+			   (`auto-learn-runner.ts`, `auto-learn-gate.ts`, `auto-learn-store.ts`,
+			   `auto-learn-settings.ts`, spec 2026-10-15-moodle-auto-learn). Without
+			   the runner no automatic line is ever queued. */
 			const runner = createRemoteRunner({
 				device: idAppareil,
 				now: () => Date.now(),
@@ -914,7 +896,6 @@ async function demarrer(): Promise<void> {
 			// Closing cleanly: the file goes, so no other device waits for a dead PC.
 			stopGenerations?.();
 			stopRemote?.();
-			stopAutoLearn?.();
 			await chatFiles.clearGenerations().catch(() => {});
 			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
 			await sessions.vider();

@@ -523,7 +523,7 @@ export function renderSettings(
 	/* The Moodle page is mounted when its tab exists (PC): it only reads the
 	   state; nothing is contacted until the user signs in or syncs. */
 	const moodlePage = pages.get("moodle");
-	const demonterMoodle = moodlePage ? mountMoodleSettings(moodlePage, deps.aiSettings) : () => undefined;
+	const demonterMoodle = moodlePage ? mountMoodleSettings(moodlePage) : () => undefined;
 
 	if (phone) montrerPrincipal();
 	else show(categories.some(c => c.id === lastCategory) ? lastCategory : "general");

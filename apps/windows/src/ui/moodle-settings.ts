@@ -26,15 +26,13 @@ import { openYearFoldersModal } from "./year-folders-modal";
 import { readYearPlan } from "../../../../src/dashboard/year-folders-run";
 import type { YearPlan } from "../../../../src/dashboard/year-folders";
 import { currentHost } from "../../../../src/host/current";
-import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
-import { mountAutoLearnSettings } from "./auto-learn-settings";
 import { RAIL_PREFS_EVENT } from "../../../../src/dashboard/nav";
 
 const SONDE_MS = 2000;
 const ATTENTE_MAX_MS = 10 * 60 * 1000;
 const PLAN_MS = 5000;
 
-export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHost): () => void {
+export function mountMoodleSettings(page: HTMLElement): () => void {
 	const api = pont().moodle;
 	if (!api) return () => undefined;
 	let detruit = false;
@@ -47,9 +45,6 @@ export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHos
 	const racine = ajouter(page, "div", "nq-moodle");
 	/* The timetable: OUTSIDE `racine` too, or a sync push would wipe the link being typed. */
 	const zonePlanning = ajouter(page, "div", "nq-moodle-planning");
-	/* OUTSIDE `racine`: `peindre` empties it on every state push (sync progress), which would destroy the usage line. */
-	const nouveaux = ajouter(page, "div", "nq-moodle-auto");
-	const demonterAuto = mountAutoLearnSettings(nouveaux, aiSettings);
 	/* The card of the section being painted (`peindre` swaps it). */
 	let carte: HTMLElement = racine;
 
@@ -348,5 +343,5 @@ export function mountMoodleSettings(page: HTMLElement, aiSettings: AiSettingsHos
 	const desabonner = api.surEtat(() => { void rafraichir(); });
 	void rafraichir();
 	void api.planningEtat().then(ep => { if (!detruit) peindrePlanning(ep); }, () => undefined);
-	return () => { detruit = true; arreterSonde(); desabonner(); demonterAuto(); };
+	return () => { detruit = true; arreterSonde(); desabonner(); };
 }
