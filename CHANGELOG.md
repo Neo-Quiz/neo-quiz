@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The hours of a Moodle module no longer count its exam sessions: their dates show apart ("exam on Thursday, December 10"), with the date the module runs until.
+
 ## [1.20.120] - 2026-10-17
 
 ### Changed

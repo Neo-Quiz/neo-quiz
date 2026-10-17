@@ -1748,8 +1748,19 @@ await withSrcModule(mods, async (pur, noms, client, disque, api, garde, jetonMod
 			S("Code module: XCS-413-2627PSA01", 180, 2000), S("XTI306CYB", 30, 3000),
 		];
 		assert.deepEqual(volumesParCode(s, ["XTI306", "XCS413", "XTI999", "X", "a.*", "XTI306"]), {
-			XTI306: { minutes: 450, seances: 3, fin: (5000 + 120) * 60000 }, XCS413: { minutes: 180, seances: 1, fin: (2000 + 180) * 60000 },
+			XTI306: { minutes: 450, seances: 3, fin: (5000 + 120) * 60000, epreuves: [] }, XCS413: { minutes: 180, seances: 1, fin: (2000 + 180) * 60000, epreuves: [] },
 		});
+		// exam sessions: dated apart, not counted in the hours; a course CALLED "contrôle" stays a course
+		const E = [
+			S("Communication\nCode module: XMUT303-2627PSA01\nActivité: COURS", 150, 100), S("Communication\nCode module: XMUT303-2627PSA01\nActivité: DE", 60, 900),
+			S("Anglais\nCode module: XMUT301\nActivité: CE", 60, 800), S("Partiel XTI999", 120, 700), S("XTI999 Examen final", 120, 750),
+			S("Contrôle de gestion XCG101", 180, 200), S("XTI999 DS de rattrapage", 60, 760), S("Dossier XTI999 Design System", 60, 50),
+		];
+		const v = volumesParCode(E, ["XMUT303", "XMUT301", "XTI999", "XCG101"]);
+		assert.deepEqual([v.XMUT303.minutes, v.XMUT303.seances, v.XMUT303.epreuves], [150, 1, [900 * 60000]]);
+		assert.deepEqual([v.XMUT301.minutes, v.XMUT301.seances, v.XMUT301.epreuves.length, v.XMUT301.fin], [0, 0, 1, (800 + 60) * 60000]);
+		assert.deepEqual([v.XTI999.seances, v.XTI999.epreuves.length], [1, 3], "Partiel, Examen, DS are exams; Design System is not");
+		assert.deepEqual([v.XCG101.seances, v.XCG101.epreuves.length], [1, 0]);
 	});
 	await test("timetable service: link encrypted and never returned, same-host redirects only, bounded, a failure keeps the cache and waits", async () => {
 		const SECRET = "s3cr3t-token-abcdef";

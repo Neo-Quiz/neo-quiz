@@ -23,8 +23,22 @@ export interface LienPlanning { url: string; hote: string }
 /** `debut`: start in minutes on a naive clock (only compared with other starts);
     `cle`: identity of the session in the feed (UID, recurrence id, start). */
 export interface Seance { texte: string; minutes: number; debut: number; cle: string }
-/** `fin`: end of the last session (epoch ms; naive local for a feed without UTC times, a few hours off at most). */
-export interface Volume { minutes: number; seances: number; fin: number }
+/** `fin`: end of the last session, exams included (epoch ms; naive local for
+    a feed without UTC times, a few hours off at most). `epreuves`: the starts
+    of its exam sessions, which `minutes` and `seances` do NOT count (a
+    syllabus volume counts teaching hours, not the written test). */
+export interface Volume { minutes: number; seances: number; fin: number; epreuves: number[] }
+
+/** An exam session, not a class: the activity field of an Efrei timetable
+    ("Activité: DE", devoir écrit; "CE", the English written test), or a
+    title that says so in any school's words. The title only: a course can be
+    CALLED "Contrôle de gestion", so "contrôle" is never a sign. */
+export function estEpreuve(texte: string): boolean {
+	const nl = texte.indexOf("\n");
+	const titre = nl < 0 ? texte : texte.slice(0, nl);
+	if (/Activit[ée]\s*:\s*(DE|CE|DS|EXAM|EXAMEN|PARTIEL)\b/i.test(texte)) return true;
+	return /(^|[^\p{L}])(examens?|exams?|partiels?|midterms?|final exam|devoir surveill[ée])(?![\p{L}])/iu.test(titre) || /(^|[^A-Za-z])DS(?![A-Za-z])/.test(titre);
+}
 
 export interface OptionsLien { /** Tests only: accept `http:` and a port. */ http?: boolean }
 
@@ -152,7 +166,7 @@ const normaliser = (s: string): string => s.toUpperCase().replace(/([A-Z])[-_ ]+
     `XTI3061` does not). Codes without a session are absent. */
 export function volumesParCode(seances: readonly Seance[], codes: readonly string[]): Record<string, Volume> {
 	const out: Record<string, Volume> = {};
-	const textes = seances.map(s => ({ t: normaliser(s.texte), m: s.minutes, d: s.debut }));
+	const textes = seances.map(s => ({ t: normaliser(s.texte), m: s.minutes, d: s.debut, e: estEpreuve(s.texte) }));
 	for (const code of new Set(codes)) {
 		const n = normaliser(code);
 		if (!/^[A-Z0-9]{2,32}$/.test(n)) continue;
@@ -160,8 +174,15 @@ export function volumesParCode(seances: readonly Seance[], codes: readonly strin
 		let minutes = 0;
 		let nb = 0;
 		let fin = 0;
-		for (const s of textes) if (re.test(s.t)) { minutes += s.m; nb++; fin = Math.max(fin, (s.d + s.m) * 60000); }
-		if (nb) out[code] = { minutes, seances: nb, fin };
+		const epreuves: number[] = [];
+		for (const s of textes) {
+			if (!re.test(s.t)) continue;
+			fin = Math.max(fin, (s.d + s.m) * 60000);
+			if (s.e) { if (epreuves.length < 10) epreuves.push(s.d * 60000); continue; }
+			minutes += s.m;
+			nb++;
+		}
+		if (nb || epreuves.length) out[code] = { minutes, seances: nb, fin, epreuves: epreuves.sort((a, b) => a - b) };
 	}
 	return out;
 }

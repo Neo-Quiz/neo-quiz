@@ -129,7 +129,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	let etat: EtatMoodle | null = null;
 	let cours: CoursMoodle[] = [];
 	/** Hours and sessions of the timetable per module code (empty without a timetable link). */
-	let volumes: Record<string, { minutes: number; seances: number; fin: number }> = {};
+	let volumes: Record<string, { minutes: number; seances: number; fin: number; epreuves: number[] }> = {};
 	let devoirs: DevoirMoodle[] = [];
 	const nouveaux = new Set<number>();
 	const trouves: ResultatRechercheMoodle[] = [];
@@ -198,9 +198,21 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 	function texteVolume(co: CoursMoodle): string | null {
 		const v = co.code ? volumes[co.code] : undefined;
 		if (!v) return null;
-		const h = Math.round(v.minutes / 6) / 10;
-		const heures = (Number.isInteger(h) ? String(h) : h.toFixed(1)).replace(".", currentLang() === "fr" ? "," : ".");
-		return t(v.seances === 1 ? "settings.moodle.wVolumeOne" : "settings.moodle.wVolume", { hours: heures, n: String(v.seances) });
+		const morceaux: string[] = [];
+		if (v.seances) {
+			const h = Math.round(v.minutes / 6) / 10;
+			const heures = (Number.isInteger(h) ? String(h) : h.toFixed(1)).replace(".", currentLang() === "fr" ? "," : ".");
+			morceaux.push(t(v.seances === 1 ? "settings.moodle.wVolumeOne" : "settings.moodle.wVolume", { hours: heures, n: String(v.seances) }));
+		}
+		const jour = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US", { weekday: "long", day: "numeric", month: "long" });
+		/* The end of a running module (an ended one says it in its badge). */
+		if (v.fin >= Date.now()) morceaux.push(t("settings.moodle.wUntil", { date: jour.format(new Date(v.fin)) }));
+		/* The exam sessions are not hours of the module: their dates, apart. */
+		if (v.epreuves.length) {
+			const dates = v.epreuves.slice(0, 2).map(ms => jour.format(new Date(ms))).join(", ");
+			morceaux.push(t(v.epreuves.length === 1 ? "settings.moodle.wExam" : "settings.moodle.wExams", { dates }));
+		}
+		return morceaux.join(" · ") || null;
 	}
 	/** The timetable says the module's last session is over: not checked when the
 	    window opens (a favourite still is; opening the module checks it). */
