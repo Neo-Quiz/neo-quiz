@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.20.118] - 2026-10-17
+
 ### Added
 
 - Link your school timetable (an ICS calendar link) in Settings, Moodle: each module of the Moodle window then shows its hours and sessions under its name. Sessions already past stay counted, even when the timetable stops listing them.
