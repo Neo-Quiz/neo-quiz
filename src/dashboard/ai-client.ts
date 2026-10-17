@@ -344,7 +344,7 @@ export interface AiClient {
 	    documents only, the lowest effort, 30 s at most. Resolves with the
 	    model's raw text (`parseClarifyAnswer` reads it); rejects on any failure,
 	    including a provider that cannot hold the exchange. */
-	clarify(request: string, documentNames: readonly string[]): Promise<string>;
+	clarify(request: string, documentNames: readonly string[], folderNames?: readonly string[]): Promise<string>;
 	/** The short call that sorts ambiguous file names (`lectureClassifyPrompt`): names only, no tools, lowest effort, 30 s at most; the raw text, read by `parseLectureVerdicts`; rejects on any failure. */
 	classifyLectures(names: readonly string[]): Promise<string>;
 	abort(): void;
@@ -2326,8 +2326,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	/** The clarify call of "Generate": same provider as the generation, same
 	    call forms (no tool, no new option), the LOWEST effort the provider
 	    offers, and 30 s at most. */
-	async function clarify(request: string, documentNames: readonly string[]): Promise<string> {
-		const { system, user } = clarifyPrompt(request, documentNames, currentLang());
+	async function clarify(request: string, documentNames: readonly string[], folderNames: readonly string[] = []): Promise<string> {
+		const { system, user } = clarifyPrompt(request, documentNames, currentLang(), folderNames);
 		return appelCourt(system, user);
 	}
 

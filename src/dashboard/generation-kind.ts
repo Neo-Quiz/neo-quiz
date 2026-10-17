@@ -2,10 +2,13 @@
    WHICH KIND OF QUIZ A REQUEST WANTS, AND WHAT TO ASK FIRST — pure
    (spec 2026-10-07-generate-auto-kind, amended by the owner the same day)
 
-   The clarify call infers the kind from the request's meaning and document
-   names. It asks about Learn/Test only when that intent is genuinely unclear.
-   It always asks for a question count and asks how many quizzes for multiple
-   documents; any failure leaves generation ready with Learn as the fallback.
+   The clarify call infers the kind (Learn by default, Test only when the
+   request clearly asks for practice) and never asks the learner about it.
+   When the message is not a request for a quiz (a greeting, small talk, a
+   question about the app) it answers conversationally instead and lists the
+   learner's folders (`reply`). Otherwise it asks for a question count and, for
+   several documents, how many quizzes; any failure leaves generation ready
+   with Learn as the fallback.
 ══════════════════════════════════════════════════════════ */
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
@@ -18,12 +21,14 @@ export type KindChoice = "learn" | "practice" | "both";
 export type QuizzesChoice = number | "auto";
 /** The most quizzes one request may ask for. */
 export const MAX_QUIZZES = 10;
-export interface ClarifyOption { label: string; description: string; kind?: KindChoice; quizzes?: QuizzesChoice }
+export interface ClarifyOption { label: string; description: string; quizzes?: QuizzesChoice }
 /** One clarifying question, in the manner of Claude Code's AskUserQuestion: a
     short header chip, the question, 2 to 4 options, one or several answers.
     The app adds its own "write something" option. */
-export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "kind" | "quizzes" }
-export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] }) & { kind?: KindChoice };
+export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" }
+export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice };
+/** The longest conversational reply kept (characters). */
+export const MAX_REPLY = 4000;
 /** The most questions a request is asked, and the longest header chip. */
 export const MAX_CLARIFY_QUESTIONS = 3;
 export const MAX_HEADER = 12;
@@ -79,6 +84,8 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	const obj = o as Record<string, unknown>;
 	const kind = isKindChoice(obj.kind) ? obj.kind : undefined;
 	const ready: ClarifyAnswer = kind ? { ready: true, kind } : READY;
+	// A conversational reply wins over everything else (bounded, plain text).
+	if (typeof obj.reply === "string" && obj.reply.trim()) return { reply: obj.reply.trim().slice(0, MAX_REPLY) };
 	if (!Array.isArray(obj.questions) || obj.questions.length < 1 || obj.questions.length > MAX_CLARIFY_QUESTIONS) return ready;
 	const questions: ClarifyQuestion[] = [];
 	for (const x of obj.questions) {
@@ -89,29 +96,14 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 		const lues: ClarifyOption[] = [];
 		for (const op of options) {
 			if (!op || typeof op !== "object") return ready;
-			const { label, description, kind: optionKind, quizzes: optionQuizzes } = op as Record<string, unknown>;
+			const { label, description, quizzes: optionQuizzes } = op as Record<string, unknown>;
 			if (typeof label !== "string" || !label.trim()) return ready;
-			lues.push({ label: label.trim().slice(0, 80), description: typeof description === "string" ? description.trim().slice(0, 160) : "", ...(isKindChoice(optionKind) ? { kind: optionKind } : {}), ...(isQuizzesChoice(optionQuizzes) ? { quizzes: optionQuizzes } : {}) });
+			lues.push({ label: label.trim().slice(0, 80), description: typeof description === "string" ? description.trim().slice(0, 160) : "", ...(isQuizzesChoice(optionQuizzes) ? { quizzes: optionQuizzes } : {}) });
 		}
-		const validKindQuestion = purpose === "kind" && multiple !== true && lues.every(option => isKindChoice(option.kind));
 		const validQuizzesQuestion = purpose === "quizzes" && multiple !== true && lues.every(option => isQuizzesChoice(option.quizzes));
-		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validKindQuestion ? { purpose: "kind" as const } : validQuizzesQuestion ? { purpose: "quizzes" as const } : {}) });
+		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validQuizzesQuestion ? { purpose: "quizzes" as const } : {}) });
 	}
 	return { questions, ...(kind ? { kind } : {}) };
-}
-
-/** Resolve a type choice; malformed or custom answers safely fall back to Learn. */
-export function kindFromClarifications(kind: KindChoice | undefined, questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): KindChoice {
-	const index = questions.findIndex(question => question.purpose === "kind");
-	if (index >= 0) {
-		const question = questions[index];
-		const selected = answers[index]?.length ? answers[index] : [question.options[question.default]?.label ?? question.options[0]?.label ?? ""];
-		for (const label of selected) {
-			const choice = question.options.find(option => option.label === label)?.kind;
-			if (isKindChoice(choice)) return choice;
-		}
-	}
-	return kind ?? "learn";
 }
 
 /** The number of quizzes asked (`"auto"`: the model decides), or `null` when
@@ -164,27 +156,29 @@ export function sansPrecisions(text: string): string {
 /** The instruction of the clarify call: English like every instruction to the
     model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */
-export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en"): { system: string; user: string } {
+export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en", folderNames: readonly string[] = []): { system: string; user: string } {
 	const system = [
-		"You are an assistant inside Neo Quiz, a revision app that generates either a Learn (a guided path that teaches a topic step by step), a Test (questions only), or both.",
-		"Deduce the quiz kind from the meaning of the learner's request and the attached document names. If the intent is clear, return its kind and do not ask a kind question. A request that says the learner understood nothing and needs to understand all the notions clearly wants Learn; 'test me', 'mock exam' and 'QCM d'entraînement' clearly want a Test. Choose both only when the learner clearly asks for both.",
+		"You are an assistant inside Neo Quiz, a revision app that generates either a Learn (a guided path that teaches a topic step by step) or a Test (questions only). You decide which one yourself and NEVER ask the learner about it.",
+		"FIRST decide whether the message asks for a quiz or for studying material. A greeting (\"slt\", \"salut\", \"hello\"), small talk, a question about the app or \"what can you do\" is NOT such a request: answer it conversationally, briefly, in the language of the message, and offer to work on one of the learner's folders, listing the folders given below (only those names, as a short list; if none is given, invite the learner to attach a document or name a topic). Return {\"reply\":\"<your answer>\"} alone, as plain text without HTML. Never reply conversationally to a message that names a subject, a course, a module, a document or asks for a quiz.",
+		"Otherwise deduce the quiz kind from the meaning of the learner's request and the attached document names: Learn by default. A request that says the learner understood nothing and needs to understand all the notions clearly wants Learn; 'test me', 'mock exam' and 'QCM d'entraînement' clearly want a Test. Choose both only when the learner clearly asks for both. Never ask a question about the kind.",
 		"A keyword such as 'test', 'examen' or 'contrôle' inside a pasted path, filename, document title, or quoted material does NOT express the learner's intent. Treat such names as context about the subject, never as an instruction to choose Test. Follow the meaning of the request.",
-		"Ask a Learn/Test/Both question ONLY when the intended kind is genuinely ambiguous. Mark that single-choice question with \"purpose\":\"kind\" and give each option its canonical object: {\"kind\":\"learn\"}, {\"kind\":\"practice\"}, or {\"kind\":\"both\"}; choose Learn as its default. This uses the one optional clarification slot, so do not also ask a scope or level question.",
-		"Always include the deduced canonical \"kind\" (\"learn\", \"practice\", or \"both\") when the intent is clear. If it is ambiguous, omit the top-level kind and ask the type question. The app safely defaults to Learn if the kind is missing or invalid.",
+		"Always include the deduced canonical \"kind\" (\"learn\", \"practice\", or \"both\") in your answer. The app safely defaults to Learn if it is missing or invalid.",
 		"Before generating, ask short multiple-choice clarification questions.",
 		"Always ask one question about the NUMBER OF QUESTIONS to generate, even if the request already names a count. Offer concrete choices such as 15, 25, and 40 questions.",
 		"If two or more attached documents are listed, also ask HOW MANY QUIZZES to make, simply as a number: a single-choice question marked \"purpose\":\"quizzes\" whose options are \"Auto\" {\"quizzes\":\"auto\"} first (you decide), then 1, 2 and 3 quizzes ({\"quizzes\":1}, {\"quizzes\":2}, {\"quizzes\":3}); its default is 0. The quizzes share the material of ALL the documents, split by theme; never describe them as one quiz per document.",
 		"For each of these two questions (number of questions, number of quizzes), put the option labeled exactly \"Auto\" first and set the default to index 0. \"Auto\" means you decide freely; it imposes NO numeric bound.",
-		"You may ask at most ONE optional clarifying question: ask about kind when it is ambiguous, otherwise ask about scope or learner level only when genuinely vague. Never exceed 3 questions total.",
+		"You may ask at most ONE optional clarifying question about scope or learner level, only when genuinely vague. Never exceed 3 questions total.",
 		"NEVER ask what the attached documents already answer. You see only their names; if a name makes the scope clear, do not ask about scope.",
 		"You have no tools; you only see the request and the names of the attached documents.",
-		"Always return a questions JSON object because the question-count question is required. Include a top-level kind when the intent is clear; omit it only when asking the kind question. The parser also accepts a kind-only answer for compatibility, but your required question count still takes priority.",
+		"Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
-		`- {"kind":"learn","questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions; a kind question has "purpose":"kind" and each option has its own canonical "kind" value. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
+		`- {"kind":"learn","questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
+	const dossiers = folderNames.map(n => n.trim()).filter(Boolean).slice(0, 60);
 	const user = [
 		"THE LEARNER'S REQUEST:\n" + (request.trim() || "(empty)"),
+		dossiers.length ? "THE LEARNER'S FOLDERS (names only):\n" + dossiers.map(n => "- " + n).join("\n") : "",
 		names.length ? "ATTACHED DOCUMENTS (names only):\n" + names.map(n => "- " + n).join("\n") : "",
 	].filter(Boolean).join("\n\n---\n\n");
 	return { system, user };

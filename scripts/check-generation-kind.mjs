@@ -21,12 +21,25 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	const o = (label, description = "") => ({ label, description });
 	const q = (header, question, labels, multiple = false, def = 0) => ({ header, question, multiple, options: labels.map(l => o(l, "d " + l)), default: def });
 	const qs = [q("Niveau", "Quel niveau ?", ["Débutant", "Avancé"]), q("Parties", "Quelles parties ?", ["A", "B", "C"], true)];
-	const kindQuestion = { header: "Type", question: "Quel format voulez-vous ?", multiple: false, options: [
+	/* A model that still sends the old kind question: it is read as a plain question, never as a kind choice. */
+	const oldKindQuestion = { header: "Type", question: "Quel format voulez-vous ?", multiple: false, options: [
 		{ ...o("Learn"), kind: "learn" }, { ...o("Test"), kind: "practice" }, { ...o("Both"), kind: "both" },
 	], default: 0, purpose: "kind" };
+	const plainKindQuestion = { ...oldKindQuestion, options: oldKindQuestion.options.map(({ kind, ...x }) => x) };
+	delete plainKindQuestion.purpose;
 	r.check("clarify: ready", K.parseClarifyAnswer("{\"ready\":true}"), READY);
 	r.check("clarify: a kind alone is accepted", K.parseClarifyAnswer('{"kind":"practice"}'), { ready: true, kind: "practice" });
-	r.check("clarify: valid kind and type question are retained", K.parseClarifyAnswer(JSON.stringify({ kind: "learn", questions: [kindQuestion] })), { questions: [kindQuestion], kind: "learn" });
+	r.check("clarify: the kind question is never produced: an old one loses its purpose and option kinds", K.parseClarifyAnswer(JSON.stringify({ kind: "learn", questions: [oldKindQuestion] })), { questions: [plainKindQuestion], kind: "learn" });
+	r.check("clarify: no kind question helper remains", typeof K.kindFromClarifications, "undefined");
+	/* The conversational reply (2026-10-17). */
+	r.check("reply: parsed and trimmed, with text around the JSON", K.parseClarifyAnswer('Sure {"reply":"  Salut ! Voici tes dossiers.  "} ok'), { reply: "Salut ! Voici tes dossiers." });
+	r.check("reply: bounded to MAX_REPLY", K.parseClarifyAnswer(JSON.stringify({ reply: "x".repeat(1e6) })).reply.length, K.MAX_REPLY);
+	r.check("reply: a reply wins over questions and keeps no kind", K.parseClarifyAnswer(JSON.stringify({ kind: "practice", reply: "Hi", questions: qs })), { reply: "Hi" });
+	r.check("reply: empty, blank or non-string replies fall back to the rest", [
+		K.parseClarifyAnswer('{"reply":""}'), K.parseClarifyAnswer('{"reply":"  "}'), K.parseClarifyAnswer('{"reply":42}'), K.parseClarifyAnswer('{"reply":{"a":1},"kind":"practice"}'),
+	], [READY, READY, READY, { ready: true, kind: "practice" }]);
+	r.check("reply: HTML stays a plain string for the caller to render as text", K.parseClarifyAnswer('{"reply":"<img src=x onerror=alert(1)>"}'), { reply: "<img src=x onerror=alert(1)>" });
+	r.check("reply: a truncated or hostile object never throws", [K.parseClarifyAnswer('{"reply":"abc'), K.parseClarifyAnswer('{"reply":null}'), K.parseClarifyAnswer('{"__proto__":{"reply":"x"}}')], [READY, READY, READY]);
 	r.check("clarify: malformed kind is ignored while valid questions survive", K.parseClarifyAnswer(JSON.stringify({ kind: "Test", questions: qs })), { questions: qs });
 	r.check("clarify: a valid kind survives malformed questions", K.parseClarifyAnswer('{"kind":"practice","questions":"broken"}'), { ready: true, kind: "practice" });
 	r.check("clarify: 1 to 3 questions are kept with header, label and description; `multiple` defaults to false",
@@ -58,14 +71,6 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		["unrelated object", "{\"other\":\"learn\"}"],
 		["empty", ""],
 	]) r.check("clarify: " + nom + " is treated as ready", K.parseClarifyAnswer(brut), READY);
-	r.check("clarify: malformed type metadata is ignored", K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...kindQuestion, purpose: "mode", options: kindQuestion.options.map(x => ({ ...x, kind: "Test" })) }] })).questions, [{ ...kindQuestion, purpose: undefined, options: kindQuestion.options.map(({ kind, ...x }) => x) }]);
-	r.check("clarify: a multi-select type question is not trusted", K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...kindQuestion, multiple: true }] })).questions[0].purpose, undefined);
-	const kindFromAnswers = typeof K.kindFromClarifications === "function" ? K.kindFromClarifications : () => null;
-	r.check("answers: a type choice overrides the safe default, while a skipped choice uses its Learn default", [
-		kindFromAnswers(undefined, [kindQuestion], [["Test"]]),
-		kindFromAnswers(undefined, [kindQuestion], [[]]),
-	], ["practice", "learn"]);
-	r.check("answers: a custom type answer falls back safely", kindFromAnswers(undefined, [kindQuestion], [["Something else"]]), "learn");
 
 	r.check("answers: one line per answered question, under the label",
 		K.formatClarifications("Précisions :", qs, [["Débutant"], ["A", "mes notes"]]), "Précisions :\n- Quel niveau ?\n    Débutant\n- Quelles parties ?\n    A, mes notes");
@@ -97,11 +102,16 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		[K.quizCountFromClarifications([quizzesQ], [["2"]]), K.quizCountFromClarifications([quizzesQ], [["Auto"]]), K.quizCountFromClarifications([quizzesQ], [[]]), K.quizCountFromClarifications([quizzesQ], [["4 quiz"]]), K.quizCountFromClarifications([quizzesQ], [["beaucoup"]]), K.quizCountFromClarifications([], [])],
 		[2, "auto", "auto", 4, null, null]);
 	r.check("clarify prompt: allows one optional question and never exceeds three",
-		['at most ONE optional clarifying question', 'ask about kind when it is ambiguous', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true, true]);
+		['at most ONE optional clarifying question', 'Never exceed 3 questions total'].map(w => p.system.includes(w)), [true, true]);
 	r.check("clarify prompt: infers kind from meaning and ignores keywords inside paths and filenames",
-		["Deduce the quiz kind from the meaning", "pasted path", "filename", "does NOT express the learner's intent"].map(w => p.system.includes(w)), [true, true, true, true]);
-	r.check("clarify prompt: asks Learn/Test/Both only for genuinely ambiguous intent and links options to canonical kinds",
-		['ONLY when the intended kind is genuinely ambiguous', '"purpose":"kind"', '"kind":"learn"', '"kind":"practice"', '"kind":"both"'].map(w => p.system.includes(w)), [true, true, true, true, true]);
+		["deduce the quiz kind from the meaning", "pasted path", "filename", "does NOT express the learner's intent"].map(w => p.system.includes(w)), [true, true, true, true]);
+	r.check("clarify prompt: never asks about the kind, Learn by default, canonical kinds still named",
+		['NEVER ask the learner about it', 'Never ask a question about the kind', 'Learn by default', '"learn"', '"practice"', '"both"'].map(w => p.system.includes(w)), [true, true, true, true, true, true]);
+	r.check("clarify prompt: no trace of the kind question", ['"purpose":"kind"', 'Learn/Test/Both question', 'ask about kind when'].map(w => p.system.includes(w)), [false, false, false]);
+	r.check("clarify prompt: conversational reply for non-requests, folders offered",
+		['"reply"', 'greeting', 'small talk', 'NOT such a request', "learner's folders"].map(w => p.system.includes(w)), [true, true, true, true, true]);
+	const pf = K.clarifyPrompt("slt", [], "fr", ["XTI302", "Maths", " "]);
+	r.check("clarify prompt: folder names are listed (names only, blanks dropped), absent without folders", [pf.user.includes("- XTI302"), pf.user.includes("- Maths"), pf.user.split("\n- ").length - 1, p.user.includes("FOLDERS")], [true, true, 2, false]);
 	r.check("clarify prompt: does not offer ready when the count must always be asked", p.system.includes('{"ready":true}'), false);
 	r.check("clarify prompt: no key of the quiz format, no exam", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(p.system + p.user)], [false]);
 	r.check("clarify prompt: when the request reveals no language, the app's language is the fallback (French or English)",

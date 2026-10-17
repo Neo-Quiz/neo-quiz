@@ -195,7 +195,7 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	// After a reload of the page the in-memory request is gone: only a request with no document can be rebuilt.
 	const pend = { ...base, clarify: { questions: qs, genre: "both" } };
 	r.check("the kind to generate is read back, `both` included", read([pend])[0].clarify.genre, "both");
-	const routed = { ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [{ ...op("Learn"), kind: "learn" }, { ...op("Test"), kind: "practice" }] }], genre: "learn", action: "remote" } };
+	const routed = { ...base, clarify: { questions: [qs[0]], genre: "learn", action: "remote" } };
 	r.check("type-choice metadata and the continuation route survive chat storage", read([routed])[0].clarify, routed.clarify);
 	/* The "how many quizzes" question must survive storage too: the answer is
 	   read back from the record, and without the mark "Auto" fell back to one
@@ -204,8 +204,8 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	r.check("quiz-count metadata survives chat storage", read([counted])[0].clarify, counted.clarify);
 	const badCount = read([{ ...base, clarify: { questions: [{ ...qs[0], purpose: "quizzes", options: [{ ...op("Auto"), quizzes: "many" }, { ...op("1 quiz"), quizzes: 1 }] }] } }])[0].clarify;
 	r.check("a malformed quiz count is ignored without losing the question", [badCount.questions[0].purpose, badCount.questions[0].options.map(o => o.quizzes)], [undefined, [undefined, 1]]);
-	const badMetadata = read([{ ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [{ ...op("Learn"), kind: "Test" }, { ...op("Test"), kind: "practice" }] }], action: "invalid" } }])[0].clarify;
-	r.check("malformed type metadata and routes are ignored without losing the question", [badMetadata.questions[0].purpose, badMetadata.questions[0].options.map(o => o.kind), badMetadata.action], [undefined, [undefined, "practice"], undefined]);
+	const badMetadata = read([{ ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [op("Learn"), op("Test")] }], action: "invalid" } }])[0].clarify;
+	r.check("malformed type metadata and routes are ignored without losing the question", [badMetadata.questions[0].purpose, badMetadata.action], [undefined, undefined]);
 	r.check("an unknown kind is ignored", read([{ ...base, clarify: { questions: qs, genre: "exam" } }])[0].clarify.genre, undefined);
 	r.check("resume: a pending request with no document is rebuilt from the record (text and kind)", Q.resumeSource(read([pend])[0]), { text: "Python", genre: "both" });
 	r.check("resume: without a stored kind, the request's mode", [Q.resumeSource(read([{ ...base, mode: "practice", clarify: { questions: qs } }])[0])?.genre, Q.resumeSource(read([{ ...base, clarify: { questions: qs } }])[0])?.genre], ["practice", "learn"]);

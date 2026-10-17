@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The AI page answers a greeting or a question in plain conversation and offers your folders; the AI picks Learn or Test itself.
+
 ## [1.21.13] - 2026-10-17
 
 ### Changed
