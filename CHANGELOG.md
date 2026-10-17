@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Gallery and folder cards show their subject at the bottom right; gallery illustrations sit on the card at a smaller size.
+
 ## [1.21.10] - 2026-10-17
 
 ### Changed

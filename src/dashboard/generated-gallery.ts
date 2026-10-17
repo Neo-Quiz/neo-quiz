@@ -4,6 +4,7 @@ import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
 import { detecterCategorie } from "./categorie-quiz";
 import { topicArt } from "./topic-art";
+import { libelleCategorie } from "./categorie-affichage";
 
 /* ══════════════════════════════════════════════════════════
    THE GENERATED QUIZZES, A GALLERY INSIDE THE AI PAGE (2026-10-17)
@@ -11,8 +12,7 @@ import { topicArt } from "./topic-art";
    Modelled on claude.ai's "Artifacts" page: a serif title, a row of tabs
    (All · Learn · Test) with the search field on the right, then a grid of
    cards, newest first. A card shows a flat illustration of the quiz's
-   subject (`topic-art.ts`, like claude.ai's "Create" tiles), a small icon square
-   straddling the preview's bottom edge, then the quiz's name and "Learn ·
+   subject (`topic-art.ts`, like claude.ai's "Create" tiles), then the quiz's name and "Learn ·
    Modified 3 h ago". A click opens the quiz. The side column of the AI page
    stays on screen, its entry highlighted.
 ══════════════════════════════════════════════════════════ */
@@ -93,10 +93,12 @@ export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalle
 		const apercu = ajouter(c, "div", "qbd-gen-preview");
 		const sujet = detecterCategorie({ pieces: q.generated?.source ? [q.generated.source] : [], demande: q.title });
 		apercu.appendChild(topicArt(sujet));
-		host.ui.setIcon(ajouter(apercu, "span", "qbd-gen-badge"), learn ? "book-open" : "list-checks");
 		const pied = ajouter(c, "div", "qbd-gen-foot");
 		ajouter(pied, "span", "qbd-gen-name", q.title);
-		ajouter(pied, "span", "qbd-gen-date", `${t(learn ? "ai.gallery.kindLearn" : "ai.gallery.kindTest")} · ${modifie(q.mtime, now)}`);
+		// The kind and the date on the left, the subject at the bottom right.
+		const bas = ajouter(pied, "div", "qbd-gen-foot-row");
+		ajouter(bas, "span", "qbd-gen-date", `${t(learn ? "ai.gallery.kindLearn" : "ai.gallery.kindTest")} · ${modifie(q.mtime, now)}`);
+		if (sujet !== "general") ajouter(bas, "span", "qbd-gen-topic", libelleCategorie(sujet));
 		c.addEventListener("click", () => deps.open(q));
 	};
 

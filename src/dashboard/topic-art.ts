@@ -5,8 +5,8 @@ import { estLangue } from "./categorie-quiz";
    A SMALL FLAT ILLUSTRATION PER SUBJECT (2026-10-17)
 
    The preview of a card in the gallery of generated quizzes, after the
-   "Create something new" tiles of claude.ai: a dark tinted ground, a lighter
-   rounded panel in the middle, and flat shapes in two or three tones of the
+   "Create something new" tiles of claude.ai: a dark tinted ground and,
+   straight on it (no panel: no tile inside a tile), flat shapes in two or three tones of the
    subject's colour (an editor for code, axes and a curve for maths, nodes for
    networks...). Built with `createElementNS` from fixed shapes: no markup
    string, nothing taken from the quiz.
@@ -104,7 +104,9 @@ export function topicArt(c: CategorieQuiz): SVGSVGElement {
 	const f = familleDe(c);
 	const t = TEINTES[f];
 	const svg = document.createElementNS(NS, "svg");
-	svg.setAttribute("viewBox", "0 0 160 100");
+	/* A wide frame around the 160 x 100 drawing: the shapes keep a modest size
+	   in a large card instead of filling it. */
+	svg.setAttribute("viewBox", "-22 -4 204 108");
 	svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
 	svg.setAttribute("aria-hidden", "true");
 	const id = `nq-art-${f}`;
@@ -112,7 +114,8 @@ export function topicArt(c: CategorieQuiz): SVGSVGElement {
 	const grad = document.createElementNS(NS, "linearGradient");
 	grad.setAttribute("id", id);
 	grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0"); grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
-	for (const [offset, couleur, op] of [["0", t.fond, "0.95"], ["1", t.fond, "0.45"]] as const) {
+	// The colour fades into the card itself: no separate block for the picture.
+	for (const [offset, couleur, op] of [["0", t.fond, "0.9"], ["1", t.fond, "0"]] as const) {
 		const stop = document.createElementNS(NS, "stop");
 		stop.setAttribute("offset", offset);
 		stop.setAttribute("stop-color", couleur);
@@ -126,9 +129,8 @@ export function topicArt(c: CategorieQuiz): SVGSVGElement {
 		for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
 		svg.appendChild(el);
 	};
-	poser(["rect", { x: 0, y: 0, width: 160, height: 100, fill: `url(#${id})` }]);
-	// The lighter panel in the middle, as on claude.ai's tiles.
-	poser(["rect", { x: 34, y: 12, width: 92, height: 76, rx: 10, fill: "#ffffff", "fill-opacity": 0.06, stroke: "#ffffff", "stroke-opacity": 0.12 }]);
+	poser(["rect", { x: -22, y: -4, width: 204, height: 108, fill: `url(#${id})` }]);
+	// No panel behind the shapes: no tile inside the card's tile.
 	for (const forme of formes(f, t)) poser(forme);
 	return svg;
 }

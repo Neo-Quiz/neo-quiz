@@ -6,6 +6,8 @@ import type { ModuleGroup } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
 import { openMenuOnRightClick } from "./quiz-card";
+import { categorieDuDossier } from "./categorie-quiz";
+import { libelleCategorie } from "./categorie-affichage";
 
 /* ══════════════════════════════════════════════════════════
    MODULE CARD — une carte = un MODULE (dossier de quiz). Design
@@ -108,6 +110,10 @@ export function renderModuleCard(
 			dateEl.textContent = t("dashboard.quizzes.folderModified", { date });
 		}, () => undefined);
 	}
+	// The folder's subject at the bottom right, as on the cards of the gallery
+	// of generated quizzes (2026-10-17); none for an unknown subject.
+	const sujet = opts?.generated ? "general" : categorieDuDossier(group.path ?? group.folder, group.name);
+	if (sujet !== "general") ajouter(footer, "span", "qbd-module-card__topic", libelleCategorie(sujet));
 	if (onMenu) {
 		const moreBtn = ajouter(footer, "button", "qbd-card-more qbd-module-card__menu");
 		moreBtn.type = "button";

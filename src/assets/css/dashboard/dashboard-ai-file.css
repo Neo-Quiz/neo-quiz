@@ -1991,10 +1991,8 @@
 /* The preview: a flat illustration of the subject (topic-art.ts). */
 .qbd-gen-preview {
 	position: relative;
-	height: 156px;
+	height: 150px;
 	overflow: hidden;
-	background: #141417;
-	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .qbd-gen-preview > svg {
@@ -2013,26 +2011,6 @@
 	.qbd-gen-card:hover .qbd-gen-preview > svg { transform: none; }
 }
 
-/* The small icon square straddling the preview's bottom edge. */
-.qbd-gen-badge {
-	position: absolute;
-	left: 12px;
-	bottom: 10px;
-	display: grid;
-	place-items: center;
-	width: 26px;
-	height: 26px;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 7px;
-	background: var(--background-secondary);
-	color: var(--text-muted);
-}
-
-.qbd-gen-badge svg {
-	width: 14px;
-	height: 14px;
-}
-
 .qbd-gen-foot {
 	display: flex;
 	flex-direction: column;
@@ -2049,7 +2027,24 @@
 	font-size: 15px;
 }
 
+.qbd-gen-foot-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
 .qbd-gen-date {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	color: var(--text-faint);
 	font-size: 13px;
+}
+
+.qbd-gen-topic {
+	flex: none;
+	color: var(--text-muted);
+	font-size: 12px;
 }
