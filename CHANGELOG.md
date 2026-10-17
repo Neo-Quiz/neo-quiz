@@ -15,6 +15,10 @@ release notes.
 
 ### Changed
 
+- Dates written in figures (a Moodle file's date, a session's time) follow the regional format of Windows, not the language of the app.
+
+### Changed
+
 - A PDF in a Moodle module sits in the same tinted square as the other icons.
 
 ## [1.21.5] - 2026-10-17

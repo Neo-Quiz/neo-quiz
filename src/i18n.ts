@@ -82,6 +82,23 @@ export function setHourCycle(value?: string): void {
 	hourCycle = value === "12h" ? "12h" : "24h";
 }
 
+/* THE SYSTEM'S REGIONAL FORMAT (2026-10-17): a date written in figures
+   ("23/09/2026") follows the format Windows is set to, which may differ from
+   the language of the interface (English UI, French dates). Dates written
+   with words keep the interface's language, so a sentence never mixes two.
+   Set once at start by the host (`setNumericDateLocale`); a host that does
+   not know it leaves the interface's locale. */
+let localeChiffres: string | null = null;
+export function setNumericDateLocale(locale: unknown): void {
+	try {
+		localeChiffres = typeof locale === "string" && locale ? Intl.getCanonicalLocales(locale)[0] ?? null : null;
+	} catch { localeChiffres = null; }
+}
+/** The locale of a date written in figures: the system's regional format, else the interface's. */
+export function numericDateLocale(): string {
+	return localeChiffres ?? (currentLang() === "fr" ? "fr-FR" : "en-US");
+}
+
 export function currentHourCycle(): HourCycle {
 	return hourCycle;
 }

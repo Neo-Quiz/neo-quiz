@@ -24,7 +24,7 @@ import type {
 } from "../../electron/pont";
 import { currentHost, requireHost } from "../../../../src/host/current";
 import type { HostModalHandle } from "../../../../src/host/types";
-import { currentHourCycle, currentLang, hourOptions, t } from "../../../../src/i18n";
+import { currentHourCycle, currentLang, hourOptions, numericDateLocale, t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 import { heure, resumeLancement, span } from "./moodle-common";
@@ -70,8 +70,8 @@ const locale = (): string => (currentLang() === "fr" ? "fr-FR" : "en-US");
 function quand(sec: number): string {
 	const d = new Date(sec * 1000);
 	return t("settings.moodle.wWhenAt", {
-		day: d.toLocaleDateString(locale(), { weekday: "short", day: "2-digit", month: "2-digit" }),
-		time: d.toLocaleTimeString(locale(), { minute: "2-digit", ...hourOptions(currentHourCycle()) }),
+		day: `${d.toLocaleDateString(locale(), { weekday: "short" })} ${d.toLocaleDateString(numericDateLocale(), { day: "2-digit", month: "2-digit" })}`,
+		time: d.toLocaleTimeString(numericDateLocale(), { minute: "2-digit", ...hourOptions(currentHourCycle()) }),
 	});
 }
 function nomCourt(c: { name: string }): string { return c.name.replace(/^\S+\s*-\s*/, ""); }
@@ -1046,7 +1046,7 @@ function monter(contenu: HTMLElement, estDetruit: () => boolean): () => void {
 		const morceaux: string[] = [];
 		if (shown !== f.name) morceaux.push(f.name);
 		if (f.size) morceaux.push(taille(f.size));
-		if (f.date) morceaux.push(new Date(f.date * 1000).toLocaleDateString(locale()));
+		if (f.date) morceaux.push(new Date(f.date * 1000).toLocaleDateString(numericDateLocale()));
 		meta.textContent = morceaux.join(" · ");
 		const action = ajouter(ligne, "div", "nqm-file-action");
 

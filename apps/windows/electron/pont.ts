@@ -766,6 +766,8 @@ export interface Pont {
 		    ÉCRIRE donnerait à la page le droit de LIRE le presse-papiers.
 		    N'expose aucune lecture : le rendu écrit, il ne relit jamais. */
 		copierTexte(texte: string): Promise<void>;
+		/** The system's regional format (`app.getSystemLocale()`, "fr-FR"): the dates written in figures follow it. */
+		localeRegionale?(): Promise<string>;
 		/** Les vaults qu'Obsidian connaît. Une liste vide est un état NORMAL
 		    (Obsidian absent de la machine), pas une erreur. */
 		vaultsObsidian(): Promise<VaultConnu[]>;
@@ -1212,6 +1214,7 @@ export const CANAUX = {
 	systemeDossierDefaut: "neo:systeme/dossier-defaut",
 	systemeRelancer: "neo:systeme/relancer",
 	systemeCopierTexte: "neo:systeme/copier-texte",
+	systemeLocale: "neo:systeme/locale",
 	systemeChoisirDossierDefaut: "neo:systeme/choisir-dossier-defaut",
 	systemeChoisirFichiers: "neo:systeme/choisir-fichiers",
 	partageEnregistrer: "neo:partage/enregistrer",

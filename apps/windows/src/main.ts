@@ -9,7 +9,7 @@ import "./assets/question-edit.css";
 import "./assets/modal.css";
 import "./assets/moodle-modal.css";
 import "./assets/math.css";
-import { setLanguage, setHourCycle, currentHourCycle, t } from "../../../src/i18n";
+import { setLanguage, setHourCycle, setNumericDateLocale, currentHourCycle, t } from "../../../src/i18n";
 import { chargerLangue } from "./ui/langue";
 import { PHONE_LAYOUT_QUERY } from "../../../src/phone-layout";
 import { chargerFormatHeure, suivreFormatHeureTelephone } from "./ui/format-heure";
@@ -533,6 +533,8 @@ async function demarrer(): Promise<void> {
 	setLanguage(await chargerLangue());
 	// Le format de l'heure, lu avec la langue : 24 h tant que rien d'autre n'est choisi.
 	setHourCycle(await chargerFormatHeure());
+	// Dates in figures follow Windows' regional format (`numericDateLocale`).
+	setNumericDateLocale(await pont().systeme.localeRegionale?.().catch(() => null));
 	suivreFormatHeureTelephone(currentHourCycle, () => location.reload());
 	document.title = t("app.window.title");
 	/* Montée UNE FOIS, avant le premier écran : elle survit à tous les

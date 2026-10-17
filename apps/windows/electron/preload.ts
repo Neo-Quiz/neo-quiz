@@ -130,6 +130,7 @@ const pont: Pont = {
 	systeme: {
 		ouvrir: abs => ipcRenderer.invoke(CANAUX.ouvrir, abs),
 		copierTexte: texte => ipcRenderer.invoke(CANAUX.systemeCopierTexte, texte),
+		localeRegionale: () => ipcRenderer.invoke(CANAUX.systemeLocale),
 		vaultsObsidian: () => ipcRenderer.invoke(CANAUX.vaultsObsidian),
 		dossierDefaut: () => ipcRenderer.invoke(CANAUX.systemeDossierDefaut),
 		relancer: () => ipcRenderer.invoke(CANAUX.systemeRelancer),

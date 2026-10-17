@@ -951,6 +951,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 	};
 
+	// The regional format Windows is set to (dates in figures). No argument crosses.
+	ipcMain.handle(CANAUX.systemeLocale, () => app.getSystemLocale());
 	ipcMain.handle(CANAUX.systemeCopierTexte, (_e, texte: unknown) => {
 		if (typeof texte !== "string" || texte.length > 524288) throw new Error("copie refusée : le presse-papiers ne prend qu'un texte borné");
 		dernierTexteEcritParLapp = texte;

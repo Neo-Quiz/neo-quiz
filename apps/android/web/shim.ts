@@ -168,6 +168,8 @@ const pont: Pont = {
 	systeme: {
 		ouvrir: (abs) => appeler("systeme.ouvrir", [abs]),
 		copierTexte: (texte) => appeler("systeme.copierTexte", [texte]),
+		// The phone's own locale carries its region: no channel needed.
+		localeRegionale: async () => globalThis.navigator?.language || "en-US",
 		vaultsObsidian: () => appeler("systeme.vaultsObsidian"),
 		dossierDefaut: () => appeler("systeme.dossierDefaut"),
 		choisirDossierDefaut: () => appeler("systeme.choisirDossierDefaut"),
