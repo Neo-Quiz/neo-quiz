@@ -1809,7 +1809,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 					majAvisCategorie();
 					paintDestination?.();
 				},
-			})), { className: "qbd-menu-claude" });
+			})), { className: "qbd-menu-claude", search: t("ai.composer.destinationSearch") });
 		});
 		/* Folder suggestions, under the composer; and the picker offered on
 		   arrival (like "Choose a provider"): a popover anchored to the chip,
@@ -3759,7 +3759,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			label: settings().aiOutputFolder || aiSettingsDefaults().aiOutputFolder,
 			icon: GENERATED_MODULE_ICON,
 			color: GENERATED_MODULE_ACCENT,
-			sub: racine.name,
+			sub: "",
 		}];
 		const vus = new Set([defaut]);
 		const dossiers: { path: string; name: string; icon: string; color: string; root: string }[] = [];

@@ -74,6 +74,7 @@ import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
 import { chargerFins, finDuDossier, rafraichirLiensMoodle } from "./moodle-dossiers";
+import { YEAR_FOLDER_RE } from "../../../../src/dashboard/year-folders";
 import { monterPointLogo } from "./mise-a-jour";
 import { noterVue } from "./reprise";
 import { createSheetStack } from "./sheet-stack";
@@ -800,10 +801,14 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		for (const [cle, ov] of Object.entries(ctx.settings.quizzesModuleOverrides || {})) {
 			if (ov?.path) vus.set(ov.path, ov.name?.trim() || cle);
 		}
+		/* A quiz inside a declared folder counts for that folder: its own
+		   sub-folder ("Session 1" of a course) is not a destination of its own. */
+		const declares = [...vus.keys()];
 		for (const q of deps.scanner.getQuizzes()) {
 			const coupe = q.path.lastIndexOf("/");
 			if (coupe <= 0) continue;
 			const dossier = q.path.slice(0, coupe);
+			if (declares.some(d => dossier === d || dossier.startsWith(d + "/"))) continue;
 			if (!vus.has(dossier)) vus.set(dossier, dossier.split("/").pop() as string);
 		}
 		/* L'icône, la couleur et la RACINE de chaque dossier, pour que le menu
@@ -820,7 +825,9 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 				path, name,
 				icon: moduleIcon({ icon: ov?.icon, name, ue: ov?.ue }, { generated }),
 				color: moduleAccent({ folder: name, color: ov?.color }, { generated }),
-				root: currentHost().paths.rootOf(path)?.name ?? "",
+				/* The school year the folder sits in ("B2 2026-2027"), rather than the
+				   root's name repeated on every row; nothing outside a year folder. */
+				root: currentHost().paths.localPath(path).split("/").find(seg => YEAR_FOLDER_RE.test(seg)) ?? "",
 			};
 		}
 		return [...vus.entries()].map(([path, name]) => decrire(path, name)).sort((a, b) => a.name.localeCompare(b.name));

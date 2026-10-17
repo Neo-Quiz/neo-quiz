@@ -225,6 +225,51 @@
 	min-width: 248px;
 }
 
+/* A searchable action menu (ui-select.ts `search`): the field stays, the rows scroll. */
+.qbd-action-menu.is-searchable {
+	display: flex;
+	flex-direction: column;
+	max-height: min(60vh, 460px);
+	overflow: hidden;
+}
+
+.qbd-action-menu-search {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+	margin: 2px 2px 6px;
+	padding: 6px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	color: var(--text-muted);
+}
+
+.qbd-action-menu-search svg {
+	width: 14px;
+	height: 14px;
+	flex: none;
+}
+
+.qbd-action-menu-search-input {
+	flex: 1;
+	min-width: 0;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	outline: none;
+	color: var(--text-normal);
+	font: inherit;
+	font-size: 13px;
+	padding: 0 !important;
+}
+
+.qbd-action-menu-list {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
 .qbd-action-menu .qbd-select-option {
 	padding: 8px 12px 8px 10px;
 	gap: 10px;

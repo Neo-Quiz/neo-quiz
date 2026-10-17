@@ -35,6 +35,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.preview.openFailed": "Impossible d'ouvrir {name}",
 	"ai.preview.props": "Propriétés",
 	"ai.composer.destination": "Dossier de sortie : {folder}",
+	"ai.composer.destinationSearch": "Chercher un dossier",
 	"ai.composer.destinationLocked": "Le dossier de ce chat. Ouvre un nouveau chat pour travailler dans un autre dossier.",
 	"ai.composer.generate": "Générer le quiz",
 	"ai.composer.stop": "Arrêter",

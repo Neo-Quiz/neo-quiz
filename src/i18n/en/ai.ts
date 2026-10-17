@@ -40,6 +40,7 @@ export const EN_AI = {
 	"ai.preview.openFailed": "Could not open {name}",
 	"ai.preview.props": "Properties",
 	"ai.composer.destination": "Output folder: {folder}",
+	"ai.composer.destinationSearch": "Find a folder",
 	"ai.composer.destinationLocked": "The folder of this chat. Start a new chat to work in another folder.",
 	"ai.composer.generate": "Generate quiz",
 	"ai.composer.stop": "Stop",

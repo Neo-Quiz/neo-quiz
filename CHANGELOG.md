@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- The output folder menu of the AI page has a search field and scrolls, shows each folder's school year instead of the root's name, and no longer lists the sub-folders of a course.
+
 ## [1.21.0] - 2026-10-17
 
 ### Changed

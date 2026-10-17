@@ -288,6 +288,9 @@ export interface ActionMenuItem {
 export interface ActionMenuOptions {
 	/** Classe ajoutée au menu (`qbd-menu-claude` : la matière des menus de claude.ai). */
 	className?: string;
+	/** A search field at the top (its placeholder), filtering the rows by their
+	    label and hint, accents ignored; the rows then scroll under it. */
+	search?: string;
 }
 
 /*
@@ -360,7 +363,31 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 			});
 		}
 	}
-	remplir(menuEl, items, true);
+	if (options.search) {
+		/* A long list (the destination folders): a search field that stays at the
+		   top, and the rows in their own scrolling box under it. */
+		menuEl.classList.add("is-searchable");
+		const champ = ajouter(ajouter(menuEl, "label", "qbd-action-menu-search"), "input", "qbd-action-menu-search-input");
+		currentHost().ui.setIcon(champ.parentElement!.insertBefore(document.createElement("span"), champ), "search");
+		champ.type = "search";
+		champ.placeholder = options.search;
+		champ.setAttribute("aria-label", options.search);
+		const liste = ajouter(menuEl, "div", "qbd-action-menu-list");
+		remplir(liste, items, true);
+		const plier = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+		champ.addEventListener("input", () => {
+			const q = plier(champ.value.trim());
+			for (const b of liste.querySelectorAll<HTMLElement>(".qbd-select-option")) b.hidden = !!q && !plier(b.textContent || "").includes(q);
+		});
+		champ.addEventListener("keydown", e => {
+			if (e.key !== "Enter") return;
+			e.preventDefault();
+			[...liste.querySelectorAll<HTMLButtonElement>(".qbd-select-option")].find(b => !b.hidden && !b.disabled)?.click();
+		});
+		setTimeout(() => champ.focus(), 0);
+	} else {
+		remplir(menuEl, items, true);
+	}
 
 	/* ── Flyout d'un sous-menu (même patron que ceux d'`openModelMenu`) :
 	   portalé au <body> (le menu a overflow, un enfant absolu serait rogné),
