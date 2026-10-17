@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- Antigravity CLI usage shows in the Accounts settings like Claude Code and Codex, per model group, without opening a terminal.
+
 ## [1.21.13] - 2026-10-17
 
 ### Changed

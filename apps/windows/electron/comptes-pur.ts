@@ -179,3 +179,68 @@ export function usageClaudeDepuisReponse(corps: unknown): UsageRow[] {
 function majuscule(s: string): string {
 	return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+/* ── ANTIGRAVITY QUOTAS (2026-10-17) ──
+   Antigravity meters its quota per MODEL GROUP, not in 5-hour or weekly
+   windows: `fetchAvailableModels` (the call `agy` makes for `/usage`) gives
+   each model a `quotaInfo { remainingFraction, resetTime }`. Models that
+   report the same numbers share one quota, so they are grouped by value
+   (reset compared to the minute); untouched quotas stay apart by family so
+   unrelated pools never merge. Proto JSON omits a zero `remainingFraction`:
+   a reset time without a fraction is a spent quota. Only models with a
+   display name are listed (the others are internal: tab completion...). */
+
+type FamilleAgy = "Gemini" | "Claude & GPT-OSS";
+
+function familleAgy(cle: string): FamilleAgy | null {
+	if (cle.startsWith("gemini")) return "Gemini";
+	if (cle.startsWith("claude") || cle.startsWith("gpt-oss")) return "Claude & GPT-OSS";
+	return null;
+}
+
+/** "Gemini 3.1 Pro (High)" → "Gemini 3.1 Pro": the effort is not a quota. */
+function nomDeBase(nom: string): string {
+	return nom.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
+export function usageAntigravityDepuisModeles(corps: unknown): UsageRow[] {
+	if (!corps || typeof corps !== "object") return [];
+	const modeles = (corps as { models?: unknown }).models;
+	if (!modeles || typeof modeles !== "object") return [];
+	const groupes = new Map<string, { famille: FamilleAgy; utilise: number; reset: number | null; noms: string[] }>();
+	for (const [cle, m] of Object.entries(modeles as Record<string, unknown>)) {
+		if (!m || typeof m !== "object") continue;
+		const nom = (m as { displayName?: unknown }).displayName;
+		const famille = familleAgy(cle);
+		if (typeof nom !== "string" || !nom.trim() || !famille) continue;
+		const q = (m as { quotaInfo?: unknown }).quotaInfo;
+		if (!q || typeof q !== "object") continue;
+		const brutFraction = (q as { remainingFraction?: unknown }).remainingFraction;
+		const brutReset = (q as { resetTime?: unknown }).resetTime;
+		const reset = typeof brutReset === "string" && Number.isFinite(Date.parse(brutReset)) ? Date.parse(brutReset) : null;
+		let restant: number;
+		if (typeof brutFraction === "number" && Number.isFinite(brutFraction)) restant = Math.min(1, Math.max(0, brutFraction));
+		else if (brutFraction === undefined && reset !== null) restant = 0;
+		else continue;
+		const utilise = Math.round((1 - restant) * 1000) / 10;
+		const intact = restant >= 1;
+		const cleGroupe = famille + "|" + (intact ? "full" : utilise + "|" + (reset === null ? "-" : Math.floor(reset / 60000)));
+		/* An untouched quota reports a reset five hours from NOW, moving with
+		   every read (measured on 2026-10-17): it is no reset time, none is shown. */
+		const resetUtile = intact ? null : reset;
+		const g = groupes.get(cleGroupe) ?? { famille, utilise, reset: resetUtile, noms: [] };
+		const base = nomDeBase(nom);
+		if (!g.noms.includes(base)) g.noms.push(base);
+		if (resetUtile !== null && (g.reset === null || resetUtile < g.reset)) g.reset = resetUtile;
+		groupes.set(cleGroupe, g);
+	}
+	const liste = [...groupes.values()];
+	return liste
+		.map((g): UsageRow => {
+			// The family names the pool when it is the only one of its family.
+			const seul = liste.filter(x => x.famille === g.famille).length === 1;
+			const noms = g.noms.length > 3 ? g.noms.slice(0, 3).join(", ") + " +" + (g.noms.length - 3) : g.noms.join(", ");
+			return { kind: "weekly-model", modelName: seul ? g.famille : noms, usedPercent: g.utilise, resetsAt: g.reset };
+		})
+		.sort((a, b) => (a.modelName ?? "").localeCompare(b.modelName ?? "") || b.usedPercent - a.usedPercent);
+}

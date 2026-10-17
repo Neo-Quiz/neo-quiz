@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { LOG_PREFIX } from "../../../src/branding";
 import type { EtatCompte } from "../../../src/host/types";
 import type { UsageRead } from "../../../src/dashboard/usage-format";
-import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageClaudeDepuisReponse, usageCodexDepuisLigne } from "./comptes-pur";
+import { comptClaude, comptCodex, emailAntigravityDepuisJournal, usageAntigravityDepuisModeles, usageClaudeDepuisReponse, usageCodexDepuisLigne } from "./comptes-pur";
 import type { OutilCompte } from "./comptes-pur";
 import { ARGS_COMPTE } from "./gabarits-cli";
 import { dossierPersonnel, environnementEnfant, lancer, resoudreExecutable } from "./process";
@@ -215,6 +215,8 @@ async function usageClaude(env: NodeJS.ProcessEnv): Promise<UsageRead> {
 				"anthropic-beta": CLAUDE_OAUTH_BETA,
 				"Content-Type": "application/json",
 			},
+			// The token goes to this URL only, never to where a redirect points.
+			redirect: "error",
 			signal: AbortSignal.timeout(DELAI_MS),
 		});
 	} catch (e) {
@@ -292,9 +294,124 @@ async function usageCodex(env: NodeJS.ProcessEnv): Promise<UsageRead> {
 	return { rows: [], error: { kind: "unavailable" }, mesureAt: null };
 }
 
-/** Les quotas du forfait, pour les deux fournisseurs qui les publient. */
-export async function usageCompte(outil: "claude" | "codex", env: NodeJS.ProcessEnv = process.env): Promise<UsageRead> {
-	return outil === "claude" ? usageClaude(env) : usageCodex(env);
+/* ── ANTIGRAVITY QUOTAS, READ LIKE `agy /usage` DOES (2026-10-17) ──
+   The quota used to show only in agy's own REPL, opened in a terminal. It
+   comes from two Cloud Code calls, made here with agy's OWN sign-in:
+   `loadCodeAssist` (the account's project), then `fetchAvailableModels`
+   (each model's `quotaInfo`). The token is read from the Windows credential
+   `gemini:antigravity` (target WRITTEN HERE, never received from the window)
+   by a CONSTANT PowerShell script; it is used for these two requests to
+   Google only and never leaves this module. Nothing is ever written back.
+   An expired token is renewed by agy itself (`agy models`, the sign-in
+   probe), never by a client secret of ours. */
+const AGY_CRED_SCRIPT = [
+	"$ErrorActionPreference='Stop'",
+	"Add-Type -TypeDefinition @'",
+	"using System; using System.Runtime.InteropServices;",
+	"public static class NqAgyCred {",
+	"  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] public struct C { public int Flags; public int Type; public string TargetName; public string Comment; public long LastWritten; public int Size; public IntPtr Blob; public int Persist; public int AttributeCount; public IntPtr Attributes; public string TargetAlias; public string UserName; }",
+	"  [DllImport(\"advapi32.dll\", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CredReadW(string t, int type, int flags, out IntPtr c);",
+	"  [DllImport(\"advapi32.dll\")] static extern void CredFree(IntPtr c);",
+	"  public static string Read() { IntPtr p; if (!CredReadW(\"gemini:antigravity\", 1, 0, out p)) return \"\"; try { var c = (C)Marshal.PtrToStructure(p, typeof(C)); var b = new byte[c.Size]; Marshal.Copy(c.Blob, b, 0, b.Length); return Convert.ToBase64String(b); } finally { CredFree(p); } }",
+	"}",
+	"'@",
+	"[Console]::Out.Write([NqAgyCred]::Read())",
+].join("\n");
+const AGY_LOAD_URL = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
+const AGY_MODELS_URL = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
+/** A token this close to its expiry is renewed first: it must not lapse mid-request. */
+const AGY_MARGE_MS = 60_000;
+
+/** agy's access token and its expiry (null when the blob has none), or null
+    (not signed in, unreadable). PowerShell gets only what it needs to start:
+    no other variable of this process reaches it. */
+async function jetonAgy(env: NodeJS.ProcessEnv): Promise<{ jeton: string; expire: number | null } | null> {
+	const systemRoot = env.SystemRoot || "C:\Windows";
+	try {
+		const { stdout, code } = await lancer({
+			executable: join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+			args: ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(AGY_CRED_SCRIPT, "utf16le").toString("base64")],
+			stdin: "",
+			timeoutMs: 15_000,
+			env: { SystemRoot: systemRoot, TEMP: env.TEMP ?? "", TMP: env.TMP ?? "", PATH: join(systemRoot, "System32") },
+		});
+		// A credential blob is about 1.5 KB: anything far larger is not agy's.
+		if (code !== 0 || !stdout.trim() || stdout.length > 64_000) return null;
+		const blob = JSON.parse(Buffer.from(stdout.trim(), "base64").toString("utf8")) as { token?: { access_token?: unknown; expiry?: unknown } };
+		const jeton = blob.token?.access_token;
+		const expire = typeof blob.token?.expiry === "string" ? Date.parse(blob.token.expiry) : NaN;
+		return typeof jeton === "string" && jeton ? { jeton, expire: Number.isFinite(expire) ? expire : null } : null;
+	} catch (e) {
+		return null;
+	}
+}
+
+/** One Cloud Code call: no redirect is followed (the token goes to this URL
+    only), the body is read up to 1 MB and parsed. Throws on any failure but
+    an HTTP status, which is returned. */
+async function postAgy(url: string, jeton: string, corps: unknown): Promise<{ ok: true; json: unknown } | { ok: false; status: number; headers: Headers }> {
+	const resp = await fetch(url, {
+		method: "POST",
+		headers: { "Authorization": "Bearer " + jeton, "User-Agent": "antigravity", "Content-Type": "application/json" },
+		body: JSON.stringify(corps),
+		redirect: "error",
+		signal: AbortSignal.timeout(DELAI_MS * 2),
+	});
+	if (!resp.ok) { await resp.body?.cancel().catch(() => undefined); return { ok: false, status: resp.status, headers: resp.headers }; }
+	const lecteur = resp.body?.getReader();
+	if (!lecteur) throw new Error("empty body");
+	const morceaux: Uint8Array[] = [];
+	let taille = 0;
+	for (;;) {
+		const { done, value } = await lecteur.read();
+		if (done) break;
+		taille += value.byteLength;
+		if (taille > 1_000_000) { await lecteur.cancel().catch(() => undefined); throw new Error("answer too large"); }
+		morceaux.push(value);
+	}
+	return { ok: true, json: JSON.parse(Buffer.concat(morceaux).toString("utf8")) as unknown };
+}
+
+async function lireUsageAntigravity(env: NodeJS.ProcessEnv): Promise<UsageRead> {
+	if (process.platform !== "win32") return { rows: [], error: { kind: "unavailable" }, mesureAt: null };
+	let lu = await jetonAgy(env);
+	if (lu && lu.expire !== null && lu.expire <= Date.now() + AGY_MARGE_MS) {
+		// agy renews its own token and stores it again: the sign-in probe does it.
+		const executable = resoudreExecutable("agy", env);
+		if (!executable) return { rows: [], error: { kind: "unauthenticated" }, mesureAt: null };
+		await lancer({ executable, args: ["models"], stdin: "", timeoutMs: DELAI_MS * 2, env: environnementEnfant(env) }).catch(() => null);
+		lu = await jetonAgy(env);
+		if (lu && lu.expire !== null && lu.expire <= Date.now()) lu = null;
+	}
+	if (!lu) return { rows: [], error: { kind: "unauthenticated" }, mesureAt: null };
+	try {
+		const charge = await postAgy(AGY_LOAD_URL, lu.jeton, { metadata: { ideType: "ANTIGRAVITY" } });
+		if (!charge.ok) return { rows: [], error: erreurDepuisStatut(charge.status, charge.headers), mesureAt: null };
+		const p = charge.json && typeof charge.json === "object" ? (charge.json as { cloudaicompanionProject?: unknown }).cloudaicompanionProject : null;
+		const projet = typeof p === "string" ? p : p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string" ? (p as { id: string }).id : null;
+		const modeles = await postAgy(AGY_MODELS_URL, lu.jeton, projet ? { project: projet } : {});
+		if (!modeles.ok) return { rows: [], error: erreurDepuisStatut(modeles.status, modeles.headers), mesureAt: null };
+		const rows = usageAntigravityDepuisModeles(modeles.json);
+		return rows.length ? { rows, error: null, mesureAt: Date.now() } : { rows: [], error: { kind: "unavailable" }, mesureAt: null };
+	} catch (e) {
+		return { rows: [], error: { kind: "unavailable" }, mesureAt: null };
+	}
+}
+
+/* Each read launches PowerShell (and agy near the token's expiry): one at a
+   time, and its answer kept 60 s, so no window can turn hovering into a
+   stream of processes. */
+let usageAgyGarde: { at: number; lecture: Promise<UsageRead> } | null = null;
+function usageAntigravity(env: NodeJS.ProcessEnv): Promise<UsageRead> {
+	if (usageAgyGarde && Date.now() - usageAgyGarde.at < 60_000) return usageAgyGarde.lecture;
+	const lecture = lireUsageAntigravity(env);
+	usageAgyGarde = { at: Date.now(), lecture };
+	return lecture;
+}
+
+/** Les quotas du forfait, pour les trois fournisseurs qui les publient. */
+export async function usageCompte(outil: "claude" | "codex" | "agy", env: NodeJS.ProcessEnv = process.env): Promise<UsageRead> {
+	return outil === "claude" ? usageClaude(env) : outil === "codex" ? usageCodex(env) : usageAntigravity(env);
 }
 
 /* ── ONE ACCOUNT OPERATION AT A TIME (2026-10-10) ──

@@ -160,6 +160,36 @@ await withSrcModule("apps/windows/electron/comptes-pur.ts", async (m) => {
 		[sorties.includes("SECRET-QUI-NE-DOIT-PAS-SORTIR"), sorties.includes("oat01")],
 		[false, false]);
 
+	/* ─── Antigravity: `fetchAvailableModels` quotas, grouped by pool ─── */
+	const R = "2026-10-18T00:20:35Z";
+	const R2 = "2026-10-17T22:00:10Z";
+	const modele = (displayName, quotaInfo) => ({ displayName, quotaInfo, model: "x" });
+	r.check("untouched quotas: one pool per family, no moving reset time",
+		m.usageAntigravityDepuisModeles({ models: {
+			"gemini-3.1-pro-high": modele("Gemini 3.1 Pro (High)", { remainingFraction: 1, resetTime: R }),
+			"gemini-3-flash": modele("Gemini 3 Flash", { remainingFraction: 1, resetTime: R }),
+			"claude-opus-5-5-high": modele("Claude Opus 5.5 (High)", { remainingFraction: 1, resetTime: R }),
+			"gpt-oss-120b-medium": modele("GPT-OSS 120B (Medium)", { remainingFraction: 1, resetTime: R }),
+			"chat_23310": { quotaInfo: { remainingFraction: 0.2 } },
+			"tab_flash_lite_preview": { quotaInfo: { remainingFraction: 1 } },
+		} }),
+		[{ kind: "weekly-model", modelName: "Claude & GPT-OSS", usedPercent: 0, resetsAt: null },
+		 { kind: "weekly-model", modelName: "Gemini", usedPercent: 0, resetsAt: null }]);
+	r.check("pools of one family split by value and named by their models; a missing fraction with a reset is spent",
+		m.usageAntigravityDepuisModeles({ models: {
+			"gemini-3.1-pro-high": modele("Gemini 3.1 Pro (High)", { remainingFraction: 0.6, resetTime: R2 }),
+			"gemini-3.1-pro-low": modele("Gemini 3.1 Pro (Low)", { remainingFraction: 0.6, resetTime: R2 }),
+			"gemini-3-flash": modele("Gemini 3 Flash", { remainingFraction: 1, resetTime: R }),
+			"claude-opus-5-5-high": modele("Claude Opus 5.5 (High)", { resetTime: R2 }),
+		} }),
+		[{ kind: "weekly-model", modelName: "Claude & GPT-OSS", usedPercent: 100, resetsAt: Date.parse(R2) },
+		 { kind: "weekly-model", modelName: "Gemini 3 Flash", usedPercent: 0, resetsAt: null },
+		 { kind: "weekly-model", modelName: "Gemini 3.1 Pro", usedPercent: 40, resetsAt: Date.parse(R2) }]);
+	r.check("a hostile or empty answer gives no row, without throwing",
+		[m.usageAntigravityDepuisModeles(null), m.usageAntigravityDepuisModeles({ models: "x" }),
+		 m.usageAntigravityDepuisModeles({ models: { "gemini-x": modele("G", { remainingFraction: "1" }) } })],
+		[[], [], []]);
+
 	r.done();
 });
 

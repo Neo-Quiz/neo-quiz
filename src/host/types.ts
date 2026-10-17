@@ -700,8 +700,9 @@ export interface HostProcess {
 	    l'utilisateur fait. La section « Comptes » continue de demander les
 	    trois d'un coup en omettant ce paramètre. */
 	etatComptes(outils?: EtatCompte["outil"][]): Promise<EtatCompte[]>;
-	/** Les quotas du forfait, pour les deux fournisseurs qui les publient. */
-	usageCompte(tool: "claude" | "codex"): Promise<UsageRead>;
+	/** The plan's quotas, for the three providers that publish them
+	    (Antigravity since 2026-10-17, per model group). */
+	usageCompte(tool: "claude" | "codex" | "agy"): Promise<UsageRead>;
 	/** Codex banked resets (desktop app only, hence optional): `read` lists
 	    them, `consume` spends one. The host judges the request. */
 	codexResets?(requete: ResetsRequest): Promise<ResetsResult>;

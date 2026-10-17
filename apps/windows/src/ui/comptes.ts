@@ -199,7 +199,7 @@ function actionDe(etat: EtatCompte): "installer" | "connecter" | "deconnecter" {
    `usageCompte` n'accepte que ces deux outils — le compilateur refuse déjà
    Antigravity et Ollama à l'appel, ce module n'a pas besoin de le revérifier
    lui-même au-delà de ce type. */
-type OutilAvecUsage = "claude" | "codex";
+type OutilAvecUsage = "claude" | "codex" | "agy";
 
 /** La page d'usage d'Ollama (session + semaine), ouverte au clic sur l'icône. */
 const OLLAMA_USAGE_URL = "https://ollama.com/settings";
@@ -530,19 +530,15 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 		});
 	}
 
-	/** L'icône d'usage, à gauche de l'action, sur une ligne CONNECTÉE seulement
-	    (ailleurs elle n'ouvrirait qu'un cas d'échec) :
-	    - Claude Code et Codex : le survol (ou le focus) ouvre le popover des
-	      jauges, lues par le principal.
-	    - Ollama : un clic ouvre `ollama.com/settings` dans le navigateur — la
-	      seule page où Ollama montre l'usage de la session et de la semaine ;
-	      `/api/me` ne le publie pas (ollama/ollama#12532).
-	    - Antigravity : un clic ouvre un TERMINAL interactif où `agy` tourne,
-	      prêt à recevoir `/usage` — son quota ne s'affiche nulle part ailleurs
-	      (aucune page web, aucun mode headless ; vérifié le 2026-09-21). Un
-	      trou à sa place ferait la seule ligne des quatre sans rien (décision
-	      d'Ahmed du même jour : les quatre lignes portent chacune leur
-	      accès à l'usage). */
+	/** The usage icon, left of the action, on a SIGNED-IN row only
+	    (anywhere else it would only open a failure):
+	    - Claude Code, Codex and Antigravity: hovering (or focusing) opens the
+	      popover of gauges read by the main process. Antigravity's quota, per
+	      model group, is read there since 2026-10-17; it used to open a
+	      terminal on agy's `/usage`.
+	    - Ollama: a click opens `ollama.com/settings` in the browser, the only
+	      page where Ollama shows its session and weekly usage; `/api/me` does
+	      not publish it (ollama/ollama#12532). */
 	function poserIconeUsage(droite: HTMLElement, etat: EtatCompte): void {
 		if (!etat.connecte) return;
 		const icone = ajouter(droite, "button", "nq-comptes-usage");
@@ -561,32 +557,8 @@ export function monterReglagesComptes(section: HTMLElement): () => void {
 			});
 			return;
 		}
-		if (etat.outil === "agy") {
-			icone.setAttribute("aria-label", t("app.comptes.usageTerminal"));
-			icone.title = t("app.comptes.usageTerminal");
-			icone.addEventListener("click", () => {
-				void requireHost("process").terminalUsageCli("agy").then((verdict) => {
-					/* « indisponible » : hors Windows, ou le terminal n'a pas pu
-					   être lancé — une Notice, jamais un bouton mort. */
-					if (verdict !== "lance") { currentHost().ui.notice(t("app.comptes.usageTerminalFailed")); return; }
-					/* LA CONSIGNE VIENT DE L'APPLICATION, PAS DU TERMINAL (mesuré
-					   le 2026-09-21) : `agy` peint son interface sur l'ÉCRAN
-					   ALTERNATIF du terminal, ce qui EFFACE la ligne que le
-					   script y écrit avant de le lancer — elle ne reparaît qu'à
-					   la sortie du CLI, quand elle ne sert plus. Une Notice, elle,
-					   vit dans une fenêtre qu'`agy` ne peut pas repeindre. Elle
-					   annonce aussi la configuration du PREMIER lancement : tant
-					   qu'elle n'est pas faite, `agy` ouvre son assistant (choix du
-					   thème, conditions d'utilisation) au lieu de son invite, et
-					   `/usage` n'est pas encore atteignable. */
-					currentHost().ui.notice(t("app.comptes.usageTerminalOpened"));
-				}).catch((e: unknown) => {
-					console.warn(LOG_PREFIX, "terminal d'usage Antigravity impossible:", e);
-					currentHost().ui.notice(t("app.comptes.usageTerminalFailed"));
-				});
-			});
-			return;
-		}
+		/* Antigravity: its quota is read like the two others since 2026-10-17
+		   (`comptes.ts` of the main process), per model group; no terminal. */
 		icone.setAttribute("aria-label", t("app.comptes.usageOf", { name: nomOutil(etat.outil) }));
 		attacherPopoverUsage(icone, etat.outil);
 	}

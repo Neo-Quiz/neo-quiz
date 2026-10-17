@@ -938,7 +938,7 @@ export interface Pont {
 		comptesEtat(outils?: EtatCompte["outil"][]): Promise<EtatCompte[]>;
 		/** Les quotas d'un compte. Le jeton qui les obtient ne quitte jamais le
 		    principal. */
-		comptesUsage(tool: "claude" | "codex"): Promise<UsageRead>;
+		comptesUsage(tool: "claude" | "codex" | "agy"): Promise<UsageRead>;
 		/** Codex banked resets: `read` lists them, `consume` spends one. The
 		    request is judged by the main process (action + a credit id seen in
 		    the last read); nothing else crosses. */
