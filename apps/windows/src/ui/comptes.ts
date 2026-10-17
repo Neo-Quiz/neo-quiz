@@ -30,7 +30,7 @@ import { pont } from "../host/pont";
 import { CLE_REGLAGES_IA } from "../../electron/pont";
 import { LOG_PREFIX } from "../../../../src/branding";
 import type { UsageRead, UsageReadError, UsageRow } from "../../../../src/dashboard/usage-format";
-import { usageRowLabel, formatResetMoment, formatAge, formatDuration } from "../../../../src/dashboard/usage-format";
+import { usageGroups, usageWindowTitle, formatResetMoment, formatAge, formatDuration } from "../../../../src/dashboard/usage-format";
 
 /** L'ordre d'affichage, fixé par le cahier des charges — jamais celui que
     rendrait `etatComptes()` (qui ne connaît pas Ollama). */
@@ -251,7 +251,7 @@ function classeSeuil(pct: number): string {
 function poserLigneUsage(pop: HTMLElement, row: UsageRow): void {
 	const ligneUsage = ajouter(pop, "div", "nq-usage-row");
 	const info = ajouter(ligneUsage, "div", "nq-usage-row-info");
-	ajouter(info, "div", "nq-usage-row-label", usageRowLabel(row));
+	ajouter(info, "div", "nq-usage-row-label", usageWindowTitle(row));
 	const reset = formatResetMoment(row.resetsAt, currentLang());
 	if (reset) ajouter(info, "div", "nq-usage-row-reset", t("app.comptes.usage.resetsAt", { moment: reset }));
 	ajouter(ligneUsage, "span", "nq-usage-row-pct", t("ai.usage.usedPercent", { n: Math.round(row.usedPercent) }));
@@ -300,7 +300,15 @@ function poserUsagePopoverContenu(pop: HTMLElement, outil: OutilAvecUsage, entre
 		ajouter(pop, "p", "nq-usage-error", t("app.comptes.usage.errorUnavailable"));
 		return;
 	}
-	for (const row of entree.resultat.rows) poserLigneUsage(pop, row);
+	// One section per model group (Antigravity), its name and note as the heading.
+	for (const section of usageGroups(entree.resultat.rows)) {
+		if (section.group) {
+			const tete = ajouter(pop, "div", "nq-usage-group");
+			ajouter(tete, "div", "nq-usage-group-name", section.group);
+			if (section.note) ajouter(tete, "div", "nq-usage-group-note", section.note);
+		}
+		for (const row of section.rows) poserLigneUsage(pop, row);
+	}
 	if (outil === "codex") {
 		// Codex n'a pas d'état courant : la lecture vient du dernier fichier
 		// de session écrit sur disque, une photo prise au dernier LANCEMENT du

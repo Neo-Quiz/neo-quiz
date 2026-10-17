@@ -4658,6 +4658,34 @@
 	padding-bottom: 0;
 }
 
+/* A model group (Antigravity, 2026-10-17): its name and the provider's note
+   head its windows, as agy's `/usage`; the windows then name only their span. */
+.qbd-usage-pop-group {
+	padding: 14px 0 2px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.qbd-usage-pop-group-name {
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+.qbd-usage-pop-group-note {
+	margin-top: 2px;
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+.qbd-usage-pop-group ~ .qbd-usage-pop-win {
+	padding-left: 12px;
+}
+
+.qbd-usage-pop-group + .qbd-usage-pop-win {
+	border-top: none;
+	padding-top: 8px;
+}
+
 .qbd-usage-pop-top {
 	display: flex;
 	justify-content: space-between;

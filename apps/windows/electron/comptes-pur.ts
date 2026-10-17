@@ -357,6 +357,8 @@ export function usageAntigravityDepuisResume(corps: unknown): UsageRow[] {
 	for (const g of groupes.slice(0, 12)) {
 		if (!g || typeof g !== "object") continue;
 		const nom = (g as { displayName?: unknown }).displayName;
+		const desc = (g as { description?: unknown }).description;
+		const note = typeof desc === "string" && desc.trim() ? desc.trim().slice(0, 200) : undefined;
 		const seaux = (g as { buckets?: unknown }).buckets;
 		if (typeof nom !== "string" || !nom.trim() || !Array.isArray(seaux)) continue;
 		for (const b of seaux.slice(0, 6)) {
@@ -370,7 +372,7 @@ export function usageAntigravityDepuisResume(corps: unknown): UsageRow[] {
 			// Proto JSON omits a zero fraction: a bucket without one is spent.
 			const restant = typeof f === "number" && Number.isFinite(f) ? Math.min(1, Math.max(0, f)) : 0;
 			const intact = restant >= 1;
-			rows.push({ kind, group: nom.trim().slice(0, 60), usedPercent: Math.round((1 - restant) * 1000) / 10, resetsAt: intact ? null : reset });
+			rows.push({ kind, group: nom.trim().slice(0, 60), ...(note ? { groupNote: note } : {}), usedPercent: Math.round((1 - restant) * 1000) / 10, resetsAt: intact ? null : reset });
 		}
 	}
 	return rows;

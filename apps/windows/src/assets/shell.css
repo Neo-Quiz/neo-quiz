@@ -1033,6 +1033,35 @@ label.nq-set-ligne {
 	margin-bottom: 0;
 }
 
+/* A model group (Antigravity, 2026-10-17): its name and note head its windows. */
+.nq-usage-group {
+	margin: 12px 0 8px;
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.nq-usage-titre + .nq-usage-group {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+
+.nq-usage-group-name {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+.nq-usage-group-note {
+	margin-top: 2px;
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.nq-usage-group ~ .nq-usage-row {
+	padding-left: 10px;
+}
+
 .nq-usage-row-info {
 	min-width: 0;
 }

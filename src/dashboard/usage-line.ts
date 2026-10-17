@@ -4,7 +4,7 @@ import { currentHost } from "../host/current";
 import { PROVIDERS, setBrandLogo } from "./ai-providers";
 import { cadenceRateLimited, cadenceSuccess, cadenceVerdict, newCadence } from "./usage-cadence";
 import type { Cadence } from "./usage-cadence";
-import { formatAge, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
+import { formatAge, usageGroups, usageWaitText, usageLevel, usageRemainingPercent, usageResetIn, usageResetText, usageShortLabel, usageStatusRows, usageWindowTitle } from "./usage-format";
 import type { UsageRead } from "./usage-format";
 import type { UsageSnapshot } from "./auto-learn-gate";
 import { spendable } from "./codex-resets";
@@ -256,7 +256,15 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		if (!verdict.ok && verdict.reason === "backoff") ajouter(pop, "div", "qbd-usage-pop-note", t("ai.usage.rateLimited", { when: usageWaitText(verdict.waitMs) }));
 		// Signed out: the last numbers belong to the account that left, not shown.
 		const signedOut = emails.get(tool)?.connecte === false;
-		for (const row of cur && !signedOut ? usageStatusRows(cur.rows) : []) {
+		/* One section per model group (Antigravity, 2026-10-17): its name and the
+		   provider's note as the heading, as agy's `/usage` shows them. */
+		const sections = usageGroups(cur && !signedOut ? usageStatusRows(cur.rows) : []);
+		for (const section of sections) for (const [i, row] of section.rows.entries()) {
+			if (i === 0 && section.group) {
+				const tete = ajouter(pop, "div", "qbd-usage-pop-group");
+				ajouter(tete, "div", "qbd-usage-pop-group-name", section.group);
+				if (section.note) ajouter(tete, "div", "qbd-usage-pop-group-note", section.note);
+			}
 			const pct = Math.max(0, Math.min(100, Math.round(row.usedPercent)));
 			const sec = ajouter(pop, "div", "qbd-usage-pop-win");
 			const top = ajouter(sec, "div", "qbd-usage-pop-top");

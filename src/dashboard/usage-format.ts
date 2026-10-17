@@ -33,6 +33,9 @@ export interface UsageRow {
 	    (Antigravity's "Gemini Models", "Claude and GPT models", 2026-10-17):
 	    one provider, several groups, each with its 5-hour and weekly window. */
 	group?: string;
+	/** The provider's line under the group's name ("Models within this
+	    group: Gemini Flash, Gemini Pro"), data of the API, shown as text. */
+	groupNote?: string;
 	/** kind "monthly" (Ollama's included usage, 2026-10-17): the amounts as
 	    Ollama writes them, e.g. "$19.63 of $60"; a percentage of a budget in
 	    dollars says little on its own. */
@@ -266,7 +269,8 @@ export function usageStatusRows(rows: UsageRow[]): UsageRow[] {
 	const groupes = [...new Set(rows.map(r => r.group ?? ""))];
 	return rows
 		.filter(r => r.kind === "session" || r.kind === "weekly-all" || r.kind === "window" || r.kind === "monthly" || (r.kind === "weekly-model" && rows.every(x => x.kind === "weekly-model")))
-		.sort((a, b) => groupes.indexOf(a.group ?? "") - groupes.indexOf(b.group ?? "") || span(a) - span(b));
+		// Inside a group, the provider's own order (weekly first, as agy's `/usage`).
+		.sort((a, b) => groupes.indexOf(a.group ?? "") - groupes.indexOf(b.group ?? "") || (a.group ? 0 : span(a) - span(b)));
 }
 
 /** Short window label: "5h" / "7d" ("7j" in French), translated at render time. */
@@ -298,7 +302,8 @@ function groupeCourt(g: string): string {
 }
 
 export function usageWindowTitle(row: UsageRow): string {
-	if (row.group) return groupeCourt(row.group) + " · " + usageWindowTitle({ ...row, group: undefined });
+	// The group is the heading of its section (`usageGroups`): never repeated on each row.
+	if (row.group) return usageWindowTitle({ ...row, group: undefined });
 	if (row.kind === "weekly-model" || row.kind === "monthly") return usageRowLabel(row);
 	const mins = row.kind === "session" ? 300 : row.kind === "weekly-all" ? 10080 : (row.windowMinutes || 0);
 	if (mins === 10080) return t("ai.usage.limitWeekly");
@@ -331,4 +336,18 @@ export function usageWaitText(ms: number): string {
 	const s = Math.max(1, Math.ceil(ms / 1000));
 	if (s < 60) return t("ai.usage.seconds", { n: s });
 	return t("ai.usage.durationMinutes", { m: Math.ceil(s / 60) });
+}
+
+/** The rows of a popover in sections: one per model group (its name and the
+    provider's note as the heading), in order; rows without a group form one
+    section without a heading. */
+export function usageGroups(rows: UsageRow[]): { group: string | null; note: string | null; rows: UsageRow[] }[] {
+	const out: { group: string | null; note: string | null; rows: UsageRow[] }[] = [];
+	for (const row of rows) {
+		const g = row.group ?? null;
+		let s = out.find(x => x.group === g);
+		if (!s) { s = { group: g, note: row.groupNote ?? null, rows: [] }; out.push(s); }
+		s.rows.push(row);
+	}
+	return out;
 }
