@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-10-17
+
 ### Changed
 
 - The Explain chat shows the agent mode chip (Full access...) like the AI page, and an open quiz reloads by itself, where you are, when the AI edits its note.
