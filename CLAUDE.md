@@ -354,11 +354,12 @@ Le DÉTAIL — le défaut réel que chaque contrôle empêche — vit dans
   (`dashboard/generation-queue-store.ts`), et restaurée par
   `restaurer` (`check:file-generation`). Dans la CI.
 - `npm run check:live-protocol` — le PROTOCOLE d'une session Claude Code live
-  (`live-claude.ts`, `argumentsLiveClaude` de `gabarits-cli.ts`) : un lancement avec les
-  réglages du projet (`--setting-sources user,project` ferait tourner un hook planté dans
-  la racine synchronisée), une option glissée dans la ligne de lancement, une réponse de
-  contrôle hostile prise pour une demande de permission ; côté Codex, un lancement sans la
-  racine déclarée non fiable (`argsLiveCodex`). Dans la CI.
+  (`live-claude.ts`, `argumentsLiveClaude` de `gabarits-cli.ts`) : un lancement qui ne
+  chargerait pas les réglages comme un terminal (« comme dans Warp », 2026-10-17), une
+  option glissée dans la ligne de lancement (sources de réglages restreintes, MCP, dossier
+  ajouté), une réponse de contrôle hostile prise pour une demande de permission ; côté
+  Codex, un lancement qui ne serait pas exactement celui du dossier privé (`argsLiveCodex`).
+  Dans la CI.
 - `npm run check:run-store` — le magasin des runs (`run-store.ts`, `userData/runs/`) : un
   identifiant de run qui devient un chemin hors du magasin, deux écritures concurrentes
   dont les lignes s'entrelacent, un fichier qui dépasse son plafond, une ligne abîmée qui
@@ -1037,56 +1038,60 @@ du réseau et hors réseau local demande une confirmation NATIVE, et
 `aiMentionExtraFolders` doit déjà être au périmètre. Sans elle, un rendu
 compromis obtenait un hôte Internet dans la liste au lancement suivant.
 
-**Claude Code et Codex tournent en AGENTS dans un dossier de confiance** (décision
-d'Ahmed du 2026-10-10, « comme si on avait lancé un terminal PowerShell dedans »,
-risque d'injection de consigne par un fichier reçu expliqué et accepté) : le
-réglage `aiAgentMode` (pastille du composer, comme MonoCode : Supervisé = lecture
-seule, Modifications auto, Auto, Accès complet, défaut Accès complet) choisit la
-forme d'appel, une par mode, mesurée sur Claude Code 2.1.296 et Codex 0.162.1
-(`src/host/claude-outils.ts` côté page, `gabarits-cli.ts` côté principal,
-comparés par `check:partage`). Sous Windows, `-s workspace-write` de Codex reste
-en lecture seule : ses modes du milieu passent par `--approve-for-me`. Ce qui
-reste : forme exacte, dossier approuvé et jugé, `.neo-quiz/` refusé aux outils de fichiers, le travail de l'IA
-affiché OUVERT et résumé comme MonoCode (« Projet exploré · 6 outils utilisés »).
-La forme Supervisé est l'ancienne forme lecture seule ci-dessous. Hors dossier de
-confiance, le CLI est lancé **sans aucun outil**. Le dossier de confiance
-(depuis le 2026-10-09) : avant la première génération qui vise un dossier, la page pose
-la question dans SA modale (depuis le 2026-10-11 : la boîte native Windows, claire et
-qui sonne, a été jugée pas professionnelle ; Claude Code et MonoCode demandent dans
-leur interface) ; sur « Faire confiance », le PRINCIPAL (`canaux.ts`, `confiance(dossier, true)`)
-résout le dossier, vérifie le périmètre et garde la réponse (chemin et `realpath`) sous la clé réservée
-`aiTrustedFolders` (`confiance-ia.ts`) ; le rendu ne fait que demander. Approuvé,
-le CLI tourne avec `cwd` = ce dossier, jugé par le principal (résolu, au
-périmètre, couvert par un dossier approuvé), et la forme d'appel unique de
-`gabarits-cli.ts` (`argumentsAvecOutils`) : `--tools Read,Grep,Glob`,
-`--allowedTools Read(./**)`, `--disallowedTools` (Bash, Write, Edit, Task,
-WebFetch, WebSearch, `mcp__*`…), `--permission-mode dontAsk`,
-`--permission-prompts none`, `--restricted`, `--setting-sources ""`,
-`--settings {"disableAllHooks":true}`, `--strict-mcp-config` avec un
-`--mcp-config` vide, et `--add-dir` du seul dossier des pièces jointes. Chaque
-appel d'outil et son résultat (refus compris) s'affichent dans le bloc replié
-« Travail de l'IA » (`transcript.ts`). Le chat « Expliquer » tourne de la même façon depuis le 2026-10-14 (décision d'Ahmed : « il ne doit plus être lancé sans tools ») : UN chat par quiz, enregistré comme les chats de la page « IA » (ex-« Générer », renommée le même jour) avec une marque `explain` (`chat-record.ts`, relue comme hostile depuis les fichiers synchronisés, `foreign` pour un quiz hors de la racine des chats) ; chaque message est une ligne de la file de génération marquée `explication` (`file-generation-app.ts`, `expliquer`), tour de la session live du chat dans la racine (une session neuve reçoit tout le texte tant qu'elle n'a pas reçu un tour : `Session.primed`), sinon un appel ponctuel avec tout l'historique ; chaque message porte À LA FIN la slide où l'élève se trouve (`positionCourante`), la méthode d'explication et la consigne d'édition de cette question ; le composer est fermé sur une question pas encore corrigée (`composerOpen`, `src/explain-follow.ts`) ; le travail de l'IA reste visible (`peindreTravailEnregistre`). Noyau pur : `src/dashboard/explain-chat.ts`. Antigravity, Ollama, la clarification
-et toute demande venue d'un autre appareil restent sans outil. Sinon, le modèle ne peut ouvrir aucun fichier. C'est
-l'APPLICATION qui lit les sources — `dashboard/prompt-paths.ts` résout les chemins écrits
-dans le composer (vault, chemin absolu, racine externe configurée) et
-`startGeneration` les attache via les mêmes fonctions que le picker « @ ». Un chemin
-introuvable ou ambigu est signalé par une Notice, jamais ignoré en silence.
+**Les quatre fournisseurs tournent COMME DANS UN TERMINAL** (décision d'Ahmed du
+2026-10-17, « exactement comme si je l'avais lancé dans Warp », qui remplace le
+confinement du 2026-10-10) : tout appel parti DE CE PC — génération, chat de la page
+IA, « Expliquer », sessions live — charge les réglages, hooks, skills, serveurs MCP et
+CLAUDE.md de l'utilisateur, sans aucune restriction ajoutée par Neo Quiz ; seul compte
+le mode de la pastille (`aiAgentMode` : Supervisé, Modifications auto, Auto, Accès
+complet, défaut Accès complet). Il tourne dans le dossier du quiz (`cwd`), sans
+question de confiance : le principal vérifie seulement que le dossier est au
+périmètre (`dossierOutilsJuge`, `canaux.ts`). Formes, une par mode, dans
+`src/host/claude-outils.ts` (page) et `gabarits-cli.ts` (principal), comparées par
+`check:partage` : Claude Code `--permission-mode dontAsk` / `acceptEdits` / `auto`
+(avec `--permission-prompts none`) / `--dangerously-skip-permissions` (modes de Claude
+Code 2.1.302 : acceptEdits, auto, bypassPermissions, manual, dontAsk, plan) ; Codex
+`-s read-only` / `--approve-for-me` / `--dangerously-bypass-approvals-and-sandbox`,
+sans `--ignore-user-config` (sous Windows, `-s workspace-write` reste en lecture
+seule) ; Antigravity `--mode plan` / `accept-edits` / `auto` /
+`--dangerously-skip-permissions` (mesuré : plan lit sans écrire, accept-edits écrit
+sans lancer de commande, auto retombe sur accept-edits pour ce compte) ; Ollama
+TOURNE DANS CLAUDE CODE (comme `ollama launch claude`) : la page envoie `ollama: true`,
+le principal pose `ANTHROPIC_BASE_URL` sur le serveur Ollama LOCAL de ses propres
+réglages (`ollamaLocal`, loopback http seulement), `ANTHROPIC_AUTH_TOKEN=ollama` et une
+clé vide. Le travail de l'IA (outils, fichiers, commandes) s'affiche OUVERT et résumé
+comme MonoCode (`transcript.ts`, décodeurs Claude, Codex et Antigravity). Le chat
+« Expliquer » : UN chat par quiz, enregistré comme les chats de la page « IA » avec une
+marque `explain` (`chat-record.ts`, relue comme hostile depuis les fichiers
+synchronisés, `foreign` pour un quiz hors de la racine des chats) ; chaque message est
+une ligne de la file marquée `explication` (`file-generation-app.ts`), tour de la
+session live du chat dans la racine (une session neuve reçoit tout le texte tant
+qu'elle n'a pas reçu un tour : `Session.primed`), sinon un appel ponctuel avec tout
+l'historique ; il porte À LA FIN la slide où l'élève se trouve (`positionCourante`) ;
+le composer est fermé sur une question pas encore corrigée (`composerOpen`). Noyau
+pur : `src/dashboard/explain-chat.ts`.
 
-**Sessions live Claude Code et Codex** (décision d'Ahmed du 2026-10-11, comme MonoCode) :
-elles chargent les réglages, hooks, skills et serveurs MCP PROPRES À L'UTILISATEUR —
-Claude Code avec `--setting-sources user`, Codex avec `~/.codex` partagé par un dossier
-privé `userData/codex-home/` (`codex-home.ts`). Elles ne chargent JAMAIS la configuration
-projet de la racine Neo Quiz : le `.stignore` racine exclut `.claude/`, `.mcp.json`,
-`.codex/` et `/.obsidian` (`syncthing-regles.ts`), pour qu'un hook planté par un autre
-appareil ne tourne pas sur ce PC et que chaque appareil garde son espace de travail.
-Pour Codex, la racine est en plus déclarée NON FIABLE au lancement (`-c projects=…
-trust_level="untrusted"`, `argsLiveCodex`) : sans elle, un `thread/start` en Accès complet
-(ou Modifications auto, Auto) inscrit lui-même la racine comme fiable dans
-`CODEX_HOME/config.toml` et charge son `.codex/config.toml` (mesuré sur codex-cli 0.162.1,
-`check:live-protocol`).
+**Ce qui reste bridé, et pourquoi** : une ligne que PERSONNE au PC n'a lancée — une
+demande venue d'un autre appareil (jamais de dossier, donc sans outil) ou une ligne
+automatique (`neverAskTrust` : la forme lecture seule confinée `ARGS_OUTILS_CLAUDE`,
+Codex avec `--ignore-user-config`, seulement dans un dossier déjà approuvé de
+`aiTrustedFolders`) — car un fichier reçu ne doit pas lancer un agent sans limites. La
+clarification (`appelCourt`) reste un appel court sans outil (30 s). Antigravity sans
+outils tourne en `--mode plan` dans un dossier VIDE à lui (`dossierVideAgy`). Et la
+synchro ne reçoit JAMAIS de configuration IA d'un autre appareil, à toute profondeur :
+`.claude`, `.mcp.json`, `.codex`, `.agents`, `.agent` (`syncthing-regles.ts`), puisque
+les CLI chargent désormais la configuration de projet comme un terminal.
+
+**Sessions live Claude Code et Codex** (2026-10-11, comme MonoCode ; « comme dans
+Warp » depuis le 2026-10-17) : Claude Code charge toutes ses sources de réglages (plus
+de `--setting-sources user`, plus de refus de `.neo-quiz/`), Codex partage `~/.codex`
+par un dossier privé `userData/codex-home/` (`codex-home.ts`) et la racine n'est plus
+déclarée non fiable (`argsLiveCodex`). C'est l'APPLICATION qui lit les sources jointes
+au composer — `dashboard/prompt-paths.ts` résout les chemins écrits (vault, chemin
+absolu, racine externe configurée) et `startGeneration` les attache comme le picker
+« @ » ; un chemin introuvable ou ambigu est signalé par une Notice, jamais ignoré.
 Chaque ligne d'une session est gardée dans `userData/runs/` (`run-store.ts`), jamais sous
-la racine. Les appels ponctuels (génération, clarification, « Expliquer ») gardent les
-formes isolées décrites plus haut.
+la racine.
 
 ## Composants UI (règles)
 

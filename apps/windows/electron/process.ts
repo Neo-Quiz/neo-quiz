@@ -2285,13 +2285,6 @@ export function envOllama(base: string): Record<string, string> {
 	return { ANTHROPIC_BASE_URL: base, ANTHROPIC_AUTH_TOKEN: "ollama", ANTHROPIC_API_KEY: "" };
 }
 
-/** No inherited `ANTHROPIC_*` variable (a model, another server, a key)
-    reaches Claude Code when it runs on Ollama: only `envOllama`'s three. */
-function sansAnthropic(e: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-	for (const k of Object.keys(e)) if (k.toUpperCase().startsWith("ANTHROPIC_")) delete e[k];
-	return e;
-}
-
 /** An empty folder for agy without tools, made once per run of the app. */
 let videAgy: string | null = null;
 function dossierVideAgy(): string {
@@ -2416,7 +2409,7 @@ export async function run(spec: {
 				signal: spec.signal,
 				timeoutMs: spec.timeoutMs,
 				env: spec.tool === "claude"
-					? Object.assign(spec.ollama ? sansAnthropic(environnementEnfant(env)) : environnementEnfant(env), ENV_SORTIE_CLAUDE, spec.ollama ? envOllama(spec.ollama) : {})
+					? Object.assign(environnementEnfant(env), ENV_SORTIE_CLAUDE, spec.ollama ? envOllama(spec.ollama) : {})
 					: environnementEnfant(env),
 				/* agy without tools runs in an EMPTY folder of its own (2026-10-17):
 				   its plan mode writes nothing, but it still reads, and the home

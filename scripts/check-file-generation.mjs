@@ -472,7 +472,8 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const l2 = file.lignes()[0];
 	r.check("a wrong count of quizzes: the line fails with the reason, nothing is saved",
 		[l2.etat, l2.echec, /2 quizzes for 3 documents/.test(l2.erreur ?? ""), ecrits.size], ["echouee", "generation", true, 0]);
-	r.check("the Claude call carries --strict-mcp-config and no --mcp-config", [appels[0].args.includes("--strict-mcp-config"), appels[0].args.includes("--mcp-config")], [true, false]);
+	// As in a terminal (2026-10-17): a call from this PC loads the user's own MCP servers, and the app adds none.
+	r.check("the Claude call from this PC narrows no MCP config and adds none", [appels[0].args.includes("--strict-mcp-config"), appels[0].args.includes("--mcp-config")], [false, false]);
 	/* Defence in depth: a line from another device never launches a provider with live tools. */
 	file.fermer(l2.id);
 	const avant = appels.length;

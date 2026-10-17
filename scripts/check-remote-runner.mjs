@@ -197,7 +197,11 @@ await withSrcModule(["src/dashboard/remote-runner.ts", "src/dashboard/chat-reque
 		// The Claude call used for a remote request (no image) carries the no-tool flag.
 		const { readFileSync } = await import("node:fs");
 		const ai = readFileSync("src/dashboard/ai-client.ts", "utf8");
-		r.check("ai-client grants Claude no tool unless an image is attached (confined Read) or a trusted folder", ai.includes('["--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"]') && ai.includes("? ARGS_IMAGES_CLAUDE") && ai.includes("proc.trustFolder(dossier)"), true);
+		/* A remote request never carries a folder (the queue drops it), so it never
+		   gets the PC's "as in a terminal" agent forms (2026-10-17). */
+		const fileGen = readFileSync("src/dashboard/file-generation-app.ts", "utf8");
+		r.check("ai-client grants Claude no tool unless an image is attached (confined Read) or a folder, and a remote line never carries a folder",
+			ai.includes('["--tools", "", "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config"]') && ai.includes("? ARGS_IMAGES_CLAUDE") && (fileGen.match(/dossier: d\.fromDevice \? undefined/g) ?? []).length >= 3, true);
 	}
 	{ // Interrupted by a restart
 		const g = rig(); g.log.list = [{ id: "lq3k2-int001", from: PH, at: NOW - 600_000 }]; g.setIncoming([file("lq3k2-int001")]);

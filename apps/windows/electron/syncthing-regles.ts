@@ -52,14 +52,15 @@ export const IGNORES: readonly string[] = [
 	/* The STAGING folder of an import (`share-import.ts`, `<parent>/.import-<id>`):
 	   only the finished folder, once renamed into place, may reach another device. */
 	"(?d).import-*",
-	/* Project AI config of the synced root. Live sessions load only the user's
-	   own settings (Claude Code `--setting-sources user`; Codex with the root
-	   marked untrusted, `argsLiveCodex`), never these, so a paired device must
-	   not be able to plant a hook, an MCP server or an exec policy that would
-	   run on this PC. */
-	"/.claude",
-	"/.mcp.json",
-	"/.codex",
+	/* Project AI config, AT ANY DEPTH (2026-10-17). The CLIs launched from this
+	   PC load project settings as a terminal would ("exactly as if launched in
+	   Warp", the owner's decision), in the root and in any course folder, so a
+	   paired device must never be able to plant a hook, an MCP server or an
+	   exec policy there: these files are never received, each device keeps
+	   its own. */
+	".claude",
+	".mcp.json",
+	".codex",
 	/* Antigravity's project config (2026-10-17): `.agents/` holds its MCP
 	   servers and skills, and agy runs as an agent IN a course folder, so at
 	   any depth, not only at the root. */

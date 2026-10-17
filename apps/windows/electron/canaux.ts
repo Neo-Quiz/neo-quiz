@@ -1638,14 +1638,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	const approuves = async () => lireApprouves(await reglagesOuErreur().lire(CLE_CONFIANCE_IA));
 	/** The resolved working folder of a tools run, or `undefined` when the
 	    folder it names is not a folder, not in the perimeter, or not trusted. */
+	/* AS IN A TERMINAL (2026-10-17, the owner's decision): a CLI launched from
+	   this PC runs in any folder of the perimeter, without the trust question;
+	   the folder must still resolve to a folder the app opened. The trusted
+	   list (`aiTrustedFolders`) still answers `isFolderTrusted`, which a line
+	   nobody at this PC asked for reads before it may get tools. */
 	async function dossierOutilsJuge(dossier: unknown): Promise<string | undefined> {
 		const c = await dossierCanonique(dossier);
-		const ok = jugerDossierOutils({
-			reel: c?.real ?? null,
-			estDossier: c !== null,
-			dansPerimetre: c !== null && await perimetre.contient(c.real),
-			approuves: await approuves(),
-		});
+		const ok = c !== null && await perimetre.contient(c.real);
 		return ok && c ? path.resolve(c.real) : undefined;
 	}
 	/* THE QUESTION IS ASKED IN THE APP (2026-10-11): the native dialog (a light

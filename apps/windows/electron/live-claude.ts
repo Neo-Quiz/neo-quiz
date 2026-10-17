@@ -10,10 +10,11 @@
    window never sends a raw line, a path or an argument (spec
    2026-10-11-live-cli-sessions-design, sections 4.1 and 8).
 
-   The launch loads the USER's settings only (`--setting-sources user`),
-   never `project` or `local`: the Neo Quiz root is synced, and a planted
-   `.claude/settings.json` hook would run on this PC. `gabarits-cli.ts`
-   (`argumentsLiveClaude`) accepts exactly these forms and nothing else.
+   The launch loads every settings source, as a terminal opened in the Neo
+   Quiz root would (2026-10-17, the owner's decision: "exactly as if launched
+   in Warp"); the synced root never carries `.claude/` from another device
+   (`syncthing-regles.ts`). `gabarits-cli.ts` (`argumentsLiveClaude`) accepts
+   exactly these forms and nothing else.
 
    PURE (no Node, no Electron): `npm run check:live-protocol` tests it.
 
@@ -68,8 +69,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MODEL = /^[a-z0-9][a-z0-9.\-]{0,63}$/;
 /** A level of `claude --effort`, exactly the ones its help lists. */
 const EFFORT = /^(low|medium|high|xhigh|max)$/;
-/** Same denial as the agent forms: the app's own folder stays out of reach. */
-export const NEO_QUIZ_PROTEGE = "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)";
 /** Inline settings: sessions are kept ten years, so a thread can always be
     resumed (the CLI's default deletes them after 30 days). */
 export const LIVE_SETTINGS = "{\"cleanupPeriodDays\":3650}";
@@ -91,10 +90,9 @@ export function liveClaudeArgs(o: { model: string; effort?: string; mode: ModeAg
 	return [
 		"-p", "--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
 		"--permission-prompt-tool", "stdio", "--include-partial-messages", "--replay-user-messages",
-		"--setting-sources", "user", "--settings", LIVE_SETTINGS,
+		"--settings", LIVE_SETTINGS,
 		"--model", o.model, ...(o.effort ? ["--effort", o.effort] : []),
 		...PERMISSION_MODE[o.mode],
-		"--disallowedTools", NEO_QUIZ_PROTEGE,
 		...(o.resume ? ["--resume", o.sessionId] : ["--session-id", o.sessionId]),
 	];
 }

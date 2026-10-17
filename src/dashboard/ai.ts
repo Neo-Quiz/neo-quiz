@@ -4088,7 +4088,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   which have no tools, still get them. */
 	function fournisseurAgent(): boolean {
 		const p = settings().aiProvider;
-		return (p === "claude-code" || p === "codex") && host.platform.isDesktopApp && !!host.process?.trustFolder;
+		// Antigravity and Ollama (through Claude Code) are agents too since 2026-10-17.
+		return (p === "claude-code" || p === "codex" || p === "antigravity-cli" || p === "ollama") && host.platform.isDesktopApp && !!host.process?.trustFolder;
 	}
 
 	async function rattacherDocumentsHerites(): Promise<void> {

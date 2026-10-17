@@ -71,25 +71,19 @@ export function lireModeAgent(v: unknown): ModeAgent {
 	return MODES_AGENT.includes(v as ModeAgent) ? v as ModeAgent : "full";
 }
 
-/** No settings file, no hook, no session kept, no MCP server: the same CLI
-    whatever the user's own configuration says. */
-const SANS_CONFIG: readonly string[] = [
-	"--no-session-persistence",
-	"--setting-sources", "",
-	"--settings", "{\"disableAllHooks\":true}",
-	"--strict-mcp-config",
-	"--mcp-config", "{\"mcpServers\":{}}",
-];
-/** The app's own folder (review log, chats, other devices' requests) stays out of the file tools. */
-const NEO_QUIZ_PROTEGE = "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)";
-
-/** The tail of the Claude Code call in a trusted folder, per mode. */
+/* AS IN A TERMINAL (2026-10-17, the owner's decision: "exactly as if I had
+   launched it in Warp"). A call made FROM THIS PC loads the user's own
+   settings, hooks, skills, MCP servers and CLAUDE.md, as a terminal opened in
+   the folder would; Neo Quiz adds no restriction of its own, only the mode of
+   the composer's chip. `--permission-prompts none`: headless, a prompt nobody
+   can answer is denied instead of hanging. Measured modes of Claude Code
+   2.1.302: acceptEdits, auto, bypassPermissions, manual, dontAsk, plan. */
 export function argsAgentClaude(mode: ModeAgent): readonly string[] {
 	switch (mode) {
-		case "supervised": return ARGS_OUTILS_CLAUDE;
-		case "acceptEdits": return ["--tools", "Read,Grep,Glob,Write,Edit,MultiEdit", "--disallowedTools", "Bash,PowerShell,Task,Agent,WebFetch,WebSearch,mcp__*," + NEO_QUIZ_PROTEGE, "--permission-mode", "acceptEdits", "--permission-prompts", "none", "--restricted", ...SANS_CONFIG];
-		case "auto": return ["--disallowedTools", NEO_QUIZ_PROTEGE, "--permission-mode", "auto", "--permission-prompts", "none", ...SANS_CONFIG];
-		case "full": return ["--disallowedTools", NEO_QUIZ_PROTEGE, "--dangerously-skip-permissions", ...SANS_CONFIG];
+		case "supervised": return ["--permission-mode", "dontAsk"];
+		case "acceptEdits": return ["--permission-mode", "acceptEdits", "--permission-prompts", "none"];
+		case "auto": return ["--permission-mode", "auto", "--permission-prompts", "none"];
+		case "full": return ["--dangerously-skip-permissions"];
 	}
 }
 

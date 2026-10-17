@@ -2,7 +2,7 @@ import { SIMULATOR_GUIDE } from "../interactive-page-guide";
 import JSON5 from "json5";
 import { currentHost, requireHost } from "../host/current";
 import { jetonFichier, jetonHome, jetonPieces, jetonSortie, nouveauMarqueur } from "../host/jetons";
-import { ARGS_AGY_SANS_OUTILS, ARGS_IMAGES_CLAUDE, argsAgentAntigravity, argsAgentClaude, argsAgentCodex, lireModeAgent, optionInconnue } from "../host/claude-outils";
+import { ARGS_AGY_SANS_OUTILS, ARGS_IMAGES_CLAUDE, ARGS_OUTILS_CLAUDE, argsAgentAntigravity, argsAgentClaude, argsAgentCodex, lireModeAgent, optionInconnue } from "../host/claude-outils";
 import type { ModeAgent } from "../host/claude-outils";
 import {
 	resolveClaudeModel,
@@ -1285,8 +1285,10 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			if (!ok) throw new FolderNotTrusted(dossier);
 			return true;
 		}
-		if (!proc.trustFolder) return false;
-		try { return (await proc.trustFolder(dossier)) === "trusted"; } catch (e) { console.warn("[quiz-blocks] trust check failed:", e); return false; }
+		/* A run asked FROM THIS PC runs in its folder as in a terminal
+		   (2026-10-17, "exactly as if launched in Warp"): no trust question.
+		   The main process still checks the folder is one the app opened. */
+		return !!proc.run;
 	}
 	/** The live session of the running generation or plan (`GenerateOptions.live`),
 	    or of the running chat message (`ChatOptions.live`). */
@@ -1744,7 +1746,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		const argsOutils = [
 			"-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", model,
 			...(effort ? ["--effort", effort] : []),
-			...argsAgentClaude(mode),
+			// A line nobody at this PC asked for keeps the confined read-only form.
+			...(neverAskTrust ? ARGS_OUTILS_CLAUDE : argsAgentClaude(mode)),
 			// The pictures live in the host's temporary folder: the only other folder readable.
 			...(fichiers.length > 0 ? ["--add-dir", jetonPieces(marqueur)] : []),
 		];
@@ -1919,7 +1922,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			// valeur vient de models_cache.json (service_tiers[].id).
 			...(fast ? ["-c", "service_tier=priority"] : []),
 			...(agent
-				? [...argsAgentCodex(mode), "--skip-git-repo-check", "--ignore-user-config"]
+				// The user's own Codex config, as in a terminal; never for a line nobody at this PC asked for.
+				? [...argsAgentCodex(mode), "--skip-git-repo-check", ...(neverAskTrust ? ["--ignore-user-config"] : [])]
 				: ["-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "-C", jetonHome(marqueur)]),
 			"-o", jetonSortie(marqueur),
 			...fichiers.flatMap((_, i) => ["-i", jetonFichier(marqueur, i + 1)]),

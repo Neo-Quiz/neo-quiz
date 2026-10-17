@@ -150,20 +150,18 @@ const effortClaude: Piece[] = ["--effort", (e: string) => EFFORT_CLAUDE.test(e)]
    Measured on Claude Code 2.1.296 and Codex 0.162.1 under Windows (see the
    page's copy): Codex `-s workspace-write` stays read-only on Windows, so
    its middle modes use `--approve-for-me`. */
-const SANS_CONFIG: readonly string[] = [
-	"--no-session-persistence",
-	"--setting-sources", "",
-	"--settings", REGLAGES_SANS_HOOK,
-	"--strict-mcp-config",
-	"--mcp-config", MCP_VIDE,
-];
-const NEO_QUIZ_PROTEGE = "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)";
-/** The Claude tails, one per mode; the first is the read-only form above. */
+/** The Claude tails. The first is the confined read-only form above, kept
+    for a line nobody at this PC asked for (a request of another device, an
+    automatic line). The four others are the modes of a call made FROM THIS PC
+    since 2026-10-17, "exactly as if launched in Warp" (the owner's decision):
+    the user's own settings, hooks, skills and MCP servers load, and Neo Quiz
+    adds nothing but the mode (`src/host/claude-outils.ts`, `argsAgentClaude`). */
 const QUEUES_AGENT_CLAUDE: readonly (readonly string[])[] = [
 	["--tools", OUTILS_LECTURE, ...RESTRICTIONS],
-	["--tools", "Read,Grep,Glob,Write,Edit,MultiEdit", "--disallowedTools", "Bash,PowerShell,Task,Agent,WebFetch,WebSearch,mcp__*," + NEO_QUIZ_PROTEGE, "--permission-mode", "acceptEdits", "--permission-prompts", "none", "--restricted", ...SANS_CONFIG],
-	["--disallowedTools", NEO_QUIZ_PROTEGE, "--permission-mode", "auto", "--permission-prompts", "none", ...SANS_CONFIG],
-	["--disallowedTools", NEO_QUIZ_PROTEGE, "--dangerously-skip-permissions", ...SANS_CONFIG],
+	["--permission-mode", "dontAsk"],
+	["--permission-mode", "acceptEdits", "--permission-prompts", "none"],
+	["--permission-mode", "auto", "--permission-prompts", "none"],
+	["--dangerously-skip-permissions"],
 ];
 /** The Codex sandbox options, one per mode. */
 const QUEUES_AGENT_CODEX: readonly (readonly string[])[] = [
@@ -225,8 +223,13 @@ export function argumentsAvecOutils(tool: string, args: unknown, marqueur: unkno
 		for (const queue of QUEUES_AGENT_CODEX) {
 			for (const avecRapide of [false, true]) {
 				// No `-C`: the agent works in the folder the main process runs it in.
-				const base: Piece[] = [...teteCodex(), ...(avecRapide ? RAPIDE_CODEX : []), ...queue, "--skip-git-repo-check", "--ignore-user-config", "-o", jeton("sortie")];
-				if (a.length >= base.length && correspond(a.slice(0, base.length), base) && imagesCodex(a.slice(base.length), jeton)) return true;
+				/* With the user's config, as in a terminal (a call from this PC,
+				   2026-10-17), or without it (`--ignore-user-config`, a line
+				   nobody at this PC asked for). */
+				for (const config of [[], ["--ignore-user-config"]]) {
+					const base: Piece[] = [...teteCodex(), ...(avecRapide ? RAPIDE_CODEX : []), ...queue, "--skip-git-repo-check", ...config, "-o", jeton("sortie")];
+					if (a.length >= base.length && correspond(a.slice(0, base.length), base) && imagesCodex(a.slice(base.length), jeton)) return true;
+				}
 			}
 		}
 	}
@@ -313,9 +316,11 @@ const ABSOLU = /^(?:[A-Za-z]:[\\/]|\\\\|\/)/;
 export function argsLiveCodex(home: string, root: string): string[] {
 	if (typeof home !== "string" || !ABSOLU.test(home)) throw new Error("The private Codex home must be an absolute path");
 	if (typeof root !== "string" || !ABSOLU.test(root)) throw new Error("The root must be an absolute path");
-	// Lowercase: the form Codex itself writes for a Windows trust key.
-	const untrusted = "projects={" + JSON.stringify(root.toLowerCase()) + "={trust_level=\"untrusted\"}}";
-	return ["app-server", "-c", "sqlite_home=" + JSON.stringify(home), "-c", untrusted];
+	/* No "untrusted" override any more (2026-10-17, "exactly as if launched in
+	   Warp"): Codex treats the root as the user's own config says, as in a
+	   terminal. The synced root never carries `.codex/` from another device
+	   (`syncthing-regles.ts`). */
+	return ["app-server", "-c", "sqlite_home=" + JSON.stringify(home)];
 }
 
 /** True when `args` is exactly the live Codex launch for the private home

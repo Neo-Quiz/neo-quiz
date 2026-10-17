@@ -3,9 +3,10 @@
  * and its argument form (`gabarits-cli.ts`, `argumentsLiveClaude`), on the
  * real code.
  *
- * What it prevents: a live session launched with the project's settings
- * (`--setting-sources user,project`: a `.claude/settings.json` planted in the
- * synced Neo Quiz root would run its hooks on the PC), an extra option slipped
+ * What it prevents: a live session that would not load the user's settings
+ * as a terminal does (2026-10-17, "exactly as if launched in Warp"; a
+ * `.claude/` planted by another device never arrives, `syncthing-regles.ts`),
+ * an extra option slipped
  * into the launch (`--mcp-config`, `--add-dir`), an effort or a session id that
  * would become an option of its own, a stdin line split in two by a newline
  * in the user's text, and a hostile control line (prototype keys, wrong
@@ -20,11 +21,9 @@
  * permissions request takes `permissions`, not `decision`), and a drift from
  * the lines a real Codex session exchanged
  * (`scripts/fixtures/live/codex-session.jsonl`). Its launch form
- * (`argsLiveCodex`) is checked too: only the private home and the root vary,
- * quoted; the root is always marked untrusted for Codex (a planted
- * `<root>/.codex/config.toml` is never loaded); the user's own home (a bare
- * `app-server`), a form without the untrusted root, or an extra override is
- * refused.
+ * (`argsLiveCodex`) is checked too: only the private home varies, quoted; no
+ * "untrusted" override since 2026-10-17 (as in a terminal); the user's own
+ * home (a bare `app-server`) or an extra override is refused.
  *
  *     npm run check:live-protocol
  */
@@ -32,7 +31,7 @@ import { readFileSync } from "node:fs";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/electron/gabarits-cli.ts"], (live, gabarits) => {
-	const { liveClaudeArgs, claudeUserLine, claudeControlLine, claudePermissionLine, claudeEmptyControlResponse, parseClaudeControl, NEO_QUIZ_PROTEGE } = live;
+	const { liveClaudeArgs, claudeUserLine, claudeControlLine, claudePermissionLine, claudeEmptyControlResponse, parseClaudeControl } = live;
 	const { argumentsLiveClaude } = gabarits;
 	const r = makeReporter("Live Claude session protocol");
 	const U = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -43,18 +42,17 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 	r.check("args: full access, new session, exact form", full, [
 		"-p", "--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
 		"--permission-prompt-tool", "stdio", "--include-partial-messages", "--replay-user-messages",
-		"--setting-sources", "user", "--settings", "{\"cleanupPeriodDays\":3650}",
+		"--settings", "{\"cleanupPeriodDays\":3650}",
 		"--model", "claude-opus-5-5",
 		"--permission-mode", "bypassPermissions", "--allow-dangerously-skip-permissions",
-		"--disallowedTools", NEO_QUIZ_PROTEGE,
 		"--session-id", U,
 	]);
-	r.check("args: the protected folder is the app's own .neo-quiz/",
-		NEO_QUIZ_PROTEGE, "Read(./.neo-quiz/**),Grep(./.neo-quiz/**),Glob(./.neo-quiz/**),Write(./.neo-quiz/**),Edit(./.neo-quiz/**),MultiEdit(./.neo-quiz/**)");
+	r.check("args: as in a terminal, no setting source is narrowed and nothing is denied by the app",
+		[full.includes("--setting-sources"), full.includes("--disallowedTools"), full.includes("--strict-mcp-config")], [false, false, false]);
 
 	const modeTail = (mode) => {
 		const a = liveClaudeArgs({ model: "claude-opus-5-5", mode, sessionId: U, resume: false });
-		return a.slice(a.indexOf("--permission-mode"), a.indexOf("--disallowedTools"));
+		return a.slice(a.indexOf("--permission-mode"), a.indexOf("--session-id"));
 	};
 	r.check("args: supervised asks for every tool", modeTail("supervised"), ["--permission-mode", "default"]);
 	r.check("args: accept edits", modeTail("acceptEdits"), ["--permission-mode", "acceptEdits"]);
@@ -83,8 +81,8 @@ await withSrcModule(["apps/windows/electron/live-claude.ts", "apps/windows/elect
 		forms.push(liveClaudeArgs({ model: "claude-haiku-5-5", effort, mode, sessionId: U, resume }));
 	}
 	r.check("form: every built form is accepted", forms.every(f => argumentsLiveClaude(f)), true);
-	r.check("form: project settings refused",
-		argumentsLiveClaude(full.map(a => a === "user" ? "user,project" : a)), false);
+	r.check("form: setting sources narrowed by the window refused (the PC loads them all, as a terminal)",
+		argumentsLiveClaude([...full.slice(0, 10), "--setting-sources", "user", ...full.slice(10)]), false);
 	r.check("form: an extra --mcp-config refused", argumentsLiveClaude([...full, "--mcp-config", "x"]), false);
 	r.check("form: an extra --mcp-config in the middle refused",
 		argumentsLiveClaude([...full.slice(0, 4), "--mcp-config", "x", ...full.slice(4)]), false);
@@ -198,31 +196,28 @@ await withSrcModule(["apps/windows/electron/live-codex.ts", "apps/windows/electr
 		: v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
 
 	// The launch form: the private Codex home (`codex-home.ts`) is also the SQLite
-	// home, and the root (the cwd) is UNTRUSTED for Codex: without it, a Full
-	// access `thread/start` trusts the root itself and loads `<root>/.codex/`.
+	// home. No "untrusted" root override since 2026-10-17: Codex treats the root
+	// as the user's config says, as in a terminal; another device's `.codex/`
+	// never arrives by sync (`syncthing-regles.ts`).
 	const H = "C:\\Users\\a b\\AppData\\Roaming\\Neo Quiz\\codex-home\\default";
 	const R = "C:\\Neo Quiz";
 	const UNTRUSTED = "projects={\"c:\\\\neo quiz\"={trust_level=\"untrusted\"}}";
-	r.check("launch: exact form", argsLiveCodex(H, R), ["app-server", "-c", "sqlite_home=\"C:\\\\Users\\\\a b\\\\AppData\\\\Roaming\\\\Neo Quiz\\\\codex-home\\\\default\"", "-c", UNTRUSTED]);
+	r.check("launch: exact form, the home only", argsLiveCodex(H, R), ["app-server", "-c", "sqlite_home=\"C:\\\\Users\\\\a b\\\\AppData\\\\Roaming\\\\Neo Quiz\\\\codex-home\\\\default\""]);
 	r.check("launch: the value is a TOML string that reads back as the home", JSON.parse(argsLiveCodex(H, R)[2].slice("sqlite_home=".length)), H);
-	const rootKey = (a) => JSON.parse(a[4].slice("projects={".length, a[4].length - "={trust_level=\"untrusted\"}}".length));
-	r.check("launch: the root is marked untrusted by its lowercase key (Codex's own form)", rootKey(argsLiveCodex(H, "D:\\Cours\\ÉTÉ")), "d:\\cours\\été");
 	const odd = "C:\\x\"\n -c y=1";
 	r.check("launch: a quote or a newline in the home stays inside the string",
-		[JSON.parse(argsLiveCodex(odd, R)[2].slice("sqlite_home=".length)), argsLiveCodex(odd, R).length, argsLiveCodex(odd, R)[2].includes("\n")], [odd, 5, false]);
-	const oddRoot = "C:\\r\"}} -c x=1\n";
-	r.check("launch: a quote or a newline in the root stays inside the key",
-		[rootKey(argsLiveCodex(H, oddRoot)), argsLiveCodex(H, oddRoot).length, argsLiveCodex(H, oddRoot)[4].includes("\n")], [oddRoot.toLowerCase(), 5, false]);
+		[JSON.parse(argsLiveCodex(odd, R)[2].slice("sqlite_home=".length)), argsLiveCodex(odd, R).length, argsLiveCodex(odd, R)[2].includes("\n")], [odd, 3, false]);
 	r.check("launch: an empty or relative home throws",
 		[throws(() => argsLiveCodex("", R)), throws(() => argsLiveCodex("codex-home", R)), throws(() => argsLiveCodex(null, R))], [true, true, true]);
 	r.check("launch: an empty, relative or missing root throws",
 		[throws(() => argsLiveCodex(H, "")), throws(() => argsLiveCodex(H, "Neo Quiz")), throws(() => argsLiveCodex(H))], [true, true, true]);
 	r.check("form: the built form is accepted for its own home and root", argumentsLiveCodex(argsLiveCodex(H, R), H, R), true);
 	r.check("form: another home refused", argumentsLiveCodex(argsLiveCodex(H, R), H + "2", R), false);
-	r.check("form: another root refused", argumentsLiveCodex(argsLiveCodex(H, R), H, "C:\\Other"), false);
 	r.check("form: the bare app-server (the user's own home) refused", argumentsLiveCodex(["app-server"], H, R), false);
-	r.check("form: the form without the untrusted root refused (Codex would trust it itself)", argumentsLiveCodex(argsLiveCodex(H, R).slice(0, 3), H, R), false);
-	r.check("form: the root trusted instead refused", argumentsLiveCodex(argsLiveCodex(H, R).map(a => a.replace("untrusted", "trusted")), H, R), false);
+	r.check("form: a root trust override added by the window refused", [
+		argumentsLiveCodex([...argsLiveCodex(H, R), "-c", UNTRUSTED], H, R),
+		argumentsLiveCodex([...argsLiveCodex(H, R), "-c", UNTRUSTED.replace("untrusted", "trusted")], H, R),
+	], [false, false]);
 	r.check("form: an extra option refused", [
 		argumentsLiveCodex([...argsLiveCodex(H, R), "-c", "sandbox_mode=\"danger-full-access\""], H, R),
 		argumentsLiveCodex(["app-server", "--dangerously-bypass-approvals-and-sandbox", ...argsLiveCodex(H, R).slice(1)], H, R),

@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- AI providers launched from this PC run exactly as in a terminal: your own settings, hooks, skills and MCP servers load, and only the agent mode you pick applies; no trust question any more. Requests from another device stay without tools.
 - Every AI provider shows its usage under the composer and in the Accounts settings: Antigravity CLI per model group, Ollama its monthly credits.
 - The agent mode chip shows for Antigravity CLI and Ollama too.
 - Antigravity CLI and Ollama run as agents in a trusted folder, with the same four modes as Claude Code and Codex; Ollama models run inside Claude Code.

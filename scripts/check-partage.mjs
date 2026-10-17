@@ -272,15 +272,21 @@ await withSrcModule(["apps/windows/electron/gabarits-cli.ts", "src/host/claude-o
 			argumentsAvecOutils("codex", [...agentCodex("full"), "--add-dir", "C:/"], m),
 			argumentsAvecOutils("codex", agentCodex("full").map(x => (x === j("sortie") ? autreJeton : x)), m),
 			argumentsAvecOutils("codex", [...agentCodex("full"), "-i", j("fichier:2")], m),
-			argumentsAvecOutils("codex", agentCodex("full").filter(x => x !== "--ignore-user-config"), m),
+			argumentsAvecOutils("codex", [...agentCodex("full"), "-c", "model_provider=evil"], m),
 		], [false, false, false, false, false, false]);
-	r.check("agent modes: a Claude agent form with an MCP server, hooks allowed, no strict MCP, an extra folder or acceptEdits without --restricted is refused",
+	r.check("agent modes: Codex with the user's own config (a call from this PC, as in a terminal) and without it (a line nobody at this PC asked for)",
+		MODES_AGENT.flatMap(mode => [argumentsAvecOutils("codex", agentCodex(mode).filter(x => x !== "--ignore-user-config"), m), argumentsAvecOutils("codex", agentCodex(mode), m)]),
+		MODES_AGENT.flatMap(() => [true, true]));
+	/* AS IN A TERMINAL (2026-10-17): the PC's forms load the user's own
+	   settings and add nothing but the mode; anything the window would ADD
+	   (an MCP config, settings, another folder, another mode) is still refused. */
+	r.check("agent modes: a Claude agent form with an added MCP server, settings, setting sources, an extra folder or an unlisted mode is refused",
 		[
-			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full").map(x => (x === "{\"mcpServers\":{}}" ? MCP_HOSTILE : x))], m),
-			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full").map(x => (x === "{\"disableAllHooks\":true}" ? "{}" : x))], m),
-			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("auto").filter(x => x !== "--strict-mcp-config")], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full"), "--mcp-config", MCP_HOSTILE], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("auto"), "--settings", "{}"], m),
+			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("supervised"), "--setting-sources", "user"], m),
 			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("full"), "--add-dir", "C:/"], m),
-			argumentsAvecOutils("claude", [...teteC, ...argsAgentClaude("acceptEdits").filter(x => x !== "--restricted")], m),
+			argumentsAvecOutils("claude", [...teteC, "--permission-mode", "bypassPermissions"], m),
 		], [false, false, false, false, false]);
 	r.check("the page's list of tools options (src/host/claude-outils.ts) is exactly the form accepted here",
 		argumentsAvecOutils("claude", ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", "haiku", ...ARGS_OUTILS_CLAUDE], m), true);
@@ -845,9 +851,11 @@ await withSrcModule(["src/dashboard/auto-learn-line.ts", "src/host/claude-outils
 	}));
 	r.check("every user mode, every frozen mode: the line runs Supervised", formes, formes.map(() => "supervised"));
 	const s = A.reglagesDeLigne({ aiAgentMode: "full" }, { reglages: { aiAgentMode: "full" }, auto });
-	const tail = O.argsAgentClaude(O.lireModeAgent(s.aiAgentMode));
-	r.check("its Claude tail is exactly the read-only tools form the main process accepts",
-		[tail, G.argumentsAvecOutils("claude", [...teteC, ...tail], m), tail.includes("--dangerously-skip-permissions")], [O.ARGS_OUTILS_CLAUDE, true, false]);
+	/* A line nobody at this PC asked for runs the CONFINED read-only form
+	   (`ai-client.ts`, `neverAskTrust`), not the PC's "as in a terminal" one. */
+	const tail = O.ARGS_OUTILS_CLAUDE;
+	r.check("its Claude tail is the confined read-only tools form the main process accepts",
+		[O.lireModeAgent(s.aiAgentMode), G.argumentsAvecOutils("claude", [...teteC, ...tail], m), tail.includes("--dangerously-skip-permissions"), tail.includes("--strict-mcp-config")], ["supervised", true, false, true]);
 	r.check("its Codex sandbox is read-only", O.argsAgentCodex(O.lireModeAgent(s.aiAgentMode)), ["-s", "read-only"]);
 	r.check("a manual line keeps the user's mode (the forcing is not global)", O.lireModeAgent(A.reglagesDeLigne({ aiAgentMode: "full" }, { reglages: {} }).aiAgentMode), "full");
 	r.check("never a live turn: automatic or remote lines; a manual line may", [A.liveDeLigne({ auto }), A.liveDeLigne({ fromDevice: "phone" }), A.liveDeLigne({})], [false, false, true]);
