@@ -44,17 +44,24 @@ export function palierZoomVoisin(courant: number, sens: 1 | -1): number {
 /** The repository, and the page a bug report starts from. */
 export const URL_DEPOT = "https://github.com/Neo-Quiz/neo-quiz";
 
-/** "Windows 10.0" from a user agent ("Windows NT 10.0"), or "Windows" when it does not say. */
-export function versionWindows(userAgent: string): string {
+/** The Windows release for a bug report. The user agent says "Windows NT 10.0"
+    for both Windows 10 and 11, so the Client Hints `platformVersion` decides:
+    major 13 or more is Windows 11, 1 to 12 is Windows 10. Without it, the
+    user agent's "10.0" can only say "Windows 10 or 11". */
+export function versionWindows(userAgent: string, platformVersion?: string): string {
+	const major = platformVersion ? Number.parseInt(platformVersion, 10) : NaN;
+	if (Number.isFinite(major) && major >= 13) return "Windows 11";
+	if (Number.isFinite(major) && major >= 1) return "Windows 10";
 	const m = /Windows NT (\d+(?:\.\d+)?)/.exec(userAgent);
-	return m ? `Windows ${m[1]}` : "Windows";
+	if (m?.[1] === "10.0") return "Windows 10 or 11";
+	return m ? `Windows NT ${m[1]}` : "Windows";
 }
 
 /** The new-issue URL with a prefilled template: versions, then three headings.
     The headings are the repository's public (English) issue language, not the UI's. */
-export function urlSignalement(version: string, userAgent: string): string {
+export function urlSignalement(version: string, userAgent: string, platformVersion?: string): string {
 	const corps = `**App version:** ${version}
-**System:** ${versionWindows(userAgent)}
+**System:** ${versionWindows(userAgent, platformVersion)}
 
 ## What happened
 

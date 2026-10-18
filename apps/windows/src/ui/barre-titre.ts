@@ -53,6 +53,11 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 	const barre = document.createElement("div");
 	barre.className = "nq-barre";
 	root.prepend(barre);
+	/* Read once, ahead of the click: the bug report must open from the click
+	   itself, and Client Hints are asynchronous. */
+	let platformVersion: string | undefined;
+	const hints = (navigator as Navigator & { userAgentData?: { getHighEntropyValues(h: string[]): Promise<{ platformVersion?: string }> } }).userAgentData;
+	void hints?.getHighEntropyValues(["platformVersion"]).then(v => { platformVersion = v.platformVersion; }).catch(() => {});
 
 	const gauche = ajouter(barre, "div", "nq-barre-gauche");
 
@@ -200,7 +205,7 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					window.open(URL_DEPOT, "_blank", "noopener");
 				} else if (id === "report-bug") {
 					// Same path as the repository link above (the main process hands it to the browser).
-					window.open(urlSignalement(application.version, navigator.userAgent), "_blank", "noopener");
+					window.open(urlSignalement(application.version, navigator.userAgent, platformVersion), "_blank", "noopener");
 				} else if (id === "change-wallpaper") {
 					deps.choisirFond();
 				} else if (id === "reload") {

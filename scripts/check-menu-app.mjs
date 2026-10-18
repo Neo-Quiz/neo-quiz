@@ -52,9 +52,13 @@ await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/elec
 	const u = new URL(urlSignalement("1.21.14", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140"));
 	r.check("bug report targets the repository's new-issue page", u.origin + u.pathname, `${URL_DEPOT}/issues/new`);
 	const corps = u.searchParams.get("body") ?? "";
-	r.check("bug report body carries both versions", [corps.includes("1.21.14"), corps.includes("Windows 10.0")], [true, true]);
+	r.check("bug report body carries both versions", [corps.includes("1.21.14"), corps.includes("Windows 10 or 11")], [true, true]);
 	r.check("bug report body carries the three headings",
 		["## What happened", "## Steps to reproduce", "## Expected"].every(h => corps.includes(h)), true);
+	const ua10 = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140";
+	r.check("Client Hints 15.0.0 is Windows 11", decodeURIComponent(urlSignalement("1", ua10, "15.0.0")).includes("Windows 11"), true);
+	r.check("Client Hints 10.0.0 is Windows 10", decodeURIComponent(urlSignalement("1", ua10, "10.0.0")).includes("**System:** Windows 10\n"), true);
+	r.check("without Client Hints, NT 10.0 never claims one release", decodeURIComponent(urlSignalement("1", ua10)).includes("Windows 10 or 11"), true);
 	r.check("an unknown user agent still names Windows", urlSignalement("1", "x").includes(encodeURIComponent("Windows")), true);
 	r.done();
 });
