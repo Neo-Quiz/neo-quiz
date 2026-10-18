@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- The Explain window composer now takes the focus on a single click anywhere on its card, shows the same hover and active contour as the Generate page, and the field is focused as the window opens.
 - On narrow windows the Generate composer row and the bottom bar now fit 360 to 430 px: the agent mode chip shows its icon only and the model labels ellipsize, and the five tabs share the width.
 - The Generate composer no longer shows a subject chip or picker: the AI now picks the quiz's subject itself, in the short call that already decides Learn or Test and the folder.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.

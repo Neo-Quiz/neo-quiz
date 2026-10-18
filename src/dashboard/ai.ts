@@ -1,4 +1,5 @@
 import type { ModuleInfo } from "./quiz-modules";
+import { focusFieldOnCardPress } from "./composer-focus";
 import JSON5 from "json5";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
@@ -2162,14 +2163,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// Toute la carte est cliquable pour écrire (demande 2026-07-10) :
 		// un clic hors des contrôles focus le champ, caret en fin de texte.
 		// mousedown natif du textarea préservé (positionnement du caret).
-		composer.addEventListener("mousedown", (e) => {
-			if ((e.target as HTMLElement).closest("button, textarea, .qbd-select, .qbd-ai-note-chip")) return;
-			e.preventDefault(); // pas de blur/re-focus visible
-			const len = composerInput.value.length;
-			composerInput.focus();
-			composerInput.setSelectionRange(len, len);
-			composerCaret = len;
-		});
+		focusFieldOnCardPress(composer, composerInput, (len) => { composerCaret = len; });
 
 		// Glisser-déposer de fichiers (images, .md, .txt) sur tout le composer
 		composer.addEventListener("dragover", (e) => {

@@ -44,6 +44,7 @@ import { mathifyElement } from "../../../../src/engine/mathjax";
 import { brancherCadres, htmlFrameMarkup } from "../../../../src/engine/html-frame";
 import { splitHtmlBlocks } from "../../../../src/engine/html-frame-core";
 import { consigneExplication, contexteQuiz, positionCourante } from "../../../../src/explain-prompt";
+import { focusFieldOnCardPress } from "../../../../src/dashboard/composer-focus";
 import { composerOpen } from "../../../../src/explain-follow";
 import { ancrerImagesCitees } from "../../../../src/explain-images";
 import type { ImageJointe } from "../../../../src/explain-images";
@@ -849,6 +850,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		let detacherMentions: (() => void) | null = null;
 		let ligneForfait: UsageLine | null = null;
 		let desabonner: (() => void) | null = null;
+		let retirerActif: (() => void) | null = null;
 		const handle = requireHost("modals").open({
 			className: "nq-explain-modal",
 			/* No visible title (2026-10-18): "Assistant" said nothing the panel
@@ -1540,7 +1542,24 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (enCoursLa?.lineId !== undefined) { q.annuler(enCoursLa.lineId); return; }
 					void envoyer();
 				});
+				/* The whole card is the field's click target, and shows it as on the Generate page
+				   (hover and `--actif` contour, dashboard-ai.css): active after a press or focus inside,
+				   dropped by a press elsewhere in the page only (a menu opened from the card moves the
+				   focus without leaving it, which `:focus-within` would not survive). */
+				focusFieldOnCardPress(composer, champ);
+				const activer = (): void => composer.classList.add("qbd-ai-composer--actif");
+				composer.addEventListener("pointerdown", activer);
+				composer.addEventListener("focusin", activer);
+				const surAilleurs = (e: Event): void => {
+					const cible = e.target as Node | null;
+					if (!cible || composer.contains(cible)) return;
+					// A menu portalled out of the card belongs to it: only the window itself drops the contour.
+					if (m.panelEl.contains(cible)) composer.classList.remove("qbd-ai-composer--actif");
+				};
+				document.addEventListener("pointerdown", surAilleurs, true);
+				retirerActif = () => document.removeEventListener("pointerdown", surAilleurs, true);
 				champ.focus();
+				if (!champ.disabled) composer.classList.add("qbd-ai-composer--actif");
 			},
 			// Closing the window keeps the chat (saved, its answers still running in the queue); only the painting stops.
 			onClose: () => {
@@ -1550,6 +1569,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				ligneForfait?.destroy();
 				ligneForfait = null;
 				desabonner?.();
+				retirerActif?.();
+				retirerActif = null;
 				desabonner = null;
 				majComposeur = null;
 				etat.repeindre = null;
