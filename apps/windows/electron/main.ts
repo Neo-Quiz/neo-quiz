@@ -77,6 +77,12 @@ import { createTray } from "./tray";
 import { decide, HIDDEN_FLAG, isHiddenLaunch, RELAUNCH_HIDDEN_KEY } from "./tray-lifecycle";
 import type { LifecycleState } from "./tray-lifecycle";
 import type { BacASable } from "./code-sandbox";
+import { creerJournalMemoire, installerJournalMemoire } from "./journal-memoire";
+
+/** Bug-report log buffer, installed at module load so early warnings count.
+    Task 4 hands it to the bug report service. */
+export const journalMemoire = creerJournalMemoire();
+installerJournalMemoire(journalMemoire);
 
 /** Le serveur de développement de Vite. Le port vient de `vite.config.ts`
     (`strictPort: true`) : s'il change là-bas, il change ici. */
