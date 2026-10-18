@@ -57,6 +57,7 @@ import type { FileRef } from "./folder-suggest";
 import { findFolderByName, folderNamesForPrompt, folderOfAttachments, type KnownFolder } from "./folder-choice";
 import { fallbackFolder, folderNamed, foldersOfQuizzes } from "./folder-choice-io";
 import { suivreDebord } from "./detail-fiche";
+import { htmlToText, isHtmlFile } from "./html-text";
 import { folderFromClarifications, formatClarifications, quizCountFromClarifications, parseClarifyAnswer, withoutAskedCount, type ClarifyFolders, type QuizzesChoice } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
@@ -2936,9 +2937,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			} else if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
 				// La carte paraît tout de suite, la lecture suit (`joindrePdf`).
 				lectures.push(joindrePdf(file.name, async () => new Uint8Array(await file.arrayBuffer()), source, origin?.path));
-			} else if (/\.(md|txt)$/i.test(file.name) || file.type.startsWith("text/")) {
+			} else if (isHtmlFile(file.name, file.type) || /\.(md|txt)$/i.test(file.name) || file.type.startsWith("text/")) {
 				try {
-					const content = await file.text();
+					/* A course page (.html): its text, converted in an inert document
+					   (`html-text.ts`), never the markup; bounded like the others. */
+					const brut = await file.text();
+					const content = isHtmlFile(file.name, file.type) ? htmlToText(brut) : brut;
 					// A read started before a preset must not land in the new preset's composer.
 					if (epoque !== epochPreset) return;
 					const key = attachmentKey({ source, path: origin?.path, name: file.name });
@@ -3000,6 +3004,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	function mimeForName(name: string): string {
 		const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
 		if (ext === "pdf") return "application/pdf";
+		if (ext === "html" || ext === "htm" || ext === "xhtml") return "text/html";
 		if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "avif"].includes(ext)) {
 			return "image/" + (ext === "jpg" ? "jpeg" : ext);
 		}

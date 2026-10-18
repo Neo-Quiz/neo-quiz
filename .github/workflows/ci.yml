@@ -290,6 +290,10 @@ jobs:
       - name: Model picker
         run: npm run check:model-picker
 
+      # AN HTML COURSE PAGE AS TEXT: parsed inert, never run, bounded, structure kept.
+      - name: HTML attachments
+        run: npm run check:html-text
+
       # THE OVERSCROLL STRETCH: the damped pull, the edge test, and which boxes can stretch.
       - name: Overscroll stretch
         run: npm run check:overscroll

@@ -184,7 +184,7 @@ function missLabel(cands: string[], quoted: boolean): string | null {
 	if (!pick) return null;
 	const hasSep = /[\\/]/.test(pick);
 	const ext = pick.slice(pick.lastIndexOf(".") + 1).toLowerCase();
-	const DOC_EXT = new Set(["md", "pdf", "txt", "csv"]);
+	const DOC_EXT = new Set(["md", "pdf", "txt", "csv", "html", "htm"]);
 	if (!hasSep && !DOC_EXT.has(ext) && !/\s/.test(pick)) return null;
 	return pick;
 }

@@ -741,7 +741,7 @@ export const EN_AI = {
 
 	/* ── Notices ── */
 	"ai.notice.pdfNoText": "“{name}”: no extractable text (scanned PDF?)",
-	"ai.notice.unsupportedFormat": "Unsupported format: {files} (images, PDF, .md, .txt)",
+	"ai.notice.unsupportedFormat": "Unsupported format: {files} (images, PDF, .md, .txt, .html)",
 	"ai.notice.noteAlreadyAttached": "“{name}” is already attached",
 	"ai.notice.noteReadFailed": "Could not read “{name}”",
 	/* Chemins cités dans le prompt et attachés automatiquement (prompt-paths.ts). */

@@ -15,6 +15,7 @@ release notes.
 
 ### Added
 
+- The composer accepts .html and .htm pages (course sites): the page is turned into plain text, keeping headings, lists, code blocks, tables and picture descriptions, without ever running it. Other unsupported types are still refused with the same message.
 - "Report a bug" in the application menu opens a new GitHub issue prefilled with the app and Windows versions and the headings What happened, Steps to reproduce and Expected.
 - A toast at the bottom right announces a new version once it is downloaded (or waits for a click on a metered connection), with a Restart and update (or Download) button and a close button that hides it for that version until the next launch.
 

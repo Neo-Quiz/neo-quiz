@@ -691,7 +691,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 
 	/* ── Notices ── */
 	"ai.notice.pdfNoText": "« {name} » : aucun texte extractible (PDF scanné ?)",
-	"ai.notice.unsupportedFormat": "Format non pris en charge : {files} (images, PDF, .md, .txt)",
+	"ai.notice.unsupportedFormat": "Format non pris en charge : {files} (images, PDF, .md, .txt, .html)",
 	"ai.notice.noteAlreadyAttached": "« {name} » est déjà attachée",
 	"ai.notice.noteReadFailed": "Impossible de lire « {name} »",
 	"ai.notice.pathsAttached": "Joint depuis votre demande : {files}",
