@@ -627,6 +627,13 @@ await withSrcModule(
 				{ ok: await providers.sondeConnexion("agy")(), n: providers.getAntigravityModels().length }, { ok: true, n: 4 });
 			installHost(fauxHote({ runs: { "agy models": { code: 1, stdout: "Fetching available models...\nError: Please sign in to view available models." } } }).hote);
 			r.check("checkAntigravityLogin : faux sur « Please sign in » (code 1)", await providers.checkAntigravityLogin(), false);
+			/* A generation holds the tool: the probe is refused as `occupe` and the account is NOT reported signed out. */
+			const occupe = Object.assign(new Error("busy"), { name: "occupe" });
+			installHost(fauxHote({ runs: { "agy models": occupe } }).hote);
+			r.check("checkAntigravityLogin : un run en cours (`occupe`) ne vaut pas « non connecté »", await providers.checkAntigravityLogin(), true);
+			const expire = Object.assign(new Error("slow"), { name: "timeout" });
+			installHost(fauxHote({ runs: { "agy models": expire } }).hote);
+			r.check("checkAntigravityLogin : un délai dépassé (`timeout`) reste « non connecté »", await providers.checkAntigravityLogin(), false);
 			installHost(hote);
 			/* Un échec (compte non connecté : « Please sign in… », code 1) garde
 			   l'instantané d'avant et ne dit AUCUN changement. */

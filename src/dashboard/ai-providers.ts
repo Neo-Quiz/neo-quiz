@@ -1868,7 +1868,11 @@ export async function checkAntigravityLogin(): Promise<boolean> {
 			antigravityModelsSnapshot = { at: Date.now(), models: modeles };
 			return true;
 		})
-		.catch(() => false);
+		/* A run of the same tool is under way (a generation holds its lock): the
+		   probe is refused as `occupe`. The tool is plainly signed in, it is
+		   working; answering "not signed in" showed the sign-in banner under a
+		   running Antigravity generation (2026-10-18, see `estOccupe`). */
+		.catch((e: unknown) => estOccupe(e));
 }
 
 export function sondeConnexion(tool: "claude" | "codex" | "agy"): () => Promise<boolean> {
