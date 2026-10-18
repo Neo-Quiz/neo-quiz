@@ -57,7 +57,7 @@ import type { FileRef } from "./folder-suggest";
 import { findFolderByName, folderNamesForPrompt, folderOfAttachments, type KnownFolder } from "./folder-choice";
 import { fallbackFolder, folderNamed, foldersOfQuizzes } from "./folder-choice-io";
 import { suivreDebord } from "./detail-fiche";
-import { folderFromClarifications, formatClarifications, quizCountFromClarifications, parseClarifyAnswer, type ClarifyFolders, type QuizzesChoice } from "./generation-kind";
+import { folderFromClarifications, formatClarifications, quizCountFromClarifications, parseClarifyAnswer, withoutAskedCount, type ClarifyFolders, type QuizzesChoice } from "./generation-kind";
 import type { ClarifyAnswer, KindChoice } from "./generation-kind";
 import { poserListeChats, suivreConversations } from "./chat-sidebar";
 import { ouvrirRecherche } from "./chat-search";
@@ -4416,7 +4416,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		let reponse: ClarifyAnswer = { ready: true };
 		try {
 			if (settings().aiProvider) {
-				reponse = parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name), dossiersPourIa));
+				// An explicit count in the request is honoured: the count question is dropped (2026-10-19).
+				reponse = withoutAskedCount(parseClarifyAnswer(await createAiClient(deps.settings).clarify(envoi.text, pieces.map(p => p.name), dossiersPourIa)), envoi.text);
 			}
 		} catch (err) {
 			console.warn(LOG_PREFIX, "clarify call failed, using Learn", err);

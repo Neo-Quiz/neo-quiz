@@ -36,7 +36,7 @@ export interface ClarifyOption { label: string; description: string; quizzes?: Q
 /** One clarifying question, in the manner of Claude Code's AskUserQuestion: a
     short header chip, the question, 2 to 4 options, one or several answers.
     The app adds its own "write something" option. */
-export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" | "folder" }
+export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" | "folder" | "count" }
 /** `folder`: the name of one of the learner's folders the model says fits
     (read against the real list by the caller, never trusted as a path). */
 /** `subject`: the subject id the model picked, always a known id (`estCategorie`); absent = `general`. */
@@ -125,7 +125,8 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 		}
 		const validQuizzesQuestion = purpose === "quizzes" && multiple !== true && lues.every(option => isQuizzesChoice(option.quizzes));
 		const validFolderQuestion = purpose === "folder" && multiple !== true;
-		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validQuizzesQuestion ? { purpose: "quizzes" as const } : validFolderQuestion ? { purpose: "folder" as const } : {}) });
+		const validCountQuestion = purpose === "count" && multiple !== true;
+		questions.push({ header: typeof header === "string" ? header.trim().slice(0, MAX_HEADER) : "", question: question.trim().slice(0, 300), multiple: multiple === true, options: lues, default: defaultIndex(defaut, lues.length), ...(validQuizzesQuestion ? { purpose: "quizzes" as const } : validFolderQuestion ? { purpose: "folder" as const } : validCountQuestion ? { purpose: "count" as const } : {}) });
 	}
 	// Only one "which folder" question counts: a second one is an ordinary question.
 	const premier = questions.findIndex(q => q.purpose === "folder");
@@ -150,6 +151,56 @@ export function quizCountFromClarifications(questions: readonly ClarifyQuestion[
 		if (isQuizzesChoice(n)) return n;
 	}
 	return null;
+}
+
+/* ── AN EXPLICIT QUESTION COUNT IN THE REQUEST (2026-10-19) ──
+   "5 questions", "cinq QCM", "une seule question", "20 questions max": the
+   learner already said how many, so the count question is not asked. A live
+   run asked "Combien de questions ?" anyway and its default "Auto" overrode
+   the request (12 questions came back for "5 questions"). */
+const NUMBER_WORDS: Record<string, number> = {
+	un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16,
+	vingt: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60,
+	one: 1, two: 2, three: 3, four: 4, five: 5, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+	twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60,
+};
+/** The most questions an explicit count may name; beyond it the request is read as having none. */
+export const MAX_EXPLICIT_COUNT = 200;
+const COUNT_WORD = Object.keys(NUMBER_WORDS).sort((a, b) => b.length - a.length).join("|");
+const COUNT_UNIT = "(?:questions?|qcms?|mcqs?|flash\\s?cards?|cartes?|fiches?|exercices?|exos?)";
+const COUNT_FILLER = "(?:(?:seule?s?|only|single|short|quick|petites?|courtes?|rapides?|simples?|mini|multiple[- ]choice|de r[ée]vision|de cours|pratiques?|difficiles?|faciles?|and|et)\\s+){0,2}";
+const COUNT_RE = new RegExp("(?<![\\p{L}\\p{N}])(\\d{1,3}|(?:" + COUNT_WORD + ")(?:(?:\\s+et\\s+|[-\\s])(?:" + COUNT_WORD + "))?)\\s+" + COUNT_FILLER + COUNT_UNIT + "(?![\\p{L}\\p{N}])", "giu");
+
+/** The number of questions the request names, or `null` when it names none
+    (or a range, or something absurd). Digits or French/English words. */
+export function explicitQuestionCount(request: string): number | null {
+	const text = String(request ?? "");
+	for (const m of text.matchAll(COUNT_RE)) {
+		// "5 à 10 questions", "5-10 questions": a range is not a count.
+		if (/\d\s*(?:-|–|à|a|to|ou|or)\s*$/iu.test(text.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0))) continue;
+		const raw = m[1].toLowerCase();
+		const n = /^\d+$/.test(raw) ? Number(raw) : raw.split(/\s+et\s+|[-\s]/).reduce((sum, w) => sum + (NUMBER_WORDS[w] ?? 0), 0);
+		if (Number.isInteger(n) && n >= 1 && n <= MAX_EXPLICIT_COUNT) return n;
+	}
+	return null;
+}
+
+/** Whether a clarifying question asks how many questions to generate: the
+    model's own mark, else its wording (it does not always send the mark). */
+export function isCountQuestion(q: ClarifyQuestion): boolean {
+	if (q.purpose === "count") return true;
+	if (q.purpose) return false;
+	return /\b(?:combien de questions?|nombre de questions?|how many questions?|number of questions?)\b/i.test(q.question);
+}
+
+/** Honours an explicit count: the count question is dropped from the
+    answer (no questions left: ready, the kind, folder, subject and icon kept). */
+export function withoutAskedCount(answer: ClarifyAnswer, request: string): ClarifyAnswer {
+	if (!("questions" in answer) || explicitQuestionCount(request) === null) return answer;
+	const restantes = answer.questions.filter(q => !isCountQuestion(q));
+	if (restantes.length === answer.questions.length) return answer;
+	const { questions: _, ...extra } = answer;
+	return restantes.length ? { questions: restantes, ...extra } : { ready: true, ...extra };
 }
 
 /** The folder name the learner chose in the "which folder" question (an
@@ -234,6 +285,7 @@ export const SUBJECT_RULE = "Also deduce the quiz's SUBJECT from the request and
     request and the NAMES of the attached documents, never their content. */
 export function clarifyPrompt(request: string, documentNames: readonly string[], uiLanguage: "en" | "fr" = "en", folders?: ClarifyFolders): { system: string; user: string } {
 	const choisit = !!folders && folders.choose !== false && !folders.decided;
+	const count = explicitQuestionCount(request);
 	const system = [
 		"You are an assistant inside Neo Quiz, a revision app that generates either a Learn (a guided path that teaches a topic step by step) or a Test (questions only). You decide which one yourself and NEVER ask the learner about it.",
 		"FIRST decide whether the message asks for a quiz or for studying material. A greeting (\"slt\", \"salut\", \"hello\"), small talk, a question about the app or \"what can you do\" is NOT such a request: answer it conversationally, briefly, in the language of the message, and offer to work on one of the learner's folders, listing the folders given below (only those names, as a short list; if none is given, invite the learner to attach a document or name a topic). Return {\"reply\":\"<your answer>\"} alone, as plain text without HTML. Never reply conversationally to a message that names a subject, a course, a module, a document or asks for a quiz.",
@@ -242,7 +294,9 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"Always include the deduced canonical \"kind\" (\"learn\", \"practice\", or \"both\") in your answer. The app safely defaults to Learn if it is missing or invalid.",
 		SUBJECT_RULE,
 		"Before generating, ask short multiple-choice clarification questions.",
-		"Always ask one question about the NUMBER OF QUESTIONS to generate, even if the request already names a count. Offer concrete choices such as 15, 25, and 40 questions.",
+		...(count === null
+			? ["Always ask one question about the NUMBER OF QUESTIONS to generate. Offer concrete choices such as 15, 25, and 40 questions. Mark it \"purpose\":\"count\"."]
+			: [`The request already names the number of questions (${count}). Do NOT ask about the number of questions.`]),
 		"If two or more attached documents are listed, also ask HOW MANY QUIZZES to make, simply as a number: a single-choice question marked \"purpose\":\"quizzes\" whose options are \"Auto\" {\"quizzes\":\"auto\"} first (you decide), then 1, 2 and 3 quizzes ({\"quizzes\":1}, {\"quizzes\":2}, {\"quizzes\":3}); its default is 0. The quizzes share the material of ALL the documents, split by theme; never describe them as one quiz per document.",
 		"For each of these two questions (number of questions, number of quizzes), put the option labeled exactly \"Auto\" first and set the default to index 0. \"Auto\" means you decide freely; it imposes NO numeric bound.",
 		"You may ask at most ONE optional clarifying question about scope or learner level, only when genuinely vague. Never exceed 3 questions total.",
@@ -250,7 +304,9 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		...(choisit ? [ICON_RULE] : []),
 		"NEVER ask what the attached documents already answer. You see only their names; if a name makes the scope clear, do not ask about scope.",
 		"You have no tools; you only see the request, the names of the attached documents and the names of the learner's folders.",
-		"Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above.",
+		count === null
+			? "Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above."
+			: "Always include the top-level kind. When you have no question to ask, return {\"kind\":\"...\"} alone (no questions). The only alternative is the conversational {\"reply\":\"...\"} object described above.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
 		`- {"kind":"learn","subject":"<one subject id>",${choisit ? "\"folder\":\"<optional: exact name of one of the learner's folders>\"," : ""}"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");

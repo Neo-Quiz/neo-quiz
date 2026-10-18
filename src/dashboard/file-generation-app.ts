@@ -30,6 +30,7 @@ import { completerConfigLearn, fusionnerConfigsFinales } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { currentHost } from "../host/current";
 import { LOG_PREFIX } from "../branding";
+import { explicitQuestionCount } from "./generation-kind";
 import { FolderNotTrusted, NoQuizAnswer, createAiClient, nettoyerTitre } from "./ai-client";
 import type { AiClient, ImagePayload, PreparationExamen } from "./ai-client";
 import type { AiSettingsHost } from "./ai-settings-host";
@@ -552,7 +553,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const transcript = transcriptVide();
 			transcripts.set(ligne.id, transcript);
 			const lancer = () => client.generate(prompt, {
-				count: d.count, type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
+				// An explicit count in what the learner WROTE is honoured (never the answers appended after it).
+				count: d.count ?? explicitQuestionCount(d.texteAffiche ?? d.text), type: d.type, mode: d.mode, source, planTranches: learn.plan, images, categorie: d.categorie, preparation: d.preparation,
 				documents, plansParDocument: liens?.map(l => l?.plan), parties: d.parties,
 				lectureMinutes: d.mode === "learn" ? (d.lectureMinutes ?? deps.lectureMinutes?.(dossier)) : undefined,
 				/* The quiz's folder: Claude Code may read it with read-only tools

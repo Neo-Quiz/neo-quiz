@@ -179,5 +179,26 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	const ids = K.SUBJECT_RULE.split("one of these ids: ")[1].split(". ")[0].split(",");
 	r.check("subject prompt: the id list is the CATEGORIES list, comma separated, once each", [ids.length > 60, ids[0], ids.includes("python"), ids.includes("langues"), new Set(ids).size === ids.length], [true, "general", true, true, true]);
 	r.check("subject prompt: the user part carries the request and NAMES only (no ids, no content)", [p.user.includes("python,"), p.user.includes(ids.join(","))], [false, false]);
+	/* ── AN EXPLICIT COUNT IN THE REQUEST (2026-10-19): honoured, the count question is not asked ── */
+	r.check("count: digits and words, FR and EN, with fillers and a trailing 'max'", [
+		"5 questions", "Fais-moi 3 questions sur les pointeurs", "cinq questions", "3 QCM", "une seule question", "10 flashcards", "20 questions max", "vingt-cinq questions", "twelve questions please", "one question only", "7 cartes", "Give me 8 multiple-choice questions",
+	].map(x => K.explicitQuestionCount(x)), [5, 3, 5, 3, 1, 10, 20, 25, 12, 1, 7, 8]);
+	r.check("count: none, a quiz count, a range, a year or an absurd number is not a question count", [
+		"Quiz sur les pointeurs", "3 quiz sur le cours", "2 quizzes", "de 5 à 10 questions", "5-10 questions", "questions 2024", "999 questions", "0 questions", "Chapitre 3 questionnaire", "les 5 premières pages",
+	].map(x => K.explicitQuestionCount(x)), Array(10).fill(null));
+	const nq = { header: "Nombre", question: "Combien de questions ?", multiple: false, options: [o("Auto"), o("15"), o("25")], default: 0 };
+	const lvl = q("Niveau", "Quel niveau ?", ["Débutant", "Avancé"]);
+	const asked = JSON.stringify({ kind: "practice", subject: "python", questions: [nq, lvl] });
+	r.check("count: a question marked purpose count is kept as such", K.parseClarifyAnswer(JSON.stringify({ questions: [{ ...nq, purpose: "count" }] })).questions[0].purpose, "count");
+	r.check("count: with an explicit count the count question is dropped, the others and the metadata stay",
+		K.withoutAskedCount(K.parseClarifyAnswer(asked), "Fais 5 questions sur Python"), { questions: [lvl], kind: "practice", subject: "python" });
+	r.check("count: dropped by its wording too when the model forgot the mark (FR and EN)", [
+		K.withoutAskedCount({ questions: [nq] }, "3 questions"), K.withoutAskedCount({ questions: [{ ...nq, question: "How many questions?" }], kind: "learn" }, "3 questions"),
+	], [{ ready: true }, { ready: true, kind: "learn" }]);
+	r.check("count: without an explicit count the question is still asked", K.withoutAskedCount(K.parseClarifyAnswer(asked), "Quiz sur Python"), K.parseClarifyAnswer(asked));
+	r.check("count: a quizzes question is never taken for a count question", K.withoutAskedCount({ questions: [{ ...nq, question: "Combien de quiz ?", purpose: "quizzes" }] }, "5 questions").questions?.length, 1);
+	const pCnt = K.clarifyPrompt("Fais 5 questions sur Python", []), pn = K.clarifyPrompt("Quiz sur Python", []);
+	r.check("count prompt: told not to ask when the request names a count, and asked (with the mark) when it does not",
+		[pCnt.system.includes("Do NOT ask about the number of questions"), pCnt.system.includes("(5)"), pn.system.includes("Always ask one question about the NUMBER OF QUESTIONS"), pn.system.includes('Mark it "purpose":"count"')], [true, true, true, true]);
 	r.done();
 });

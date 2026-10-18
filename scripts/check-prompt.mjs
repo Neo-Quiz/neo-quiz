@@ -27,6 +27,13 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	const auto = composerPrompts("x", { mode: "practice", count: null, type: "Compréhension" }).systemPrompt;
 	r.check("Auto + Compréhension : aucun nombre inventé", [/exactly (null|undefined|NaN)/.test(auto), auto.includes("as many questions as the source has EXAMINABLE POINTS")], [false, true]);
 	r.check("nombre fixé : exactement N", composerPrompts("x", { mode: "practice", count: 12 }).systemPrompt.includes("exactly 12 questions"), true);
+	/* A Learn asked for a count (2026-10-19): the Learn's own "two questions per slice" must not override it. */
+	const learnCount = composerPrompts("x", { mode: "learn", count: 5 }).systemPrompt;
+	r.check("Learn with a count: exactly N question cards, the per-slice cap and 'AT MOST' slices are gone, singular for one",
+		[learnCount.includes("EXACTLY 5 question cards in total"), learnCount.includes("QUANTITY: AT MOST"), composerPrompts("x", { mode: "learn", count: 1 }).systemPrompt.includes("EXACTLY 1 question card in total")], [true, false, true]);
+	r.check("Learn without a count keeps its slice cap", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("QUANTITY: AT MOST"), true);
+	r.check("clarify prompt: states the count and asks no count question when the request names one",
+		[clarifyPrompt("Fais 5 questions", []).system.includes("Do NOT ask about the number of questions"), clarifyPrompt("Quiz sur X", []).system.includes("Do NOT ask about the number of questions")], [true, false]);
 	/* NI PLUS NI MOINS (2026-09-30) : une question par point examinable, jamais
 	   un plafond ni un gabarit fixe par tranche — 537 questions pour 3 CM le
 	   même jour, 1 amorce + 1 « explique » + 3 rappels par notion, quelle

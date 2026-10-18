@@ -945,7 +945,11 @@ export function composerPrompts(prompt: string, options: GenerateOptions = {}): 
 	   uncapped one gave eight Learns of 52 to 113 questions — some 600 in
 	   all, and an hour of generation. The plan splits the program; each
 	   quiz of it stays one quiz. */
-	const quantite = count != null
+	const quantite = count != null && learn
+		/* A Learn asked for a count (2026-10-19): a request that says "5
+		   questions" got the Learn's usual two questions per slice (6 for 3). */
+		? `QUANTITY: the learner asked for exactly ${count} question${count === 1 ? "" : "s"}. The path contains EXACTLY ${count} question card${count === 1 ? "" : "s"} in total (MCQ questions and flashcards both count, reading cards do not), whatever the per-slice counts of the MODE below say: use as many slices as needed (one to three question cards each, at most one flashcard per slice), every slice keeps its reading card. Never exceed ${count} and never fall short; this number wins over any other count in the request.`
+		: count != null
 		? `QUANTITY: generate exactly ${count} questions — this number wins over any other count, range or list of themes stated in the user request below. If the request asks for more themes than ${count} questions, cover the most important ones; never exceed ${count}.`
 		: learn
 		/* A Learn is CAPPED (2026-10-10): "one slice per notion" with 2 to 3
