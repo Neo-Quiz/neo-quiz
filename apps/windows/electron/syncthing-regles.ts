@@ -591,3 +591,20 @@ export function etatDemande(envoyeLe: number | undefined, enPause: boolean, main
 	if (envoyeLe === undefined) return null;
 	return maintenant - envoyeLe < DEMANDE_DUREE_MS ? "envoyee" : "expiree";
 }
+
+/** Delays between relaunches of a Syncthing that exited (same table as the Android `RestartPolicy`):
+    2 s, 5 s, 15 s, 60 s, then every 5 min; a run that stayed up `DUREE_SAINE_MS` starts over. There is
+    no "give up" step: sync is never left dead while it is switched on (2026-10-18). */
+export const DELAIS_RELANCE_MS: readonly number[] = [2_000, 5_000, 15_000, 60_000, 300_000];
+export const DUREE_SAINE_MS = 2 * 60_000;
+export function creerPolitiqueRelance(delais: readonly number[] = DELAIS_RELANCE_MS, saineMs: number = DUREE_SAINE_MS): { prochainDelai(dureeMarcheMs: number): number } {
+	let echecs = 0;
+	return {
+		prochainDelai(dureeMarcheMs: number): number {
+			if (dureeMarcheMs >= saineMs) echecs = 0;
+			const d = delais[Math.min(echecs, delais.length - 1)]!;
+			echecs++;
+			return d;
+		},
+	};
+}

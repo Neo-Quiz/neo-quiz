@@ -32,6 +32,10 @@ release notes.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.
 - The usage popover folds the model groups you are not using (click a title to unfold), the line under the composer shows the group title on its own line, and both follow a model change at once.
 
+### Fixed
+
+- Sync no longer stays stopped after Syncthing exits twice: it is relaunched with growing delays (2 s, 5 s, 15 s, 1 min, then every 5 min) for as long as sync is on, and meanwhile the Sync page keeps your devices listed as not connected instead of showing sync as off. On Android a launch that fails is retried the same way, a network change or opening the app retries at once, the pinned listen port is checked before Syncthing starts (it was tested after, so the app's own listener made every restart fall back to a random port), and Syncthing's output is kept in a bounded private log shown by the Sync page's log dialog when Syncthing is not answering.
+
 ## [1.21.14] - 2026-10-17
 
 ### Changed

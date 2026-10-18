@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Build
 import android.graphics.drawable.Icon
 import android.os.Environment
@@ -25,6 +27,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -94,7 +99,13 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     fun signalWrite(abs: String) { engine?.signalWrite(abs) }
 
     /** The app came to the screen: a new foreground start is allowed again. */
-    fun resume() { paused = false }
+    fun resume() { paused = false; engine?.revive() }
+
+    /** The network changed or came back: a Syncthing waiting out its restart delay tries again now. */
+    fun networkChanged() { engine?.revive() }
+
+    /** The bounded diagnostic log of Syncthing (private files; see [RollingLog]). */
+    private val diagLog by lazy { RollingLog(File(appContext.filesDir, "sync-log")) }
 
     /** The bridge attaches: it admits the shared folder to its perimeter (now if the engine already runs, e.g. after a service-only start). */
     fun attach(allow: (File) -> Unit) {
@@ -167,13 +178,13 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         // An import interrupted long ago left its (Syncthing-ignored) staging folder: nobody else removes it.
         scope.launch { StagingCleanup.purge(root, System.currentTimeMillis()) }
         val home = File(appContext.filesDir, "syncthing")
-        val process = SyncthingProcess(File(appContext.applicationInfo.nativeLibraryDir, ProcTable.BINARY_NAME), home, File(appContext.cacheDir, "syncthing-tmp"))
+        val process = SyncthingProcess(File(appContext.applicationInfo.nativeLibraryDir, ProcTable.BINARY_NAME), home, File(appContext.cacheDir, "syncthing-tmp")).also { it.log = diagLog }
         val created = SyncEngine(
             launcher = { process.start() },
             root = root,
             deviceName = ownName(),
-            portFree = process::listenPortFree,
             scope = scope,
+            diag = diagLog::append,
         )
         created.onState = { s -> lastState = s; stateListener?.invoke(s); notifyListener?.invoke(s) }
         created.onReceived = {
@@ -207,7 +218,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
         if (paused) return null
         // Switched off in the Sync page: NOTHING starts the engine, not even the page asking for the state.
         if (activeFlag() == false) return null
-        engine?.let { admitRoot(); return it }
+        engine?.let { admitRoot(); it.revive(); return it }
         startService()
         // First start can take a while (key generation); the page waits for its id. Only the WAIT times out:
         // cancelling the launch itself would leave a half-started process without an owner.
@@ -232,8 +243,12 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     override suspend fun sendAgain(id: String) { ensure()?.sendAgain(id) }
 
     override suspend fun logLines(): JSONArray? {
-        val e = ensure() ?: return null
-        return try { e.logLines() } catch (_: Exception) { null }
+        val live = try { ensure()?.logLines() } catch (_: Exception) { null }
+        if (live != null && live.length() > 0) return live
+        // Syncthing stalled or is being relaunched: what its output left on disk (bounded, scrubbed).
+        val kept = diagLog.tail(SyncEngine.MAX_LOG_LINES)
+        if (kept.isEmpty()) return live
+        return JSONArray().also { out -> for ((at, text) in kept) out.put(org.json.JSONObject().put("quand", at).put("niveau", "").put("message", text)) }
     }
 
     override suspend fun deactivate() {
@@ -314,8 +329,33 @@ class SyncService : Service() {
         }
         hub.notifyListener = { s -> handler.post { latest = s; postSoon() } }
         latest = hub.lastState
-        scope.launch { if (hub.launchEngine() == null) stopSelf() }
+        // A launch that failed (boot before the storage is ready, a busy device) is retried with the same growing
+        // delays as a restart; it ends only when sync is switched off.
+        if (launching == null || launching?.isActive != true) {
+            launching = scope.launch {
+                val policy = RestartPolicy()
+                while (isActive && hub.isActive() && hub.launchEngine() == null) delay(policy.nextDelayMs(0))
+            }
+        }
+        watchNetwork(hub)
         return START_STICKY
+    }
+
+    private var launching: kotlinx.coroutines.Job? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    /** A network that comes back or changes wakes a Syncthing that is waiting out its restart delay. */
+    private fun watchNetwork(hub: SyncHub) {
+        if (networkCallback != null) return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { hub.networkChanged() }
+        }
+        try {
+            getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(cb)
+            networkCallback = cb
+        } catch (e: Exception) {
+            SyncLog.warn(TAG, "network callback not registered", e)
+        }
     }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
@@ -359,6 +399,9 @@ class SyncService : Service() {
 
     override fun onDestroy() {
         SyncHub.peek()?.notifyListener = null
+        networkCallback?.let { try { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } catch (_: Exception) { } }
+        networkCallback = null
+        scope.cancel()
         handler.removeCallbacksAndMessages(null)
         // The process may be killed right after: stop Syncthing on its own thread, with a bounded wait.
         val hub = SyncHub.peek()

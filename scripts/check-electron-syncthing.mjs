@@ -189,6 +189,9 @@ await withSrcModule(
 			r.check("a counter that went down restarts", calculerDebit(p2.echantillon, c(10, 10), 20_000).bas, 0);
 			r.check("not connected: nothing kept", calculerDebit(p2.echantillon, { connected: false, inBytesTotal: 99999 }, 20_000), { bas: 0, haut: 0, echantillon: undefined });
 			r.check("junk counters count as zero", calculerDebit(p1.echantillon, c("x", -5), 12_000).bas, 0);
+			const pol = regles.creerPolitiqueRelance();
+			r.check("relaunch delays grow and stay at 5 min, never give up", [1, 2, 3, 4, 5, 6, 7].map(() => pol.prochainDelai(0)), [2_000, 5_000, 15_000, 60_000, 300_000, 300_000, 300_000]);
+			r.check("a run that stayed up starts the delays over", [pol.prochainDelai(3 * 60_000), pol.prochainDelai(1_000)], [2_000, 5_000]);
 			r.check("relay type", typeConnexion({ connected: true, type: "relay-client" }), "relais");
 			r.check("local", typeConnexion({ connected: true, type: "tcp-client", isLocal: true }), "lan");
 			r.check("direct", typeConnexion({ connected: true, type: "quic-server", isLocal: false }), "direct");

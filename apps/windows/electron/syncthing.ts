@@ -64,7 +64,7 @@ import {
 	launchArgs,
 	configXmlSansEcoute,
 	launchEnv,
-	optionsFixees, avecIgnore, estIgnore, demandesExpirees, retraitsDistants, etatDemande, RETRAIT_DELAI_MS } from "./syncthing-regles";
+	optionsFixees, creerPolitiqueRelance, avecIgnore, estIgnore, demandesExpirees, retraitsDistants, etatDemande, RETRAIT_DELAI_MS } from "./syncthing-regles";
 
 /** `annule`: the owner declined the native confirmation. */
 export type ResultatAppairage = "ok" | "invalide" | "indisponible" | "annule";
@@ -316,8 +316,11 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	const intervalle = opts.intervalMs ?? 10_000;
 	let courant: Lancement = await lancer(opts);
 	let arrete = false;
-	let redemarre = false;
+	/* `mort`: Syncthing exited and is being relaunched (name kept: every guard below reads it). */
 	let mort = false;
+	let dernierConnu: EtatSync | null = null;
+	const politique = creerPolitiqueRelance();
+	let reveil: (() => void) | null = null;
 	let since = 0;
 	let detecteur = creerDetecteurReception();
 	let dernier = "";
@@ -386,7 +389,23 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 	}
 
 	async function calculerEtat(): Promise<EtatSync> {
-		if (mort) return ETAT_ABSENT;
+		if (mort) return etatAbsent();
+		const e = await calculerEtatVivant();
+		dernierConnu = e;
+		return e;
+	}
+
+	/* While Syncthing is relaunched: the last known state, devices shown as not connected, not "off". */
+	function etatAbsent(): EtatSync {
+		if (!dernierConnu) return ETAT_ABSENT;
+		return {
+			...dernierConnu,
+			appareils: dernierConnu.appareils.map(a => ({ ...a, connecte: false, progression: undefined, debitBas: undefined, debitHaut: undefined })),
+			dossier: { etat: "idle", pourcentage: null },
+		};
+	}
+
+	async function calculerEtatVivant(): Promise<EtatSync> {
 		const { rest, ownId } = courant;
 		const [devices, connexions] = await Promise.all([rest.devices(), rest.connections()]);
 		let statut = null;
@@ -503,27 +522,49 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		}
 	}
 
-	/* One restart on an unexpected exit, then give up (the page shows sync as
-	   off rather than the app looping on a binary that cannot run). */
-	function surveiller(l: Lancement): void {
-		void l.fini.then(async () => {
+	/* An unexpected exit is never final: relaunched with a growing delay for as long as sync is on. */
+	function surveiller(l: Lancement, debut: number = Date.now()): void {
+		void l.fini.then(() => {
 			if (arrete || l !== courant) return;
-			if (redemarre) { mort = true; void diffuser().catch(() => undefined); return; }
-			redemarre = true;
+			void relancer(Date.now() - debut);
+		});
+	}
+	async function relancer(dureeMarcheMs: number): Promise<void> {
+		mort = true;
+		dernier = "";
+		console.warn("[syncthing] exited after " + Math.round(dureeMarcheMs / 1000) + " s: relaunching");
+		void diffuser().catch(() => undefined);
+		let duree = dureeMarcheMs;
+		while (!arrete) {
+			const attente = politique.prochainDelai(duree);
+			duree = 0;
+			await new Promise<void>(ok => {
+				const t = setTimeout(ok, attente);
+				reveil = () => { clearTimeout(t); ok(); };
+			});
+			reveil = null;
+			if (arrete) return;
 			try {
 				/* The wrapper died: the real child may still be running and
 				   holding the home; `lancer` clears it before spawning. */
-				courant = await lancer(opts);
+				const suivant = await lancer(opts);
+				if (arrete) {
+					try { await suivant.rest.shutdown(); } catch { tuerArbre(suivant.child); }
+					return;
+				}
+				courant = suivant;
 				since = 0;
 				detecteur = creerDetecteurReception();
+				mort = false;
 				surveiller(courant);
+				lancerBoucleEvenements();
+				dernier = "";
+				void diffuser().catch(() => undefined);
+				return;
 			} catch (e) {
 				console.warn("[syncthing] restart failed:", e instanceof Error ? e.message : String(e));
-				mort = true;
 			}
-			dernier = "";
-			void diffuser().catch(() => undefined);
-		});
+		}
 	}
 	surveiller(courant);
 	const minuteur = setInterval(() => { void tick(); }, intervalle);
@@ -573,18 +614,28 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		if (change || recu) void diffuser().catch(() => undefined);
 		return recu;
 	}
-	void (async () => {
-		while (!arrete && !mort) {
+	let boucleActive = false;
+	function lancerBoucleEvenements(): void {
+		if (boucleActive) return;
+		boucleActive = true;
+		void (async () => {
 			try {
-				const evs = await courant.rest.events(since, EVENEMENTS, 10);
-				if (arrete) break;
-				if (await traiterEvenements(evs)) for (const a of abonnesDonnees) a();
-			} catch {
-				if (arrete) break;
-				await pause(1000); // the engine restarts, or a call failed: try again shortly
+				while (!arrete && !mort) {
+					try {
+						const evs = await courant.rest.events(since, EVENEMENTS, 10);
+						if (arrete) break;
+						if (await traiterEvenements(evs)) for (const a of abonnesDonnees) a();
+					} catch {
+						if (arrete) break;
+						await pause(1000); // the engine restarts, or a call failed: try again shortly
+					}
+				}
+			} finally {
+				boucleActive = false;
 			}
-		}
-	})();
+		})();
+	}
+	lancerBoucleEvenements();
 
 	/* Writes of the app, scanned at once: gathered for `DELAI_SCAN_MS` so a
 	   burst (a note and its journal line) is one call. */
@@ -752,6 +803,7 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		async stop() {
 			if (arrete) return;
 			arrete = true;
+			reveil?.();
 			clearInterval(minuteur);
 			clearInterval(minuteurMouvement);
 			if (minuteurScan) clearTimeout(minuteurScan);

@@ -31,7 +31,9 @@ object PairResult {
  *   connected), the pending offers (accepted only for our folder, from a paired
  *   device: re-aligning the folder with the paired list is the whole
  *   acceptance), and the state pushed when it changed;
- * - one restart on an unexpected exit, then the page shows sync as off.
+ * - an unexpected exit of Syncthing is never final: it is relaunched with a growing delay ([Supervisor],
+ *   [RestartPolicy]) for as long as the engine lives; meanwhile the state keeps the known devices, shown
+ *   as not connected, rather than "off" (2026-10-18: a stopped engine only came back after a manual off/on).
  *
  * There is no native pairing confirmation any more (owner's decision, 2026-10-05, like the PC): the
  * tap on "Add" is the answer.
@@ -41,9 +43,11 @@ class SyncEngine(
     private val launcher: () -> SyncthingInstance,
     private val root: File,
     private val deviceName: String,
-    private val portFree: () -> Boolean,
     private val scope: CoroutineScope,
     private val intervalMs: Long = 10_000,
+    private val policy: RestartPolicy = RestartPolicy(),
+    /** Lines for the bounded diagnostic log (restarts, their delays). */
+    private val diag: (String) -> Unit = {},
 ) {
     private class Running(val instance: SyncthingInstance, val ownId: String)
 
@@ -77,7 +81,7 @@ class SyncEngine(
 
     /** The app just wrote [abs]: if it lies in the shared folder, have Syncthing scan it now. */
     fun signalWrite(abs: String) {
-        if (stopped || dead) return
+        if (stopped || down) return
         val rel = ShareRules.pathToScan(root.path, abs) ?: return
         toScan.add(rel)
         if (scanPending) return
@@ -91,8 +95,28 @@ class SyncEngine(
         }
     }
     @Volatile private var stopped = false
-    @Volatile private var dead = false
-    private var restarted = false
+    private val supervisor = Supervisor<Running>(
+        scope = scope,
+        policy = policy,
+        launch = { launchAndConfigure() },
+        awaitExit = { it.instance.waitFor() },
+        onUp = { next ->
+            since = 0
+            detector = ReceptionDetector()
+            current = next
+            last = ""
+            push()
+        },
+        onDown = { last = ""; push() },
+        onEvent = { diag("supervisor: $it") },
+    )
+    /** True while Syncthing is being relaunched: commands are refused, the state shows the devices as away. */
+    private val down: Boolean get() = supervisor.restarting
+
+    /** Hurry a relaunch (network back, app on screen); nothing when it runs. */
+    fun revive() = supervisor.kick()
+
+    private var lastKnown: Map<String, Any?>? = null
     private var since = 0L
     private var detector = ReceptionDetector()
     private var last = ""
@@ -107,7 +131,7 @@ class SyncEngine(
 
     suspend fun start() {
         withContext(Dispatchers.IO) { current = launchAndConfigure() }
-        watch(current!!)
+        supervisor.adopt(current!!)
         // Real time (2026-10-03): the tick long-polls the events (up to 10 s), so it returns as soon as
         // Syncthing has something; a short pause between two ticks keeps a failing engine from spinning.
         loop = scope.launch(Dispatchers.IO) {
@@ -123,7 +147,7 @@ class SyncEngine(
         try {
             val rest = instance.rest
             val ownId = rest.myId()
-            rest.patchOptions(ShareRules.fixedOptions(portFree()))
+            rest.patchOptions(ShareRules.fixedOptions(instance.portFree))
             val devices = rest.devices()
             var me: JSONObject? = null
             val paired = ArrayList<String>()
@@ -140,30 +164,6 @@ class SyncEngine(
             instance.stop(graceMs = 2000)
             throw e
         }
-    }
-
-    /** One restart on an unexpected exit; the wrapper may have died while its child still holds the home (`releaseHome` clears it). */
-    private fun watch(r: Running) {
-        Thread {
-            r.instance.waitFor()
-            if (stopped || current !== r) return@Thread
-            scope.launch(Dispatchers.IO) {
-                if (restarted) { dead = true; push(); return@launch }
-                restarted = true
-                try {
-                    val next = launchAndConfigure()
-                    since = 0
-                    detector = ReceptionDetector()
-                    current = next
-                    watch(next)
-                } catch (e: Exception) {
-                    SyncLog.warn(TAG, "restart failed", e)
-                    dead = true
-                }
-                last = ""
-                push()
-            }
-        }.apply { isDaemon = true; start() }
     }
 
     /** Devices being removed: hidden, and never shared with again ([forget], [removeByOther]). */
@@ -204,8 +204,15 @@ class SyncEngine(
     suspend fun state(): Map<String, Any?> = withContext(Dispatchers.IO) { computeState() }
 
     private fun computeState(): Map<String, Any?> {
+        val s = computeLive()
+        if (s["actif"] == true && !down) lastKnown = s
+        return s
+    }
+
+    private fun computeLive(): Map<String, Any?> {
         val r = current
-        if (dead || r == null) return ABSENT
+        if (r == null) return ABSENT
+        if (down) return awayState()
         val rest = r.instance.rest
         val devices = rest.devices()
         val connections = rest.connections().optJSONObject("connections") ?: JSONObject()
@@ -246,7 +253,7 @@ class SyncEngine(
             rates[id] = rt
         }
         moving = folder.state == "syncing" || rates.values.any { it.down > 0 || it.up > 0 }
-        return mapOf(
+        return mapOf<String, Any?>(
             "actif" to true,
             "appareil" to r.ownId,
             "nom" to deviceName.take(64),
@@ -277,6 +284,15 @@ class SyncEngine(
         )
     }
 
+    /** While Syncthing is relaunched: the last known state, every device shown as not connected. */
+    private fun awayState(): Map<String, Any?> {
+        val known = lastKnown ?: return ABSENT
+        val devices = (known["appareils"] as? List<*>)?.filterIsInstance<Map<*, *>>().orEmpty().map { d ->
+            d.entries.associate { (k, v) -> k.toString() to (if (k == "connecte") false else v) } - "progression" - "debitBas" - "debitHaut"
+        }
+        return known + mapOf("appareils" to devices, "dossier" to mapOf("etat" to "idle", "pourcentage" to null))
+    }
+
     private fun push() {
         val s = try { computeState() } catch (_: Exception) { return }
         val text = JSONObject(s).toString()
@@ -286,7 +302,7 @@ class SyncEngine(
     }
 
     private suspend fun tick() {
-        if (stopped || dead || !tickLock.tryLock()) return
+        if (stopped || down || !tickLock.tryLock()) return
         try {
             val r = current ?: return
             val rest = r.instance.rest
@@ -339,7 +355,7 @@ class SyncEngine(
     suspend fun pair(raw: String, scannedName: String? = null): String = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
-        if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || dead) return@withContext PairResult.INVALID
+        if (!ShareRules.isDeviceId(id) || !ShareRules.hasValidCheckDigits(id) || r == null || id == r.ownId || down) return@withContext PairResult.INVALID
         // Paired again right after a removal: the pending deletion is called off.
         removing.remove(id)
         try {
@@ -376,7 +392,7 @@ class SyncEngine(
     suspend fun ignore(raw: String) = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
-        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead) return@withContext
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || down) return@withContext
         try { r.instance.rest.dismissPendingDevice(id) } catch (_: Exception) { /* nothing pending */ }
         // Remembered, or it asks again at its next connection attempt.
         try {
@@ -391,7 +407,7 @@ class SyncEngine(
     suspend fun forget(raw: String) = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
-        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead) return@withContext
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || down) return@withContext
         val paired = pairedIds(r)
         if (id !in paired) return@withContext
         // Like a friends list: the folder stops being shared with it at once (it sees "notSharing"
@@ -416,7 +432,7 @@ class SyncEngine(
         val id = raw.trim()
         val name = ShareRules.cleanName(rawName)
         val r = current
-        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead || name.isEmpty()) return@withContext
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || down || name.isEmpty()) return@withContext
         val devices = r.instance.rest.devices()
         val d = (0 until devices.length()).map { devices.getJSONObject(it) }.firstOrNull { it.optString("deviceID") == id } ?: return@withContext
         r.instance.rest.putDevice(d.put("name", name))
@@ -426,7 +442,7 @@ class SyncEngine(
     suspend fun sendAgain(raw: String) = withContext(Dispatchers.IO) {
         val id = raw.trim()
         val r = current
-        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || dead || id in removing) return@withContext
+        if (!ShareRules.isDeviceId(id) || r == null || id == r.ownId || down || id in removing) return@withContext
         val devices = r.instance.rest.devices()
         val d = (0 until devices.length()).map { devices.getJSONObject(it) }.firstOrNull { it.optString("deviceID") == id } ?: return@withContext
         sentAt[id] = System.currentTimeMillis()
@@ -460,6 +476,7 @@ class SyncEngine(
     suspend fun stop() {
         if (stopped) return
         stopped = true
+        supervisor.stop()
         loop?.cancel()
         val r = current
         withContext(Dispatchers.IO) { r?.instance?.stop() }

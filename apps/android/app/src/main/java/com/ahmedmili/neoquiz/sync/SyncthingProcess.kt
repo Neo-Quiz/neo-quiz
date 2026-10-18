@@ -41,6 +41,8 @@ class SyncthingInstance internal constructor(
     private val home: File,
     private val procRoot: File,
     private val kill: (Int) -> Unit,
+    /** Was the pinned listen port free BEFORE this process started (see [SyncthingProcess.start])? */
+    val portFree: Boolean = true,
 ) {
     val isAlive: Boolean get() = process.isAlive
 
@@ -76,6 +78,8 @@ class SyncthingProcess(
     private val procRoot: File = File("/proc"),
     private val kill: (Int) -> Unit = { android.os.Process.killProcess(it) },
 ) {
+    /** Where the output of Syncthing is kept (bounded, scrubbed); null: dropped. */
+    var log: RollingLog? = null
     /** Kills the survivors of a previous run and removes the pid file; waits until they are gone. Returns the killed pids. */
     fun releaseHome(): List<Int> {
         val targets = LinkedHashSet<Int>()
@@ -96,6 +100,11 @@ class SyncthingProcess(
         home.mkdirs()
         tmpDir.mkdirs()
         releaseHome()
+        // Checked HERE, before the child exists: probed after the spawn, the child's own listener on the pinned
+        // port (stored config) made it look busy and every restart fell back to a random port (the PC then
+        // dialled the old one for minutes). A port still held by a dying process is waited for, a few seconds.
+        val portFree = awaitListenPortFree(8_000)
+        log?.append("start: listen port ${ShareRules.LISTEN_PORT} " + if (portFree) "free" else "busy, a random port will be used")
         val port = freeLoopbackPort()
         val key = ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
         val builder = ProcessBuilder(listOf(binary.path) + ShareRules.launchArgs(home.path, port, key))
@@ -107,10 +116,15 @@ class SyncthingProcess(
         env["TMPDIR"] = tmpDir.path
         env["HOME"] = home.path
         builder.redirectErrorStream(true)
-        // Syncthing logs to stdout: an undrained pipe would block it, and the log never carries the key.
-        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(File("/dev/null")))
+        // Syncthing logs to stdout: it is drained into the bounded log (an undrained pipe would block it).
         val process = builder.start()
-        val instance = SyncthingInstance(process, SyncthingRest(port, key), home, procRoot, kill)
+        Thread {
+            try {
+                process.inputStream.bufferedReader().forEachLine { log?.append(it) }
+            } catch (_: IOException) { /* the process is gone */ }
+            log?.append("exit: code " + try { process.exitValue() } catch (_: IllegalThreadStateException) { "?" })
+        }.apply { isDaemon = true; start() }
+        val instance = SyncthingInstance(process, SyncthingRest(port, key), home, procRoot, kill, portFree)
         try {
             val deadline = System.currentTimeMillis() + 30_000
             while (true) {
@@ -130,6 +144,16 @@ class SyncthingProcess(
 
     /** Is the pinned listen port free (all interfaces)? */
     fun listenPortFree(): Boolean = try { ServerSocket(ShareRules.LISTEN_PORT).use { true } } catch (_: IOException) { false }
+
+    /** Polls [listenPortFree] up to [maxMs]; the last answer. */
+    fun awaitListenPortFree(maxMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + maxMs
+        while (true) {
+            if (listenPortFree()) return true
+            if (System.currentTimeMillis() >= deadline) return false
+            Thread.sleep(250)
+        }
+    }
 
     private fun freeLoopbackPort(): Int = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
 
