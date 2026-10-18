@@ -270,6 +270,20 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 		]);
 	r.check("agy: a repeated ACTIVE line opens its step once; garbage and non-JSON lines give nothing",
 		createTranscriptDecoder("agy")(agyLignes.split("\n")[2] + "\n" + agyLignes.split("\n")[2] + "\nnot json\n{\"event\":42}\n").length, 1);
+	/* The model's text (2026-10-19, measured on a real run: 499 `text_delta`s of an
+	   `agent_response` add up to the result's exact length): kept as text events. */
+	const agyTexte = [
+		{ event: "init", init: { cwd: "C:\\q" } },
+		{ event: "step_update", step_update: { step_index: 1, state: "ACTIVE", step_type: "agent_response", text_delta: "[\n  // title" } },
+		{ event: "step_update", step_update: { step_index: 1, state: "ACTIVE", step_type: "agent_response", text_delta: ": Un titre\n" } },
+		{ event: "step_update", step_update: { step_index: 1, state: "DONE", step_type: "agent_response", text_delta: "]" } },
+		{ event: "step_update", step_update: { step_index: 0, state: "DONE", step_type: "user_input" } },
+		{ event: "step_update", step_update: { step_index: 1, state: "ACTIVE", step_type: "agent_response", text_delta: 42 } },
+		{ event: "result", result: { response: "x" } },
+	].map(x => JSON.stringify(x)).join("\n") + "\n";
+	const trAgy = transcriptVide();
+	for (const ev of createTranscriptDecoder("agy")(agyTexte)) appliquer(trAgy, ev);
+	r.check("agy: the model's text deltas add up to its answer (a user step or a non-string delta adds nothing)", [trAgy.text, trAgy.done], ["[\n  // title: Un titre\n]", true]);
 
 	/* A MESSAGE CUT BY THE OUTPUT LIMIT (2026-10-18): the result carries only the
 	   last message, which began mid-string; the answer is every message from the

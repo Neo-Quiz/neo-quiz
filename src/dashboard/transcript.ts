@@ -499,6 +499,15 @@ function agyEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	}
 	if (event === "result") return [{ kind: "done" }];
 	const step = event === "step_update" ? rec(line.step_update) : null;
+	/* The model's own words (2026-10-19): every `agent_response` carries its text
+	   in `text_delta`s, and their sum IS the final answer (measured: 499
+	   deltas, 9,966 characters, the exact length of the result). They were
+	   dropped, so an Antigravity run never showed "Wrote N lines" nor the
+	   quiz progress the Claude and Codex runs show. */
+	if (step && str(step.step_type) === "agent_response") {
+		const delta = typeof step.text_delta === "string" ? step.text_delta : "";
+		return delta ? [{ kind: "text", text: delta }] : [];
+	}
 	if (!step || str(step.step_type) !== "tool") return [];
 	const index = step.step_index;
 	if (typeof index !== "number") return [];
