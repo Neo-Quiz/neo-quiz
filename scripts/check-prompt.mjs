@@ -502,6 +502,15 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	await avecRelances(async () => { n5++; throw new TransientCliError("cut"); }, () => true, 2, async () => {}, 1).catch(() => undefined);
 	r.check("avecRelances: a Stop is never retried", n5, 1);
 
+	/* THE QUIZ INSIDE A LONGER ANSWER (2026-10-18): GLM-5.3 Flash through Claude Code answered with the notes it had read (a PDF's text, code blocks with lists of dicts), then the quiz array, then "Generated." */
+	const quizTexte = "[\n  { title: 'La portée', prompt: 'Que vaut a ?', options: ['3', '7'], correctIndex: 1 },\n  { title: 'Le dictionnaire', prompt: 'Que renvoie keys ?', options: ['Les clés', 'Les valeurs'], correctIndex: 0 }\n]";
+	const notes = "# CM1 - Introduction à Python.pdf\n\n## Fonctions (p. 30)\n\n```python\ndef f(x, y):\n    return x + y\nrows = [\n  {'a': 1},\n  {'a': 2}\n]\nprint(rows[0])\n```\n\n";
+	const noye = parseReponseQuiz(notes + quizTexte + "\n\nGénéré.");
+	r.check("a quiz after the notes the agent printed is found, the lists of dicts in the notes are not taken for it", [noye.questions.length, noye.questions[0].title], [2, "La portée"]);
+	r.check("a cut quiz after notes stays unreadable (never a shorter quiz taken for the answer)",
+		(() => { try { parseReponseQuiz(notes + quizTexte.slice(0, quizTexte.length - 40)); return "(read)"; } catch (e) { return e instanceof Error; } })(), true);
+	r.check("prose with no quiz inside is still the non-quiz error, not a salvage", (() => { try { parseReponseQuiz("Voici mon avis [\n {un exemple}\n] sur la question."); return "(read)"; } catch (e) { return e instanceof Error; } })(), true);
+
 	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
 	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
 	const coupe = "[{ title: 'A', prompt: 'very lo";

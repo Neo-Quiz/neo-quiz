@@ -273,6 +273,34 @@ export function diagnosticAntigravity(stdout: string): string {
 	return out.join(" ");
 }
 
+/**
+ * The quiz array hidden in a longer answer (2026-10-18). An agent that read a
+ * PDF may answer with the text it extracted FIRST (95 KB of notes, measured on
+ * GLM-5.3 Flash through Claude Code), then the quiz, then "Done.": the whole is
+ * not JSON5, yet the quiz is whole inside it. Every line that opens an array of
+ * objects is a candidate start, tried from the LAST one backwards (notes quote
+ * code with lists of dicts, the quiz comes after them), each read up to the last
+ * `]`; the first that parses as a list of question objects wins. Never a
+ * guess: a cut or malformed array stays unreadable, and the caller reports it.
+ */
+export function extraireTableauQuiz(texte: string): unknown[] | null {
+	const fin = texte.lastIndexOf("]");
+	if (fin < 0) return null;
+	const debuts: number[] = [];
+	for (const m of texte.matchAll(/(?:^|\n)[ \t]*\[[ \t]*\r?\n?[ \t]*\{/g)) {
+		debuts.push(texte.indexOf("[", m.index ?? 0));
+	}
+	for (const debut of debuts.slice(-20).reverse()) {
+		if (debut >= fin) continue;
+		try {
+			const v = JSON5.parse(texte.slice(debut, fin + 1)) as unknown;
+			if (Array.isArray(v) && v.length > 0 && v.every(q => typeof q === "object" && q !== null && !Array.isArray(q))
+				&& v.some(q => "prompt" in (q as object) || "title" in (q as object))) return v;
+		} catch { /* not this start */ }
+	}
+	return null;
+}
+
 /** The note appended to the request for the ONE automatic second attempt: what
     the app could not read, and what to send instead. */
 export function noteDeReparation(erreur: unknown, brut: string): string {
@@ -1153,6 +1181,9 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		   discriminant est la présence de champs de question, pas le premier
 		   caractère : de la prose peut commencer par « [ » (lien markdown,
 		   ponctuation échappée). */
+		/* The quiz may sit inside a longer answer (notes first, the array, then a closing word): see `extraireTableauQuiz`. */
+		const extrait = extraireTableauQuiz(cleaned) ?? extraireTableauQuiz(content);
+		if (extrait) return { questions: inertRemoteImages(sansFauxTitres(extrait)), titre: titreEnCommentaire(cleaned) };
 		const looksLikeQuiz = /["']?(prompt|title|options|correctIndex|answer)["']?\s*:/.test(cleaned);
 		/* The parser's position AND the start of the answer (2026-10-10): "invalid
 		   character 'R' at 1:1" alone could not tell what the model had written
