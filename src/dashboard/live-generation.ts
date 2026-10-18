@@ -38,6 +38,8 @@ import type { ModeAgent } from "../host/claude-outils";
 import type { HostLive, LiveEvent, RunEvent } from "../host/types";
 import { addUserMessage, answerPermission, applyLive, emptyThread } from "./live-thread";
 import type { Thread } from "./live-thread";
+import { appliquer, createTranscriptDecoder, transcriptVide } from "./transcript";
+import type { Transcript } from "./transcript";
 import { collectLine, emptyOutcome } from "./live-turn";
 import type { TurnOutcome } from "./live-turn";
 import { forgetAllSaved, readAll, readSaved, turnFromStore, writeSaved } from "./live-turn-store";
@@ -231,6 +233,35 @@ export async function recordedTurn(run: ChatRun): Promise<Thread | null> {
 	const stored = await readAll(live, run.runId).catch(() => null);
 	if (!stored) return null;
 	return turnFromStore(stored, run, false).thread;
+}
+
+/** The work of a recorded ONE-SHOT call (a generation by Antigravity, Claude
+    Code on an Ollama model, a one-shot Claude or Codex call), rebuilt from the
+    raw lines the main process kept, with the same decoders as the live
+    transcript (2026-10-19): a stopped generation keeps its transcript as of
+    the stop. `null` when the run is gone, this host has no store, or the run
+    is not a one-shot one (`recordedTurn` reads those). */
+export async function recordedOneShot(run: ChatRun): Promise<{ transcript: Transcript; cancelled: boolean; ended: boolean } | null> {
+	const live = currentHost().live;
+	if (!live) return null;
+	const head = await live.readRun(run.runId, { offset: 0, limit: 1 }).catch(() => null);
+	if (!head || head.header.mode !== "one-shot") return null;
+	const stored = await readAll(live, run.runId).catch(() => null);
+	if (!stored) return null;
+	const decode = createTranscriptDecoder(head.header.tool);
+	const transcript = transcriptVide();
+	let cancelled = false;
+	let ended = false;
+	for (const e of stored.events) {
+		if (e.seq < run.fromSeq || e.seq > run.toSeq) continue;
+		if (e.dir === "out") {
+			for (const ev of decode((typeof e.l === "string" ? e.l : JSON.stringify(e.l)) + "\n")) appliquer(transcript, ev, e.t);
+		} else if (e.end && typeof e.end === "object") {
+			ended = true;
+			cancelled = (e.end as { cancelled?: unknown }).cancelled === true;
+		}
+	}
+	return { transcript, cancelled, ended };
 }
 
 /** One event of a stored run, by its INDEX (a one-event page). */

@@ -21,6 +21,7 @@ import { currentLang, t } from "../i18n";
 import type { ModeGeneration } from "../quiz-format";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { complementCategorie } from "./categorie-prompt";
+import { newRunId, runIdDeCle } from "./run-id";
 import { clarifyPrompt, type ClarifyFolders } from "./generation-kind";
 import { lectureClassifyPrompt } from "./lecture-detect";
 import { READING_MAX_CHARS } from "../lecture-style";
@@ -147,6 +148,11 @@ export interface GenerateOptions {
 	    and Codex run as a turn of the chat's live session when the host has
 	    them (`HostLive`); otherwise the one-shot call, as before. */
 	live?: LiveOptions;
+	/** The chat this generation belongs to (2026-10-19): every one-shot CLI
+	    call it makes then keeps its raw output in the run store
+	    (`HostProcess.run` `registre`), so a stopped or finished generation
+	    keeps its transcript. The runs are listed in `AiClient.lastRuns`. */
+	chatId?: string;
 }
 
 /** See `GenerateOptions.live`. */
@@ -514,6 +520,8 @@ export interface ChatOptions {
 	    queue restored after it attaches to the CLI still running instead of
 	    launching the same call again. Each CLI call gets its own key from it. */
 	reprise?: string;
+	/** As `GenerateOptions.chatId`. */
+	chatId?: string;
 	/** A command of Claude Code (2026-10-15): the last user turn is sent AS IT
 	    IS to the chat's live session, with no system prompt and no context.
 	    Without a live session (or with another provider) it rejects with
@@ -537,7 +545,7 @@ export interface AiClient {
 	    provider rejects with a message saying so. */
 	chat(history: ChatTurn[], options?: ChatOptions): Promise<string>;
 	/** "/exam": the model reads every document, then plans the quizzes. `[]`: no plan (unsupported provider or unreadable answer). */
-	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions }): Promise<EtapePlan[]>;
+	planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options?: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions; chatId?: string }): Promise<EtapePlan[]>;
 	/** The short call that may ask clarifying questions before a vague request
 	    generates (spec 2026-10-07-generate-auto-kind): the request and the NAMES of the
 	    documents only, the lowest effort, 30 s at most. Resolves with the
@@ -551,6 +559,10 @@ export interface AiClient {
 	/** Consommation de la DERNIÈRE génération réussie ; null si le fournisseur
 	    n'a rien publié (cf. ai-usage.ts : on n'estime jamais un compteur absent). */
 	lastUsage: AiUsage | null;
+	/** The runs (ids in the run store, in call order) of the LAST generation,
+	    chat message or plan given a `chatId`, kept even when it was stopped
+	    or failed: empty when none was recorded. */
+	lastRuns: string[];
 }
 
 /** Erreur d'exécution CLI, à la forme que `child_process.exec` produisait.
@@ -1526,6 +1538,21 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    a line after a reload asks the same keys in the same order. */
 	let repriseBase: string | null = null;
 	let appelsCli = 0;
+	/** The key base the call count belongs to. A generation asked AGAIN under
+	    the same base (the unreadable answer asked once more) goes on counting:
+	    restarting at 0 would reuse the key, and run id, of a call that already
+	    ended. After a reload the client is new and counts from 0 again, which
+	    is what makes the replay name the same calls. */
+	let baseDuCompte: string | null = null;
+	function commencerCompte(base: string | null): void {
+		if (base === null || base !== baseDuCompte) appelsCli = 0;
+		baseDuCompte = base;
+	}
+	/** The chat whose generation is running (its CLI calls are recorded in the
+	    run store), the runs it made so far, and those of the last one. */
+	let registreChat: string | null = null;
+	let runsFaits: string[] = [];
+	let derniersRuns: string[] = [];
 	/** The raw stream of the last Claude Code call, read only when its answer
 	    is not a quiz: a size limit may be named there and not in the answer. */
 	let derniereSortieClaude = "";
@@ -1625,6 +1652,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		   for the two CLIs that stream a format we read. */
 		const sink = transcriptSink;
 		const decode = sink ? createTranscriptDecoder(spec.tool) : null;
+		/* The resume key of THIS call; the run id is made from it, so the
+		   replay of the line after a reload names the SAME run (the CLI's
+		   output is recorded once, by the call that launched it). */
+		const cleAppel = repriseBase ? `${repriseBase}-${appelsCli++}` : undefined;
+		const runId = cleAppel ? runIdDeCle(cleAppel) : newRunId();
+		if (registreChat) runsFaits.push(runId);
 		return requireHost("process").run({
 			onStdout: decode && sink ? (chunk) => { for (const ev of decode(chunk)) sink(ev); } : undefined,
 			tool: spec.tool,
@@ -1636,7 +1669,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			sortieFichier: spec.sortieFichier,
 			dossier: spec.dossier,
 			...(spec.ollama ? { ollama: true } : {}),
-			reprise: repriseBase ? `${repriseBase}-${appelsCli++}` : undefined,
+			reprise: cleAppel,
+			...(registreChat ? { registre: { runId, chatId: registreChat } } : {}),
 		});
 	}
 
@@ -1684,7 +1718,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		aborted = false;
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
-		appelsCli = 0;
+		registreChat = options.chatId ?? options.live?.chatId ?? null; runsFaits = [];
+		commencerCompte(repriseBase);
 		dossierOutils = options.dossier ?? null;
 		neverAskTrust = !!options.neverAskTrust;
 		liveCtx = options.live ?? null;
@@ -1726,6 +1761,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			repriseBase = null;
+			derniersRuns = runsFaits; registreChat = null;
 			dossierOutils = null;
 			neverAskTrust = false;
 			liveCtx = null;
@@ -2623,16 +2659,17 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    document at once, then chooses the quizzes that will cover everything
 	    that can come up — their number, their order, what each covers.
 	    `typeImpose`: the Learn | Test selector, which the plan follows. */
-	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions } = {}): Promise<EtapePlan[]> {
+	async function planifier(demande: string, documents: string, typeImpose: "learn" | "practice" | undefined, options: { onTranscript?: (event: TranscriptEvent) => void; reprise?: string; dossier?: string; live?: LiveOptions; chatId?: string } = {}): Promise<EtapePlan[]> {
 		aborted = false;
 		pendingUsage = null;
 		transcriptSink = options.onTranscript ?? null;
 		repriseBase = options.reprise ?? null;
+		registreChat = options.chatId ?? options.live?.chatId ?? null; runsFaits = [];
 		dossierOutils = options.dossier ?? null;
 		neverAskTrust = false;
 		liveCtx = options.live ?? null;
 		texteSuite = null;
-		appelsCli = 0;
+		commencerCompte(repriseBase);
 		await refreshCliCaches();
 		try {
 			const provider = settings.get().aiProvider || "";
@@ -2673,6 +2710,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			abortCurrent = null;
 			transcriptSink = null;
 			repriseBase = null;
+			derniersRuns = runsFaits; registreChat = null;
 			dossierOutils = null;
 			neverAskTrust = false;
 			liveCtx = null;
@@ -2703,6 +2741,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		neverAskTrust = false;
 		liveCtx = null;
 		repriseBase = null;
+		registreChat = null;
 		await refreshCliCaches();
 		const limite = window.setTimeout(() => { if (abortCurrent) abortCurrent(); }, DECIDE_TIMEOUT_MS);
 		try {
@@ -2765,7 +2804,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		try {
 			// Inside the `try`: should it throw, `finally` still resets the live state above.
 			repriseBase = options.reprise ?? null;
-			appelsCli = 0;
+			registreChat = options.chatId ?? null; runsFaits = [];
+			commencerCompte(repriseBase);
 			await refreshCliCaches();
 			const provider = settings.get().aiProvider || "";
 			let model = settings.get().aiModel || (provider ? getProvider(provider).defaultModel : "");
@@ -2828,6 +2868,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			liveCtx = null;
 			texteSuite = null;
 			repriseBase = null;
+			derniersRuns = runsFaits; registreChat = null;
 		}
 	}
 
@@ -2838,6 +2879,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		classifyLectures,
 		planifier,
 		abort: () => { if (abortCurrent) abortCurrent(); },
-		get lastUsage() { return lastUsage; }
+		get lastUsage() { return lastUsage; },
+		get lastRuns() { return derniersRuns; }
 	};
 }

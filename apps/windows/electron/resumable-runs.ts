@@ -21,6 +21,16 @@
    which outlives a reload): a key names nothing for another window. A page
    that is destroyed (window closed) takes all its runs with it.
 
+   A CALL THAT ALREADY ENDED IS HELD TOO (2026-10-19). A generation makes
+   several CLI calls in a row (the first answer, then up to three repair
+   rounds), each under its own key; the reloaded page replays them in the
+   same order. A call that ended before the reload used to be forgotten as
+   soon as it was delivered, so the replay launched it AGAIN from scratch
+   (minutes and quota spent twice) before it reached the call that was still
+   running. A delivered result is now kept `retenueMs` (or until the page
+   leaves, then `delaiMs` for the reload to claim it): the replay gets it
+   at once and moves on to the running call.
+
    PURE of Electron: the page is an opaque value and the timers are
    injectable, so `check:cli-resume` drives every path deterministically.
 ══════════════════════════════════════════════════════════ */
@@ -84,7 +94,8 @@ export interface Reprises<P> {
 	taille(): number;
 }
 
-export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; minuteries?: Minuteries }): Reprises<P> {
+export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; /** How long a delivered result is kept for a replay (default: 15 minutes). */ retenueMs?: number; minuteries?: Minuteries }): Reprises<P> {
+	const retenueMs = options.retenueMs ?? 15 * 60_000;
 	const minuteries: Minuteries = options.minuteries ?? {
 		poser: (fn, ms) => setTimeout(fn, ms),
 		annuler: (j) => clearTimeout(j as ReturnType<typeof setTimeout>),
@@ -127,8 +138,9 @@ export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; 
 				message: err instanceof Error ? err.message : String(err),
 			})).then(res => {
 				e.fini = true;
-				// Delivered to a live caller: nothing left to hold.
-				if (!e.detache) oublier(cle, e);
+				/* Delivered to a live caller: kept a while for the replay of a
+				   reload (see the header); gone for good once it was claimed. */
+				if (!e.detache) e.minuteur = minuteries.poser(() => { e.minuteur = null; oublier(cle, e); }, retenueMs);
 				return res;
 			});
 			entrees.set(cle, e);
@@ -157,6 +169,8 @@ export function creerReprises<P>(options: { delaiMs: number; tailleMax: number; 
 				if (e.page !== page || e.detache) continue;
 				e.detache = true;
 				e.relais = null;
+				// The retention of a delivered result gives way to the reload's delay.
+				if (e.minuteur !== null) { minuteries.annuler(e.minuteur); e.minuteur = null; }
 				e.minuteur = minuteries.poser(() => {
 					e.minuteur = null;
 					if (!e.fini) e.controleur.abort();

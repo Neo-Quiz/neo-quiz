@@ -587,6 +587,13 @@ export interface HostProcess {
 		    the SAME run (its output replayed, then its result) instead of a
 		    new one. A host that cannot keep a run alive ignores it. */
 		reprise?: string;
+		/** KEEP THIS CALL'S RAW OUTPUT (2026-10-19): the page names the run
+		    (`runId`, a lowercase UUID it made up) and the chat it belongs to;
+		    the host writes every line the CLI prints, and how it ended, in
+		    the run store (`HostLive.readRun` reads it back), so a stopped or
+		    finished generation keeps its transcript. Tools `claude`, `codex`
+		    and `agy` only; a host without a store ignores it. */
+		registre?: { runId: string; chatId: string };
 		/** THE FOLDER the CLI works in (2026-10-09), a CONTRACT path: only
 		    the read-only tools form of Claude Code sends one, after
 		    `trustFolder` said `trusted`. The host passes it on as a disk
@@ -1117,10 +1124,11 @@ export interface HostDepot {
     Code / Codex run, `<userData>/runs/<runId>.jsonl`, kept on the PC only. */
 export interface RunHeader {
 	v: 1;
-	tool: "claude" | "codex";
+	tool: "claude" | "codex" | "agy";
 	model: string;
 	effort?: string;
-	mode: ModeAgent;
+	/** `"one-shot"`: the run of ONE CLI call (`HostProcess.run` with `registre`), not a live session. */
+	mode: ModeAgent | "one-shot";
 	/** A UUID: the store refuses anything else before it builds a path. */
 	runId: string;
 	cwd: string;

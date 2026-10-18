@@ -79,10 +79,10 @@ function unionDocuments(old: readonly ChatDocument[], now: readonly ChatDocument
     `old` is what was recorded before: its time and author stay, its results
     are kept. A request with an answer in and a sibling still working is
     "stopped" until it ends (an interrupted one stays so: "running" is never
-    stored, it is read from the live queue). `runOf` gives the place of a
-    line's finished live turn in its run (`ChatRun`): kept with the request,
+    stored, it is read from the live queue). `runOf` gives the places of a
+    line's finished runs (`ChatRun`: its live turn, and the one-shot CLI calls it made): kept with the request,
     so its AI work can be read back once the line has left the queue. */
-export function recordRequest(g: RequestGroup, device: string, now: number, old?: ChatRequest, runOf?: (l: LigneGeneration) => ChatRun | null): ChatRequest | null {
+export function recordRequest(g: RequestGroup, device: string, now: number, old?: ChatRequest, runOf?: (l: LigneGeneration) => readonly ChatRun[]): ChatRequest | null {
 	const terminal = g.lines.filter(isTerminal);
 	if (terminal.length === 0) return null;
 	const first = g.lines[0].demande;
@@ -124,7 +124,7 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 	const error = failed?.erreur ?? old?.error;
 	if (error && state === "failed") req.error = error;
 	// The AI work of its live turns: the ones recorded, plus the lines' own.
-	const runs = readRuns([...(old?.runs ?? []), ...(runOf ? g.lines.map(runOf).filter((x): x is ChatRun => !!x) : [])]);
+	const runs = readRuns([...(old?.runs ?? []), ...(runOf ? g.lines.flatMap(l => runOf(l)) : [])]);
 	if (runs) req.runs = runs;
 	return req;
 }
@@ -132,7 +132,7 @@ export function recordRequest(g: RequestGroup, device: string, now: number, old?
 /** The chats brought up to date from the queue. A group with nothing ended is
     skipped; a deleted chat is never revived; a request already recorded is
     only replaced when something changed (so `updatedAt` only moves then). */
-export function reconcileChats(chats: readonly ChatRecord[], groups: readonly RequestGroup[], device: string, now: number, runOf?: (l: LigneGeneration) => ChatRun | null): { chats: ChatRecord[]; changed: boolean } {
+export function reconcileChats(chats: readonly ChatRecord[], groups: readonly RequestGroup[], device: string, now: number, runOf?: (l: LigneGeneration) => readonly ChatRun[]): { chats: ChatRecord[]; changed: boolean } {
 	const list = [...chats];
 	let changed = false;
 	for (const g of groups) {

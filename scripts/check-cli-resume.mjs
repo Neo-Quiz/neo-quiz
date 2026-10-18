@@ -56,7 +56,9 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		const res = await p;
 		r.check("live run: the output is relayed as it comes", vus, ["a", "b"]);
 		r.check("live run: the result reaches the caller", res.stdout, "fini");
-		r.check("live run: nothing is held afterwards", reg.taille(), 0);
+		r.check("live run: its delivered result is kept for a replay (2026-10-19)", reg.taille(), 1);
+		avancer(15 * 60000 + 1);
+		r.check("live run: and forgotten after the retention", reg.taille(), 0);
 	}
 
 	// 2. The page reloads mid-run, then attaches again: same process, output replayed.
@@ -83,7 +85,8 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		cli.finir("quiz");
 		r.check("attached: the result reaches the new page", (await rattache.resultat).stdout, "quiz");
 		await tick();
-		r.check("attached: nothing is held once delivered", reg.taille(), 0);
+		avancer(15 * 60000 + 1);
+		r.check("attached: nothing is held once delivered and the retention is over", reg.taille(), 0);
 		r.check("a key is attached once: a second attach finds nothing", reg.rattacher("page", "cle-reload", "E", null), null);
 	}
 
@@ -182,5 +185,36 @@ await withSrcModule("apps/windows/electron/resumable-runs.ts", async ({ creerRep
 		r.check("fingerprint: the same request is", reg.rattacher("page", "cle-empreinte", "quiz CM1", null) !== null, true);
 	}
 
+
+	// 3 bis. A generation makes SEVERAL calls in a row (answer, repair rounds): the page reloads during the
+	// second. The replay asks the first again: it must get its held result, not launch it a second time.
+	{
+		const reg = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
+		const un = faux();
+		const deux = faux();
+		let lancements = 0;
+		const compte = (cli) => (e) => { lancements++; return cli.demarrer(e); };
+		const p1 = reg.lancer("page", "gen-0", "E1", new AbortController(), compte(un), null);
+		un.finir("premiere reponse");
+		await p1;
+		void reg.lancer("page", "gen-1", "E2", new AbortController(), compte(deux), null);
+		deux.dire("correction en cours");
+		reg.detacher("page");
+		const rejeu0 = reg.rattacher("page", "gen-0", "E1", null);
+		r.check("replay: the call that ended before the reload is answered from its held result, no new CLI", [rejeu0 !== null, (await rejeu0?.resultat)?.stdout, lancements], [true, "premiere reponse", 2]);
+		const apres = [];
+		const rejeu1 = reg.rattacher("page", "gen-1", "E2", t => apres.push(t));
+		r.check("replay: the call still running is attached, its output replayed", [rejeu1 !== null, apres.join("")], [true, "correction en cours"]);
+		deux.finir("quiz corrige");
+		r.check("replay: and its result reaches the reloaded page", (await rejeu1.resultat).stdout, "quiz corrige");
+		await tick();
+		const reg2 = creerReprises({ delaiMs: 60000, tailleMax: 100, minuteries });
+		const c = faux();
+		const p2 = reg2.lancer("page", "gen-0", "E1", new AbortController(), c.demarrer, null);
+		c.finir("x");
+		await p2;
+		reg2.detacher("page");
+		r.check("replay: a held result is for the SAME request and the SAME window only", [reg2.rattacher("page", "gen-0", "autre demande", null), reg2.rattacher("autre-page", "gen-0", "E1", null), reg2.rattacher("page", "gen-0", "E1", null) !== null], [null, null, true]);
+	}
 	r.done();
 });

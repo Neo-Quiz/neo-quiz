@@ -310,6 +310,61 @@ await withSrcModule("apps/windows/electron/run-store.ts", async ({ createRunStor
 			await writeFile(join(root, ID(15) + ".jsonl"), '{"v":1,"tool":\n{"t":1,"dir":"out","l":1}\n');
 			r.check("a damaged header reads as null", await createRunStore(root).read(ID(15)), null);
 		});
+
+		/* ── THE RAW OUTPUT OF A ONE-SHOT CALL (2026-10-19, `one-shot-run.ts`) ──
+		   An Antigravity or Ollama generation kept nothing: a stopped one lost
+		   its transcript and its completeness could not be checked. */
+		await withSrcModule("apps/windows/electron/one-shot-run.ts", async (O) => {
+			const root = join(dir, "oneshot", "runs");
+			const store = createRunStore(root);
+			const reg = { runId: ID(70), chatId: "chat-1" };
+			r.check("one-shot: only a UUID run id, a chat id and a recorded tool pass", [
+				O.validerRegistre(reg, "agy"), O.validerRegistre(reg, "claude"), O.validerRegistre(reg, "codex"),
+				O.validerRegistre(reg, "ollama"), O.validerRegistre({ runId: "../x", chatId: "c" }, "agy"), O.validerRegistre({ runId: "ABCDEFAB-0000-4000-8000-000000000070", chatId: "c" }, "agy"),
+				O.validerRegistre({ runId: ID(70), chatId: "" }, "agy"), O.validerRegistre({ runId: ID(70), chatId: "a\nb" }, "agy"), O.validerRegistre({ runId: ID(70), chatId: "x".repeat(201) }, "agy"), O.validerRegistre("x", "agy"), O.validerRegistre(null, "agy"),
+			], [reg, reg, reg, null, null, null, null, null, null, null, null]);
+			r.check("one-shot: the model is read from the arguments", [O.modeleDesArguments(["-p", "--model", "gemini-4"]), O.modeleDesArguments(["-m", "gpt"]), O.modeleDesArguments(["--model"]), O.modeleDesArguments(["--model", "--x"]), O.modeleDesArguments([])], ["gemini-4", "gpt", "", "", ""]);
+			await cas(r, "one-shot: chunks cut anywhere become whole lines, in order, JSON parsed and text kept", async () => {
+				const rec = O.ouvrirEnregistreur(store, reg, { tool: "agy", model: "gemini-4", cwd: "C:/x" });
+				rec.sortie('{"type":"a","n":1}\n{"type":"b"');
+				rec.sortie(',"n":2}\nplain text line\n\n{"type":"c"');
+				rec.sortie(',"n":3}');
+				await rec.fin({ code: 0, annule: false, stderr: " warn " });
+				const run = await store.read(ID(70));
+				r.check("one-shot: header says one-shot, tool agy", [run.header.mode, run.header.tool, run.header.chatId, run.header.model], ["one-shot", "agy", "chat-1", "gemini-4"]);
+				r.check("one-shot: every line is there, once, in order, then stderr and the end",
+					run.events.map(e => e.l ?? e.meta ?? e.end),
+					[{ type: "a", n: 1 }, { type: "b", n: 2 }, "plain text line", { type: "c", n: 3 }, { stderr: "warn" }, { code: 0, cancelled: false }]);
+				r.check("one-shot: seq is 0..n without a gap", run.events.map(e => e.seq), [0, 1, 2, 3, 4, 5]);
+			});
+			await cas(r, "one-shot: a stopped call keeps what it printed and says cancelled", async () => {
+				const rec = O.ouvrirEnregistreur(store, { runId: ID(71), chatId: "c" }, { tool: "claude", model: "", cwd: "" });
+				rec.sortie('{"type":"x"}\n{"type":"half');
+				await rec.fin({ code: null, annule: true, stderr: "" });
+				const run = await store.read(ID(71));
+				r.check("one-shot: stopped run: lines, the cut last line, end cancelled", run.events.map(e => e.l ?? e.end), [{ type: "x" }, '{"type":"half', { code: null, cancelled: true }]);
+			});
+			await cas(r, "one-shot: a store that fails never throws into the call", async () => {
+				const erreurs = [];
+				const casse = { open: async () => { throw new Error("disk"); }, append: async () => { throw new Error("disk"); } };
+				const rec = O.ouvrirEnregistreur(casse, { runId: ID(72), chatId: "c" }, { tool: "codex", model: "", cwd: "", surErreur: e => erreurs.push(String(e.message)) });
+				rec.sortie('{"a":1}\n');
+				await rec.fin({ code: 1, annule: false });
+				r.check("one-shot: the failures are reported, nothing thrown", erreurs.length > 0, true);
+			});
+		});
+
+		/* ── THE RUN ID OF A CALL COMES FROM ITS RESUME KEY (2026-10-19, `run-id.ts`) ──
+		   After a reload the replayed call must name the run the launching call
+		   recorded; two calls of a generation must never share one. */
+		await withSrcModule("src/dashboard/run-id.ts", async (I) => {
+			const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+			const ids = Array.from({ length: 50 }, (_, i) => I.runIdDeCle("sess-12-1727700000000-" + i));
+			r.check("run id: a key gives the same UUID every time (the replay names the same run)", I.runIdDeCle("sess-12-1727700000000-0"), I.runIdDeCle("sess-12-1727700000000-0"));
+			r.check("run id: it is a lowercase UUID the run store accepts", ids.every(x => UUID.test(x)) && UUID.test(I.newRunId()), true);
+			r.check("run id: the calls of a generation (-0, -1, ...) and other lines never share one", [new Set(ids).size, I.runIdDeCle("a-1-1-0") === I.runIdDeCle("a-2-1-0"), I.runIdDeCle("a-1-1-0") === I.runIdDeCle("a-1-2-0")], [50, false, false]);
+			r.check("run id: a random id is never twice the same", I.newRunId() === I.newRunId(), false);
+		});
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

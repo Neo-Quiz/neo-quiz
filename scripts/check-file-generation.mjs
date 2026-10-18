@@ -866,3 +866,57 @@ await withSrcModule("src/dashboard/auto-learn-record.ts", (A) => {
 		["moodle-live-1", "moodle-new-1", "moodle-new-2"]);
 	r.done();
 });
+
+/* A STOPPED GENERATION KEEPS ITS WORK (2026-10-19), through the REAL queue with a
+   fake CLI and a fake run store (a one-shot call: the line comes from another device, so it never runs live): the CLI call is recorded under the chat and a
+   run id made from its resume key (a replay after a reload names the same run);
+   when the line is stopped, the record learns where its work is kept WHILE the
+   line is still in the queue (it leaves right after, and a stopped request used
+   to show only "Stopped"). */
+await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.ts", "src/dashboard/run-id.ts"], async (app, hote, ids) => {
+	const r = makeReporter("A stopped generation keeps its work");
+	globalThis.document = { documentElement: { classList: { toggle: () => {} } } };
+	const appels = [];
+	const runs = new Map();
+	hote.installHost({
+		platform: { isDesktopApp: true },
+		process: {
+			lireCache: async () => null, trustFolder: async () => "refused", isFolderTrusted: async () => false, diagnosticReponse: async () => {},
+			run: (spec) => new Promise((_, rejeter) => {
+				appels.push(spec);
+				if (spec.registre) runs.set(spec.registre.runId, [{ t: 1, seq: 0, dir: "out", l: { type: "system" } }, { t: 2, seq: 1, dir: "out", l: { type: "assistant" } }, { t: 3, seq: 2, end: { code: null, cancelled: true } }]);
+				spec.signal.addEventListener("abort", () => rejeter(Object.assign(new Error("annulé"), { name: "annule" })));
+			}),
+		},
+		live: {
+			readRun: async (runId, page) => {
+				const events = runs.get(runId);
+				if (!events) return null;
+				const o = page?.offset ?? 0;
+				return { header: { v: 1, tool: "claude", model: "m", mode: "one-shot", runId, cwd: "", chatId: "c-stop", start: 1 }, events: events.slice(o, o + (page?.limit ?? 2000)), total: events.length, offset: o, interrupted: false, truncated: false, live: false };
+			},
+		},
+		fs: { mkdirs: async () => {}, exists: async () => false, write: async () => {}, getFile: () => null, read: async () => "" },
+		paths: { contractPath: (root, local) => root + "/" + local, defaultRoot: () => ({ id: "R", name: "Neo Quiz" }), localPath: (p) => (p === "R" ? "" : p.replace(/^R\//, "")), rootOf: () => ({ id: "R", name: "Neo Quiz" }) },
+		ui: { notice: () => {} },
+	});
+	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p, title: p, basename: p }), getQuizzes: () => [] };
+	const reglages = { aiProvider: "claude-code", aiModel: "sonnet", aiEffort: "medium" };
+	const file = app.fileDeGeneration({ settings: { get: () => ({ ...reglages }), save: async () => {} }, scanner });
+	await new Promise(res => setTimeout(res, 50));
+	const vus = [];
+	file.abonner(() => { vus.push(file.lignes().map(l => ({ etat: l.etat, places: file.placeTour(l.id).length }))); }, () => false);
+	file.envoyer({ text: "Fais un quiz", notes: [], images: [], mode: "practice", count: null, type: "Mixte", destination: "R/Cours", reglages, categorie: "general", chatId: "c-stop", fromDevice: "phone-1" });
+	for (let i = 0; i < 200 && appels.length === 0; i++) await new Promise(res => setTimeout(res, 10));
+	const id = file.lignes()[0].id;
+	file.annuler(id);
+	for (let i = 0; i < 200 && file.lignes().length > 0; i++) await new Promise(res => setTimeout(res, 10));
+	const reg = appels[0]?.registre;
+	r.check("the call is recorded under the chat, with a UUID run id made from its resume key",
+		[reg?.chatId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(reg?.runId ?? ""), reg?.runId === ids.runIdDeCle(appels[0].reprise)], ["c-stop", true, true]);
+	r.check("stopped: the line leaves the queue", file.lignes().length, 0);
+	r.check("stopped: the record could read where the work is kept while the line was still there",
+		vus.some(snap => snap.some(l => l.etat === "arret" && l.places === 1)), true);
+	r.done();
+	hote.uninstallHost();
+});

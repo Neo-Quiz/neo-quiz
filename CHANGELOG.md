@@ -37,6 +37,9 @@ release notes.
 
 ### Fixed
 
+- A generation stopped with Stop keeps its work: the request still shows what the AI had done (tools, reasoning, the text written so far), marked as stopped, instead of only "Stopped". Every AI run (Antigravity CLI, Claude Code, Ollama models run in Claude Code, Codex) now keeps its raw output on the PC with the same size limit as live sessions.
+- Reloading the window during a generation no longer starts the calls that had already ended over again: the reloaded window gets their results at once and reattaches to the call still running.
+- A Claude Code answer that had to be corrected, or asked once more, no longer reuses the name of a call that already ended.
 - A folder's Moodle course links now appear even when the Moodle window was never opened: the course is looked up on demand and every declared folder is refreshed at start, so the note reaches the phone.
 - Sync no longer stays stopped after Syncthing exits twice: it is relaunched with growing delays (2 s, 5 s, 15 s, 1 min, then every 5 min) for as long as sync is on, and meanwhile the Sync page keeps your devices listed as not connected instead of showing sync as off. On Android a launch that fails is retried the same way, a network change or opening the app retries at once, the pinned listen port is checked before Syncthing starts (it was tested after, so the app's own listener made every restart fall back to a random port), and Syncthing's output is kept in a bounded private log shown by the Sync page's log dialog when Syncthing is not answering.
 - The running header of an AI answer no longer blinks and can be clicked or hovered while it updates: a repaint of the conversation kept replacing its nodes, which dropped the hover and press and restarted its shine.

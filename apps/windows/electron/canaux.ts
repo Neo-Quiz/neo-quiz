@@ -80,6 +80,8 @@ import { vaultsObsidian } from "./vaults";
 import { argumentsAutorises, argumentsAvecOutils } from "./gabarits-cli";
 import { ajouterApprouve, CLE_CONFIANCE_IA, VERSION_CONFIANCE, dossierCanonique, estApprouve, lireApprouves, retirerApprouve } from "./confiance-ia";
 import { creerReprises, estCleReprise } from "./resumable-runs";
+import { modeleDesArguments, ouvrirEnregistreur, validerRegistre } from "./one-shot-run";
+import { createRunStore } from "./run-store";
 import { enregistrerCanauxLive } from "./live-canaux";
 
 /** How long a generation whose page reloaded waits to be claimed again
@@ -1719,6 +1721,12 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (apres.length !== avant.length) await reglagesOuErreur().ecrire(CLE_CONFIANCE_IA, apres);
 	});
 
+	/* The run store of the one-shot CLI calls: the SAME folder as the live
+	   sessions' (`live-canaux.ts` makes its own handle; the runs of the two
+	   never share an id). */
+	let magasinRuns: ReturnType<typeof createRunStore> | null = null;
+	const runsUniques = (): ReturnType<typeof createRunStore> => (magasinRuns ??= createRunStore(path.join(app.getPath("userData"), "runs")));
+
 	const cliEnVol = new Map<number, { controleur: AbortController; page: Electron.WebContents; reprenable: boolean }>();
 	/* A PAGE THAT GOES AWAY TAKES ITS CLIs WITH IT (2026-09-30): a reload of
 	   the window (update, crash, Ctrl+R) left the running Claude Code going
@@ -1844,7 +1852,16 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const reprenable = !!cleReprise && reprises.libre(cleReprise);
 		const enVolCli = { controleur, page: expediteur, reprenable };
 		if (!Number.isNaN(id)) cliEnVol.set(id, enVolCli);
-		const executer = async (emettre?: (texte: string) => void): Promise<ResultatCli> => {
+		/* THE RAW OUTPUT KEPT (2026-10-19): a call that names its run and chat
+		   writes every line the CLI prints in the run store, also when the
+		   page is gone or the call is stopped. Recorded by the call that
+		   LAUNCHES the CLI: an attach (above) replays, never records. */
+		const registre = validerRegistre(s.registre, tool);
+		const enregistreur = registre
+			? ouvrirEnregistreur(runsUniques(), registre, { tool: tool as "claude" | "codex" | "agy", model: modeleDesArguments(args), cwd: cwd ?? "", surErreur: err => console.warn(LOG_PREFIX, "run not recorded:", err instanceof Error ? err.message : err) })
+			: null;
+		const executer = async (emettreBrut?: (texte: string) => void): Promise<ResultatCli> => {
+			const emettre = enregistreur ? (texte: string): void => { enregistreur.sortie(texte); emettreBrut?.(texte); } : emettreBrut;
 			try {
 				const res = await run({
 					tool,
@@ -1858,8 +1875,10 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 					cwd,
 					ollama,
 				}, { surStdout: emettre });
+				await enregistreur?.fin({ code: res.code, annule: false, stderr: res.stderr });
 				return { ok: true, stdout: res.stdout, stderr: res.stderr, code: res.code, sortie: res.sortie };
 			} catch (e) {
+				await enregistreur?.fin({ code: null, annule: controleur.signal.aborted, stderr: e instanceof Error ? e.message : String(e) });
 				/* Le NOM survit, c'est tout l'objet de l'enveloppe. « erreur » est le
 				   défaut d'une exception qui n'en porterait pas — jamais un nom du
 				   contrat choisi au hasard, qui mentirait sur la cause. */

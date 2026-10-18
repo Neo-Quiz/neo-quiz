@@ -243,9 +243,11 @@ export interface FileGenerationApp {
 	repondreVivant(id: number, requestId: string, allow: boolean): void;
 	/** The full output of one tool call of the line's live turn. */
 	sortieOutil(id: number, toolId: string): Promise<string | null>;
-	/** Where the line's finished live turn sits in its run, kept with its
-	    request in the chat record; `null` otherwise. */
-	placeTour(id: number): ChatRun | null;
+	/** Where the line's finished runs sit in the run store, kept with its
+	    request in the chat record: its live turn, and the raw output of the
+	    one-shot CLI calls of a generation (stopped ones included); empty
+	    otherwise. */
+	placeTour(id: number): ChatRun[];
 }
 
 let instance: FileGenerationApp | null = null;
@@ -297,6 +299,29 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		groupe: d => (d.fromDevice ? "remote" : d.reglages.aiProvider === "antigravity-cli" ? "antigravity" : null),
 	};
 	const etapes = new Map<number, EtapeGeneration>();
+	/* The one-shot CLI runs of each line (raw output in the run store), kept
+	   when the generation ends or is stopped so the record can show its work. */
+	const runsUniques = new Map<number, ChatRun[]>();
+	async function garderRuns(id: number, runIds: readonly string[]): Promise<void> {
+		const live = currentHost().live;
+		if (!live || !runIds.length) return;
+		const out: ChatRun[] = [];
+		for (const runId of runIds) {
+			try {
+				const debut = await live.readRun(runId, { offset: 0, limit: 1 });
+				if (!debut || debut.total === 0 || !debut.events[0]) continue;
+				const fin = await live.readRun(runId, { offset: debut.total - 1, limit: 1 });
+				const dernier = fin?.events[0];
+				if (dernier) out.push({ runId, fromSeq: debut.events[0].seq, toSeq: dernier.seq });
+			} catch { /* a run that cannot be read is simply not kept */ }
+		}
+		if (!out.length) return;
+		runsUniques.set(id, out);
+		/* Published NOW, while the line is still in the queue: a stopped line
+		   leaves it right after (`solder`), and the record could never learn
+		   where its work was kept (the stopped request showed no transcript). */
+		publier();
+	}
 	/* The transcripts, by line, and who repaints them. Chunks arrive many
 	   times a second: the listeners hear of it once per 80 ms at most. */
 	const transcripts = new Map<number, Transcript>();
@@ -541,6 +566,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				   a remote or an automatic line (`liveDeLigne`). */
 				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) } : undefined,
 				reprise: cleReprise(ligne),
+				chatId: d.chatId ?? LEGACY_CHAT_ID,
 				onTranscript: (ev) => {
 					// A stopped or retried line no longer owns this transcript.
 					if (transcripts.get(ligne.id) !== transcript) return;
@@ -608,6 +634,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			// Un arrêt voulu n'est pas un échec : `solder` retire la ligne.
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
+			await garderRuns(ligne.id, client.lastRuns);
 			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
@@ -678,6 +705,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const e = err as Error & { aborted?: boolean };
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
+			await garderRuns(ligne.id, client.lastRuns);
 			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
@@ -715,6 +743,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const e = err as Error & { aborted?: boolean };
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
+			await garderRuns(ligne.id, client.lastRuns);
 			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
@@ -739,6 +768,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 				dossier: d.fromDevice ? undefined : await dossierDeLigne(d),
 				live: liveDeLigne(d) ? { chatId: d.chatId ?? LEGACY_CHAT_ID, key: cleVivante(ligne) } : undefined,
 				reprise: cleReprise(ligne),
+				chatId: d.chatId ?? LEGACY_CHAT_ID,
 				onTranscript: (ev) => {
 					if (transcripts.get(ligne.id) !== transcript) return;
 					appliquer(transcript, ev);
@@ -762,6 +792,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			const e = err as Error & { aborted?: boolean };
 			if (!e?.aborted || tourne(ligne.id)) file = F.echouer(file, ligne.id, e?.message || t("ai.error.checkSettings"));
 		} finally {
+			await garderRuns(ligne.id, client.lastRuns);
 			if (clients.get(ligne.id) === client) clients.delete(ligne.id);
 			etapes.delete(ligne.id);
 			file = F.solder(file, ligne.id);
@@ -936,7 +967,8 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		},
 		placeTour(id) {
 			const cle = cleDe(id);
-			return cle ? liveTurnPlace(cle) : null;
+			const vivant = cle ? liveTurnPlace(cle) : null;
+			return [...(vivant ? [vivant] : []), ...(runsUniques.get(id) ?? [])];
 		},
 		abonnerTranscript(ecouteur) {
 			ecouteursTranscript.add(ecouteur);

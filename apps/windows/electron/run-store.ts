@@ -125,7 +125,7 @@ function pickHeader(h: RunHeader): RunHeader {
 }
 
 function readHeader(o: unknown, runId: string): RunHeader | null {
-	if (!isObject(o) || o.v !== 1 || (o.tool !== "claude" && o.tool !== "codex") || o.runId !== runId) return null;
+	if (!isObject(o) || o.v !== 1 || (o.tool !== "claude" && o.tool !== "codex" && o.tool !== "agy") || o.runId !== runId) return null;
 	if (typeof o.model !== "string" || typeof o.mode !== "string" || typeof o.cwd !== "string"
 		|| typeof o.chatId !== "string" || typeof o.start !== "number") return null;
 	if (o.effort !== undefined && typeof o.effort !== "string") return null;

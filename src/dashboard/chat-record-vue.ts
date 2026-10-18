@@ -47,7 +47,8 @@ import type { DeviceRef } from "../shared-state/request-origin";
 import { labelOf, originContext, peindreOrigine, refsOf, statusText } from "./request-origin-vue";
 import type { ChatRun } from "./chat-record";
 import type { Thread } from "./live-thread";
-import { recordedToolOutput, recordedTurn, recordedTurnMs } from "./live-generation";
+import { recordedOneShot, recordedToolOutput, recordedTurn, recordedTurnMs } from "./live-generation";
+import { creerBlocTravail } from "./transcript-steps";
 import * as aiProviders from "./ai-providers";
 import { renderThread } from "./work-view";
 
@@ -135,6 +136,7 @@ function peindreTravail(parent: HTMLElement, q: ChatRequest, runner: DeviceRef, 
 		}
 		let detail: HTMLElement | null = null;
 		let lu: Promise<Thread | null> | null = null;
+		let uneFois: ReturnType<typeof recordedOneShot> | null = null;
 		b.addEventListener("click", () => {
 			const ouvrir = !detail;
 			b.setAttribute("aria-expanded", String(ouvrir));
@@ -145,13 +147,30 @@ function peindreTravail(parent: HTMLElement, q: ChatRequest, runner: DeviceRef, 
 			b.after(d);
 			detail = d;
 			const racine = ajouter(d, "div", "qbd-work");
-			lu ??= recordedTurn(run).catch(() => null);
-			void lu.then(thread => {
+			/* A one-shot call (Antigravity, Claude Code on an Ollama model...) kept
+			   its raw output: its transcript is rebuilt, a stopped one included
+			   (2026-10-19). Any other run is a live turn, read as a thread. */
+			uneFois ??= recordedOneShot(run).catch(() => null);
+			void uneFois.then(une => {
 				if (detail !== d) return;
-				// Gone from the store (deleted, or never kept here): say so, keep the line.
-				if (!thread || !thread.items.length) { ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable")); return; }
-				// Read-only: a recorded turn has no permission left to answer.
-				renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
+				if (une) {
+					const bloc = creerBlocTravail();
+					racine.append(bloc.el);
+					bloc.maj(une.transcript, false);
+					const texte = une.transcript.text.trim();
+					if (texte) ajouter(racine, "pre", "qbd-ai-transcript-reflexion", texte.length > 20000 ? texte.slice(0, 20000) + "…" : texte);
+					if (une.cancelled) ajouter(racine, "div", "qbd-ai-statut", t("ai.thread.stopped"));
+					else if (!bloc.el.children.length && !texte) ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable"));
+					return;
+				}
+				lu ??= recordedTurn(run).catch(() => null);
+				void lu.then(thread => {
+					if (detail !== d) return;
+					// Gone from the store (deleted, or never kept here): say so, keep the line.
+					if (!thread || !thread.items.length) { ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable")); return; }
+					// Read-only: a recorded turn has no permission left to answer.
+					renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
+				});
 			});
 		});
 	}
