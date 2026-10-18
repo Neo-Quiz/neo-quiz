@@ -251,6 +251,34 @@ export function lireOuDiagnostiquer(texte: string, lire: LireReponse, erreurCli 
 	}
 }
 
+/** The note appended to the request for the ONE automatic second attempt: what
+    the app could not read, and what to send instead. */
+export function noteDeReparation(erreur: unknown, brut: string): string {
+	const detail = (erreur instanceof Error ? erreur.message : String(erreur)).slice(0, 300);
+	return "\n\nAUTOMATIC SECOND ATTEMPT: your previous answer could not be read by the app (" + detail + "). It began with: “" + apercuReponse(brut) + "”. Answer again with the COMPLETE quiz: ONE valid JSON5 array, nothing before or after it, every object and string closed. If the previous answer was long, make it more compact (shorter readings and explanations) so that it fits in one message.";
+}
+
+/**
+ * One model call and its reading, with ONE automatic repair (2026-10-18):
+ * an answer the app cannot read (cut off, malformed, prose instead of the
+ * quiz) must not stop the generation. The call is made again with a note that
+ * quotes the parser error (`noteDeReparation`; a live session answers it in
+ * the same conversation); only when the second answer is unreadable too, or
+ * its call fails, is the error of the FIRST answer reported. Never repaired:
+ * a model's explicit "no quiz", a usage limit, a context limit, a Stop.
+ */
+export async function lireOuReparer(appel: (suite: string) => Promise<string>, lire: LireReponse, annule: () => boolean = () => false): Promise<ReponseQuiz & { lot?: ReponseDocument[] }> {
+	const brut = await appel("");
+	try {
+		return lire(brut);
+	} catch (e) {
+		if (annule() || e instanceof NoQuizAnswer || e instanceof UsageLimitError || (e instanceof Error && e.message === t("ai.err.contextLimit"))) throw e;
+		let second: string;
+		try { second = await appel(noteDeReparation(e, brut)); } catch { throw e; }
+		try { return lire(second); } catch { throw e; }
+	}
+}
+
 /** The quiz of ONE document in the answer of a one-pass generation. */
 export interface ReponseDocument {
 	/** The document's name, as it was given in `GenerateOptions.documents`. */
@@ -1298,6 +1326,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    sent when the session already holds the conversation. Never set by a
 	    generation or a plan. */
 	let texteSuite: string | null = null;
+	/** The repair note of the second attempt (`lireOuReparer`): a follow-up turn sends `texteSuite`, not the prompt it would be appended to. */
+	let noteReparation = "";
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -1380,7 +1410,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		abortCurrent = () => { aborted = true; arreter?.(); };
 		try {
 			return await runLiveTurn({
-				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texteSuite ?? texte,
+				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texteSuite ? texteSuite + noteReparation : texte,
 				...(texteSuite ? { freshText: texte } : {}),
 				...(effort ? { effort } : {}),
 				images: images.map(i => ({ mediaType: i.mediaType || "image/png", base64: i.base64 })),
@@ -1562,7 +1592,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   niveau de raisonnement est DANS le nom du modèle (`…-high`, `…-low`),
 	   donc pas d'effort à passer. */
 	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lire(await callAntigravityTexte(model, systemPrompt, userPrompt, images));
+		return lireOuReparer(suite => callAntigravityTexte(model, systemPrompt, userPrompt + suite, images), lire, () => aborted);
 	}
 
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
@@ -1674,7 +1704,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   compte Pro/Max/Team/Enterprise. Prompt complet par stdin
 	   (aucun échappement d'argument), sortie --output-format json. */
 	async function callClaudeCode(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lire(await callClaudeCodeTexte(model, systemPrompt, userPrompt, images));
+		return lireOuReparer(suite => { noteReparation = suite; return callClaudeCodeTexte(model, systemPrompt, userPrompt + suite, images); }, lire, () => aborted);
 	}
 
 	/** The effort chosen in the composer, as `claude --effort` reads it. It
@@ -1868,7 +1898,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   écrite dans un fichier (-o) pour un parsing propre. Sandbox read-only et
 	   --ignore-user-config isolent la génération (pas de MCP/hooks perso). */
 	async function callCodex(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false, lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lire(await callCodexTexte(model, systemPrompt, userPrompt, images, effort, fast));
+		return lireOuReparer(suite => callCodexTexte(model, systemPrompt, userPrompt + suite, images, effort, fast), lire, () => aborted);
 	}
 
 	/** The call itself, returning the model's TEXT (see `callClaudeCodeTexte`). */

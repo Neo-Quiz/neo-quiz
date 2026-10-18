@@ -358,7 +358,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 	r.check("parts: one entry per quiz with its title and questions", [parts.map(x => x.titre), parts.map(x => x.questions[0].title)], [["Couches", "Routage"], ["Q1", "Q2"]]);
 	r.check("parts: a count that differs from the one asked is refused", (() => { try { parseReponseParties(reponse(partie(1, "A")), 2); return "accepted"; } catch { return "refused"; } })(), "refused");
 	r.check("parts: auto accepts the count the model chose", parseReponseParties(reponse(partie(1, "A"), partie(2, "B"), partie(3, "C")), "auto").length, 3);
-	r.check("parts: two equal titles get distinct keys", (() => { const x = parseReponseParties(reponse(partie(1, "Même"), partie(2, "Même")), 2); return x[0].document !== x[1].document; })(), true);
+	r.check("parts: two equal titles get distinct keys", (() => { const x = parseReponseParties(reponse(partie(1, "Mï¿½me"), partie(2, "Mï¿½me")), 2); return x[0].document !== x[1].document; })(), true);
 	/* 2026-10-14: in agent modes Claude Code loads the user's own skills; one
 	   written for course notes kept running at every generation. */
 	r.check("agent modes: the generation forbids invoking a skill", ["full", "auto", "acceptEdits"].map(m => consigneAvecOutils(composerPrompts("x", { mode: "learn" }).systemPrompt, m).includes("Never invoke a skill")), [true, true, true]);
@@ -440,7 +440,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -475,6 +475,30 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("an explicit 'no quiz' is not a failure: passed through, nothing kept", [f.nom, f.gardes.length], ["NoQuizAnswer", 0]);
 	const g = (() => { try { return lireOuDiagnostiquer("[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]", parseReponseQuiz, "", () => { throw new Error("x"); }).questions.length; } catch { return -1; } })();
 	r.check("a readable answer is read, the keeper never called", g, 1);
+
+	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
+	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
+	const coupe = "[{ title: 'A', prompt: 'very lo";
+	const appels = [];
+	const rep = await lireOuReparer(async (suite) => { appels.push(suite); return appels.length === 1 ? coupe : bon; }, parseReponseQuiz);
+	r.check("a broken then a good answer: the quiz is read, after exactly two calls", [rep.questions.length, appels.length], [1, 2]);
+	r.check("the first call has no note, the second quotes the parser error and the start of the broken answer",
+		[appels[0], appels[1].includes("AUTOMATIC SECOND ATTEMPT"), appels[1].includes("very lo"), appels[1].includes("could not be read")], ["", true, true, true]);
+	const toujoursCasse = [];
+	const errCasse = await lireOuReparer(async (suite) => { toujoursCasse.push(suite); return coupe; }, parseReponseQuiz).catch(e => e);
+	r.check("two broken answers: ONE repair only, then the error of the FIRST answer", [toujoursCasse.length, errCasse instanceof Error, errCasse.message.includes("very lo")], [2, true, true]);
+	const sansCoupure = [];
+	await lireOuReparer(async (suite) => { sansCoupure.push(suite); return bon; }, parseReponseQuiz);
+	r.check("a good answer is never repeated", sansCoupure.length, 1);
+	const aucun = [];
+	const nq = await lireOuReparer(async (suite) => { aucun.push(suite); return "NO_QUIZ\nnothing to quiz"; }, parseReponseQuiz).catch(e => e);
+	r.check("an explicit 'no quiz' is not repaired", [aucun.length, nq instanceof NoQuizAnswer], [1, true]);
+	let annule = false;
+	const stopped = [];
+	await lireOuReparer(async (suite) => { stopped.push(suite); annule = true; return coupe; }, parseReponseQuiz, () => annule).catch(() => undefined);
+	r.check("a Stop during the first call is not repaired", stopped.length, 1);
+	const echecReparation = await lireOuReparer(async (suite) => { if (suite) throw new Error("cli down"); return coupe; }, parseReponseQuiz).catch(e => e);
+	r.check("a failing repair call reports the first answer's error", echecReparation.message.includes("very lo"), true);
 
 	const dossier = mkdtempDiag(joinDiag(tmpdirDiag(), "quiz-diag-"));
 	try {
