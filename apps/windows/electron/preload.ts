@@ -306,7 +306,7 @@ const pont: Pont = {
 		},
 	},
 
-	/* BUG REPORT: text in, result out; the GitHub token stays in the main process. */
+	/* BUG REPORT: text in, result out; the GitHub credential stays in the main process. */
 	signalement: process.platform !== "win32" ? undefined : {
 		apercu: () => ipcRenderer.invoke(CANAUX.signalementApercu),
 		envoyer: rapport => ipcRenderer.invoke(CANAUX.signalementEnvoyer, rapport),
