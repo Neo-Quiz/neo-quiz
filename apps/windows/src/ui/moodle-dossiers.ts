@@ -56,12 +56,31 @@ export function noterCours(cours: readonly CoursMoodle[]): void {
 export async function rafraichirLiensMoodle(dossier: string): Promise<boolean> {
 	const api = pont().moodle;
 	const code = codeDuDossier(dossier);
-	const id = code ? lireIds()[code] : undefined;
-	if (!api || !id) return false;
+	if (!api || !code) return false;
+	/* The id map lives in this window's storage and is only filled when the Moodle
+	   window opens: a fresh install, cleared storage or an app start that never
+	   opened it left the folder without links (and the phone, which cannot reach
+	   Moodle, with none either). Ask the course list (cached by the main process). */
+	let id = lireIds()[code];
+	if (!id) {
+		noterCours(await api.cours().catch(() => [] as CoursMoodle[]));
+		id = lireIds()[code];
+	}
+	if (!id) return false;
 	const mod = await api.module(id).catch(() => null);
 	if (!mod) return false;
 	const liens = mod.sections.flatMap(s => s.activites.filter(a => a.lien).map(a => ({ title: a.name, url: a.lien as string })));
 	return ecrireLiensMoodle(dossier, liens);
+}
+
+/** Writes `Liens Moodle.md` for every declared folder (start of the app), so the
+    synced note reaches the phone even when this PC never opened the folder page. */
+export async function rafraichirTousLesLiens(ctx: DashboardShellCtx): Promise<void> {
+	if (!pont().moodle || currentHost().platform.isMobile) return;
+	for (const o of Object.values(ctx.settings.quizzesModuleOverrides || {})) {
+		const dossier = o?.path;
+		if (dossier && codeDuDossier(dossier)) await rafraichirLiensMoodle(dossier).catch(() => false);
+	}
 }
 
 /** Takes the ends of a timetable answer (the Moodle window passes its own). */

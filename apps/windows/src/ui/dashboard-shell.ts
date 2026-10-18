@@ -71,7 +71,7 @@ import { isoLocal, upcomingExams } from "../../../../src/dashboard/home-tasks";
 import { pont } from "../host/pont";
 import { estMobile } from "../host/platform";
 import { openMoodleModal } from "./moodle-modal";
-import { chargerFins, finDuDossier, rafraichirLiensMoodle } from "./moodle-dossiers";
+import { chargerFins, finDuDossier, rafraichirLiensMoodle, rafraichirTousLesLiens } from "./moodle-dossiers";
 import { YEAR_FOLDER_RE } from "../../../../src/dashboard/year-folders";
 import { monterPointLogo } from "./mise-a-jour";
 import { noterVue } from "./reprise";
@@ -706,6 +706,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	coquilleMontee = ctx;
 	repeindreMontee = () => peindre();
 	// The timetable's ends, for the "Ended" section of the Folders page.
+	void rafraichirTousLesLiens(ctx);
 	void chargerFins(ctx).then(ok => { if (ok && coquilleMontee === ctx) peindre(); });
 	const nav = createNavHandlers(ctx);
 	const home = createHomeHandlers(ctx);
