@@ -151,7 +151,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.step.answerLabel": "Réponse",
 
 	/* ── Question texte / terminal ── */
-	"engine.text.placeholder": "Votre réponse...",
+	"engine.text.placeholder": "Votre réponse…",
 	"engine.terminal.programOutputLabel": "Sortie du programme…",
 	"engine.terminal.window.cmd": "Invite de commandes",
 	"engine.terminal.window.powershell": "Windows PowerShell",
@@ -159,7 +159,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Votre réponse libre",
-	"engine.textOnly.answerPlaceholder": "Écrivez votre réponse avec vos mots...",
+	"engine.textOnly.answerPlaceholder": "Réponse avec vos propres mots…",
 	"engine.textOnly.explanationLabel": "Explication",
 	"engine.textOnly.noExpectedAnswer": "Réponse attendue non renseignée.",
 	"engine.textOnly.noAnswerGiven": "Aucune réponse donnée.",
@@ -248,7 +248,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 
 	/* ── Bouton Exécuter d'un bloc de code Python ── */
 	"engine.code.run": "Exécuter",
-	"engine.code.answerPlaceholder": "Écris ton code ici...",
+	"engine.code.answerPlaceholder": "Votre code…",
 	"engine.code.running": "Exécution…",
 	"engine.code.output": "Sortie",
 	"engine.code.empty": "(aucune sortie)",

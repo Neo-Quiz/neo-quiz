@@ -167,7 +167,7 @@ export const EN_ENGINE = {
 	"engine.step.answerLabel": "Answer",
 
 	/* ── Question texte / terminal ── */
-	"engine.text.placeholder": "Your answer...",
+	"engine.text.placeholder": "Your answer…",
 	/* Variante terminal qui n'est PAS une vraie invite de commande (retour #2,
 	   2026-09-26 soir) : le champ devient un bloc de code éditable, avec ce
 	   libellé au-dessus au lieu d'une invite « C:\> ». */
@@ -178,7 +178,7 @@ export const EN_ENGINE = {
 
 	/* ── Mode entraînement (réponse libre) ── */
 	"engine.textOnly.answerLabel": "Your own answer",
-	"engine.textOnly.answerPlaceholder": "Write your answer in your own words...",
+	"engine.textOnly.answerPlaceholder": "Answer in your own words…",
 	"engine.textOnly.explanationLabel": "Explanation",
 	"engine.textOnly.noExpectedAnswer": "No expected answer was provided.",
 	"engine.textOnly.noAnswerGiven": "No answer given.",
@@ -267,7 +267,7 @@ export const EN_ENGINE = {
 
 	/* ── Run button on a Python code block ── */
 	"engine.code.run": "Run",
-	"engine.code.answerPlaceholder": "Write your code here...",
+	"engine.code.answerPlaceholder": "Your code…",
 	"engine.code.running": "Running…",
 	"engine.code.output": "Output",
 	"engine.code.empty": "(no output)",
