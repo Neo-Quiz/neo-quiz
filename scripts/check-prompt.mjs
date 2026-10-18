@@ -440,7 +440,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, diagnosticAntigravity, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -475,6 +475,14 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("an explicit 'no quiz' is not a failure: passed through, nothing kept", [f.nom, f.gardes.length], ["NoQuizAnswer", 0]);
 	const g = (() => { try { return lireOuDiagnostiquer("[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]", parseReponseQuiz, "", () => { throw new Error("x"); }).questions.length; } catch { return -1; } })();
 	r.check("a readable answer is read, the keeper never called", g, 1);
+
+	/* ANTIGRAVITY DIAGNOSTIC (2026-10-18): only the result/error events say why a run failed; the agent's own tool outputs never do. */
+	const outilAgy = JSON.stringify({ event: "step_update", step_update: { step_type: "tool", text: "python: command not found, error 401, quota, introuvable, 429 not recognized" } });
+	const finiAgy = JSON.stringify({ event: "result", result: { status: "SUCCESS", response: "[]" } });
+	r.check("a successful agent stream full of 'not recognized', 401, quota, introuvable says nothing", diagnosticAntigravity([outilAgy, finiAgy].join("\n")).trim(), "");
+	const echecAgy = JSON.stringify({ event: "result", result: { status: "ERROR", error: "Authentication required" } });
+	r.check("the result event's error is kept, with the tool noise left out", [diagnosticAntigravity([outilAgy, echecAgy].join("\n")).includes("Authentication required"), diagnosticAntigravity([outilAgy, echecAgy].join("\n")).includes("introuvable")], [true, false]);
+	r.check("a plain text error (no stream) is taken as it is", diagnosticAntigravity("Fetching available models...\nError: Please sign in to view available models.").includes("Please sign in"), true);
 
 	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
 	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";

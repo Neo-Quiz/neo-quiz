@@ -251,6 +251,28 @@ export function lireOuDiagnostiquer(texte: string, lire: LireReponse, erreurCli 
 	}
 }
 
+/**
+ * The part of an Antigravity output that may say WHY it failed (2026-10-18).
+ * In agent mode its `stream-json` output carries everything the agent did, tool
+ * outputs included: scanning it all for "401", "quota", "not recognized" or
+ * "introuvable" blamed a missing install on a quiz whose own commands had
+ * printed one of them. Only the `result` and `error` events count; an output
+ * that is not a stream (a plain error text) is taken as it is, its end only.
+ */
+export function diagnosticAntigravity(stdout: string): string {
+	const lignes = String(stdout || "").split("\n").map(l => l.trim()).filter(Boolean);
+	if (!lignes.some(l => l.startsWith("{\"event\":"))) return lignes.join(" ").slice(-2000);
+	const out: string[] = [];
+	for (const l of lignes) {
+		if (!l.startsWith("{\"event\":\"result\"") && !l.startsWith("{\"event\":\"error\"")) continue;
+		try {
+			const v = JSON.parse(l) as { result?: { status?: string; error?: string }; error?: unknown; message?: unknown };
+			out.push(String(v.result?.error ?? ""), v.result?.status && v.result.status !== "SUCCESS" ? String(v.result.status) : "", typeof v.error === "string" ? v.error : "", typeof v.message === "string" ? v.message : "");
+		} catch { /* a cut line says nothing */ }
+	}
+	return out.join(" ");
+}
+
 /** The note appended to the request for the ONE automatic second attempt: what
     the app could not read, and what to send instead. */
 export function noteDeReparation(erreur: unknown, brut: string): string {
@@ -1632,7 +1654,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		    required » sans compte, « quota » quand le forfait est épuisé. */
 		const erreurAntigravity = (e: ExecError): Error => {
 			console.error("[quiz-blocks] Antigravity CLI error:", e.message, e.stderr || "");
-			const detail = ((e.stderr || "") + " " + (e.stdout || "") + " " + e.message).toLowerCase();
+			const detail = ((e.stderr || "") + " " + diagnosticAntigravity(e.stdout || "") + " " + e.message).toLowerCase();
 			if (e.code === "ENOENT" || e.code === 127 || detail.includes("not recognized") || detail.includes("introuvable") || detail.includes("command not found")) {
 				return new Error(t("ai.err.antigravityNotInstalled"));
 			}
