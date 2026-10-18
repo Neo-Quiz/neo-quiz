@@ -102,8 +102,8 @@ function premierEcart(obtenu, attendu) {
    copy of the singleton, and `currentHost()` would throw on the module under
    test. */
 await withSrcModule(
-	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts", "src/dashboard/exam-keep.ts"],
-	async (io, hote, exp, keepMod) => {
+	["src/dashboard/detail-io.ts", "src/host/current.ts", "src/editor/export.ts", "src/dashboard/exam-keep.ts", "src/dashboard/quiz-subject-edit.ts"],
+	async (io, hote, exp, keepMod, subj) => {
 	const r = makeReporter("Écriture d'un bloc");
 
 	/** Un faux HÔTE sur une carte en mémoire : un chemin, un contenu, une date.
@@ -862,6 +862,85 @@ await withSrcModule(
 			const lue = { id: "q1", prompt: "second", options: ["a", "b"], correctIndex: 0 };
 			r.check("16e. a duplicated key: refused, the note untouched",
 				[(await io.saveQuestionEdit(v.chemin, bloc(v.contenu), 0, lue, { prompt: "third" })).ok, v.contenu === depart], [false, true]);
+		}
+	}
+
+	/* ─────────── 17. the quiz's subject: ONE frontmatter line, nothing else ─────────── */
+
+	{
+		const BOM = String.fromCharCode(0xfeff);
+		const SAUF_SUJET = (s) => s.split(/\r\n|\n/).filter(l => !/^\s+subject:/.test(l)).join("|");
+		const RE_BLOC = new RegExp(FENCE + "quiz-blocks[^\\n]*\\n([\\s\\S]*?)\\r?\\n[ \\t]*" + FENCE);
+		const sansExtra = (eol) => ["---", "tags: [cours]", "neo-quiz:", "  provider: claude", "  model: opus", "  generatedAt: 2026-10-01T10:00:00Z", "---", "", "Intro text.", ""].join(eol) + note({ eol });
+
+		// a. add under an existing neo-quiz: key, LF and CRLF
+		for (const [nom, eol] of [["LF", LF], ["CRLF", CRLF]]) {
+			const depart = sansExtra(eol);
+			const apres = subj.reecrireSujet(depart, "python");
+			r.check("17a. " + nom + ": the subject is added as ONE line", apres.split(eol).length - depart.split(eol).length, 1);
+			r.check("17a. " + nom + ": read back", subj.lireSujetNote(apres), "python");
+			r.check("17a. " + nom + ": the line ending is kept (no stray LF)", eol === CRLF ? !/[^\r]\n/.test(apres) : !apres.includes(CRLF), true);
+			r.check("17a. " + nom + ": removing it gives back the original bytes", subj.reecrireSujet(apres, null), depart);
+			// b. replace
+			const change = subj.reecrireSujet(apres, "maths");
+			r.check("17b. " + nom + ": replaced in place", [subj.lireSujetNote(change), SAUF_SUJET(change) === SAUF_SUJET(apres), change.split(eol).length], ["maths", true, apres.split(eol).length]);
+			r.check("17b. " + nom + ": same subject is a no-op", subj.reecrireSujet(apres, "python"), apres);
+		}
+
+		// c. unknown keys, a comment on the line, and the block itself are untouched
+		{
+			const depart = ["---", "neo-quiz:", "  provider: claude", "  model: opus", "  subject: algo # chosen", "  generatedAt: 2026-10-01T10:00:00Z", "custom: 7", "---", "", note()].join(LF);
+			const apres = subj.reecrireSujet(depart, "reseau");
+			r.check("17c. the comment and every other key stay", apres, depart.replace("subject: algo # chosen", "subject: reseau # chosen"));
+			r.check("17c. the quiz block is byte for byte the same", apres.slice(apres.indexOf("```")), depart.slice(depart.indexOf("```")));
+			r.check("17c. clearing keeps the other keys", subj.reecrireSujet(depart, null), depart.replace("  subject: algo # chosen\n", ""));
+		}
+
+		// d. a note without frontmatter; a frontmatter without neo-quiz:; a BOM
+		{
+			const nue = note();
+			const avec = subj.reecrireSujet(nue, "sql");
+			r.check("17d. no frontmatter: one is created", avec.startsWith("---" + LF + "neo-quiz:" + LF + "  subject: sql" + LF + "---" + LF + LF), true);
+			r.check("17d. the note follows unchanged", avec.endsWith(nue), true);
+			r.check("17d. clearing it removes the frontmatter we made", subj.reecrireSujet(avec, null), nue);
+			r.check("17d. Automatic on a note with none is a no-op", subj.reecrireSujet(nue, null), nue);
+			const autre = ["---", "tags: [a]", "---", "", nue].join(LF);
+			const a2 = subj.reecrireSujet(autre, "droit");
+			r.check("17d. other frontmatter: neo-quiz: added before the closing line", a2, ["---", "tags: [a]", "neo-quiz:", "  subject: droit", "---", "", nue].join(LF));
+			r.check("17d. and cleared again, the original returns", subj.reecrireSujet(a2, null), autre);
+			const bom = BOM + sansExtra(CRLF);
+			const b2 = subj.reecrireSujet(bom, "bio");
+			r.check("17d. BOM and CRLF kept", [b2.startsWith(BOM + "---"), /[^\r]\n/.test(b2), subj.lireSujetNote(b2)], [true, false, "bio"]);
+			r.check("17d. BOM note round trip", subj.reecrireSujet(b2, null), bom);
+		}
+
+		// e. a hostile or unknown value is never written
+		{
+			const depart = sansExtra(LF);
+			for (const mal of ["python\n  evil: 1", "__proto__", "Python", "", "../x", "general ", "javascript:alert(1)"]) {
+				r.check("17e. hostile value refused: " + JSON.stringify(mal), subj.reecrireSujet(depart, mal), null);
+			}
+			const lue = depart.replace("  model: opus", "  model: opus" + LF + "  subject: evil-value");
+			r.check("17e. an unknown id in a note reads as absent", subj.lireSujetNote(lue), undefined);
+			const flux = ["---", "neo-quiz: { provider: x }", "---", "", note()].join(LF);
+			r.check("17e. a flow-style neo-quiz: is refused, not rewritten", subj.reecrireSujet(flux, "python"), null);
+		}
+
+		// f. the wiring: compare-and-swap, indivisible write, nothing else moves
+		{
+			const depart = sansExtra(LF);
+			const v = vault(depart);
+			const blocActuel = v.contenu.match(RE_BLOC)[1];
+			r.check("17f. written", await io.saveQuizSubject(v.chemin, blocActuel, undefined, "python"), true);
+			r.check("17f. the note carries it, and only that changed", [subj.lireSujetNote(v.contenu), v.contenu.replace("  subject: python" + LF, "") === depart], ["python", true]);
+			r.check("17f. a stale expected subject is refused, nothing written",
+				[await io.saveQuizSubject(v.chemin, blocActuel, "maths", "bio"), subj.lireSujetNote(v.contenu)], [false, "python"]);
+			r.check("17f. a stale block is refused, nothing written",
+				[await io.saveQuizSubject(v.chemin, blocActuel + "x", "python", "bio"), subj.lireSujetNote(v.contenu)], [false, "python"]);
+			r.check("17f. an unknown id is refused at the write", [await io.saveQuizSubject(v.chemin, blocActuel, "python", "nope"), subj.lireSujetNote(v.contenu)], [false, "python"]);
+			r.check("17f. Automatic removes the key", [await io.saveQuizSubject(v.chemin, blocActuel, "python", null), v.contenu], [true, depart]);
+			const replay = vault(depart, { process: async (etat, mutate) => { mutate(etat.contenu); etat.contenu = mutate(etat.contenu); } });
+			r.check("17f. a replayed callback ends with the same note", [await io.saveQuizSubject(replay.chemin, replay.contenu.match(RE_BLOC)[1], undefined, "algo"), subj.lireSujetNote(replay.contenu)], [true, "algo"]);
 		}
 	}
 

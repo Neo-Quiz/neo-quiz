@@ -18,7 +18,7 @@ import { markViewEnter } from "./view-enter";
 import { moduleIcon } from "./module-icons";
 import { declaredFolders, modulesAffiches } from "./quiz-modules";
 import type { ModuleGroup } from "./quiz-modules";
-import { CATEGORIES, categorieDuDossier } from "./categorie-quiz";
+import { CATEGORIES, categorieEffective } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
 import { peindreIconeCategorie, libelleCategorie } from "./categorie-affichage";
 import { phoneLayoutNow } from "../phone-layout";
@@ -130,8 +130,8 @@ export function createQuizzesHandlers(ctx: DashboardShellCtx): QuizzesHandlers {
 	   "All subjects"): `null` = every folder. Interface state, not
 	   persisted, like the open folder. */
 	let sujetFiltre: CategorieQuiz | null = null;
-	/** A folder's subject, deduced from its path and name (categorie-quiz.ts). */
-	const sujetDe = (m: ModuleGroup): CategorieQuiz => categorieDuDossier(m.path ?? m.folder, m.name);
+	/** A folder's subject: the one chosen in "Edit folder", else deduced from its path and name (categorie-quiz.ts). */
+	const sujetDe = (m: ModuleGroup): CategorieQuiz => categorieEffective({ dossier: m.subject, chemin: m.path ?? m.folder, nom: m.name });
 
 	/* Last view PAINTED ("root" or the open folder's path): render() compares
 	   it with the current view to tell an ENTRY (the entry transition plays)

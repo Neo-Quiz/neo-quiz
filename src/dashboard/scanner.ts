@@ -10,6 +10,8 @@ import { estimateQuizMinutes } from "../quiz-duration";
 import { estCarte, modeDuBloc, titreSansMode } from "../quiz-format";
 import type { ModeQuiz } from "../quiz-format";
 import type { NeoQuizFrontmatter } from "../quiz-frontmatter";
+import type { CategorieQuiz } from "./categorie-quiz";
+import { lireSujetNote } from "./quiz-subject-edit";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ SCANNER — Indexeur de vault
@@ -110,6 +112,10 @@ export interface QuizIndexEntry extends QuizMeta {
 	/** Qui a généré ce quiz — absent d'un quiz écrit à la main ou partagé
 	    sans frontmatter (lireFrontmatterNeoQuiz). */
 	generated?: NeoQuizFrontmatter;
+	/** The subject written in the note by hand or by the generator (`neo-quiz:
+	    subject:`), a known id or absent. Read apart from `generated`: a note with
+	    only a subject has no generation record. */
+	subject?: CategorieQuiz;
 }
 
 /** A note holding a quiz-blocks block whose JSON5 cannot be read. It is kept
@@ -260,6 +266,7 @@ export function createScanner(host: Host): Scanner {
 					mtime: file.mtime,
 					ctime: file.ctime,
 					generated: lireFrontmatterNeoQuiz(content) || undefined,
+					subject: lireSujetNote(content),
 				});
 			} catch {
 				// Ignorer les erreurs de lecture
@@ -312,6 +319,7 @@ export function createScanner(host: Host): Scanner {
 				mtime: file.mtime,
 					ctime: file.ctime,
 				generated: lireFrontmatterNeoQuiz(content) || undefined,
+				subject: lireSujetNote(content),
 			};
 			// L'autosave d'Obsidian déclenche `modify` toutes les ~2 s
 			// pendant la frappe : ne notifier (→ re-render sidebar + vue)

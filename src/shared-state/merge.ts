@@ -120,15 +120,20 @@ export function foldAttempts(events: AttemptEvent[]): Record<string, Tentative[]
    guessed). Each field is merged on its own, like the others; clearing one is
    a tombstone. A reader that predates them drops them the same way: the
    folder shows no session line there, and nothing else changes.
+
+   `subject` (2026-10-18): the folder's subject chosen by hand (a `CategorieQuiz`
+   id), merged like the others; "Automatic" is a cleared stamp. A reader that
+   predates it drops it: the folder keeps its deduced subject there.
 ══════════════════════════════════════════════════════════ */
 
-export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path", "hidden", "sessions", "sessionMinutes", "sessionsPerWeek"] as const;
+export const MODULE_FIELDS = ["name", "ue", "color", "icon", "path", "hidden", "sessions", "sessionMinutes", "sessionsPerWeek", "subject"] as const;
 export type ModuleField = (typeof MODULE_FIELDS)[number];
 export interface ModuleStamp { v?: string | null; at: number }
 export type StoredModules = Record<string, Partial<Record<ModuleField, ModuleStamp>>>;
 export interface ModuleValues {
 	name?: string; ue?: string | null; color?: string; icon?: string; path?: string; hidden?: string;
 	sessions?: string; sessionMinutes?: string; sessionsPerWeek?: string;
+	subject?: string;
 }
 
 function stampWins(a: ModuleStamp, b: ModuleStamp): boolean {

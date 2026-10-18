@@ -8,6 +8,9 @@ import type { ModuleGroup, ModuleMap, ModuleOverride } from "./quiz-modules";
 import { openActionMenu } from "./ui-select";
 import { openColorPicker } from "./color-picker";
 import { openIconPicker } from "./icon-picker";
+import { openSubjectPicker } from "./subject-picker";
+import { estCategorie, type CategorieQuiz } from "./categorie-quiz";
+import { libelleCategorie, peindreIconeCategorie } from "./categorie-affichage";
 import { moduleIcon } from "./module-icons";
 import { MODULE_PALETTE, moduleAccent } from "./module-color";
 import { suggestIcons } from "./icon-suggest";
@@ -30,6 +33,7 @@ const MODULE_EDIT_HANDLED_FIELDS = {
 	sessions: true,
 	sessionMinutes: true,
 	sessionsPerWeek: true,
+	subject: true,
 } satisfies Record<keyof ModuleOverride, true>;
 
 /** The modal's persistence contract in one place, so that the civil date stays
@@ -45,6 +49,8 @@ export function buildModuleOverride(folder: string, state: ModuleEditState): Mod
 	if (state.ue !== undefined) ov.ue = state.ue;
 	if (state.color) ov.color = state.color;
 	if (state.icon) ov.icon = state.icon;
+	// Only a known subject id is written; "Automatic" is the absence of the key.
+	if (estCategorie(state.subject)) ov.subject = state.subject;
 	/* CARRIED OVER AS IS, never recomputed: this modal designates no folder,
 	   it edits a name and colours. The caller passes it the path ALREADY
 	   DECLARED (and nothing when there is none). Without this, renaming a
@@ -89,6 +95,10 @@ export function openModuleEditModal(
 	let ueOverride = ctx.settings.quizzesModuleOverrides?.[group.folder]?.ue;
 	let color = group.color;
 	let icon = group.icon;
+	/* The subject chosen by hand, read from the override (the group's may be
+	   a deduced one). Absent = Automatic. */
+	let subject: CategorieQuiz | undefined = estCategorie(ctx.settings.quizzesModuleOverrides?.[group.folder]?.subject)
+		? ctx.settings.quizzesModuleOverrides?.[group.folder]?.subject as CategorieQuiz : undefined;
 	/* The DECLARED path, read from the override and not from the group: the
 	   group's may be deduced from a quiz, and persisting it would freeze in
 	   the settings a value that is, today, recomputed on its own. Same for
@@ -115,7 +125,7 @@ export function openModuleEditModal(
 	   écriture disque est différée à onClose (pas de martèlement I/O). */
 	const apply = (): void => {
 		const overrides = { ...(ctx.settings.quizzesModuleOverrides || {}) };
-		const ov = buildModuleOverride(group.folder, { name, ue: ueOverride, color, icon, path, hidden, ...sessions });
+		const ov = buildModuleOverride(group.folder, { name, ue: ueOverride, color, icon, subject, path, hidden, ...sessions });
 		overrides[group.folder] = ov;
 		ctx.settings.quizzesModuleOverrides = overrides;
 		dirty = true;
@@ -176,6 +186,27 @@ export function openModuleEditModal(
 					label: opt ?? t("dashboard.quizzes.noUe"),
 					onClick: () => { ue = opt; ueOverride = opt; paintUe(); apply(); },
 				})));
+			});
+
+			// ── Subject: chosen by hand, or Automatic (deduced from the folder's name) ──
+			ajouter(c, "p", "qbd-medit-label", t("dashboard.quizzes.subjectLabel"));
+			const subjBtn = ajouter(c, "button", "qbd-select qbd-medit-select qbd-medit-subject");
+			subjBtn.type = "button";
+			const subjLabel = ajouter(subjBtn, "span", "qbd-select-label");
+			currentHost().ui.setIcon(ajouter(subjBtn, "span", "qbd-select-chevron"), "chevron-down");
+			const paintSubject = () => {
+				subjLabel.replaceChildren();
+				if (subject) {
+					peindreIconeCategorie(ajouter(subjLabel, "span", "qbd-quizzes-subject-icon"), subject);
+					ajouter(subjLabel, "span", undefined, libelleCategorie(subject));
+				} else {
+					currentHost().ui.setIcon(ajouter(subjLabel, "span", "qbd-quizzes-subject-icon"), "sparkles");
+					ajouter(subjLabel, "span", undefined, t("dashboard.quizzes.subjectAuto"));
+				}
+			};
+			paintSubject();
+			subjBtn.addEventListener("click", () => {
+				openSubjectPicker(subjBtn, subject, (picked) => { subject = picked ?? undefined; paintSubject(); apply(); }, m.panelEl);
 			});
 
 			/* « Gérer les examens » (tâche 4, 2026-09-26) remplace le champ de

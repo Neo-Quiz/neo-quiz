@@ -49,7 +49,7 @@ import { openNewQuizModal } from "../../../../src/dashboard/folder-add";
 import { ouvrirPartage } from "./partage";
 import { annulerDerniereSuppression, buildModuleCardMenu, buildQuizCardMenu } from "../../../../src/dashboard/quiz-menu";
 import { lireModuleMap } from "../../../../src/dashboard/module-map-note";
-import { applyModuleOverrides, moduleForQuiz } from "../../../../src/dashboard/quiz-modules";
+import { applyModuleOverrides, folderSubjectOf, moduleForQuiz } from "../../../../src/dashboard/quiz-modules";
 import { lectureMinutesOfFolder } from "../../../../src/class-sessions";
 import { moduleIcon } from "../../../../src/dashboard/module-icons";
 import { moduleAccent } from "../../../../src/dashboard/module-color";
@@ -720,6 +720,7 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 	const ai = createAiHandlers({
 		// The folder of a quiz note, from the module map and its overrides: the card's icon and colour.
 		dossierDe: async (chemin) => moduleForQuiz(chemin, applyModuleOverrides(await lireModuleMap(ctx.settings.quizzesModuleMapNote || "Dashboard"), ctx.settings.quizzesModuleOverrides || {})),
+		folderSubject: (chemin) => folderSubjectOf(chemin, ctx.settings.quizzesModuleOverrides),
 		cheminAbsolu: (contrat) => deps.cheminAbsolu(contrat),
 		settings: deps.aiSettings,
 		scanner: deps.scanner,

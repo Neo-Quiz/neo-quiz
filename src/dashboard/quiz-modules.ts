@@ -1,6 +1,7 @@
 import type { QuizIndexEntry } from "./scanner";
 import type { QuizStatRecord } from "./stats-store";
 import { isMastered } from "./quiz-mastery";
+import { estCategorie, type CategorieQuiz } from "./categorie-quiz";
 
 /* ══════════════════════════════════════════════════════════
    QUIZ MODULES — regroupement des quiz par MODULE et par UE.
@@ -25,6 +26,8 @@ export interface ModuleInfo {
 	/** Icône Lucide choisie dans « Modifier dossier » (carré teinté de la carte)
 	    — absente = icône par défaut (cf. module-card.ts). */
 	icon?: string;
+	/** Subject chosen by hand (cf. ModuleOverride.subject), a known id or absent. */
+	subject?: CategorieQuiz;
 	/**
 	 * LE CHEMIN RÉEL DU DOSSIER, et non son seul segment (2026-09-17).
 	 *
@@ -67,6 +70,9 @@ export interface ModuleOverride {
 	sessions?: string;
 	sessionMinutes?: string;
 	sessionsPerWeek?: string;
+	/** The folder's subject chosen by hand ("Edit folder"): a `CategorieQuiz` id,
+	    absent = deduced from its path and name. Synced like the other fields. */
+	subject?: string;
 	/* PAS DE `examDate` ICI, et c'est délibéré (2026-09-17) : ces overrides
 	   sont indexés par NOM DE SEGMENT, qui confond deux dossiers homonymes
 	   ouverts depuis deux racines — acceptable pour une couleur, pas pour un
@@ -99,6 +105,7 @@ export function applyModuleOverrides(map: ModuleMap, overrides: Record<string, M
 			ue: ov.ue !== undefined ? ov.ue : base.ue,
 			color: ov.color ?? base.color,
 			icon: ov.icon ?? base.icon,
+			subject: estCategorie(ov.subject) ? ov.subject : base.subject,
 			path: ov.path ?? base.path,
 		};
 		byFolder.set(folder, merged);
@@ -180,6 +187,18 @@ export function moduleForQuiz(quizPath: string, map: ModuleMap): ModuleInfo {
 	return { folder: parent, name: parent, ue: null, path: segs.slice(0, -1).join("/") || undefined };
 }
 
+/** The subject chosen by hand for the folder holding `quizPath` ("Edit folder"):
+    the override of the deepest folder of the path that has one (the overrides
+    are keyed by folder segment, like `moduleForQuiz`). */
+export function folderSubjectOf(quizPath: string, overrides: Record<string, ModuleOverride> | undefined): CategorieQuiz | undefined {
+	const segs = quizPath.split("/").filter(Boolean);
+	for (let i = segs.length - 2; i >= 0; i--) {
+		const s = overrides?.[segs[i]]?.subject;
+		if (estCategorie(s)) return s;
+	}
+	return undefined;
+}
+
 /** Un module affiché : ses quiz + agrégats. */
 export interface ModuleGroup {
 	folder: string;
@@ -194,6 +213,8 @@ export interface ModuleGroup {
 	color?: string;
 	/** Icône Lucide override (cf. ModuleInfo.icon). */
 	icon?: string;
+	/** Subject chosen by hand (cf. ModuleInfo.subject). */
+	subject?: CategorieQuiz;
 	quizzes: QuizIndexEntry[];
 	total: number;
 	mastered: number;
@@ -212,12 +233,12 @@ export function buildModuleGroups(
 	const acc = new Map<string, ModuleGroup>();
 	for (const folder of alwaysInclude) {
 		const info = map.byFolder.get(folder) ?? { folder, name: folder, ue: null };
-		acc.set(folder, { folder, name: info.name, ue: info.ue, color: info.color, icon: info.icon, path: info.path, quizzes: [], total: 0, mastered: 0 });
+		acc.set(folder, { folder, name: info.name, ue: info.ue, color: info.color, icon: info.icon, subject: info.subject, path: info.path, quizzes: [], total: 0, mastered: 0 });
 	}
 	for (const q of quizzes) {
 		const m = moduleForQuiz(q.path, map);
 		let g = acc.get(m.folder);
-		if (!g) { g = { folder: m.folder, name: m.name, ue: m.ue, color: m.color, icon: m.icon, path: m.path, quizzes: [], total: 0, mastered: 0 }; acc.set(m.folder, g); }
+		if (!g) { g = { folder: m.folder, name: m.name, ue: m.ue, color: m.color, icon: m.icon, subject: m.subject, path: m.path, quizzes: [], total: 0, mastered: 0 }; acc.set(m.folder, g); }
 		/* Un groupe né d'`alwaysInclude` (déclaré, 0 quiz) n'a de chemin que
 		   celui de sa déclaration. Le premier quiz qui s'y range le lui donne
 		   si elle n'en portait pas — les dossiers déclarés avant le

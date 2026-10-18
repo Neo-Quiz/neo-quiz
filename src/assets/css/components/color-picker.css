@@ -213,3 +213,30 @@
 	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
 	color: var(--interactive-accent) !important;
 }
+
+/* ═════════════════════════════════════════════════════════
+   SUBJECT PICKER — same surface as the icon picker (subject-picker.ts); a
+   list of rows (icon + name) instead of a grid.
+   ═════════════════════════════════════════════════════════ */
+.qbd-subject-list { display: flex; flex-direction: column; gap: 1px; }
+.qbd-subject-row {
+	display: flex; align-items: center; gap: 10px;
+	width: 100%; min-height: 32px; padding: 0 8px !important;
+	border: none !important; border-radius: 8px;
+	background: transparent !important; box-shadow: none !important;
+	color: var(--text-normal) !important; font-size: 13px; text-align: left;
+	cursor: pointer; transition: background 120ms, color 120ms;
+}
+.qbd-subject-row-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; color: var(--text-muted); }
+.qbd-subject-row-icon svg { width: 16px; height: 16px; }
+.qbd-subject-row-icon img { width: 18px; height: 18px; object-fit: contain; }
+.qbd-subject-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbd-subject-row:hover { background: var(--background-modifier-hover) !important; }
+.qbd-subject-row.is-active {
+	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
+	color: var(--interactive-accent) !important;
+}
+.qbd-subject-row.is-active .qbd-subject-row-icon { color: inherit; }
+.qbd-medit-subject .qbd-select-label { display: inline-flex; align-items: center; gap: 8px; }
+.qbd-medit-subject .qbd-quizzes-subject-icon { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; }
+.qbd-medit-subject .qbd-quizzes-subject-icon svg, .qbd-medit-subject .qbd-quizzes-subject-icon img { width: 16px; height: 16px; object-fit: contain; }

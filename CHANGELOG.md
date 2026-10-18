@@ -20,6 +20,8 @@ release notes.
 
 ### Changed
 
+- A folder's subject can be changed in Edit folder, and a quiz's subject in its menu, each with a searchable list. Automatic keeps the deduced subject. The quiz's choice wins over its folder's, which wins over the folder name and the title; cards, the subject filter and the gallery all follow that order.
+
 - Generated quiz cards get a full cover in the subject's own colour, with a giant ghost emblem and a crisp tile. Only languages and tools keep a logo; every field shows a clean icon instead of a company logo or an emoji. The date in a card footer is never cut.
 
 - Picking a model, an effort level or an agent mode in the Generate or Explain composer now returns the focus to the text field, ready to type.

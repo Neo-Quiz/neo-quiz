@@ -157,6 +157,8 @@ const MODULE_VALUE_OK: Record<ModuleField, (v: string) => boolean> = {
 	sessions: v => isClassSessionValue("sessions", v),
 	sessionMinutes: v => isClassSessionValue("sessionMinutes", v),
 	sessionsPerWeek: v => isClassSessionValue("sessionsPerWeek", v),
+	// A subject id (`CategorieQuiz`): lowercase ascii; the reader checks it is a known one.
+	subject: v => /^[a-z0-9-]{1,32}$/.test(v),
 };
 
 /** `now`: a stamp more than a year ahead is a corrupt or hostile clock and is

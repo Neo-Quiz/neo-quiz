@@ -267,6 +267,8 @@ export interface AiPageDeps {
 	scanner: Scanner;
 	/** The folder of a quiz note (its icon and colour, from the module map), for the result card. Absent: defaults. */
 	dossierDe?(chemin: string): Promise<ModuleInfo | null>;
+	/** The subject chosen by hand for a quiz note's folder ("Edit folder"), for the gallery. Absent: none. */
+	folderSubject?(chemin: string): CategorieQuiz | undefined;
 	statsStore: StatsStore;
 	navigate(view: DashboardViewName, data?: NavigateData): void;
 	/** The upcoming exams of every folder, for the "/exam" menu. Absent: an empty menu. */
@@ -1151,6 +1153,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			   generation frontmatter. */
 			renderGeneratedGallery(galerie, {
 				quizzes: deps.scanner.getQuizzes().filter(q => !!q.generated),
+				folderSubject: deps.folderSubject,
 				open: quiz => deps.navigate("detail", { quiz, entree: "generation" }),
 			});
 			return;

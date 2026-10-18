@@ -344,3 +344,21 @@ export function detecterCategorie(indices: IndicesCategorie): CategorieQuiz {
 export function categorieDuDossier(chemin: string | undefined, nom: string | undefined): CategorieQuiz {
 	return detecterCategorie({ dossier: [chemin, nom].filter(Boolean).join("/") });
 }
+
+/**
+ * The subject a quiz or a folder shows, in ONE order everywhere (gallery,
+ * folder card, subject filter): the hand-picked subject of the quiz (its
+ * `neo-quiz: subject:`), then of its folder ("Edit folder"), then what the
+ * folder's path and name say, then the quiz's title and source, else `general`.
+ * An unknown id at any level is skipped, never trusted.
+ */
+export function categorieEffective(c: {
+	quiz?: unknown; dossier?: unknown; chemin?: string; nom?: string; titre?: string; source?: string;
+}): CategorieQuiz {
+	if (estCategorie(c.quiz)) return c.quiz;
+	if (estCategorie(c.dossier)) return c.dossier;
+	const deduit = c.chemin !== undefined || c.nom !== undefined ? categorieDuDossier(c.chemin, c.nom) : "general";
+	if (deduit !== "general") return deduit;
+	if (c.titre === undefined && c.source === undefined) return "general";
+	return detecterCategorie({ pieces: c.source ? [c.source] : [], demande: c.titre ?? "" });
+}

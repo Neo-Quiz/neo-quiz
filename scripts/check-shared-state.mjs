@@ -81,6 +81,20 @@ await withSrcModule(["src/shared-state/merge.ts", "src/dashboard/stats-store.ts"
 	r.check("modules: diff lists changed fields and clears", diffModules({ K: { name: "a", color: "r" } }, { K: { name: "b" }, L: { ue: null } }),
 		[{ key: "K", field: "name", v: "b" }, { key: "K", field: "color" }, { key: "L", field: "ue", v: null }]);
 
+	// A folder's SUBJECT chosen by hand (2026-10-18): same per-field rule as the colour.
+	r.check("subject: the newest write wins, whatever the order of the devices",
+		[mergeModules([{ K: { subject: f("python", 10) } }, { K: { subject: f("maths", 20) } }]),
+			mergeModules([{ K: { subject: f("maths", 20) } }, { K: { subject: f("python", 10) } }])],
+		[{ K: { subject: "maths" } }, { K: { subject: "maths" } }]);
+	r.check("subject: Automatic is a tombstone that beats an older subject",
+		mergeModules([{ K: { subject: f("python", 10), color: f("#f00", 1) } }, { K: { subject: f(undefined, 20) } }]), { K: { color: "#f00" } });
+	r.check("subject: an older tombstone does not erase a newer subject",
+		mergeModules([{ K: { subject: f(undefined, 5) } }, { K: { subject: f("sql", 9) } }]), { K: { subject: "sql" } });
+	r.check("subject: clearing it is a cleared field, never another value",
+		diffModules({ K: { subject: "sql" } }, { K: {} }), [{ key: "K", field: "subject" }]);
+	r.check("subject: rebase keeps an unsaved local subject on top of another device's colour",
+		rebaseModules({ K: { color: "#f00" } }, { K: { color: "#f00", subject: "bio" } }, { K: { color: "#00f" } }), { K: { color: "#00f", subject: "bio" } });
+
 	// A HIDDEN folder (2026-10-15): `hidden: "1"`, shown again = a tombstone, newest stamp wins.
 	r.check("hidden: hidden on A, shown on B later: shown, whatever the order",
 		[mergeModules([{ K: { hidden: f("1", 10), color: f("#f00", 1) } }, { K: { hidden: f(undefined, 20) } }]),
@@ -502,6 +516,9 @@ await withSrcModule(["apps/windows/src/host/shared-state.ts", "apps/windows/src/
 			await st.load();
 			r.check("modules: far-future stamps, bad colour/icon shapes and long strings are dropped",
 				st.modules(), { B: { ue: "ok", color: "#12ab", icon: "book-open" } });
+			const [, subj] = mk(mod("x", { A: { subject: stamp("python", 5) }, B: { subject: stamp("Py thon", 5), color: stamp("#fff", 5) } }), "pc");
+			await subj.load();
+			r.check("modules: a subject id is read, a hostile subject shape is dropped", subj.modules(), { A: { subject: "python" }, B: { color: "#fff" } });
 			const many = Object.fromEntries(Array.from({ length: 1500 }, (_, i) => [`k${i}`, { name: stamp("n", 5) }]));
 			const [, big] = mk(mod("y", many), "pc"); await big.load();
 			r.check("modules: at most 1000 keys are read from a file", Object.keys(big.modules()).length, 1000);

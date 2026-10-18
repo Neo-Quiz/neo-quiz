@@ -2,7 +2,7 @@ import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
-import { categorieDuDossier, detecterCategorie, type CategorieQuiz } from "./categorie-quiz";
+import { categorieEffective, type CategorieQuiz } from "./categorie-quiz";
 import { topicArt } from "./topic-art";
 import { libelleCategorie } from "./categorie-affichage";
 
@@ -19,6 +19,8 @@ import { libelleCategorie } from "./categorie-affichage";
 
 export interface GeneratedGalleryDeps {
 	quizzes: readonly QuizIndexEntry[];
+	/** The subject chosen by hand for the folder holding `quizPath` ("Edit folder"), if any. */
+	folderSubject?: (quizPath: string) => CategorieQuiz | undefined;
 	open: (quiz: QuizIndexEntry) => void;
 	now?: number;
 }
@@ -39,12 +41,12 @@ function modifie(ms: number, now: number): string {
 	return t("ai.gallery.modifiedOn", { date });
 }
 
-/** A card's subject: the one stored in the note, else its folder's, else a guess from the title and source, else General. */
-export function sujetDe(q: QuizIndexEntry): CategorieQuiz {
-	if (q.generated?.subject) return q.generated.subject;
-	const dossier = categorieDuDossier(q.path.split("/").slice(0, -1).join("/"), undefined);
-	if (dossier !== "general") return dossier;
-	return detecterCategorie({ pieces: q.generated?.source ? [q.generated.source] : [], demande: q.title });
+/** A card's subject, in the shared order (`categorieEffective`): the note's, its folder's chosen one, its folder's deduced one, the title's, else General. */
+export function sujetDe(q: QuizIndexEntry, dossier?: CategorieQuiz): CategorieQuiz {
+	return categorieEffective({
+		quiz: q.subject ?? q.generated?.subject, dossier,
+		chemin: q.path.split("/").slice(0, -1).join("/"), titre: q.title, source: q.generated?.source,
+	});
 }
 
 export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalleryDeps): void {
@@ -99,7 +101,7 @@ export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalle
 		c.setAttribute("aria-label", q.title);
 		// The preview: a flat illustration of the quiz's subject (`topic-art.ts`).
 		const apercu = ajouter(c, "div", "qbd-gen-preview");
-		const sujet = sujetDe(q);
+		const sujet = sujetDe(q, deps.folderSubject?.(q.path));
 		apercu.appendChild(topicArt(sujet));
 		const pied = ajouter(c, "div", "qbd-gen-foot");
 		ajouter(pied, "span", "qbd-gen-name", q.title);

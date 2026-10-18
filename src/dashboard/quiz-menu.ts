@@ -18,6 +18,7 @@ import { saveSettingsReporting } from "./save-settings";
 import { freeNotePath } from "./folder-create";
 import { quizModeIcon, quizModeLabel } from "./quiz-card";
 import { keepExamMenuItem } from "./exam-keep-menu";
+import { subjectMenuItem } from "./quiz-subject-menu";
 import { openShareChooser } from "./share-choose";
 import { baseNameVerdict, fitsPath, NAME_MAX } from "./share-names";
 import { separerNomDeNote } from "../quiz-format";
@@ -713,6 +714,8 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				submenu: sousItems,
 			});
 		}
+		// « Subject »: the quiz's own subject, written into the note's frontmatter.
+		if (anchorEl) items.push(subjectMenuItem(ctx, quiz, anchorEl, rerender));
 		// « Keep exam mode » (a Test only): checkable, written into the note.
 		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
 		if (keepExam) items.push(keepExam);

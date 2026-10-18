@@ -6,7 +6,7 @@ import type { ModuleGroup } from "./quiz-modules";
 import { moduleIcon } from "./module-icons";
 import { moduleAccent } from "./module-color";
 import { openMenuOnRightClick } from "./quiz-card";
-import { categorieDuDossier } from "./categorie-quiz";
+import { categorieEffective } from "./categorie-quiz";
 import { libelleCategorie } from "./categorie-affichage";
 
 /* ══════════════════════════════════════════════════════════
@@ -65,7 +65,7 @@ export function renderModuleCard(
 	/* Subtitle = the folder's subject (2026-10-17), in place of the teaching
 	   unit: the unit repeated the semester on every card. None for an unknown
 	   subject (the header keeps its top alignment). */
-	const sujet = categorieDuDossier(group.path ?? group.folder, group.name);
+	const sujet = categorieEffective({ dossier: group.subject, chemin: group.path ?? group.folder, nom: group.name });
 	if (sujet !== "general") ajouter(titles, "div", "qbd-module-card__subtitle", libelleCategorie(sujet));
 
 	// ── Stats : « N quiz • N maîtrisés » (nombres en gras, séparateur discret) ──

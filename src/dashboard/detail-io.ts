@@ -9,6 +9,8 @@ import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import { applyKeepExam, type KeepExam } from "./exam-keep";
+import { lireSujetNote, reecrireSujet } from "./quiz-subject-edit";
+import type { CategorieQuiz } from "./categorie-quiz";
 import { applyCardEdit, applyQuestionEdit, cardMoved } from "./card-edit";
 
 /* ══════════════════════════════════════════════════════════
@@ -220,6 +222,33 @@ export async function saveKeepExam(path: string, expectedBlock: string, keep: Ke
 			const at = actual[0].indexOf("\n") + 1;
 			const block = actual[0].slice(0, at) + next + actual[0].slice(at + actual[1].length);
 			return content.replace(QUIZ_BLOCK_RE, () => block);
+		});
+		return done;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Sets (or, with `null`, clears) the quiz's hand-picked subject: ONE line of
+ * the frontmatter (`reecrireSujet`), the rest of the note byte for byte. Same
+ * guarantees as `saveKeepExam`: `fs.process` (indivisible read-modify-write),
+ * compare-and-swap (the quiz block AND the subject must still be the ones the
+ * caller read: anything else means the note changed, and nothing is written).
+ * Returns false when nothing was written.
+ */
+export async function saveQuizSubject(path: string, expectedBlock: string, expectedSubject: CategorieQuiz | undefined, subject: CategorieQuiz | null): Promise<boolean> {
+	try {
+		let done = false;
+		await currentHost().fs.process(path, (content) => {
+			done = false;
+			const actual = content.match(QUIZ_BLOCK_RE);
+			if (!actual || actual[1] !== expectedBlock) return content;
+			if (lireSujetNote(content) !== expectedSubject) return content;
+			const next = reecrireSujet(content, subject);
+			if (next === null) return content;
+			done = true;
+			return next;
 		});
 		return done;
 	} catch {

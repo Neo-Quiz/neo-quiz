@@ -11,7 +11,7 @@
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule("src/dashboard/categorie-quiz.ts", (mod) => {
-	const { CATEGORIES, detecterCategorie, categorieDuDossier, estCategorie } = mod;
+	const { CATEGORIES, detecterCategorie, categorieDuDossier, estCategorie, categorieEffective } = mod;
 	const r = makeReporter("Catégorie d'un quiz");
 	const d = (indices) => detecterCategorie(indices);
 
@@ -100,6 +100,22 @@ await withSrcModule("src/dashboard/categorie-quiz.ts", (mod) => {
 			d({ pieces: ["index.html"] }),
 			d({ pieces: ["index.html", "style.css"], dossier: "Efrei/XTI301 - Écosystème Python" })],
 		["python", "python", "python", "web", "web"]);
+
+	/* The effective subject, ONE order: quiz > folder choice > folder path/name > title > general. */
+	const eff = (c) => categorieEffective(c);
+	const dos = { chemin: "Efrei/XTI301 - Python", nom: "XTI301 - Python" };
+	r.check("effective subject: the quiz's own beats everything",
+		eff({ quiz: "maths", dossier: "droit", ...dos, titre: "Histoire de Rome" }), "maths");
+	r.check("effective subject: then the folder's chosen one, over its name",
+		eff({ dossier: "droit", ...dos, titre: "Histoire de Rome" }), "droit");
+	r.check("effective subject: then what the folder's name says, over the title",
+		eff({ ...dos, titre: "Histoire de Rome" }), "python");
+	r.check("effective subject: then the title, else general",
+		[eff({ chemin: "Divers", titre: "Histoire de Rome" }), eff({ chemin: "Divers", titre: "Notes" }), eff({})], ["histoire", "general", "general"]);
+	r.check("effective subject: an unknown id at any level is skipped, never trusted",
+		[eff({ quiz: "nope", dossier: "x", ...dos }), eff({ quiz: 3, dossier: null, chemin: "Divers", titre: "Notes" })], ["python", "general"]);
+	r.check("effective subject: 'general' chosen by hand is a choice (no deduction behind it)",
+		eff({ quiz: "general", ...dos }), "general");
 
 	r.check("estCategorie : les seules valeurs connues", [estCategorie("python"), estCategorie("auto"), estCategorie("Python"), estCategorie(3)], [true, false, false, false]);
 	r.done();
