@@ -1,0 +1,8 @@
+name = "neo-quiz-bug-relay"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "STATE"
+# Replace with the id printed by: npx wrangler kv namespace create STATE
+id = "REPLACE_WITH_KV_NAMESPACE_ID"

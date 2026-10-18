@@ -240,6 +240,10 @@ jobs:
       - name: Bug report format
         run: npm run check:bug-report
 
+      # The bug report relay Worker: limits, kill switch, token handling, JWT.
+      - name: Bug report relay
+        run: npm run check:bug-relay
+
       # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
       # perdre de réponses, même si le quiz a changé entre deux sessions.
       - name: Quiz session snapshot
