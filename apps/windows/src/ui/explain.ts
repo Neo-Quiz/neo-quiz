@@ -851,8 +851,10 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 		let desabonner: (() => void) | null = null;
 		const handle = requireHost("modals").open({
 			className: "nq-explain-modal",
-			title: t("ai.explain.title"),
+			/* No visible title (2026-10-18): "Assistant" said nothing the panel
+			   does not show. The name stays for assistive tech only. */
 			onOpen: (m) => {
+				m.panelEl.setAttribute("aria-label", t("ai.explain.title"));
 				const fil = ajouter(m.contentEl, "div", "nq-explain-fil");
 				monterPanneau(m.panelEl);
 				const q = laFile();

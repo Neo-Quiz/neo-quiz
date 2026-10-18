@@ -664,6 +664,12 @@ body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo s
 	width: 20px;
 	height: 20px;
 }
+/* No face behind the desktop icon: the logo keeps its own colours, open or
+   closed (2026-10-18), instead of the white drawn for a gradient face. */
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo .qbd-provider-logo,
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone .qz-explain-btn-logo .qbd-provider-logo * {
+	filter: none;
+}
 
 /* THE FADES (2026-10-09): the questions scroll under a soft edge, not a hard
    cut above the arrows. `ui/quiz-bars.ts` sets the two classes on the slide
