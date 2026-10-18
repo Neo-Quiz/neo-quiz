@@ -1044,6 +1044,8 @@ du réseau et hors réseau local demande une confirmation NATIVE, et
 `aiMentionExtraFolders` doit déjà être au périmètre. Sans elle, un rendu
 compromis obtenait un hôte Internet dans la liste au lancement suivant.
 
+**Le modèle corrige LUI-MÊME sa réponse** (2026-10-18, `lireEtCorriger`, `ai-client.ts`) : une réponse illisible (coupée, JSON5 mal formé, prose) ou qui viole le schéma des questions (`validerQuestions` : options sans `correctIndex`, index hors des options) repart au MÊME modèle avec l'erreur mot pour mot, sa position, un extrait numéroté de ±5 lignes de SA réponse et l'ordre de renvoyer le bloc complet, jusqu'à 3 tours ; une session live répond dans la même conversation, un appel ponctuel reçoit sa requête + sa réponse précédente (`suiteCorrection`). Chaque tour s'affiche dans le transcript comme une étape (« Corrige le quiz (2/3) »). Jamais corrigés : « pas de quiz » explicite, limite d'usage ou de contexte, Stop. Autour : un message coupé par la limite de sortie est RECOLLÉ à sa suite (`foldClaudeChain`), un tableau de questions caché dans une réponse plus longue est retrouvé (`extraireTableauQuiz`), un `]` oublié avant le champ suivant est refermé (`reparerTableauNonFerme`), une connexion perdue (Antigravity, Ollama) est redemandée (`avecRelances`), et un Antigravity qui n'exit plus après son `result` est tué après 10 s (`finParLigne`, `process.ts`).
+
 **Les quatre fournisseurs tournent COMME DANS UN TERMINAL** (décision d'Ahmed du
 2026-10-17, « exactement comme si je l'avais lancé dans Warp », qui remplace le
 confinement du 2026-10-10) : tout appel parti DE CE PC — génération, chat de la page
