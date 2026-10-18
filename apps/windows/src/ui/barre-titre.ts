@@ -16,7 +16,9 @@ import { pont } from "../host/pont";
 import { poserIcone } from "../host/ui";
 import { poserGlyphe } from "./glyphes-fenetre";
 import { ouvrirMenuApp } from "./menu-app";
-import { palierZoomVoisin, URL_DEPOT, urlSignalement } from "./menu-app-arbre";
+import { choisirSignalement, palierZoomVoisin, URL_DEPOT, urlSignalement } from "./menu-app-arbre";
+import { openBugReportModal } from "./bug-report-modal";
+import { bugReportConfigured } from "../../../../src/bug-report-config";
 import { createZoomBubble } from "./zoom-bubble";
 import { CLE_REGLAGES_ZOOM, borneZoom } from "../../electron/pont";
 import type { EtatFenetre } from "../../electron/pont";
@@ -205,7 +207,9 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					window.open(URL_DEPOT, "_blank", "noopener");
 				} else if (id === "report-bug") {
 					// Same path as the repository link above (the main process hands it to the browser).
-					window.open(urlSignalement(application.version, navigator.userAgent, platformVersion), "_blank", "noopener");
+					const urlGithub = (): string => urlSignalement(application.version, navigator.userAgent, platformVersion);
+					if (choisirSignalement(bugReportConfigured() && !!pont().signalement) === "form") openBugReportModal({ fallbackUrl: urlGithub });
+					else window.open(urlGithub(), "_blank", "noopener");
 				} else if (id === "change-wallpaper") {
 					deps.choisirFond();
 				} else if (id === "reload") {

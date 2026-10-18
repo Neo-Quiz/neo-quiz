@@ -76,6 +76,11 @@ export function urlSignalement(version: string, userAgent: string, platformVersi
 	return `${URL_DEPOT}/issues/new?body=${encodeURIComponent(corps)}`;
 }
 
+/** The form once the relay is configured, today's prefilled GitHub URL until then. */
+export function choisirSignalement(configured: boolean): "form" | "url" {
+	return configured ? "form" : "url";
+}
+
 export function buildMenu(ctx: { version: string }): EntreeMenu[] {
 	return [
 		/* The repository link came to this menu on 2026-09-17, when the

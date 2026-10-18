@@ -111,3 +111,30 @@ await withSrcModule(["src/bug-report-config.ts"], (CFG) => {
 	r.check("config: not configured while a constant is empty", CFG.bugReportConfigured(), false);
 	r.done();
 });
+
+await withSrcModule(["src/bug-report-form.ts"], (F) => {
+	const r = makeReporter("Bug report form");
+	const base = { what: "x", steps: "", expected: "", title: "", sendEnv: true, sendLog: true, env: { app: "1", os: "w", platform: "windows" }, log: "l1", sending: false };
+	r.check("form: canSend", [F.canSend({ what: "  \n", sending: false }), F.canSend({ what: "x", sending: true }), F.canSend({ what: "x", sending: false })], [false, false, true]);
+	r.check("form: defaultTitle cuts to 80 and takes the first line", [F.defaultTitle("\n  first\nsecond"), Array.from(F.defaultTitle("a".repeat(200))).length, F.defaultTitle(" \n "), Array.from(F.defaultTitle("\u{1F600}".repeat(100))).length], ["first", 80, "", 80]);
+	const keys = (o) => Object.keys(o).sort().join();
+	r.check("form: reportFromForm omits blank optional fields", keys(F.reportFromForm({ ...base, sendEnv: false, sendLog: false })), "v,what");
+	r.check("form: reportFromForm omits env and log when unticked", [keys(F.reportFromForm({ ...base, sendLog: false })), keys(F.reportFromForm({ ...base, sendEnv: false })), keys(F.reportFromForm({ ...base, log: "  " }))], ["env,v,what", "log,v,what", "env,v,what"]);
+	const full = F.reportFromForm({ ...base, what: " w ", steps: " s ", expected: " e ", title: " t " });
+	r.check("form: reportFromForm trims and never carries a githubToken", [full.what, full.steps, full.expected, full.title, "githubToken" in full], ["w", "s", "e", "t", false]);
+	r.done();
+});
+
+await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts"], (M) => {
+	const r = makeReporter("Bug report menu");
+	r.check("menu: choisirSignalement", [M.choisirSignalement(false), M.choisirSignalement(true)], ["url", "form"]);
+	r.check("menu: urlSignalement output is pinned", M.urlSignalement("1.2.3", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140", "15.0.0"), "https://github.com/Neo-Quiz/neo-quiz/issues/new?body=**App%20version%3A**%201.2.3%0A**System%3A**%20Windows%2011%0A%0A%23%23%20What%20happened%0A%0A%0A%23%23%20Steps%20to%20reproduce%0A%0A1.%20%0A%0A%23%23%20Expected%0A%0A");
+	r.done();
+});
+
+await withSrcModule(["src/i18n/en/app.ts", "src/i18n/fr/app.ts"], (E, F) => {
+	const r = makeReporter("Bug report i18n");
+	const keys = (o) => Object.keys(o).filter(k => k.startsWith("bugReport.")).sort();
+	r.check("i18n: the bugReport.* keys exist and are the same in en and fr", [keys(E.EN_APP).length > 30, keys(E.EN_APP)], [true, keys(F.FR_APP)]);
+	r.done();
+});

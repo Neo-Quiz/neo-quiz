@@ -8,6 +8,7 @@ import "./assets/quiz-bars.css";
 import "./assets/question-edit.css";
 import "./assets/modal.css";
 import "./assets/moodle-modal.css";
+import "./assets/bug-report-modal.css";
 import "./assets/math.css";
 import { setLanguage, setHourCycle, setNumericDateLocale, currentHourCycle, t } from "../../../src/i18n";
 import { chargerLangue } from "./ui/langue";

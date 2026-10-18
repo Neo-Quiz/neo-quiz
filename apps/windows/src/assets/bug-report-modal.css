@@ -1,0 +1,169 @@
+/* THE BUG REPORT FORM (`ui/bug-report-modal.ts`): flat buttons (no 3D inside a
+   modal), the app opening animation (modal.css), no capitals, no native
+   tooltip. Every variable below is defined on :root by theme/host-vars.css. */
+
+.nq-bug-modal {
+	width: min(560px, calc(100vw - 32px));
+}
+
+.nq-bug-modal .modal-content {
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.nq-bug-modal .nqb-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+
+.nq-bug-modal [hidden] { display: none !important; }
+
+.nq-bug-modal .nqb-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.nq-bug-modal .nqb-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.nq-bug-modal .nqb-label { font-weight: 600; font-size: 13px; }
+.nq-bug-modal .nqb-counter { color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.nq-bug-modal .nqb-input {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 8px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-modifier-form-field);
+	color: var(--text-normal);
+	font: inherit;
+	box-shadow: none;
+}
+.nq-bug-modal .nqb-area { resize: vertical; min-height: 60px; line-height: 1.45; }
+.nq-bug-modal .nqb-input:focus { outline: none; border-color: var(--interactive-accent); }
+.nq-bug-modal .nqb-input::placeholder { color: var(--text-faint); }
+
+.nq-bug-modal .nqb-details,
+.nq-bug-modal .nqb-github {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	min-width: 0;
+}
+.nq-bug-modal .nqb-github:empty { display: none; }
+
+.nq-bug-modal .nqb-check { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; }
+.nq-bug-modal .nqb-check input { margin-top: 3px; flex: none; }
+.nq-bug-modal .nqb-check-text { display: flex; flex-direction: column; min-width: 0; }
+.nq-bug-modal .nqb-check-label { font-weight: 500; }
+.nq-bug-modal .nqb-check-value { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+
+.nq-bug-modal .nqb-log-head { align-items: center; cursor: default; flex-wrap: wrap; }
+.nq-bug-modal .nqb-log-head .nqb-check-label { cursor: pointer; flex: 1; min-width: 0; }
+.nq-bug-modal .nqb-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 4px;
+	border: none;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--text-muted);
+	font-size: 12px;
+	cursor: pointer;
+}
+.nq-bug-modal .nqb-link:hover { color: var(--text-normal); }
+.nq-bug-modal .nqb-chevron { display: inline-flex; transition: transform 250ms cubic-bezier(0, 0, 0, 1); }
+.nq-bug-modal .nqb-chevron.is-open { transform: rotate(180deg); }
+.nq-bug-modal .nqb-chevron .svg-icon { width: 14px; height: 14px; }
+
+/* The preview opens and closes by animating a grid row from 0fr to 1fr. */
+.nq-bug-modal .nqb-log-zone {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 250ms cubic-bezier(0, 0, 0, 1);
+}
+.nq-bug-modal .nqb-log-zone.is-open { grid-template-rows: 1fr; }
+.nq-bug-modal .nqb-log-inner { overflow: hidden; min-height: 0; }
+.nq-bug-modal .nqb-log-pre {
+	margin: 8px 0 0;
+	padding: 8px 10px;
+	max-height: 180px;
+	overflow: auto;
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: 11.5px;
+	line-height: 1.4;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.nq-bug-modal .nqb-github-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nq-bug-modal .nqb-github-mark { display: inline-flex; flex: none; color: var(--text-muted); }
+.nq-bug-modal .nqb-github-mark .svg-icon { width: 18px; height: 18px; }
+.nq-bug-modal .nqb-github-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.nq-bug-modal .nqb-github-title { font-weight: 500; }
+.nq-bug-modal .nqb-hint { color: var(--text-muted); font-size: 12px; }
+.nq-bug-modal .nqb-code {
+	align-self: flex-start;
+	padding: 6px 12px;
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	font-family: var(--font-monospace);
+	font-size: 20px;
+	font-weight: 600;
+	user-select: all;
+}
+.nq-bug-modal .nqb-error-inline { color: var(--color-red); font-size: 12px; }
+
+.nq-bug-modal .nqb-notice { margin: 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.45; }
+.nq-bug-modal .nqb-error {
+	padding: 9px 12px;
+	border-radius: var(--radius-m);
+	border: 1px solid color-mix(in srgb, var(--color-red) 45%, transparent);
+	background: color-mix(in srgb, var(--color-red) 12%, transparent);
+	line-height: 1.4;
+}
+
+.nq-bug-modal .nqb-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+
+.nq-bug-modal .nqb-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 8px 16px;
+	border: 1px solid transparent;
+	border-radius: var(--radius-m);
+	font: inherit;
+	font-weight: 600;
+	white-space: nowrap;
+	box-shadow: none !important;
+	cursor: pointer;
+}
+.nq-bug-modal .nqb-primary { background: var(--interactive-accent) !important; color: var(--text-on-accent) !important; }
+.nq-bug-modal .nqb-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--interactive-accent) 85%, white) !important; }
+.nq-bug-modal .nqb-secondary {
+	background: var(--background-modifier-form-field) !important;
+	border-color: var(--background-modifier-border);
+	color: var(--text-normal) !important;
+}
+.nq-bug-modal .nqb-secondary:hover:not(:disabled) { background: var(--background-modifier-hover) !important; }
+.nq-bug-modal .nqb-quiet { background: transparent !important; color: var(--text-muted) !important; padding: 6px 10px; }
+.nq-bug-modal .nqb-quiet:hover:not(:disabled) { color: var(--text-normal) !important; background: var(--background-modifier-hover) !important; }
+.nq-bug-modal .nqb-btn:disabled { opacity: 0.5; cursor: default; }
+.nq-bug-modal .nqb-primary:disabled { background: var(--background-modifier-form-field) !important; color: var(--text-muted) !important; opacity: 1; }
+
+.nq-bug-modal .nqb-sent { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0 4px; text-align: center; }
+.nq-bug-modal .nqb-sent-mark { color: var(--color-green); }
+.nq-bug-modal .nqb-sent-mark .svg-icon { width: 40px; height: 40px; }
+.nq-bug-modal .nqb-sent-title { font-size: 1.1em; font-weight: 600; }
+.nq-bug-modal .nqb-sent-body { margin: 0 0 8px; color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+	.nq-bug-modal .nqb-log-zone,
+	.nq-bug-modal .nqb-chevron { transition: none; }
+}
