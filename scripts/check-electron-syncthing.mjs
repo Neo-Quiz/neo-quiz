@@ -590,7 +590,14 @@ await withSrcModule(
 					const h = await sync.startSync({ exe, home: join(tmp, "h2"), root: join(tmp, "r2"), confirmer: async (id, nom) => { demandes.push([id, nom]); return reponse; } });
 					try {
 						r.check("the pid file names the running process", /^\d+$/.test(readFileSync(join(tmp, "h2", "syncthing.pid"), "utf8").trim()), true);
-						const etat = await h.etat();
+						/* The real binary scans the new empty folder right after start:
+						   "scanning" for a moment, then "idle". Wait for the end of that
+						   first scan (bounded) instead of racing it. */
+						let etat = await h.etat();
+						for (const fin = Date.now() + 15000; etat.dossier.etat === "scanning" && Date.now() < fin;) {
+							await new Promise(ok => setTimeout(ok, 250));
+							etat = await h.etat();
+						}
 						r.check("the state carries this device's id and the folder", { actif: etat.actif, id: regles.isDeviceId(etat.appareil ?? ""), dossier: etat.dossier.etat, appareils: etat.appareils }, { actif: true, id: true, dossier: "idle", appareils: [] });
 						r.check("an invalid id is refused, nothing paired", [await h.appairer("not-an-id"), (await h.etat()).appareils.length], ["invalide", 0]);
 						r.check("our own id is refused", await h.appairer(etat.appareil), "invalide");
