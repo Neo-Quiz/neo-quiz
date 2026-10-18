@@ -146,6 +146,8 @@ export async function readUsageFresh(tool: UsageTool, read: (tool: UsageTool) =>
 export interface UsageLine {
 	/** Reads again (throttled): call when a generation or a reply ends. */
 	refresh(): void;
+	/** Paints again from the cache (no read): call when the composer's model changes. */
+	redraw(): void;
 	destroy(): void;
 }
 
@@ -161,8 +163,12 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let dead = false;
 
+	/** Groups the user unfolded by hand in the open popover; reset at each opening and on a model change. */
+	const unfolded = new Set<string>();
+	let lastModel = model ? model() : "";
 	const draw = (): void => {
 		el.replaceChildren();
+		if (model && model() !== lastModel) { lastModel = model(); unfolded.clear(); }
 		const cur = cache.get(tool);
 		const toutes = cur ? usageStatusRows(cur.rows) : [];
 		// Only the chosen model's group under the composer, when one fits.
@@ -171,11 +177,13 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		el.hidden = rows.length === 0;
 		if (el.hidden) closePop();
 		const now = Date.now();
+		// A matched group heads the block once; its rows then name only their window.
+		if (groupe) ajouter(el, "div", "qbd-ai-usage-group", groupe);
 		const grid = ajouter(el, "div", "qbd-ai-usage-grid");
 		for (const row of rows) {
 			const pct = Math.max(0, Math.min(100, Math.round(row.usedPercent)));
 			const win = ajouter(grid, "span", "qbd-ai-usage-win");
-			ajouter(win, "span", "qbd-ai-usage-name", usageShortLabel(row));
+			ajouter(win, "span", "qbd-ai-usage-name", usageShortLabel(groupe ? { ...row, group: undefined } : row));
 			const bar = ajouter(win, "span", "qbd-ai-usage-bar");
 			bar.dataset.level = usageLevel(row.usedPercent);
 			// At 0 % the bar is a plain empty track: no fill, so no min-width dot.
@@ -264,8 +272,27 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		/* One section per model group (Antigravity, 2026-10-17): its name and the
 		   provider's note as the heading, as agy's `/usage` shows them. */
 		const sections = usageGroups(cur && !signedOut ? usageStatusRows(cur.rows) : []);
-		for (const section of sections) for (const [i, row] of section.rows.entries()) {
-			if (i === 0 && section.group) {
+		// Only the chosen model's group stays open; the others fold to their title.
+		const names = sections.map(x => x.group).filter((g): g is string => !!g);
+		const chosen = model ? groupOfModel(model(), names) : null;
+		for (const section of sections) {
+			const folded = !!section.group && !!chosen && section.group !== chosen && !unfolded.has(section.group);
+			if (section.group && chosen) {
+				const g = section.group;
+				const tete = ajouter(pop, "div", "qbd-usage-pop-group" + (folded ? " is-folded" : ""));
+				const btn = ajouter(tete, "button", "qbd-usage-pop-group-toggle") as HTMLButtonElement;
+				btn.type = "button";
+				btn.setAttribute("aria-expanded", String(!folded));
+				ajouter(btn, "span", "qbd-usage-pop-group-name", g);
+				if (g !== chosen) {
+					currentHost().ui.setIcon(ajouter(btn, "span", "qbd-usage-pop-group-chevron"), "chevron-down");
+					btn.addEventListener("click", () => { if (unfolded.has(g)) unfolded.delete(g); else unfolded.add(g); drawPop(); });
+				} else btn.disabled = true;
+				if (!folded && section.note) ajouter(tete, "div", "qbd-usage-pop-group-note", section.note);
+				if (folded) continue;
+			}
+			for (const [i, row] of section.rows.entries()) {
+			if (i === 0 && section.group && !chosen) {
 				const tete = ajouter(pop, "div", "qbd-usage-pop-group");
 				ajouter(tete, "div", "qbd-usage-pop-group-name", section.group);
 				if (section.note) ajouter(tete, "div", "qbd-usage-pop-group-note", section.note);
@@ -290,6 +317,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			ajouter(meta, "span", "", t("ai.usage.remaining", { n: usageRemainingPercent(row.usedPercent) }));
 			const when = usageResetIn(row.resetsAt, now);
 			ajouter(meta, "span", "", when ? t("ai.usage.resetsIn", { when }) : "");
+		}
 		}
 		drawResets(now);
 		drawAccount(pop, tool, {
@@ -470,5 +498,5 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		timer = setInterval(tick, REDRAW_MS);
 		load(false);
 	}
-	return { refresh: () => load(true), destroy };
+	return { refresh: () => load(true), redraw: draw, destroy };
 }

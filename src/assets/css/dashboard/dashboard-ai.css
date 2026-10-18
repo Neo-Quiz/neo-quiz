@@ -4619,6 +4619,37 @@
 	border-top: 1px solid var(--background-modifier-border);
 }
 
+.qbd-usage-pop-group-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.qbd-usage-pop-group-toggle:disabled { cursor: default; opacity: 1; }
+
+.qbd-usage-pop-group-chevron { display: inline-flex; color: var(--text-faint); transition: transform 150ms ease; }
+.qbd-usage-pop-group-chevron svg { width: 14px; height: 14px; }
+.qbd-usage-pop-group-toggle[aria-expanded="true"] .qbd-usage-pop-group-chevron { transform: rotate(180deg); }
+
+.qbd-usage-pop-group.is-folded { padding-bottom: 12px; }
+
+/* The group title heads the block under the composer, on its own line. */
+.qbd-ai-usage-group {
+	margin-bottom: 4px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
 .qbd-usage-pop-group-name {
 	font-size: 13px;
 	font-weight: 700;

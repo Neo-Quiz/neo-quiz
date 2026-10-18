@@ -1486,10 +1486,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 						onPickModel: async (v) => {
 							await saveSettings({ aiModel: v });
 							refresh();
+							planLine?.redraw();
 						},
 						onPickLevel: async (v, niveau) => {
 							await saveSettings({ aiModel: v, aiAntigravityLevels: { ...(settings().aiAntigravityLevels || {}), [v]: niveau } });
 							refresh();
+							planLine?.redraw();
 						}
 					});
 				});

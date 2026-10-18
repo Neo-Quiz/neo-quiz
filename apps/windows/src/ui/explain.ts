@@ -943,6 +943,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					// The effort button exists for Claude Code and Codex only.
 					effortBtn.hidden = !peutExpliquer() || !aBoutonEffort();
 					monterForfait();
+					ligneForfait?.redraw();
 					if (peutExpliquer()) {
 						modeleLabel.textContent = libelleModele();
 						const ev = effortCourant();
