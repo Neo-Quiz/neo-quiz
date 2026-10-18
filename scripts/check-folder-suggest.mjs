@@ -16,7 +16,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/folder-suggest.ts", "src/dashboard/folder-choice.ts"], (S, C) => {
+await withSrcModule(["src/dashboard/folder-suggest.ts", "src/dashboard/folder-choice.ts", "src/dashboard/module-icons.ts"], (S, C, MI) => {
 	const r = makeReporter("Folder order and choice");
 	const F = (path, name = path.split("/").pop()) => ({ path, name });
 	const f = (path, mtime, title = path.split("/").pop()) => ({ path, mtime, title });
@@ -97,6 +97,12 @@ await withSrcModule(["src/dashboard/folder-suggest.ts", "src/dashboard/folder-ch
 		["Python", "Quizzes", "Web HTML", "Quiz"]);
 	r.check("prompt: one name per distinct folder name, in the given order, capped",
 		[C.folderNamesForPrompt([F("a/Python"), F("b/python"), F("c/Rust", "Rust"), F("d/Go")], 2)], [["Python", "Rust"]]);
+
+	/* ── The AI's icon for a NEW folder ── */
+	r.check("icon: kept only for a folder just created and a known id",
+		[C.iconForNewFolder(true, "flask-conical", MI.MODULE_ICONS), C.iconForNewFolder(true, "nope", MI.MODULE_ICONS), C.iconForNewFolder(true, undefined, MI.MODULE_ICONS), C.iconForNewFolder(true, "__proto__", MI.MODULE_ICONS)],
+		["flask-conical", null, null, null]);
+	r.check("icon: an existing folder's icon is never touched", C.iconForNewFolder(false, "flask-conical", MI.MODULE_ICONS), null);
 
 	r.done();
 });

@@ -289,6 +289,8 @@ export interface AiPageDeps {
 	/** The length in minutes of one class session of a folder (contract path),
 	    from its class-session settings; undefined when unknown. Absent: a Learn
 	    keeps its default depth. */
+	/** Stores the icon the AI chose for a folder it just created, as the learner's own icon choice is stored (never called for an existing folder). Absent: the folder keeps the icon its name suggests. */
+	declareFolderIcon?(path: string, icon: string): Promise<void>;
 	lectureMinutes?(dossier: string): number | undefined;
 	/** Rend un BLOC de code (commande d'installation d'un CLI) dans `host`.
 	    Sous Obsidian, le moteur Markdown de l'app : coloration Prism, style de
@@ -353,7 +355,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    needs to generate (the documents' text is only in memory), and the folder
 	    already decided for it ("" while a "which folder" answer decides). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction; dossier: string; sujet: CategorieQuiz }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction; dossier: string; sujet: CategorieQuiz; icone?: string }>();
 	/** The "/" menu of the composer on screen (slash-commands.ts). */
 	let commandeSlash: SlashCommandHandle | null = null;
 	/** The exam picked in the "/exam" menu: the next send is a whole
@@ -3667,13 +3669,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    one, or a new one created next to the course folders); else the folder
 	    of the subject the AI named. "" for a request sent to the PC: the PC
 	    places it itself. */
-	async function dossierFinal(decide: string, nomChoisi: string | null, sujet: CategorieQuiz, action: ClarifyAction): Promise<string> {
+	async function dossierFinal(decide: string, nomChoisi: string | null, sujet: CategorieQuiz, action: ClarifyAction, icone?: string): Promise<string> {
 		if (decide) return decide;
 		if (action === "remote") return "";
 		const connus = dossiersConnus();
 		if (nomChoisi) {
 			try {
-				const chemin = await folderNamed(nomChoisi, connus);
+				const chemin = await folderNamed(nomChoisi, connus, new Date(), icone, deps.declareFolderIcon);
 				if (chemin) return chemin;
 			} catch (e) {
 				console.warn(LOG_PREFIX, "quiz folder not created:", nomChoisi, e);
@@ -4428,7 +4430,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const dossierConnu = decide || nomme;
 		if ("questions" in reponse && (dossierConnu || dossiersPourIa.choose === false)) {
 			const restantes = reponse.questions.filter(q => q.purpose !== "folder");
-			reponse = restantes.length ? { ...reponse, questions: restantes } : { ready: true, ...(reponse.kind ? { kind: reponse.kind } : {}), ...(reponse.subject ? { subject: reponse.subject } : {}) };
+			reponse = restantes.length ? { ...reponse, questions: restantes } : { ready: true, ...(reponse.kind ? { kind: reponse.kind } : {}), ...(reponse.subject ? { subject: reponse.subject } : {}), ...(reponse.icon ? { icon: reponse.icon } : {}) };
 		}
 		if ("reply" in reponse) {
 			// Not a request for a quiz: the answer is a plain text result of the chat, nothing generates.
@@ -4437,7 +4439,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		} else if ("questions" in reponse) {
 			const id = newRequestId();
 			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action, ...(sujet !== "general" ? { subject: sujet } : {}) }));
-			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action, dossier: dossierConnu, sujet });
+			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action, dossier: dossierConnu, sujet, ...(reponse.icon ? { icone: reponse.icon } : {}) });
 			notifyChatsChanged();
 		} else {
 			const dossier = await dossierFinal(dossierConnu, null, sujet, action);
@@ -4475,7 +4477,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const nomChoisi = folderFromClarifications(requete.clarify.questions, reponses);
 		const decide = attente.dossier || (action === "remote" ? "" : destinationDuContexte());
 		demarrage = true;
-		void dossierFinal(decide, nomChoisi, attente.sujet, action)
+		void dossierFinal(decide, nomChoisi, attente.sujet, action, (attente as { icone?: string }).icone)
 			.then(dossier => continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at, dossier, attente.sujet))
 			.catch(err => { console.warn(LOG_PREFIX, "clarification continuation failed:", err); host.ui.notice(t("ai.error.checkSettings")); })
 			.finally(() => { demarrage = false; render(containerRef); });

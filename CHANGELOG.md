@@ -24,6 +24,7 @@ release notes.
 - Neutral, professional placeholders in the Explain composer, the clarification answer field and the written answer fields; the Explain icon keeps its colour logo and the window drops its title.
 - The Explain window composer now takes the focus on a single click anywhere on its card, shows the same hover and active contour as the Generate page, and the field is focused as the window opens.
 - On narrow windows the Generate composer row and the bottom bar now fit 360 to 430 px: the agent mode chip shows its icon only and the model labels ellipsize, and the five tabs share the width.
+- When the AI creates a new folder for a generated quiz it also picks the folder's icon from the app's list (an existing folder keeps its own icon).
 - The Generate composer no longer shows a subject chip or picker: the AI now picks the quiz's subject itself, in the short call that already decides Learn or Test and the folder.
 - Generated quizzes gallery: each card shows the subject's colour logo large on a tinted gradient with a dotted pattern, General has its own illustration, every quiz shows a subject (General by default) and a new quiz stores the AI-picked subject in its note.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.

@@ -12,7 +12,8 @@ import { LOG_PREFIX } from "../branding";
 import { t } from "../i18n";
 import { libelleCategorie } from "./categorie-affichage";
 import type { CategorieQuiz } from "./categorie-quiz";
-import { fallbackFolderName, findFolderByName, newFolderLocalPath, safeFolderName, sameFolderName, yearFolderForNewFolder, type KnownFolder } from "./folder-choice";
+import { MODULE_ICONS } from "./module-icons";
+import { fallbackFolderName, iconForNewFolder, findFolderByName, newFolderLocalPath, safeFolderName, sameFolderName, yearFolderForNewFolder, type KnownFolder } from "./folder-choice";
 
 /** The folders that hold a quiz, from the catalogue's paths (what the queue
     knows when the page's folder list is not at hand). */
@@ -27,11 +28,17 @@ export function foldersOfQuizzes(quizzes: readonly { path: string }[]): KnownFol
 	return [...seen.values()];
 }
 
+/** Declares the icon of a folder the request just created (the caller stores
+    it exactly as the learner's own choice is stored). */
+export type DeclareFolderIcon = (path: string, icon: string) => Promise<void>;
+
 /** The folder called `raw`: a known folder of that name, else one already on
     disk in the school-year folder (or at the root), else a NEW folder created
     there. Its contract path, or null when the name is unusable (empty, a
-    reserved Windows name...). A refused `mkdirs` rejects. */
-export async function folderNamed(raw: string, known: readonly KnownFolder[], now: Date = new Date()): Promise<string | null> {
+    reserved Windows name...). A refused `mkdirs` rejects. `icon`: the AI's
+    icon for a NEW folder, handed to `declareIcon` only when this call created
+    the folder (a folder already known or on disk keeps its own icon). */
+export async function folderNamed(raw: string, known: readonly KnownFolder[], now: Date = new Date(), icon?: string, declareIcon?: DeclareFolderIcon): Promise<string | null> {
 	const name = safeFolderName(raw);
 	if (!name) return null;
 	const host = currentHost();
@@ -50,6 +57,11 @@ export async function folderNamed(raw: string, known: readonly KnownFolder[], no
 	const onDisk = (await subfolders(parent)).find(n => sameFolderName(n, name));
 	const path = host.paths.contractPath(root.id, newFolderLocalPath(onDisk ?? name, year));
 	await host.fs.mkdirs(path);
+	const chosen = iconForNewFolder(!onDisk, icon, MODULE_ICONS);
+	if (chosen && declareIcon) {
+		// The icon is a nicety: a failure never blocks the generation.
+		try { await declareIcon(path, chosen); } catch (e) { console.warn(LOG_PREFIX, "folder icon not stored:", path, e); }
+	}
 	return path;
 }
 

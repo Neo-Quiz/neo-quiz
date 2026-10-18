@@ -20,6 +20,7 @@
 
 import { CATEGORIES, estCategorie } from "./categorie-quiz";
 import type { CategorieQuiz } from "./categorie-quiz";
+import { MODULE_ICONS } from "./module-icons";
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
 export type KindChoice = "learn" | "practice" | "both";
@@ -39,7 +40,8 @@ export interface ClarifyQuestion { header: string; question: string; multiple: b
 /** `folder`: the name of one of the learner's folders the model says fits
     (read against the real list by the caller, never trusted as a path). */
 /** `subject`: the subject id the model picked, always a known id (`estCategorie`); absent = `general`. */
-export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice; folder?: string; subject?: CategorieQuiz };
+export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice; folder?: string; subject?: CategorieQuiz; icon?: string };
+/** `icon`: the icon of a NEW folder, always one id of `MODULE_ICONS` (2026-10-18); only used when the folder is really created, never for an existing one. */
 /** The longest folder name read from the model's answer. */
 export const MAX_FOLDER_NAME = 100;
 /** The longest conversational reply kept (characters). */
@@ -101,7 +103,9 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	const folder = typeof obj.folder === "string" && obj.folder.trim() ? obj.folder.trim().slice(0, MAX_FOLDER_NAME) : undefined;
 	// An unknown, missing or garbage subject is simply absent: `general`.
 	const subject = estCategorie(obj.subject) && obj.subject !== "general" ? obj.subject : undefined;
-	const extra = { ...(kind ? { kind } : {}), ...(folder ? { folder } : {}), ...(subject ? { subject } : {}) };
+	// An unknown or garbage icon is simply absent: the folder keeps the icon its name suggests.
+	const icon = typeof obj.icon === "string" && MODULE_ICONS.includes(obj.icon) ? obj.icon : undefined;
+	const extra = { ...(kind ? { kind } : {}), ...(folder ? { folder } : {}), ...(subject ? { subject } : {}), ...(icon ? { icon } : {}) };
 	const ready: ClarifyAnswer = { ready: true, ...extra };
 	// A conversational reply wins over everything else (bounded, plain text).
 	if (typeof obj.reply === "string" && obj.reply.trim()) return { reply: obj.reply.trim().slice(0, MAX_REPLY) };
@@ -216,6 +220,10 @@ export function clarifyFolderRules(folders: ClarifyFolders | undefined): string[
 	];
 }
 
+/** The icon rule of the clarify call (exported for `check:generation-kind`):
+    sent only when the call may propose a NEW folder; the compact id list. */
+export const ICON_RULE = "When you propose a NEW folder (never for an existing one), also add a top-level \"icon\" whose value is exactly one of these ids and fits the folder's subject: " + MODULE_ICONS.join(",") + ". Never invent an id.";
+
 /** The subject rule of the clarify call (exported for `check:generation-kind`):
     the subject ids, compact, and what to do when none fits. */
 export const SUBJECT_RULE = "Also deduce the quiz's SUBJECT from the request and the attached document names, and add a top-level \"subject\" whose value is exactly one of these ids: " + CATEGORIES.join(",")
@@ -239,6 +247,7 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"For each of these two questions (number of questions, number of quizzes), put the option labeled exactly \"Auto\" first and set the default to index 0. \"Auto\" means you decide freely; it imposes NO numeric bound.",
 		"You may ask at most ONE optional clarifying question about scope or learner level, only when genuinely vague. Never exceed 3 questions total.",
 		...clarifyFolderRules(folders),
+		...(choisit ? [ICON_RULE] : []),
 		"NEVER ask what the attached documents already answer. You see only their names; if a name makes the scope clear, do not ask about scope.",
 		"You have no tools; you only see the request, the names of the attached documents and the names of the learner's folders.",
 		"Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above.",

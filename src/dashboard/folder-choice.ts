@@ -120,3 +120,10 @@ export function folderNamesForPrompt(folders: readonly KnownFolder[], max = 60):
 	}
 	return out;
 }
+
+/** The icon to store for a folder the AI proposed: only when the folder was
+    just CREATED by this request and the icon is one of the app's list; an
+    existing folder's icon belongs to the learner and is never touched. */
+export function iconForNewFolder(created: boolean, icon: string | undefined, allowed: readonly string[]): string | null {
+	return created && typeof icon === "string" && allowed.includes(icon) ? icon : null;
+}

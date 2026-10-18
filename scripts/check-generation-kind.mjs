@@ -151,6 +151,20 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	r.check("folder prompt: without folder information, no folder rule at all",
 		[K.clarifyPrompt("x", []).system.includes("LEARNER'S FOLDERS"), K.clarifyPrompt("x", []).user.includes("LEARNER'S FOLDERS")], [false, false]);
 
+	/* ── THE ICON OF A NEW FOLDER (2026-10-18): the AI picks it from the app's list ── */
+	r.check("icon: a valid id is kept beside the kind, the subject and the folder",
+		[K.parseClarifyAnswer('{"icon":"flask-conical"}'), K.parseClarifyAnswer('{"kind":"learn","subject":"python","folder":"X","icon":"code"}')],
+		[{ ready: true, icon: "flask-conical" }, { ready: true, kind: "learn", folder: "X", subject: "python", icon: "code" }]);
+	r.check("icon: unknown, wrong case, not a string or a prototype key is dropped and never blocks",
+		['{"icon":"nope"}', '{"icon":"Code"}', '{"icon":42}', '{"icon":null}', '{"icon":"__proto__"}', '{"icon":"constructor"}', '{"icon":""}'].map(raw => K.parseClarifyAnswer(raw)),
+		Array(7).fill({ ready: true }));
+	r.check("icon: kept with questions", K.parseClarifyAnswer(JSON.stringify({ icon: "dna", questions: qs })), { questions: qs, icon: "dna" });
+	const pIcone = K.clarifyPrompt("Quiz sur la photosynthèse", ["cm1.pdf"], "fr", { names: ["XTI301"] });
+	r.check("icon prompt: the rule and the id list are sent when a NEW folder is possible",
+		[pIcone.system.includes(K.ICON_RULE), pIcone.system.includes("flask-conical"), K.ICON_RULE.includes("Never invent an id")], [true, true, true]);
+	r.check("icon prompt: nothing sent when the folder is decided, chosen elsewhere (PC) or not handled",
+		[K.clarifyPrompt("x", [], "en", { names: ["A"], decided: "A" }).system, K.clarifyPrompt("x", [], "en", { names: ["A"], choose: false }).system, K.clarifyPrompt("x", []).system].map(x => x.includes("flask-conical")), [false, false, false]);
+	r.check("icon prompt: the user part still carries only the request and NAMES (no icon ids)", [pIcone.user.includes("flask-conical"), pIcone.user.includes("cm1.pdf")], [false, true]);
 	/* ── THE SUBJECT (2026-10-18): the AI picks it, the composer's local detection is gone ── */
 	r.check("subject: a known id is read, beside the kind and with questions",
 		[K.parseClarifyAnswer('{"subject":"python"}'), K.parseClarifyAnswer('{"kind":"practice","subject":"reseau"}'), K.parseClarifyAnswer(JSON.stringify({ subject: "maths", questions: qs }))],

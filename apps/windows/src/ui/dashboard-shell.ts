@@ -726,6 +726,17 @@ export function monterDashboard(root: HTMLElement, deps: MonterDashboardDeps): D
 		statsStore: deps.statsStore,
 		navigate: (vue, data) => naviguer(vue, data),
 		quizFolders: () => dossiersDeQuiz(),
+		/* The icon the AI chose for a folder it just created: written like the
+		   learner's own choice (an override with the folder's path, synced to the
+		   modules file). A folder that already has an icon keeps it. */
+		declareFolderIcon: async (chemin, icone) => {
+			const cle = chemin.split("/").pop() as string;
+			const overrides: Record<string, ModuleOverride> = { ...(ctx.settings.quizzesModuleOverrides || {}) };
+			if (overrides[cle]?.icon) return;
+			overrides[cle] = { ...(overrides[cle] || {}), name: overrides[cle]?.name || cle, path: overrides[cle]?.path || chemin, icon: icone };
+			ctx.settings.quizzesModuleOverrides = overrides;
+			await ctx.saveSettings();
+		},
 		// Same folder lookup as `decrire`: by stored path, else by the folder's name.
 		lectureMinutes: (dossier) => lectureMinutesOfFolder(ctx.settings.quizzesModuleOverrides, dossier),
 		copyText: copierTexte,
