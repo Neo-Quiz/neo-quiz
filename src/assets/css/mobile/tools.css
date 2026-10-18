@@ -93,8 +93,23 @@
    stays on the button. The button keeps its own width (the tools cell
    shrank to 22 px and the 28 px button spilled out of it). */
 .is-mobile .qbd-ai-composer-tools {
-	flex: none;
+	/* May shrink (2026-10-18): `flex: none` kept the row at its natural width and
+	   pushed the agent mode chip past the card ("Accès compl" cut at 393 px). The
+	   model and effort labels ellipsize (`.qbd-select-label`), the logo, the
+	   agent mode icon and send keep their size. */
+	flex: 0 1 auto;
+	min-width: 0;
+	gap: 2px;
 }
+.is-mobile .qbd-ai-composer-bottom {
+	min-width: 0;
+}
+.is-mobile .qbd-ai-composer-tools > .qbd-select { min-width: 0; }
+.is-mobile .qbd-ai-composer-tools > .qbd-select.qbd-provider-trigger-logo,
+.is-mobile .qbd-ai-composer-send { flex: none; }
+/* Agent mode chip: the icon alone on a phone (aria-label keeps the name). */
+.is-mobile .qbd-agent-mode-trigger { flex: none; padding-left: 8px; padding-right: 8px; }
+.is-mobile .qbd-agent-mode-trigger .qbd-select-label { display: none; }
 .is-mobile .qbd-ai-composer-tools .qbd-ai-provider-nudge.is-placed {
 	left: auto !important;
 	right: 0;

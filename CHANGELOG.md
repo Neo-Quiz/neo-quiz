@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- On narrow windows the Generate composer row and the bottom bar now fit 360 to 430 px: the agent mode chip shows its icon only and the model labels ellipsize, and the five tabs share the width.
 - The Generate composer no longer shows a subject chip or picker: the AI now picks the quiz's subject itself, in the short call that already decides Learn or Test and the folder.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.
 - The usage popover folds the model groups you are not using (click a title to unfold), the line under the composer shows the group title on its own line, and both follow a model change at once.

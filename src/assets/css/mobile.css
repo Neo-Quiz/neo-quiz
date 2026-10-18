@@ -102,7 +102,7 @@ html.nq-mobile .modal-container {
 	align-items: stretch;
 	width: 100%;
 	height: 57px;
-	padding: 0 20px;
+	padding: 0 4px;
 	overflow: hidden;
 	border-top: 1px solid var(--nq-bottom-bar-line);
 	border-bottom: 0;
@@ -119,9 +119,10 @@ html.nq-mobile .modal-container {
 .is-mobile .qbd-sidebar .qbd-nav-item,
 .is-mobile .qbd-sidebar .qbd-nav-footer .qbd-nav-item {
 	--qbd-nav-cut: var(--nq-bottom-bar-bg);
-	/* 73 dp like StudySmarter, wider when a French label needs it. */
-	flex: 0 0 auto;
-	min-width: 73px;
+	/* Five tabs share the width equally (2026-10-18): 5 x 73 px minimum plus
+	   20 px of padding was 405 px and cut "Réglages" at 393 px. */
+	flex: 1 1 0;
+	min-width: 0;
 	width: auto;
 	max-width: none;
 	height: 56px;
