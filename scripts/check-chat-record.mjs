@@ -206,6 +206,8 @@ await withSrcModule(["src/dashboard/chat-record.ts", "src/dashboard/chat-request
 	r.check("a malformed quiz count is ignored without losing the question", [badCount.questions[0].purpose, badCount.questions[0].options.map(o => o.quizzes)], [undefined, [undefined, 1]]);
 	const badMetadata = read([{ ...base, clarify: { questions: [{ ...qs[0], purpose: "kind", options: [op("Learn"), op("Test")] }], action: "invalid" } }])[0].clarify;
 	r.check("malformed type metadata and routes are ignored without losing the question", [badMetadata.questions[0].purpose, badMetadata.action], [undefined, undefined]);
+	r.check("the subject the AI picked is read back (a known id only, `general` dropped)",
+		["python", "Python", "auto", "general", 3, undefined].map(x => read([{ ...base, clarify: { questions: qs, subject: x } }])[0].clarify.subject), ["python", undefined, undefined, undefined, undefined, undefined]);
 	r.check("an unknown kind is ignored", read([{ ...base, clarify: { questions: qs, genre: "exam" } }])[0].clarify.genre, undefined);
 	r.check("resume: a pending request with no document is rebuilt from the record (text and kind)", Q.resumeSource(read([pend])[0]), { text: "Python", genre: "both" });
 	r.check("resume: without a stored kind, the request's mode", [Q.resumeSource(read([{ ...base, mode: "practice", clarify: { questions: qs } }])[0])?.genre, Q.resumeSource(read([{ ...base, clarify: { questions: qs } }])[0])?.genre], ["practice", "learn"]);

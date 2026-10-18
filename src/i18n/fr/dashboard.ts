@@ -377,7 +377,6 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.select.fastSpeed": "Vitesse 1.5x",
 	"dashboard.select.fastUsage": "Consomme plus",
 	"dashboard.select.usageWarning": "Consomme vos limites plus rapidement",
-	"dashboard.select.optionsCategory": "Sujet",
 	"dashboard.select.noteSearch": "Rechercher une note…",
 	"dashboard.select.noteOpen": "Notes ouvertes",
 	"dashboard.select.noteAll": "Toutes les notes",

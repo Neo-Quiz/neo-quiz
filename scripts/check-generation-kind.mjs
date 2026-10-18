@@ -150,5 +150,20 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 		[pc.system.includes("LEARNER'S FOLDERS"), pc.system.includes("\"purpose\":\"folder\""), pc.user.includes("- XTI302"), pc.user.includes("(none yet)")], [false, false, true, false]);
 	r.check("folder prompt: without folder information, no folder rule at all",
 		[K.clarifyPrompt("x", []).system.includes("LEARNER'S FOLDERS"), K.clarifyPrompt("x", []).user.includes("LEARNER'S FOLDERS")], [false, false]);
+
+	/* ── THE SUBJECT (2026-10-18): the AI picks it, the composer's local detection is gone ── */
+	r.check("subject: a known id is read, beside the kind and with questions",
+		[K.parseClarifyAnswer('{"subject":"python"}'), K.parseClarifyAnswer('{"kind":"practice","subject":"reseau"}'), K.parseClarifyAnswer(JSON.stringify({ subject: "maths", questions: qs }))],
+		[{ ready: true, subject: "python" }, { ready: true, kind: "practice", subject: "reseau" }, { questions: qs, subject: "maths" }]);
+	r.check("subject: unknown, wrong case, not a string, a prototype key, or `general` is absent (= general, no addition)",
+		['{"subject":"Python"}', '{"subject":"auto"}', '{"subject":" python"}', '{"subject":42}', '{"subject":null}', '{"subject":["python"]}', '{"subject":"__proto__"}', '{"subject":"constructor"}', '{"subject":"general"}', '{"subject":""}'].map(raw => K.parseClarifyAnswer(raw)),
+		Array(10).fill(READY));
+	r.check("subject: a broken answer is `ready` and never blocks a generation", ['{"subject":"python"', 'subject: python', '{"subject":"python","questions":"broken"}'].map(raw => K.parseClarifyAnswer(raw).questions), [undefined, undefined, undefined]);
+	r.check("subject: a conversational reply carries no subject", K.parseClarifyAnswer('{"subject":"python","reply":"Salut"}'), { reply: "Salut" });
+	r.check("subject prompt: the rule is sent, general is the fallback, no invented ids, the answer shape names it",
+		[p.system.includes(K.SUBJECT_RULE), p.system.includes('"general"'), p.system.includes("Never invent an id"), p.system.includes('"subject":"<one subject id>"')], [true, true, true, true]);
+	const ids = K.SUBJECT_RULE.split("one of these ids: ")[1].split(". ")[0].split(",");
+	r.check("subject prompt: the id list is the CATEGORIES list, comma separated, once each", [ids.length > 60, ids[0], ids.includes("python"), ids.includes("langues"), new Set(ids).size === ids.length], [true, "general", true, true, true]);
+	r.check("subject prompt: the user part carries the request and NAMES only (no ids, no content)", [p.user.includes("python,"), p.user.includes(ids.join(","))], [false, false]);
 	r.done();
 });

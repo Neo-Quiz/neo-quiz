@@ -27,7 +27,7 @@ import { convertParsedToInternal, readModeConfig } from "../editor/convert";
 import { exportAllWithFence } from "../editor/export";
 import { ecrireFrontmatterNeoQuiz } from "../quiz-frontmatter";
 import { ensureFolder, freeNotePath } from "./folder-create";
-import { detecterCategorie } from "./categorie-quiz";
+import type { CategorieQuiz } from "./categorie-quiz";
 import { fallbackFolder, foldersOfQuizzes } from "./folder-choice-io";
 import type { DraftQuestion } from "../editor/utils";
 import type { ParsedQuizItem } from "../editor/modals";
@@ -162,10 +162,9 @@ export function canChooseQuizCount(documents: number, images: number): boolean {
 }
 
 /** The folder of a request that left with none (2026-10-17: no more
-    "Generated" folder): the one named after the subject its documents and
-    text show (`fallbackFolder`), created when missing. */
-export async function dossierDeRepli(demande: { text: string; notes: readonly { name: string }[] } | null, scanner: Scanner): Promise<string> {
-	const sujet = detecterCategorie({ pieces: (demande?.notes ?? []).map(n => n.name), demande: demande?.text ?? "" });
+    "Generated" folder): the one named after its subject (`fallbackFolder`;
+    the AI's pick, `general` when none), created when missing. */
+export async function dossierDeRepli(sujet: CategorieQuiz, scanner: Scanner): Promise<string> {
 	return fallbackFolder(sujet, foldersOfQuizzes(scanner.getQuizzes?.() ?? []));
 }
 
@@ -232,6 +231,8 @@ export interface Enregistrement {
 	    plan is named by its step: "Lists and tuples — Learn"). */
 	titreImpose?: string;
 	demande: { text: string; notes: { name: string }[] } | null;
+	/** The request's subject (the AI's pick), naming the fallback folder; absent = `general`. */
+	categorie?: CategorieQuiz;
 	/** The chosen contract path, or "" when nothing placed the request (the
 	    subject's folder is then used, `dossierDeRepli`). */
 	destination: string;
@@ -251,7 +252,7 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		if (!e.draft.questions.length) return null;
 		/* `destination` est déjà un chemin du contrat : il ne repasse pas par
 		   `contractPath`, qui le préfixerait une seconde fois. */
-		const folder = e.destination || await dossierDeRepli(e.demande, e.scanner);
+		const folder = e.destination || await dossierDeRepli(e.categorie ?? "general", e.scanner);
 		await ensureFolder(folder);
 		/* The NAME: `<base> — Learn` / `<base> — Practice` / `<base> — Exam`,
 		   the base being the attached document (the lecture), else the model's
@@ -336,7 +337,7 @@ export interface EnregistrementLot extends Omit<Enregistrement, "draft" | "quest
 export async function enregistrerLot(e: EnregistrementLot, deja: readonly QuizDuLot[] = []): Promise<QuizDuLot[] | null> {
 	const faits: QuizDuLot[] = [...deja];
 	// ONE folder for the whole batch: each document alone could read as another subject.
-	const destination = e.destination || await dossierDeRepli(e.demande, e.scanner);
+	const destination = e.destination || await dossierDeRepli(e.categorie ?? "general", e.scanner);
 	for (let i = 0; i < e.lot.length; i++) {
 		const q = e.lot[i];
 		if (faits.some(f => f.document === q.document)) continue;

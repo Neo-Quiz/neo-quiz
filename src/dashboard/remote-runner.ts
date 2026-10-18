@@ -31,7 +31,6 @@ import type { AiSettings } from "../types/dashboard-ctx";
 import { figerReglages } from "./file-generation-app";
 import type { DemandeFile, FileGenerationApp } from "./file-generation-app";
 import { CANONICAL_TYPES, normalizeTypes } from "./ai-client";
-import { categorieChoisie, indicesCategorie } from "./categorie-quiz";
 import type { NoteAttachment } from "./generation-demande";
 import { admit, validateRemote } from "../shared-state/remote-request";
 import type { RemoteRequest, TakenEntry } from "../shared-state/remote-request";
@@ -156,7 +155,8 @@ export function createRemoteRunner(deps: RunnerDeps): { scan(): Promise<void> } 
 		const demande: DemandeFile = {
 			text: req.text, notes, images: [], mode: req.mode, count: req.count ?? null,
 			type: normalizeTypes(types), destination: "", reglages: s,
-			categorie: categorieChoisie("auto", indicesCategorie(notes, req.text, "")),
+			// No clarify call runs on the PC (the phone sent a plain request): no subject-specific addition.
+			categorie: "general",
 			chatId: req.chatId, requestId: req.id, sentAt: req.at, fromDevice: req.from, ...(req.fromName ? { fromName: req.fromName } : {}),
 		};
 		deps.queue.envoyer(demande);

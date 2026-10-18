@@ -303,12 +303,6 @@
 	height: 40px;
 }
 
-/* Items du dropdown Questions : cible tactile plus haute. */
-.is-mobile .qbd-opts-dd-item {
-	padding-top: 9px;
-	padding-bottom: 9px;
-}
-
 /* Options des menus portalés (ui-select, model menu, action menu) :
    le menu vit au <body>, .is-mobile (posé sur body) les couvre. */
 .is-mobile .qbd-select-option {

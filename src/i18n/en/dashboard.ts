@@ -424,7 +424,6 @@ export const EN_DASHBOARD = {
 	"dashboard.select.fastSpeed": "1.5x speed",
 	"dashboard.select.fastUsage": "More usage",
 	"dashboard.select.usageWarning": "Consumes usage limits faster",
-	"dashboard.select.optionsCategory": "Subject",
 	"dashboard.select.noteSearch": "Search a note…",
 	"dashboard.select.noteOpen": "Open notes",
 	"dashboard.select.noteAll": "All notes",

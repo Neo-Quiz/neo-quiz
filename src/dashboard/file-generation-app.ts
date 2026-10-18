@@ -783,7 +783,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 		const draft = brouillonDe(p.questions);
 		const entree = await enregistrerQuiz({
 			draft, questions: p.questions, modeDemande: d.mode, titreModele: p.titre, titreImpose: titrePreparation(d),
-			demande: d, destination: await dossierDeLigne(d), reglages: { ...deps.settings.get(), ...d.reglages },
+			demande: d, categorie: d.categorie, destination: await dossierDeLigne(d), reglages: { ...deps.settings.get(), ...d.reglages },
 			usage: p.usage, planTranches: p.planTranches, noteLearn: p.noteLearn, scanner: deps.scanner,
 		});
 		if (!entree) {
@@ -805,7 +805,7 @@ function creer(lireDeps: () => DepsFile): FileGenerationApp {
 			file = F.completer(file, id, { ...maintenant, produit: { ...(maintenant.produit ?? p), faits } });
 		};
 		const faits = await enregistrerLot({
-			demande: d, lot, liens: p.liens, modeDemande: d.mode, destination: await dossierDeLigne(d),
+			demande: d, lot, liens: p.liens, modeDemande: d.mode, categorie: d.categorie, destination: await dossierDeLigne(d),
 			reglages: { ...deps.settings.get(), ...d.reglages }, usage: p.usage, scanner: deps.scanner, apresChaque: garder,
 		}, p.faits ?? []);
 		if (!faits) {

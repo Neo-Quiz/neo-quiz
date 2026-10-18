@@ -11,8 +11,15 @@
    with Learn as the fallback. Since 2026-10-17 it also places the quiz (there
    is no "Generated" folder any more): it names one of the learner's folders
    (`folder`), or asks one "which folder" question (`purpose: "folder"`) whose
-   options are folder names, new ones it proposes included.
+   options are folder names, new ones it proposes included. Since 2026-10-18
+   it also names the quiz's SUBJECT (`subject`, one id of `CATEGORIES`): the
+   composer's local keyword detection and subject picker are gone, the AI
+   reads the request and the document names better. The subject only selects
+   a prompt addition (categorie-prompt.ts); anything unknown is `general`.
 ══════════════════════════════════════════════════════════ */
+
+import { CATEGORIES, estCategorie } from "./categorie-quiz";
+import type { CategorieQuiz } from "./categorie-quiz";
 
 /** What a request can ask for: `both` is a Learn then a Test on the same documents. */
 export type KindChoice = "learn" | "practice" | "both";
@@ -31,7 +38,8 @@ export interface ClarifyOption { label: string; description: string; quizzes?: Q
 export interface ClarifyQuestion { header: string; question: string; multiple: boolean; options: ClarifyOption[]; /** Index of the option assumed when the question is skipped. */ default: number; purpose?: "quizzes" | "folder" }
 /** `folder`: the name of one of the learner's folders the model says fits
     (read against the real list by the caller, never trusted as a path). */
-export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice; folder?: string };
+/** `subject`: the subject id the model picked, always a known id (`estCategorie`); absent = `general`. */
+export type ClarifyAnswer = ({ ready: true } | { questions: ClarifyQuestion[] } | { reply: string }) & { kind?: KindChoice; folder?: string; subject?: CategorieQuiz };
 /** The longest folder name read from the model's answer. */
 export const MAX_FOLDER_NAME = 100;
 /** The longest conversational reply kept (characters). */
@@ -91,7 +99,9 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	const obj = o as Record<string, unknown>;
 	const kind = isKindChoice(obj.kind) ? obj.kind : undefined;
 	const folder = typeof obj.folder === "string" && obj.folder.trim() ? obj.folder.trim().slice(0, MAX_FOLDER_NAME) : undefined;
-	const extra = { ...(kind ? { kind } : {}), ...(folder ? { folder } : {}) };
+	// An unknown, missing or garbage subject is simply absent: `general`.
+	const subject = estCategorie(obj.subject) && obj.subject !== "general" ? obj.subject : undefined;
+	const extra = { ...(kind ? { kind } : {}), ...(folder ? { folder } : {}), ...(subject ? { subject } : {}) };
 	const ready: ClarifyAnswer = { ready: true, ...extra };
 	// A conversational reply wins over everything else (bounded, plain text).
 	if (typeof obj.reply === "string" && obj.reply.trim()) return { reply: obj.reply.trim().slice(0, MAX_REPLY) };
@@ -206,6 +216,11 @@ export function clarifyFolderRules(folders: ClarifyFolders | undefined): string[
 	];
 }
 
+/** The subject rule of the clarify call (exported for `check:generation-kind`):
+    the subject ids, compact, and what to do when none fits. */
+export const SUBJECT_RULE = "Also deduce the quiz's SUBJECT from the request and the attached document names, and add a top-level \"subject\" whose value is exactly one of these ids: " + CATEGORIES.join(",")
+	+ ". Use the most specific id (\"python\" over \"web\" for a Python course; \"langues\" for a human language that has no id of its own). When no id clearly fits, or the request is not about one subject, use \"general\". Never invent an id.";
+
 /** The instruction of the clarify call: English like every instruction to the
     model, the questions follow the language of the request. It carries the
     request and the NAMES of the attached documents, never their content. */
@@ -217,6 +232,7 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"Otherwise deduce the quiz kind from the meaning of the learner's request and the attached document names: Learn by default. A request that says the learner understood nothing and needs to understand all the notions clearly wants Learn; 'test me', 'mock exam' and 'QCM d'entraînement' clearly want a Test. Choose both only when the learner clearly asks for both. Never ask a question about the kind.",
 		"A keyword such as 'test', 'examen' or 'contrôle' inside a pasted path, filename, document title, or quoted material does NOT express the learner's intent. Treat such names as context about the subject, never as an instruction to choose Test. Follow the meaning of the request.",
 		"Always include the deduced canonical \"kind\" (\"learn\", \"practice\", or \"both\") in your answer. The app safely defaults to Learn if it is missing or invalid.",
+		SUBJECT_RULE,
 		"Before generating, ask short multiple-choice clarification questions.",
 		"Always ask one question about the NUMBER OF QUESTIONS to generate, even if the request already names a count. Offer concrete choices such as 15, 25, and 40 questions.",
 		"If two or more attached documents are listed, also ask HOW MANY QUIZZES to make, simply as a number: a single-choice question marked \"purpose\":\"quizzes\" whose options are \"Auto\" {\"quizzes\":\"auto\"} first (you decide), then 1, 2 and 3 quizzes ({\"quizzes\":1}, {\"quizzes\":2}, {\"quizzes\":3}); its default is 0. The quizzes share the material of ALL the documents, split by theme; never describe them as one quiz per document.",
@@ -227,7 +243,7 @@ export function clarifyPrompt(request: string, documentNames: readonly string[],
 		"You have no tools; you only see the request, the names of the attached documents and the names of the learner's folders.",
 		"Always return a questions JSON object because the question-count question is required. Always include the top-level kind. The only alternative is the conversational {\"reply\":\"...\"} object described above.",
 		"Answer with ONLY one JSON object, nothing before or after it:",
-		`- {"kind":"learn",${choisit ? "\"folder\":\"<optional: exact name of one of the learner's folders>\"," : ""}"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
+		`- {"kind":"learn","subject":"<one subject id>",${choisit ? "\"folder\":\"<optional: exact name of one of the learner's folders>\"," : ""}"questions":[{"header":"<label of at most 12 characters>","question":"<the question>","multiple":false,"default":0,"options":[{"label":"<short answer>","description":"<one line saying what it means or covers>"}, ...]}]} with an optional top-level kind whose value must be exactly "learn", "practice", or "both", and 1 to 3 questions. Each question has 2 to 4 options ("multiple":true when several can apply) and "default": the index (from 0) of the option to assume when the learner skips the question; for the number-of-questions and number-of-quizzes questions this must be 0 (Auto), and for an optional level question use the most beginner option, for a scope question use "everything in the material". Write the header, questions, labels and descriptions in the language of the request; when the request does not reveal a language (a single word like "Python", a code name, only document names), write them in ${uiLanguage === "fr" ? "French" : "English"}, the language of the app. Keep the first label "Auto" exactly as written and localize its description. Do not add an "Other" option: the app adds one.`,
 	].join("\n\n");
 	const names = documentNames.map(n => n.trim()).filter(Boolean);
 	const dossiers = (folders?.names ?? []).map(n => n.trim()).filter(Boolean).slice(0, 60);

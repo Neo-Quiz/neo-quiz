@@ -10,7 +10,8 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/categorie-quiz.ts", ({ CATEGORIES, detecterCategorie, categorieChoisie, estCategorie }) => {
+await withSrcModule("src/dashboard/categorie-quiz.ts", (mod) => {
+	const { CATEGORIES, detecterCategorie, categorieDuDossier, estCategorie } = mod;
 	const r = makeReporter("Catégorie d'un quiz");
 	const d = (indices) => detecterCategorie(indices);
 
@@ -50,10 +51,11 @@ await withSrcModule("src/dashboard/categorie-quiz.ts", ({ CATEGORIES, detecterCa
 	r.check("le dossier l'emporte sur la demande", d({ dossier: "Cours/Réseau", demande: "un quiz Python" }), "reseau");
 	r.check("demande à égalité : general", d({ demande: "physique et chimie" }), "general");
 
-	// Le choix de l'utilisateur.
-	r.check("choix Automatique : la détection ; choix explicite : lui, même general",
-		[categorieChoisie("auto", { pieces: ["Python.pdf"] }), categorieChoisie("maths", { pieces: ["Python.pdf"] }), categorieChoisie("general", { pieces: ["Python.pdf"] })],
-		["python", "maths", "general"]);
+	/* The composer no longer detects (2026-10-18): the choice helpers are gone
+	   from the module, the folder subject stays. */
+	r.check("the composer's detection helpers are gone, the folder subject stays",
+		[typeof mod.categorieChoisie, typeof mod.indicesCategorie, typeof categorieDuDossier], ["undefined", "undefined", "function"]);
+	r.check("folder subject: path then displayed name", [categorieDuDossier("Efrei/Python", undefined), categorieDuDossier("Efrei", "Cours SQL"), categorieDuDossier(undefined, undefined)], ["python", "sql", "general"]);
 	// The subjects added on 2026-09-29.
 	r.check("new subjects: by file name",
 		["TP C++ - Classes.pdf", "Cours Java.pdf", "Intro C#.pdf", "Thermodynamique.pdf", "Chimie organique.pdf", "Biologie cellulaire.pdf",

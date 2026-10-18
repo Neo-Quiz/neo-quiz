@@ -1,9 +1,14 @@
 /* ══════════════════════════════════════════════════════════
    A QUIZ'S SUBJECT — PURE module: no host, no DOM, no i18n
 
-   Feedback #7 of 2026-09-26: the prompt adapts to the quiz's SUBJECT (a
-   Python course does not call for the same questions as a networking
-   course). The subject is DEDUCED from three clues, most reliable first:
+   The prompt adapts to the quiz's SUBJECT (a Python course does not call
+   for the same questions as a networking course). Since 2026-10-18 the AI
+   chooses a GENERATED quiz's subject itself, in the clarify call
+   (generation-kind.ts, ids read with `estCategorie`); this lexicon no longer
+   feeds the composer. It is kept for what is read from a FOLDER or a title:
+   the subject filter and module cards of the folders page
+   (`categorieDuDossier`), the generated gallery's label. It DEDUCES the
+   subject from three clues, most reliable first:
    1. the names of the attachments ("CM1 - Introduction à Python.pdf");
    2. the path of the destination folder ("Efrei/Python/TD");
    3. the text of the request.
@@ -18,7 +23,7 @@
    what makes the detection worth trusting. The IDS are persisted with a
    queued request (file-generation-app.ts): add new ones freely, never
    rename one. Each subject's prompt addition lives apart
-   (categorie-prompt.ts); its label, icon and menu place on the page side
+   (categorie-prompt.ts); its label and icon on the page side
    (categorie-affichage.ts). `npm run check:categorie` holds this module.
 ══════════════════════════════════════════════════════════ */
 
@@ -105,8 +110,7 @@ export interface IndicesCategorie {
    accepts a plural (s, x, es). Whole words only: "python" but not
    "pythonesque". Everyday words that a request about something else would
    contain ("processus", "forces", "contrats", "virus", "base") are left
-   out on purpose: a false subject is worse than `general`, which the user
-   can still override in the options. */
+   out on purpose: a false subject is worse than `general`. */
 const TERMES: Readonly<Record<Exclude<Specifique, LangueQuiz | "langues">, readonly string[]>> = {
 	python: ["python", "python2", "python3", "py", "pandas", "numpy", "scipy", "django", "flask", "fastapi", "pip", "jupyter", "matplotlib", "seaborn", "tkinter", "pyqt", "pytest", "virtualenv", "venv", "conda", "anaconda", "list comprehension", "liste en comprehension", "listes en comprehension", "f-string"],
 	c: ["langage c", "programmation c", "en c", "gcc", "malloc", "calloc", "printf", "scanf", "pointeur", "arithmetique des pointeurs", "stdio.h", "stdlib.h"],
@@ -337,19 +341,6 @@ export function detecterCategorie(indices: IndicesCategorie): CategorieQuiz {
 /** A FOLDER's subject, for the subject filter of the folders page
     (2026-09-29): its path, then its displayed name as the deepest segment
     ("XTI301 - Écosystème Python" says Python where the path may not). */
-/** What the category detection reads of a request: the attachment names, the
-    destination folder (`dossier`, already resolved by the caller), the text.
-    Shared by the composer and the remote-request runner. */
-export function indicesCategorie(notes: readonly { name: string }[], texte: string, dossier: string): IndicesCategorie {
-	return { pieces: notes.map(n => n.name), dossier, demande: texte };
-}
-
 export function categorieDuDossier(chemin: string | undefined, nom: string | undefined): CategorieQuiz {
 	return detecterCategorie({ dossier: [chemin, nom].filter(Boolean).join("/") });
-}
-
-/** The subject that leaves with a request: the user's choice when they
-    made one (`auto` otherwise), the detection otherwise. */
-export function categorieChoisie(choix: CategorieQuiz | "auto", indices: IndicesCategorie): CategorieQuiz {
-	return choix === "auto" ? detecterCategorie(indices) : choix;
 }

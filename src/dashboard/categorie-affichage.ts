@@ -1,10 +1,9 @@
 /* ══════════════════════════════════════════════════════════
-   THE SUBJECT, ON THE "GENERATE" PAGE SIDE (feedback #7, 2026-09-26)
+   A SUBJECT'S DISPLAY: translated name and icon (categorie-quiz.ts)
 
-   Each subject's translated name, icon and menu place (categorie-quiz.ts),
-   and the NOTICE set in the composer's output-folder row: "Python
-   detected", as text with the icon, no badge. Nothing is shown for
-   `general`.
+   Used by the folders page (subject filter, module cards) and the generated
+   gallery. The composer's subject chip and picker are gone (2026-10-18): the
+   clarify call names the subject itself (generation-kind.ts).
 
    A human language's icon is its FLAG (2026-09-29): thirty languages behind
    one and the same Lucide glyph could not be told apart. Emoji flags are not
@@ -28,9 +27,8 @@ import { SUBJECT_LOGOS } from "../subject-logos";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { TransKey } from "../i18n";
-import { CATEGORIES, LANGUES_IDS, estLangue } from "./categorie-quiz";
+import { estLangue } from "./categorie-quiz";
 import type { CategorieQuiz, LangueQuiz } from "./categorie-quiz";
-import type { OptionCategorie } from "./ui-select";
 import { BD, CN, DE, ES, FR, GB, GR, HK, ID, IL, IN, IR, IT, JP, KE, KR, NL, PK, PL, PT, RU, SA, SE, TH, TR, UA, VN } from "country-flag-icons/string/3x2";
 
 const ICONES: Readonly<Record<CategorieQuiz, string>> = {
@@ -213,23 +211,12 @@ const DRAPEAUX: Readonly<Record<Exclude<LangueQuiz, never>, string>> = {
 	ukrainien: UA,
 };
 
-/* The menu section heading OPENED by a subject: the first of each group in
-   CATEGORIES' order. Forty-odd subjects in one flat list could not be
-   scanned; grouped, the eye goes straight to "Sciences". */
-const SECTIONS: Readonly<Partial<Record<CategorieQuiz, TransKey>>> = {
-	python: "ai.categorie.section.programming",
-	bash: "ai.categorie.section.computing",
-	maths: "ai.categorie.section.sciences",
-	histoire: "ai.categorie.section.humanities",
-	musique: "ai.categorie.section.other",
-};
-
 /** A subject's displayed name, read AT RENDER (current language). */
 export function libelleCategorie(c: CategorieQuiz): string {
 	return t(NOMS[c]);
 }
 
-/* The programming subjects, by their tag in the code catalogue. Their notice
+/* The programming subjects, by their tag in the code catalogue. Their icon
    shows that language's logo, not a generic glyph. */
 const TAG_LANGAGE: Partial<Record<CategorieQuiz, string>> = {
 	python: "python", c: "c", cpp: "cpp", java: "java", csharp: "csharp",
@@ -275,55 +262,4 @@ export function peindreIconeCategorie(el: HTMLElement, c: CategorieQuiz): void {
 		return;
 	}
 	currentHost().ui.setIcon(el, ICONES[c]);
-}
-
-/** "Python detected". French says "Détecté : Chimie": with forty-odd
-    subjects of both genders, "{name} détecté" could not agree (it once
-    special-cased "Maths détectées" alone). */
-export function libelleDetecte(c: CategorieQuiz): string {
-	return t("ai.categorie.detected", { name: libelleCategorie(c) });
-}
-
-/** The options menu's choices: every subject, `general` included, each
-    group opened by its section heading — and the languages gathered in ONE
-    "Languages" row that opens them, searchable, in a second flyout (thirty
-    of them would bury the rest of the list). */
-export function choixCategories(): OptionCategorie[] {
-	const choix = (c: CategorieQuiz): OptionCategorie =>
-		({ value: c, label: libelleCategorie(c), renderIcon: (el) => peindreIconeCategorie(el, c) });
-	const liste: OptionCategorie[] = [];
-	for (const c of CATEGORIES) {
-		if (estLangue(c)) continue;
-		const section = SECTIONS[c];
-		liste.push({ ...choix(c), ...(section ? { section: t(section) } : {}) });
-		// The Languages row closes the humanities, in the place they held.
-		if (c === "psycho") {
-			liste.push({
-				value: "", label: t("ai.categorie.section.languages"), icon: "languages",
-				section: t("ai.categorie.section.languages"),
-				children: LANGUES_IDS.map(choix),
-			});
-		}
-	}
-	return liste;
-}
-
-/**
- * Paints the subject notice in `el`: icon and text. `detectee`: the
- * subject comes from the detection ("Python detected"); otherwise it was
- * chosen in the subject list ("Python"). Nothing detected is `general`,
- * shown as "Automatic" (2026-10-12): the notice is the control that picks a
- * subject, so it never hides.
- */
-export function peindreAvisCategorie(el: HTMLElement, c: CategorieQuiz, detectee: boolean): void {
-	/* Repainted on every keystroke: nothing changes while the subject stays
-	   the same, or the appearance would replay on every letter. */
-	const cle = `${c}|${detectee}`;
-	if (el.dataset.cle === cle) return;
-	el.dataset.cle = cle;
-	el.replaceChildren();
-	peindreIconeCategorie(ajouter(el, "span", "qbd-ai-categorie-icone"), c);
-	const texte = c === "general" && detectee ? t("ai.categorie.auto")
-		: detectee ? libelleDetecte(c) : libelleCategorie(c);
-	ajouter(el, "span", "qbd-ai-categorie-texte", texte);
 }

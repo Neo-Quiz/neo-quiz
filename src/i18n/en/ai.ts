@@ -166,12 +166,7 @@ export const EN_AI = {
 	/* "N quizzes <-> 1 quiz" toggle, under the attached documents */
 	"ai.options.auto": "Auto",
 	"ai.options.autoHint": "Chosen by the AI",
-	/* A quiz's subject (categorie-quiz.ts): its name, its menu section, and
-	   the "detected" notice in the composer's output-folder row. */
-	"ai.categorie.auto": "Automatic",
-	"ai.categorie.choose": "Choose the subject",
-	"ai.categorie.search": "Search subjects…",
-	"ai.categorie.noMatch": "No matching subject",
+	/* A quiz's subject (categorie-quiz.ts): its displayed name. */
 	"ai.categorie.python": "Python",
 	"ai.categorie.c": "C",
 	"ai.categorie.bash": "Bash / Linux",
@@ -237,18 +232,9 @@ export const EN_AI = {
 	"ai.categorie.hebreu": "Hebrew",
 	"ai.categorie.suedois": "Swedish",
 	"ai.categorie.ukrainien": "Ukrainian",
-	"ai.categorie.searchLanguage": "Search languages…",
-	"ai.categorie.noMatchLanguage": "No matching language",
 	"ai.categorie.musique": "Music",
 	"ai.categorie.arts": "Art & art history",
 	"ai.categorie.conduite": "Driving test",
-	"ai.categorie.section.programming": "Programming",
-	"ai.categorie.section.computing": "Computing & systems",
-	"ai.categorie.section.sciences": "Sciences",
-	"ai.categorie.section.humanities": "Humanities & society",
-	"ai.categorie.section.languages": "Languages",
-	"ai.categorie.section.other": "Other",
-	"ai.categorie.detected": "{name} detected",
 
 	/* ── Fournisseurs (sous-titres du menu) ── */
 	"ai.provider.choose": "Select a provider",

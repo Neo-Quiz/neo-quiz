@@ -8,7 +8,7 @@ import { UNKNOWN_RETRY_MS, USAGE_MAX_AGE_MS, decideGate, readAutoLearnSettings }
 import type { GateVerdict, UsageSnapshot } from "./auto-learn-gate";
 import { admit, autoChatId, autoKey, markState, recordStart, startsSince, toRequeue } from "./auto-learn-record";
 import type { AutoEntry, AutoLearnLog } from "./auto-learn-record";
-import { categorieChoisie, indicesCategorie } from "./categorie-quiz";
+import { categorieDuDossier } from "./categorie-quiz";
 import type { ChatRecord } from "./chat-record";
 import { newChatId } from "./chat-session";
 import { newRequestId } from "./chat-requests";
@@ -130,7 +130,8 @@ export function startAutoLearnRunner(deps: AutoLearnRunnerDeps): () => void {
 			// EMPTY on purpose: the model follows the lecture's language.
 			text: "", notes: [{ name: f.name, content, path, source: "vault" }], images: [],
 			mode: "learn", count: null, type: ["Mixte"] /* TYPE_VALUES[0] of ai.ts: a Learn */, destination: folder,
-			reglages: figerReglages(deps.settings.get()), categorie: categorieChoisie("auto", indicesCategorie([{ name: f.name }], "", folder)),
+			reglages: figerReglages(deps.settings.get()), // No clarify call here: the lecture's folder is the only known subject clue.
+			categorie: categorieDuDossier(folder, undefined),
 			chatId, requestId: newRequestId(), sentAt: deps.now(),
 			auto: { key: entry.key, relPath: f.relPath }, lectureMinutes: deps.lectureMinutes(folder),
 		};

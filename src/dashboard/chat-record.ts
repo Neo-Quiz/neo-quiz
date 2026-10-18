@@ -17,6 +17,8 @@ import type { ArchivedChat } from "./chat-archives";
 import type { ClarifyOption, ClarifyQuestion } from "./generation-kind";
 import { MAX_CLARIFY_QUESTIONS, MAX_HEADER, defaultIndex, isQuizzesChoice } from "./generation-kind";
 import { NAME_UNSAFE } from "../shared-state/remote-request";
+import { estCategorie } from "./categorie-quiz";
+import type { CategorieQuiz } from "./categorie-quiz";
 
 export type ChatMode = "learn" | "practice";
 export type ClarifyAction = "generate" | "web" | "relay" | "remote";
@@ -33,7 +35,7 @@ export interface ChatRun { runId: string; fromSeq: number; toSeq: number }
     2026-10-07-generate-auto-kind): the questions, and the answers once all are
     given (one list of chosen labels per question, typed text included; an empty list is a skipped question).
     Absent `answers`: nothing generates yet. */
-export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][]; /** The kind to generate once answered (`both` included: `mode` cannot say it). */ genre?: "learn" | "practice" | "both"; action?: ClarifyAction }
+export interface ChatClarify { questions: ClarifyQuestion[]; answers?: string[][]; /** The kind to generate once answered (`both` included: `mode` cannot say it). */ genre?: "learn" | "practice" | "both"; action?: ClarifyAction; /** The subject the AI picked (a `CATEGORIES` id), kept for the generation that follows the answers. */ subject?: CategorieQuiz }
 
 export interface ChatRequest {
 	id: string;
@@ -188,6 +190,7 @@ function readClarify(x: unknown): ChatClarify | null {
 	}
 	const clarify: ChatClarify = { questions };
 	if (x.genre === "learn" || x.genre === "practice" || x.genre === "both") clarify.genre = x.genre;
+	if (estCategorie(x.subject) && x.subject !== "general") clarify.subject = x.subject;
 	if (x.action === "generate" || x.action === "web" || x.action === "relay" || x.action === "remote") clarify.action = x.action;
 	// One list per question; an EMPTY list is a skipped question.
 	if (Array.isArray(x.answers) && x.answers.length === questions.length && x.answers.every(a => Array.isArray(a) && a.every(isStr))) clarify.answers = (x.answers as string[][]).map(a => [...a]);

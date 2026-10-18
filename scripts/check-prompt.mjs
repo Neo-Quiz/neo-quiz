@@ -222,7 +222,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 
 /* LA CATÉGORIE (retour #7) : chaque complément part dans le prompt système
    des deux modes, une seule fois, et `general` n'ajoute rien. */
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prompt.ts", "src/dashboard/categorie-quiz.ts", "src/quiz-format.ts"], ({ composerPrompts }, { complementCategorie }, { CATEGORIES }, { MOTS_INTERDITS: MOTS_INTERDITS_PAR_MODE }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prompt.ts", "src/dashboard/categorie-quiz.ts", "src/quiz-format.ts", "src/dashboard/generation-kind.ts"], ({ composerPrompts }, { complementCategorie }, { CATEGORIES }, { MOTS_INTERDITS: MOTS_INTERDITS_PAR_MODE }, K) => {
 	const r = makeReporter("Prompts par catégorie");
 	const sans = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	r.check("general : prompt identique à l'absence de catégorie", composerPrompts("x", { mode: "learn", categorie: "general" }).systemPrompt, sans);
@@ -237,6 +237,13 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/categorie-prom
 		}
 		r.check(`${cat} : aucun autre complément`, CATEGORIES.filter(c => c !== "general" && c !== cat && composerPrompts("x", { categorie: cat }).systemPrompt.includes(complementCategorie(c))), []);
 	}
+	/* The subject now comes from the clarify call (2026-10-18): what the AI
+	   names reaches the prompt, anything else adds nothing. */
+	const viaClarify = (raw) => composerPrompts("x", { mode: "learn", categorie: K.parseClarifyAnswer(raw).subject ?? "general" }).systemPrompt;
+	r.check("clarify subject: a known id adds exactly that subject's complement",
+		[viaClarify('{"subject":"python"}').includes(complementCategorie("python")), viaClarify('{"subject":"sql","questions":"x"}').includes(complementCategorie("sql"))], [true, true]);
+	r.check("clarify subject: unknown, wrong case, missing or garbage adds nothing (the prompt of no subject)",
+		['{"subject":"Python"}', '{"subject":"auto"}', '{"subject":42}', '{"subject":null}', '{"subject":"general"}', '{"kind":"learn"}', 'not json'].map(raw => viaClarify(raw) === sans), [true, true, true, true, true, true, true]);
 	const py = complementCategorie("python");
 	r.check("python: ```python blocks, print output, an idiom taught by a runnable example then its contrast, the loop only once taught",
 		["```python", "`print`", "teach it by a RUNNABLE example on concrete values with what it prints", "only when every piece of it", "never explain an idiom through notions the learner has not seen", "RUNNABLE"].filter(s => !py.includes(s)), []);

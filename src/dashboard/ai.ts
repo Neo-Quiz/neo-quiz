@@ -27,13 +27,11 @@ import type { ResultatOuverture } from "./ai-web";
 import type { Scanner, QuizIndexEntry } from "./scanner";
 import type { StatsStore } from "./stats-store";
 import type { AiSettingsHost } from "./ai-settings-host";
-import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openCategoriePicker, openNotePicker, openActionMenu } from "./ui-select";
+import { closeAllSelects, openModelMenu, openProviderMenu, openEffortSlider, openNotePicker, openActionMenu } from "./ui-select";
 import { mountAgentModePill } from "./agent-mode-pill";
 import { renderGeneratedGallery } from "./generated-gallery";
 import { ouvrirMenuPlus } from "./composer-plus";
-import { categorieChoisie, detecterCategorie, estCategorie, indicesCategorie as indicesCategorieDe } from "./categorie-quiz";
-import type { CategorieQuiz, IndicesCategorie } from "./categorie-quiz";
-import { choixCategories, libelleDetecte, peindreAvisCategorie } from "./categorie-affichage";
+import type { CategorieQuiz } from "./categorie-quiz";
 import { attachmentKey, creerPiecesJointes, effetEnCours, entrerVignette, poserCroix, poserImage } from "./composer-attachments";
 import { poserNouvelleDemande } from "./conversation-mode";
 import { contexteConversation, documentsHeritiers } from "./conversation-context";
@@ -352,7 +350,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	    needs to generate (the documents' text is only in memory), and the folder
 	    already decided for it ("" while a "which folder" answer decides). A question
 	    read back from an earlier session has no entry: it cannot be answered. */
-	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction; dossier: string }>();
+	const questionsEnAttente = new Map<string, { envoi: DemandeTexte; genre: KindChoice; oneQuiz: boolean | QuizzesChoice | null; action: ClarifyAction; dossier: string; sujet: CategorieQuiz }>();
 	/** The "/" menu of the composer on screen (slash-commands.ts). */
 	let commandeSlash: SlashCommandHandle | null = null;
 	/** The exam picked in the "/exam" menu: the next send is a whole
@@ -371,13 +369,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   dossier) et non d'un choix dans les options : l'envoi la vide avec le
 	   reste du composer (spec de la file, 2026-09-26). */
 	let destinationDuPreset = false;
-	/* La CATÉGORIE du quiz (retour #7, 2026-09-26) : `null` = Automatique,
-	   déduite à l'envoi des pièces jointes, du dossier et de la demande
-	   (categorie-quiz.ts) ; sinon celle choisie dans les options. Comme le
-	   nombre et le type, elle vaut pour la session de la page. */
-	let categorieChoix: CategorieQuiz | null = null;
-	/** L'avis « Python détecté » près du bouton des options. */
-	let avisCategorieEl: HTMLElement | null = null;
+	/* The SUBJECT of the send in progress (2026-10-18): the AI names it in the
+	   clarify call (`generation-kind.ts`), it is set for that send with the
+	   destination and cleared with it. `general` = no subject-specific prompt
+	   addition: also what a send without a clarify call (an /exam) carries. */
+	let sujetEnvoi: CategorieQuiz = "general";
 	/* La file de génération de l'APPLICATION, partagée par toutes les pages :
 	   la page s'y abonne pour peindre ses lignes, elle ne la possède pas. */
 	const fileGen: FileGenerationApp = fileDeGeneration({
@@ -1749,38 +1745,6 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			document.removeEventListener("pointerdown", surAilleurs, true);
 			document.removeEventListener("focusin", surAilleurs, true);
 		} };
-
-		/* The SUBJECT notice (feedback #7), in the row at the top of the
-		   composer: "Python detected", text and icon, no badge. It is the
-		   control too (2026-10-12): a click opens the subject list beside it,
-		   so the options icon is gone. Shown whenever a provider is there,
-		   even with nothing detected ("Automatic"). Repainted on each
-		   composer change (`updateGenerateBtn`). Without a provider there is
-		   no composer to choose for: no notice. The folder chip that stood
-		   left of it is gone (2026-10-17): the AI chooses each quiz's folder. */
-		avisCategorieEl = null;
-		if (provider) {
-			const destRow = ajouter(composer, "div", "qbd-ai-composer-dest");
-			const avis = ajouter(destRow, "button", "qbd-ai-categorie");
-			avis.type = "button";
-			avis.setAttribute("aria-label", t("ai.categorie.choose"));
-			avisCategorieEl = avis;
-			majAvisCategorie();
-			avis.addEventListener("click", () => {
-				openCategoriePicker(avis, {
-					/* The subject: Automatic says what it detects, otherwise the
-					   choice forces the prompt's (feedback #7). A value that is not
-					   a known subject (a group row) is never kept. */
-					categories: choixCategories(),
-					categorie: categorieChoix,
-					categorieDetectee: libelleDetecte(detecterCategorie(indicesCategorie(noteAttachments, composerText))),
-					onCategorie: (value) => {
-						categorieChoix = estCategorie(value) ? value : null;
-						majAvisCategorie();
-					},
-				});
-			});
-		}
 
 		// Zone de texte : le textarea et la rangée de chips « notes »
 		// partagent ce conteneur (position relative). La rangée se
@@ -3698,9 +3662,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	/** The folder a send goes to once the clarify step is over: the decided
 	    one; else the folder named by the "which folder" answer (an existing
 	    one, or a new one created next to the course folders); else the folder
-	    of the request's subject. "" for a request sent to the PC: the PC
+	    of the subject the AI named. "" for a request sent to the PC: the PC
 	    places it itself. */
-	async function dossierFinal(decide: string, nomChoisi: string | null, envoi: DemandeTexte, action: ClarifyAction): Promise<string> {
+	async function dossierFinal(decide: string, nomChoisi: string | null, sujet: CategorieQuiz, action: ClarifyAction): Promise<string> {
 		if (decide) return decide;
 		if (action === "remote") return "";
 		const connus = dossiersConnus();
@@ -3712,13 +3676,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				console.warn(LOG_PREFIX, "quiz folder not created:", nomChoisi, e);
 			}
 		}
-		const sujet = categorieChoisie(categorieChoix ?? "auto", indicesCategorieDe(envoi.notes, envoi.text, ""));
 		return fallbackFolder(sujet, connus);
 	}
 
 	/** After a send: the next one decides its folder again. */
 	function oublierDestination(): void {
 		destination = "";
+		sujetEnvoi = "general";
 		destinationDuPreset = false;
 		destinationParExam = false;
 	}
@@ -3761,7 +3725,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (!draft.questions.length) return false;
 		const entry = await enregistrerQuiz({
 			draft, questions: generatedQuestions, modeDemande: mode, titreModele: generatedTitre, demande,
-			destination: fige ? fige.destination : destination, reglages, usage: lastUsage,
+			destination: fige ? fige.destination : destination, categorie: sujetEnvoi, reglages, usage: lastUsage,
 			planTranches: planTranchesEnvoye, noteLearn: noteLearnLiee, scanner: deps.scanner,
 		});
 		if (!entry) {
@@ -3892,26 +3856,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		images = [];
 	}
 
-	/** Ce que la détection de catégorie lit d'une demande : les noms des
-	    pièces jointes, le dossier de destination, le texte. */
-	function indicesCategorie(notes: readonly { name: string }[], texte: string): IndicesCategorie {
-		return indicesCategorieDe(notes, texte, destinationDuContexte());
-	}
-
-	/** La catégorie qui partirait maintenant avec le composer. */
-	function categorieCourante(): CategorieQuiz {
-		return categorieChoisie(categorieChoix ?? "auto", indicesCategorie(noteAttachments, composerText));
-	}
-
-	/** Repaints the subject notice (text, attachments, folder or choice changed). */
-	function majAvisCategorie(): void {
-		if (!avisCategorieEl) return;
-		peindreAvisCategorie(avisCategorieEl, categorieCourante(), categorieChoix === null);
-	}
-
 	function updateGenerateBtn(btn: HTMLButtonElement | null): void {
 		majBoutonRelais();
-		majAvisCategorie();
 		if (!btn) return;
 		// Le bouton d'envoi n'apparaît qu'avec du contenu (texte/image/note),
 		// et reste désactivé tant que la génération n'est pas possible
@@ -4279,9 +4225,11 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		}
 		/* A missing clarify provider safely means Learn; /exam stays explicit.
 		   No clarify call to place the quiz: the folder already decided, else
-		   the queue files it in the folder of its subject. */
+		   the queue files it in the folder of its subject (`general`: no clarify call
+		   named one). */
 		const directe = capturerEnvoi(jointesVideo);
 		destination = dossierDecide(directe.notes);
+		sujetEnvoi = "general";
 		envoyerDansLaFile(directe, commandeExam ? "exam" : "learn", { dejaVide: false });
 		render(container);
 	}
@@ -4468,6 +4416,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			attenteGenre = null;
 		}
 		const genre = reponse.kind ?? "learn";
+		// The AI's subject: an id of `CATEGORIES` (checked by the parser), `general` when it named none.
+		const sujet: CategorieQuiz = reponse.subject ?? "general";
 		/* An existing folder the model named, matched against the real list
 		   (never taken as a path); with a folder decided, a "which folder"
 		   question asked anyway is dropped. */
@@ -4475,7 +4425,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const dossierConnu = decide || nomme;
 		if ("questions" in reponse && (dossierConnu || dossiersPourIa.choose === false)) {
 			const restantes = reponse.questions.filter(q => q.purpose !== "folder");
-			reponse = restantes.length ? { ...reponse, questions: restantes } : { ready: true, ...(reponse.kind ? { kind: reponse.kind } : {}) };
+			reponse = restantes.length ? { ...reponse, questions: restantes } : { ready: true, ...(reponse.kind ? { kind: reponse.kind } : {}), ...(reponse.subject ? { subject: reponse.subject } : {}) };
 		}
 		if ("reply" in reponse) {
 			// Not a request for a quiz: the answer is a plain text result of the chat, nothing generates.
@@ -4483,12 +4433,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 			notifyChatsChanged();
 		} else if ("questions" in reponse) {
 			const id = newRequestId();
-			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action }));
-			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action, dossier: dossierConnu });
+			setChats(addClarify(getChats(), activeChatId(), chatDevice(), Date.now(), { id, text: envoi.text, documents: pieces, mode: genre === "practice" ? "practice" : "learn" }, { questions: reponse.questions, genre, action, ...(sujet !== "general" ? { subject: sujet } : {}) }));
+			questionsEnAttente.set(id, { envoi, genre, oneQuiz: seulQuiz, action, dossier: dossierConnu, sujet });
 			notifyChatsChanged();
 		} else {
-			const dossier = await dossierFinal(dossierConnu, null, envoi, action);
-			await continuerApresClarification(envoi, envoi, genre, seulQuiz, action, newRequestId(), Date.now(), dossier);
+			const dossier = await dossierFinal(dossierConnu, null, sujet, action);
+			await continuerApresClarification(envoi, envoi, genre, seulQuiz, action, newRequestId(), Date.now(), dossier, sujet);
 		}
 		render(container);
 	}
@@ -4504,7 +4454,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		   document). Neither: the card could not have been offered (`reprenable`). */
 		const gardee = questionsEnAttente.get(requestId);
 		const reprise = gardee ? null : resumeSource(requete);
-		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false, action: requete.clarify.action ?? "generate", dossier: "" } : null);
+		const attente = gardee ?? (reprise ? { envoi: { text: reprise.text, notes: [], images: [] } as DemandeTexte, genre: reprise.genre as KindChoice, oneQuiz: false, action: requete.clarify.action ?? "generate", dossier: "", sujet: requete.clarify.subject ?? "general" } : null);
 		if (!attente) { host.ui.notice(t("ai.clarify.expired")); return; }
 		const r = answerClarify(getChats(), chatId, requestId, reponses, Date.now());
 		if (!r.changed) return;
@@ -4522,15 +4472,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const nomChoisi = folderFromClarifications(requete.clarify.questions, reponses);
 		const decide = attente.dossier || (action === "remote" ? "" : destinationDuContexte());
 		demarrage = true;
-		void dossierFinal(decide, nomChoisi, attente.envoi, action)
-			.then(dossier => continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at, dossier))
+		void dossierFinal(decide, nomChoisi, attente.sujet, action)
+			.then(dossier => continuerApresClarification(envoi, attente.envoi, genre, seulQuiz, action, requestId, requete.at, dossier, attente.sujet))
 			.catch(err => { console.warn(LOG_PREFIX, "clarification continuation failed:", err); host.ui.notice(t("ai.error.checkSettings")); })
 			.finally(() => { demarrage = false; render(containerRef); });
 	}
 
-	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, action: ClarifyAction, requestId: string, sentAt: number, dossier: string): Promise<void> {
-		// The folder of THIS send (the web channel reads it again when it saves the answer).
+	async function continuerApresClarification(envoi: DemandeTexte, original: DemandeTexte, genre: KindChoice, seulQuiz: boolean | QuizzesChoice | null, action: ClarifyAction, requestId: string, sentAt: number, dossier: string, sujet: CategorieQuiz): Promise<void> {
+		// The folder and the subject of THIS send (the web channel reads them again when it builds the prompt and saves the answer).
 		destination = dossier;
+		sujetEnvoi = sujet;
 		if (action === "web") { await lancerSurSite(envoi, original, genre, seulQuiz, containerRef); return; }
 		if (action === "relay") { await partagerClarifiee(envoi, original, genre, requestId); return; }
 		if (action === "remote") { await envoyerClarifieeAuPc(envoi, original, genre, requestId); return; }
@@ -4639,7 +4590,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 				? [promptPreparation(examCible, settings().aiExamPrompt), noms.length ? t("ai.exam.documentsLine", { list: noms.join(", ") }) : "", precisions].filter(Boolean).join("\n\n")
 				: commande.texte;
 			const d: DemandeTexte = { ...envoi, text: texte };
-			const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
+			const categorie = sujetEnvoi;
 			const examen = examCible ?? undefined;
 			const base = { count: null, type: effectiveTypes("learn"), destination, reglages, categorie };
 			/* THE RIGHT NUMBER OF QUIZZES: one Learn per document (CM1, CM2, CM3
@@ -4664,10 +4615,9 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const genres: ModeGeneration[] = genre === "both" ? ["learn", "practice"] : [genre === "practice" ? "practice" : "learn"];
 		for (const mode of genres) {
 			for (const d of decouperParFichier(envoi, seulQuiz, lectureEnUnePasse(reglages.aiProvider || ""))) {
-				/* La catégorie est FIGÉE à l'envoi, par fichier : un CM Python et
-				   un CM SQL envoyés ensemble ont chacun la leur (retour #7). */
-				const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(d.notes, d.text));
-				fileGen.envoyer({ ...d, ...identite, mode, count: null, type: effectiveTypes(mode), destination, reglages, categorie });
+				/* The subject is FROZEN at the send, in each line: the one the clarify
+				   call named for this request (`general` when none was asked). */
+				fileGen.envoyer({ ...d, ...identite, mode, count: null, type: effectiveTypes(mode), destination, reglages, categorie: sujetEnvoi });
 			}
 		}
 		vider();
@@ -4735,7 +4685,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		const jeton = nouveauJeton();
 		await preparerLienLearn(msg);
 		const planTranches = planTranchesEnvoye;
-		const categorie = categorieChoisie(categorieChoix ?? "auto", indicesCategorie(msg.notes, msg.text));
+		const categorie = sujetEnvoi;
 		/* ONE PASS: the documents named in order, each with ITS Learn plan. */
 		const documents = msg.parDocument && msg.notes.length >= 2 ? msg.notes.map(n => n.name) : undefined;
 		lotWebLiens = undefined;
@@ -4966,7 +4916,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		render(containerRef);
 		const [faits] = await Promise.all([
 			enregistrerLot({
-				demande: msg, lot: quiz, liens: lotWebLiens, modeDemande: mode, destination,
+				demande: msg, lot: quiz, liens: lotWebLiens, modeDemande: mode, destination, categorie: sujetEnvoi,
 				reglages: settings(), usage: null, scanner: deps.scanner,
 			}),
 			new Promise<void>(resolve => window.setTimeout(resolve, 1000)),

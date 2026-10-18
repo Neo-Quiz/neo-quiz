@@ -660,6 +660,12 @@ await withSrcModule("src/dashboard/ai-settings-host.ts", (S) => {
 	const lus = ["file-generation-app.ts", "generation-demande.ts", "ai.ts", "remote-runner.ts"]
 		.filter(f => /aiOutputFolder|aiComposerDestination/.test(lire("src", "dashboard", f)));
 	r.check("no generation path reads the retired settings", lus, []);
+	/* The composer's local keyword detection is gone from every generation path
+	   (2026-10-18): the AI names the subject in the clarify call, a queued line
+	   keeps the id it was sent with, a request nobody clarified is `general`. */
+	const detecte = ["file-generation-app.ts", "generation-demande.ts", "ai.ts", "remote-runner.ts", "auto-learn-runner.ts"]
+		.filter(f => /detecterCategorie|categorieChoisie|indicesCategorie/.test(lire("src", "dashboard", f)));
+	r.check("no generation path runs the local subject detection", detecte, []);
 	r.done();
 });
 
