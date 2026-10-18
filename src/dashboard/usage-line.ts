@@ -277,6 +277,8 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 		const chosen = model ? groupOfModel(model(), names) : null;
 		for (const section of sections) {
 			const folded = !!section.group && !!chosen && section.group !== chosen && !unfolded.has(section.group);
+			// Windows of a folded group stay in the DOM, inside a body whose height animates.
+			let parent: HTMLElement = pop;
 			if (section.group && chosen) {
 				const g = section.group;
 				const tete = ajouter(pop, "div", "qbd-usage-pop-group" + (folded ? " is-folded" : ""));
@@ -284,12 +286,28 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 				btn.type = "button";
 				btn.setAttribute("aria-expanded", String(!folded));
 				ajouter(btn, "span", "qbd-usage-pop-group-name", g);
+				const body = ajouter(pop, "div", "qbd-usage-pop-group-body" + (folded ? " is-folded" : ""));
+				const inner = ajouter(body, "div", "qbd-usage-pop-group-inner");
+				if (section.note) ajouter(inner, "div", "qbd-usage-pop-group-note", section.note);
+				parent = inner;
 				if (g !== chosen) {
 					currentHost().ui.setIcon(ajouter(btn, "span", "qbd-usage-pop-group-chevron"), "chevron-down");
-					btn.addEventListener("click", () => { if (unfolded.has(g)) unfolded.delete(g); else unfolded.add(g); drawPop(); });
+					/* Toggles the existing DOM in place (no redraw) so the CSS transition
+					   runs; later redraws render the final state without animating. */
+					btn.addEventListener("click", () => {
+						const open = !unfolded.has(g);
+						if (open) unfolded.add(g); else unfolded.delete(g);
+						tete.classList.toggle("is-folded", !open);
+						body.classList.toggle("is-folded", !open);
+						btn.setAttribute("aria-expanded", String(open));
+						if (open) for (const f of Array.from(body.querySelectorAll<HTMLElement>(".qbd-ai-usage-fill"))) {
+							f.classList.remove("is-filling");
+							void f.offsetWidth;
+							f.style.animationDelay = "";
+							f.classList.add("is-filling");
+						}
+					});
 				} else btn.disabled = true;
-				if (!folded && section.note) ajouter(tete, "div", "qbd-usage-pop-group-note", section.note);
-				if (folded) continue;
 			}
 			for (const [i, row] of section.rows.entries()) {
 			if (i === 0 && section.group && !chosen) {
@@ -298,7 +316,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 				if (section.note) ajouter(tete, "div", "qbd-usage-pop-group-note", section.note);
 			}
 			const pct = Math.max(0, Math.min(100, Math.round(row.usedPercent)));
-			const sec = ajouter(pop, "div", "qbd-usage-pop-win");
+			const sec = ajouter(parent, "div", "qbd-usage-pop-win");
 			const top = ajouter(sec, "div", "qbd-usage-pop-top");
 			ajouter(top, "span", "qbd-usage-pop-name", usageWindowTitle(row));
 			ajouter(top, "span", "qbd-usage-pop-used", t("ai.usage.used", { n: pct }));
@@ -309,7 +327,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 			const fill = ajouter(bar, "span", "qbd-ai-usage-fill");
 			fill.style.width = pct + "%";
 			const elapsed = now - openedAt;
-			if (elapsed < FILL_MS) {
+			if (elapsed < FILL_MS && !folded) {
 				fill.classList.add("is-filling");
 				fill.style.animationDelay = -elapsed + "ms";
 			}

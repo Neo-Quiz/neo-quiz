@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.
 - The usage popover folds the model groups you are not using (click a title to unfold), the line under the composer shows the group title on its own line, and both follow a model change at once.
 
 ## [1.21.14] - 2026-10-17

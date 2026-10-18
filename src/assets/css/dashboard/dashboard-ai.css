@@ -4637,11 +4637,61 @@
 
 .qbd-usage-pop-group-toggle:disabled { cursor: default; opacity: 1; }
 
-.qbd-usage-pop-group-chevron { display: inline-flex; color: var(--text-faint); transition: transform 150ms ease; }
+.qbd-usage-pop-group-chevron { display: inline-flex; color: var(--text-faint); transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .qbd-usage-pop-group-chevron svg { width: 14px; height: 14px; }
 .qbd-usage-pop-group-toggle[aria-expanded="true"] .qbd-usage-pop-group-chevron { transform: rotate(180deg); }
 
+.qbd-usage-pop-group { transition: padding-bottom 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .qbd-usage-pop-group.is-folded { padding-bottom: 12px; }
+
+/* Folding animates the height (grid 1fr <-> 0fr, as the folders of "My quizzes"),
+   the content fades and slides; the bottom-anchored popover grows upward. */
+.qbd-usage-pop-group-body {
+	display: grid;
+	grid-template-rows: 1fr;
+	transition: grid-template-rows 280ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s;
+}
+.qbd-usage-pop-group-body.is-folded {
+	grid-template-rows: 0fr;
+	visibility: hidden;
+	transition: grid-template-rows 280ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 280ms;
+}
+.qbd-usage-pop-group-inner {
+	min-height: 0;
+	overflow: hidden;
+	opacity: 1;
+	transform: translateY(0);
+	transition: opacity 240ms ease-out 40ms, transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.qbd-usage-pop-group-body.is-folded .qbd-usage-pop-group-inner {
+	opacity: 0;
+	transform: translateY(-6px);
+	transition: opacity 160ms ease-in, transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.qbd-usage-pop-group-inner > .qbd-usage-pop-win { padding-left: 12px; }
+.qbd-usage-pop-group-inner > .qbd-usage-pop-win:first-of-type,
+.qbd-usage-pop-group-inner > .qbd-usage-pop-group-note + .qbd-usage-pop-win { border-top: none; padding-top: 8px; }
+.qbd-usage-pop-group-inner > .qbd-usage-pop-win:last-child { padding-bottom: 12px; }
+
+.qbd-usage-pop-group-toggle:not(:disabled) {
+	margin: -4px -6px;
+	padding: 4px 6px;
+	width: calc(100% + 12px);
+	border-radius: 6px;
+	transition: background-color 120ms ease, transform 120ms ease;
+}
+.qbd-usage-pop-group-toggle:not(:disabled):hover { background: var(--background-modifier-hover); }
+.qbd-usage-pop-group-toggle:not(:disabled):active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-usage-pop-group,
+	.qbd-usage-pop-group-body,
+	.qbd-usage-pop-group-body.is-folded,
+	.qbd-usage-pop-group-inner,
+	.qbd-usage-pop-group-chevron { transition: none; }
+	.qbd-usage-pop-group-body.is-folded .qbd-usage-pop-group-inner { transform: none; }
+	.qbd-usage-pop-group-toggle:not(:disabled):active { transform: none; }
+}
 
 /* The group title heads the block under the composer, on its own line. */
 .qbd-ai-usage-group {
