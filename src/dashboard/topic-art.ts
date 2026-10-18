@@ -1,157 +1,152 @@
 import type { CategorieQuiz } from "./categorie-quiz";
 import { estLangue } from "./categorie-quiz";
-import { aUneImageCategorie, peindreIconeCategorie } from "./categorie-affichage";
+import { aUneImageCategorie, glypheCategorie, peindreIconeCategorie } from "./categorie-affichage";
+import { currentHost } from "../host/current";
 
 /* ══════════════════════════════════════════════════════════
-   A SMALL FLAT ILLUSTRATION PER SUBJECT (2026-10-17)
+   THE COVER OF A GALLERY CARD (2026-10-18, "Cover" direction)
 
-   The preview of a card in the gallery of generated quizzes, after the
-   "Create something new" tiles of claude.ai: a dark tinted ground and,
-   straight on it (no panel: no tile inside a tile), flat shapes in two or three tones of the
-   subject's colour (an editor for code, axes and a curve for maths, nodes for
-   networks...). Built with `createElementNS` from fixed shapes: no markup
-   string, nothing taken from the quiz.
+   The preview of a card in the gallery of generated quizzes: a rich diagonal
+   gradient in the SUBJECT's own colour (not its family's, so two neighbours
+   differ), the subject's emblem drawn giant as a light ghost watermark,
+   cropped at the bottom right and slightly tilted, and a small crisp tile at
+   the top left holding the colour logo (Raycast's way). A subject with no
+   logo gets a solid tile with a white Lucide glyph (Duolingo's way); a human
+   language shows its flag in the tile and the gradient takes the flag's
+   colours. Built with `createElement` from fixed pieces: no markup string,
+   nothing taken from the quiz.
+
+   Each tint is [light corner, dark corner, warm accent of the bottom-right
+   glow], hand-picked from the logo's dominant colour where the logo is
+   ambiguous (Python blue + yellow, Bash graphite + green...).
 ══════════════════════════════════════════════════════════ */
 
-type Famille = "general" | "code" | "data" | "maths" | "reseau" | "secu" | "ia" | "science" | "langue" | "lettres" | "doc";
+type Teinte = readonly [string, string, string];
 
-const FAMILLE: Partial<Record<CategorieQuiz, Famille>> = {
-	python: "code", c: "code", cpp: "code", java: "code", csharp: "code", web: "code", rust: "code", go: "code", algo: "code", genie: "code", git: "code", bash: "code",
-	sql: "data",
-	maths: "maths", eco: "maths", gestion: "maths",
-	reseau: "reseau", cloud: "reseau", os: "reseau", archi: "reseau",
-	secu: "secu",
-	ia: "ia",
-	physique: "science", chimie: "science", bio: "science", medecine: "science", electronique: "science",
-	histoire: "lettres", geo: "lettres", philo: "lettres", litterature: "lettres", droit: "lettres", psycho: "lettres", musique: "lettres", arts: "lettres", conduite: "lettres",
+const TEINTES: Readonly<Record<CategorieQuiz, Teinte>> = {
+	general: ["#6d4fd8", "#1a1433", "#ff9ad0"],
+	python: ["#3b7bb8", "#14284a", "#ffd43b"],
+	c: ["#6b8bb5", "#1b2750", "#a8b9cc"],
+	cpp: ["#1f78c1", "#0a2342", "#00d0ff"],
+	java: ["#e0701c", "#3a1608", "#0074bd"],
+	csharp: ["#8e44ad", "#2a1038", "#e08be0"],
+	web: ["#e34f26", "#3d1208", "#f7df1e"],
+	rust: ["#a8502a", "#2a1409", "#f4a261"],
+	go: ["#00a7d0", "#06303d", "#8ff0ff"],
+	algo: ["#d98a0b", "#3a2405", "#ffd277"],
+	genie: ["#5e6ad2", "#181b4a", "#a5b4fc"],
+	git: ["#d93b2b", "#3d0f0a", "#ff9a7a"],
+	bash: ["#2b3a33", "#0a100d", "#4eaa25"],
+	sql: ["#3f5fd0", "#14204d", "#9b8cff"],
+	reseau: ["#12a4c4", "#08334a", "#67e8f9"],
+	secu: ["#16a34a", "#052e16", "#4ade80"],
+	os: ["#3c4452", "#12151b", "#fcc624"],
+	archi: ["#0a5fb0", "#04182e", "#00c7fd"],
+	cloud: ["#5e86f2", "#1c2f5c", "#fbbc04"],
+	ia: ["#a855f7", "#2b0f4a", "#22d3ee"],
+	maths: ["#5b4bd6", "#1b1650", "#38bdf8"],
+	physique: ["#1d4fb0", "#071a3d", "#fc3d21"],
+	chimie: ["#1fa87a", "#08302a", "#a3e635"],
+	bio: ["#4aa83a", "#10300f", "#bef264"],
+	medecine: ["#e04f5f", "#40101a", "#ffc2ca"],
+	electronique: ["#00979d", "#04302f", "#7ed957"],
+	histoire: ["#c9a227", "#3b2d08", "#f5dc8c"],
+	geo: ["#2a8f5c", "#0c2f3a", "#4285f4"],
+	philo: ["#4f6d7a", "#14222a", "#d6e0e5"],
+	litterature: ["#a35f2d", "#2f1d0c", "#f0d9a8"],
+	eco: ["#12805c", "#052a20", "#facc15"],
+	gestion: ["#8a5a44", "#2c1a12", "#e0b49a"],
+	droit: ["#34406e", "#0e1330", "#d4af37"],
+	psycho: ["#d65db1", "#3a1030", "#ffc2dd"],
+	musique: ["#d9306e", "#3b0a1e", "#ff9f1c"],
+	arts: ["#c026d3", "#3a0a42", "#fbbf24"],
+	conduite: ["#52606d", "#14181d", "#ef4444"],
+	// Languages: the main colours of the flag shown in the tile.
+	langues: ["#1cb0f6", "#0a3550", "#58cc02"],
+	anglais: ["#2b4aa0", "#0b1840", "#e0233f"],
+	francais: ["#2b4bb5", "#0e1a4a", "#ef4135"],
+	espagnol: ["#c60b1e", "#3a0409", "#ffc400"],
+	allemand: ["#4a4a4a", "#0c0c0c", "#ffce00"],
+	chinois: ["#de2910", "#3d0a04", "#ffde00"],
+	hindi: ["#f28c28", "#3a1c04", "#138808"],
+	arabe: ["#165d31", "#05200f", "#cfe8d5"],
+	bengali: ["#006a4e", "#02261c", "#f42a41"],
+	portugais: ["#046a38", "#04210f", "#da291c"],
+	russe: ["#1c4ea3", "#0b1d44", "#d52b1e"],
+	ourdou: ["#01411c", "#021a0b", "#d9efdf"],
+	indonesien: ["#ce1126", "#3a050c", "#ffd1d6"],
+	japonais: ["#bc002d", "#2e0010", "#f8e1e6"],
+	marathi: ["#ff8f1f", "#3a1a04", "#7b2d8e"],
+	telougou: ["#c24d00", "#331500", "#00a86b"],
+	turc: ["#e30a17", "#3a0308", "#ffd0d3"],
+	tamoul: ["#b3261e", "#33100d", "#ffcc33"],
+	cantonais: ["#c8102e", "#3a0614", "#ffe3e8"],
+	vietnamien: ["#da251d", "#3a0806", "#ffeb3b"],
+	coreen: ["#cd2e3a", "#14213d", "#0047a0"],
+	italien: ["#009246", "#052a16", "#ce2b37"],
+	persan: ["#239f40", "#0a2a12", "#da0000"],
+	polonais: ["#dc143c", "#3a0612", "#ffe0e6"],
+	neerlandais: ["#21468b", "#0b1a3d", "#d02a3a"],
+	swahili: ["#0b6b2f", "#061a0c", "#d00000"],
+	thai: ["#2d2a6a", "#0f0e22", "#d02040"],
+	grec: ["#0d5eaf", "#06214a", "#cfe3ff"],
+	hebreu: ["#0038b8", "#04163f", "#8fb0ff"],
+	suedois: ["#006aa7", "#04283f", "#fecc00"],
+	ukrainien: ["#0057b7", "#03204a", "#ffd700"],
 };
 
-/** The colour of each family: the ground's hue, then three tones for the shapes. */
-const TEINTES: Record<Famille, { fond: string; a: string; b: string; c: string }> = {
-	code: { fond: "#1d3a5f", a: "#5b9cf0", b: "#f2c94c", c: "#8fb8ef" },
-	data: { fond: "#1f4a4a", a: "#4fd1c5", b: "#81e6d9", c: "#2c7a7b" },
-	maths: { fond: "#3b2a5e", a: "#a78bfa", b: "#c4b5fd", c: "#7c5fd6" },
-	reseau: { fond: "#173f45", a: "#38bdf8", b: "#67e8f9", c: "#0e7490" },
-	secu: { fond: "#4a1f24", a: "#f87171", b: "#fca5a5", c: "#b91c1c" },
-	ia: { fond: "#35214f", a: "#c084fc", b: "#f0abfc", c: "#8b5cf6" },
-	science: { fond: "#173d2c", a: "#4ade80", b: "#86efac", c: "#15803d" },
-	langue: { fond: "#4a3214", a: "#f6ad55", b: "#fbd38d", c: "#c05621" },
-	lettres: { fond: "#47361a", a: "#e9b872", b: "#f6dfb2", c: "#a0703a" },
-	general: { fond: "#3a2f5b", a: "#f0abfc", b: "#fcd34d", c: "#a78bfa" },
-	doc: { fond: "#26324a", a: "#7f9cc9", b: "#b8c7e0", c: "#4d6390" },
+/** Subjects whose logo reads badly as an emblem: the Lucide glyph replaces it (a shield-check, never a globe). */
+const GLYPHE_IMPOSE: Partial<Record<CategorieQuiz, { tuile: string; fantome: string }>> = {
+	secu: { tuile: "shield-check", fantome: "shield-check" },
+	general: { tuile: "sparkles", fantome: "layers" },
 };
 
-export function familleDe(c: CategorieQuiz): Famille {
-	if (estLangue(c)) return "langue";
-	return FAMILLE[c] ?? "doc";
-}
+/** Of those, the logos whose flat white silhouette stays recognisable as a giant ghost; the others (multi-tone marks, rounded-square illustrations) would turn into a blob, so their ghost is the Lucide glyph. */
+const FANTOME_LOGO = new Set<CategorieQuiz>(["python", "c", "java", "web", "rust", "go", "git", "bash"]);
 
-const NS = "http://www.w3.org/2000/svg";
-type Forme = [string, Record<string, string | number>];
-
-function formes(f: Famille, t: { a: string; b: string; c: string }): Forme[] {
-	const ligne = (x: number, y: number, w: number, fill: string): Forme => ["rect", { x, y, width: w, height: 5, rx: 2.5, fill }];
-	switch (f) {
-		case "code": return [
-			["circle", { cx: 50, cy: 26, r: 2.6, fill: t.c }], ["circle", { cx: 58, cy: 26, r: 2.6, fill: t.c }], ["circle", { cx: 66, cy: 26, r: 2.6, fill: t.c }],
-			ligne(46, 38, 34, t.a), ligne(84, 38, 22, t.b), ligne(54, 48, 46, t.c), ligne(54, 58, 28, t.b), ligne(86, 58, 26, t.a), ligne(46, 68, 20, t.a),
-		];
-		case "data": return [
-			["rect", { x: 46, y: 26, width: 68, height: 10, rx: 3, fill: t.a }],
-			...[0, 1, 2].flatMap((r): Forme[] => [0, 1, 2].map((k): Forme => ["rect", { x: 46 + k * 24, y: 40 + r * 12, width: 20, height: 8, rx: 2, fill: (r + k) % 2 ? t.c : t.b, opacity: 0.85 }])),
-		];
-		case "maths": return [
-			["path", { d: "M48 74 V26 M48 74 H116", stroke: t.c, "stroke-width": 3, "stroke-linecap": "round", fill: "none" }],
-			["path", { d: "M50 68 C64 30, 78 30, 88 50 S104 72, 114 32", stroke: t.a, "stroke-width": 4, "stroke-linecap": "round", fill: "none" }],
-			["circle", { cx: 88, cy: 50, r: 4, fill: t.b }],
-		];
-		case "reseau": return [
-			["path", { d: "M58 34 L102 34 L80 66 Z M58 34 L80 66", stroke: t.c, "stroke-width": 3, fill: "none" }],
-			["circle", { cx: 58, cy: 34, r: 8, fill: t.a }], ["circle", { cx: 102, cy: 34, r: 8, fill: t.b }], ["circle", { cx: 80, cy: 66, r: 9, fill: t.a }],
-		];
-		case "secu": return [
-			["path", { d: "M80 22 L104 31 V50 C104 64 93 73 80 78 C67 73 56 64 56 50 V31 Z", fill: t.a }],
-			["path", { d: "M70 50 L77 57 L91 42", stroke: t.b, "stroke-width": 5, "stroke-linecap": "round", "stroke-linejoin": "round", fill: "none" }],
-		];
-		case "ia": return [
-			["path", { d: "M56 32 L80 50 L56 68 M104 32 L80 50 L104 68 M56 32 L104 68 M104 32 L56 68", stroke: t.c, "stroke-width": 2.5, fill: "none" }],
-			["circle", { cx: 56, cy: 32, r: 6, fill: t.b }], ["circle", { cx: 56, cy: 68, r: 6, fill: t.b }], ["circle", { cx: 104, cy: 32, r: 6, fill: t.b }],
-			["circle", { cx: 104, cy: 68, r: 6, fill: t.b }], ["circle", { cx: 80, cy: 50, r: 9, fill: t.a }],
-		];
-		case "science": return [
-			["ellipse", { cx: 80, cy: 50, rx: 28, ry: 10, stroke: t.a, "stroke-width": 3, fill: "none" }],
-			["ellipse", { cx: 80, cy: 50, rx: 28, ry: 10, stroke: t.b, "stroke-width": 3, fill: "none", transform: "rotate(60 80 50)" }],
-			["ellipse", { cx: 80, cy: 50, rx: 28, ry: 10, stroke: t.c, "stroke-width": 3, fill: "none", transform: "rotate(-60 80 50)" }],
-			["circle", { cx: 80, cy: 50, r: 5, fill: t.a }],
-		];
-		case "langue": return [
-			["rect", { x: 46, y: 26, width: 50, height: 26, rx: 8, fill: t.a }], ["path", { d: "M56 50 L54 60 L66 50 Z", fill: t.a }],
-			["rect", { x: 70, y: 48, width: 46, height: 24, rx: 8, fill: t.b }], ["path", { d: "M104 70 L108 78 L96 70 Z", fill: t.b }],
-			ligne(54, 34, 26, t.c), ligne(54, 42, 18, t.c),
-		];
-		case "lettres": return [
-			["path", { d: "M80 34 C70 28 58 28 48 32 V72 C58 68 70 68 80 74 Z", fill: t.a }],
-			["path", { d: "M80 34 C90 28 102 28 112 32 V72 C102 68 90 68 80 74 Z", fill: t.b }],
-			["path", { d: "M80 34 V74", stroke: t.c, "stroke-width": 2.5 }],
-		];
-		case "general": return [
-			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: t.c, opacity: 0.45, transform: "rotate(-9 80 50)" }],
-			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: t.a, opacity: 0.55, transform: "rotate(7 80 50)" }],
-			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: "#ffffff", opacity: 0.92 }],
-			ligne(60, 40, 30, t.c), ligne(60, 50, 38, t.a), ligne(60, 60, 22, t.c),
-			["path", { d: "M112 16 L115 25 L124 28 L115 31 L112 40 L109 31 L100 28 L109 25 Z", fill: t.b }],
-			["path", { d: "M46 62 L48 68 L54 70 L48 72 L46 78 L44 72 L38 70 L44 68 Z", fill: t.b, opacity: 0.8 }],
-		];
-		default: return [
-			["rect", { x: 60, y: 20, width: 40, height: 60, rx: 5, fill: t.c, opacity: 0.6 }],
-			ligne(66, 28, 22, t.a), ligne(66, 38, 28, t.b), ligne(66, 46, 24, t.b), ["circle", { cx: 68.5, cy: 58.5, r: 2.5, fill: t.a }], ligne(74, 56, 18, t.b), ligne(66, 66, 26, t.b),
-		];
-	}
-}
-
-const aUnLogo = aUneImageCategorie;
-
-const svgEl = (tag: string, attrs: Record<string, string | number>): SVGElement => {
-	const el = document.createElementNS(NS, tag);
-	for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-	return el;
+const glyphe = (parent: HTMLElement, nom: string): void => {
+	currentHost().ui.setIcon(parent, nom);
 };
 
 /**
- * The preview of a card: a soft diagonal gradient in the subject's family
- * colour, a faint dot pattern and two blurred discs, and on it the subject's
- * logo drawn large (or, where no logo exists, the family's flat drawing).
- * Sized by its container; the family colour reaches CSS as `--art-a`/`--art-b`.
+ * The cover of a card. Sized by its container; the subject's tint reaches CSS
+ * as `--art-1` (light), `--art-2` (dark) and `--art-3` (accent).
  */
 export function topicArt(c: CategorieQuiz): HTMLElement {
-	const f = familleDe(c);
-	const t = TEINTES[f];
+	const [t1, t2, t3] = TEINTES[c];
 	const racine = document.createElement("div");
 	racine.className = "qbd-gen-art";
-	racine.style.setProperty("--art-fond", t.fond);
-	racine.style.setProperty("--art-a", t.a);
-	racine.style.setProperty("--art-c", t.c);
-	const svg = document.createElementNS(NS, "svg");
-	svg.setAttribute("viewBox", "-22 -4 204 108");
-	svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-	svg.setAttribute("aria-hidden", "true");
-	svg.classList.add("qbd-gen-art-bg");
-	const id = `nq-dots-${f}`;
-	const defs = document.createElementNS(NS, "defs");
-	const motif = svgEl("pattern", { id, width: 10, height: 10, patternUnits: "userSpaceOnUse" });
-	motif.appendChild(svgEl("circle", { cx: 2, cy: 2, r: 1, fill: t.b, opacity: 0.35 }));
-	defs.appendChild(motif);
-	svg.appendChild(defs);
-	svg.appendChild(svgEl("rect", { x: -22, y: -4, width: 204, height: 108, fill: `url(#${id})` }));
-	svg.appendChild(svgEl("circle", { cx: 150, cy: 8, r: 46, fill: t.a, opacity: 0.16 }));
-	svg.appendChild(svgEl("circle", { cx: 6, cy: 98, r: 38, fill: t.c, opacity: 0.22 }));
-	if (!aUnLogo(c)) for (const [tag, attrs] of formes(f, t)) svg.appendChild(svgEl(tag, attrs));
-	racine.appendChild(svg);
-	if (aUnLogo(c)) {
-		const logo = document.createElement("div");
-		logo.className = "qbd-gen-art-logo";
-		peindreIconeCategorie(logo, c);
-		racine.appendChild(logo);
+	racine.style.setProperty("--art-1", t1);
+	racine.style.setProperty("--art-2", t2);
+	racine.style.setProperty("--art-3", t3);
+
+	const impose = GLYPHE_IMPOSE[c];
+	const drapeau = estLangue(c) && c !== "langues";
+	const logo = !impose && !drapeau && aUneImageCategorie(c);
+
+	// The giant ghost: the logo's silhouette, else the subject's glyph.
+	const fantome = document.createElement("div");
+	fantome.className = "qbd-gen-art-ghost";
+	if (logo && FANTOME_LOGO.has(c)) {
+		fantome.classList.add("is-logo");
+		peindreIconeCategorie(fantome, c);
+	} else {
+		glyphe(fantome, impose?.fantome ?? glypheCategorie(c));
 	}
+	racine.appendChild(fantome);
+
+	const lueur = document.createElement("div");
+	lueur.className = "qbd-gen-art-wash";
+	racine.appendChild(lueur);
+
+	// The tile: the colour logo or the flag; a solid tint and a white glyph otherwise.
+	const tuile = document.createElement("div");
+	tuile.className = "qbd-gen-art-tile";
+	if (logo || drapeau) peindreIconeCategorie(tuile, c);
+	else {
+		tuile.classList.add("is-solid");
+		glyphe(tuile, impose?.tuile ?? glypheCategorie(c));
+	}
+	racine.appendChild(tuile);
 	return racine;
 }

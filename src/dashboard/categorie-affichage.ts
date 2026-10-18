@@ -10,15 +10,12 @@
    an option — the project draws no emoji, and Windows shows "FR" in
    letters instead of the flag. The SVGs come from `country-flag-icons`
    and go in as an <img> data URL: an image, which runs nothing, never
-   markup set with innerHTML. Every other subject shows a COLOUR logo
-   (2026-10-10, the owner's choice over plain glyphs): the official logo of a
-   reference tool or organisation of its field (`subject-logos.ts`, from
-   Simple Icons, Wikimedia Commons or devicon), a colour Fluent UI System icon
-   where that fits better (2026-10-11), or a Fluent UI Emoji illustration
-   where no real logo fits. A programming language's logo is the
-   same official colour logo, taken before the code catalogue's own logo
-   (`code-catalogue.ts`), which stays reserved for code blocks. A Lucide glyph
-   is only left for a subject with no logo at all.
+   markup set with innerHTML. Only a subject that IS the thing, a
+   programming language or a tool (`LOGO_AUTORISE`), shows its official colour
+   logo (`subject-logos.ts`), taken before the code catalogue's own logo
+   (`code-catalogue.ts`), which stays reserved for code blocks. Every other
+   subject (fields, sciences, humanities) shows a Lucide glyph: never one
+   company's brand, never an emoji-style illustration (owner, 2026-10-18).
 ══════════════════════════════════════════════════════════ */
 
 import { currentHost } from "../host/current";
@@ -47,7 +44,7 @@ const ICONES: Readonly<Record<CategorieQuiz, string>> = {
 	bash: "terminal",
 	sql: "database",
 	reseau: "network",
-	secu: "shield",
+	secu: "shield-check",
 	os: "monitor-cog",
 	archi: "microchip",
 	cloud: "cloud",
@@ -211,6 +208,11 @@ const DRAPEAUX: Readonly<Record<Exclude<LangueQuiz, never>, string>> = {
 	ukrainien: UA,
 };
 
+/** The Lucide glyph of a subject (its icon when it has no logo, the ghost emblem of its gallery cover). */
+export function glypheCategorie(c: CategorieQuiz): string {
+	return ICONES[c];
+}
+
 /** A subject's displayed name, read AT RENDER (current language). */
 export function libelleCategorie(c: CategorieQuiz): string {
 	return t(NOMS[c]);
@@ -223,12 +225,22 @@ const TAG_LANGAGE: Partial<Record<CategorieQuiz, string>> = {
 	rust: "rust", go: "go", bash: "bash", sql: "sql",
 };
 
+/* Which subjects may wear a logo (2026-10-18, owner's rule): only those that
+   ARE the thing, a programming language or a tool. A FIELD (AI, cloud,
+   networking, OS, music, medicine...) never wears one company's brand, and no
+   emoji-style illustration stands in for a subject: it shows its Lucide glyph.
+   Every consumer (subject filter, gallery covers) follows this one list. */
+const LOGO_AUTORISE: ReadonlySet<CategorieQuiz> = new Set<CategorieQuiz>([
+	"python", "c", "cpp", "java", "csharp", "web", "rust", "go", "git", "bash",
+]);
+
 /* Each subject logo's data URI, encoded once: the largest is ~40 KB, and the
    menu draws every subject on each open. */
 const LOGO_MATIERE_SRC = new Map<CategorieQuiz, string>();
 
 /** Does the subject have an image (logo or flag), rather than only a Lucide glyph? */
 export function aUneImageCategorie(c: CategorieQuiz): boolean {
+	if (!estLangue(c) && !LOGO_AUTORISE.has(c)) return false;
 	if (SUBJECT_LOGOS[c]) return true;
 	if (TAG_LANGAGE[c] && codeLanguageOf(TAG_LANGAGE[c])?.logo) return true;
 	return estLangue(c) && c !== "langues" && !!DRAPEAUX[c as LangueQuiz];
@@ -239,7 +251,7 @@ export function aUneImageCategorie(c: CategorieQuiz): boolean {
     for a language with no colour logo, otherwise its Lucide glyph. */
 export function peindreIconeCategorie(el: HTMLElement, c: CategorieQuiz): void {
 	el.replaceChildren();
-	const logo = SUBJECT_LOGOS[c];
+	const logo = LOGO_AUTORISE.has(c) ? SUBJECT_LOGOS[c] : undefined;
 	if (logo) {
 		let src = LOGO_MATIERE_SRC.get(c);
 		if (src === undefined) {
@@ -252,7 +264,7 @@ export function peindreIconeCategorie(el: HTMLElement, c: CategorieQuiz): void {
 		img.draggable = false;
 		return;
 	}
-	const langage = TAG_LANGAGE[c] ? codeLanguageOf(TAG_LANGAGE[c]) : null;
+	const langage = LOGO_AUTORISE.has(c) && TAG_LANGAGE[c] ? codeLanguageOf(TAG_LANGAGE[c]) : null;
 	if (langage?.logo) {
 		const img = ajouter(el, "img", "qbd-categorie-logo");
 		img.src = codeLanguageBadgeSrc(langage);

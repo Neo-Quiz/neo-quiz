@@ -20,6 +20,8 @@ release notes.
 
 ### Changed
 
+- Generated quiz cards get a full cover in the subject's own colour, with a giant ghost emblem and a crisp tile. Only languages and tools keep a logo; every field shows a clean icon instead of a company logo or an emoji. The date in a card footer is never cut.
+
 - Picking a model, an effort level or an agent mode in the Generate or Explain composer now returns the focus to the text field, ready to type.
 - Neutral, professional placeholders in the Explain composer, the clarification answer field and the written answer fields; the Explain icon keeps its colour logo and the window drops its title.
 - The Explain window composer now takes the focus on a single click anywhere on its card, shows the same hover and active contour as the Generate page, and the field is focused as the window opens.

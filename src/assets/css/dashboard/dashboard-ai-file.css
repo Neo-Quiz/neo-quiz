@@ -1955,7 +1955,7 @@
 	font: inherit;
 	text-align: left;
 	cursor: pointer;
-	transition: border-color 150ms ease-out, transform 150ms ease-out;
+	transition: border-color 150ms ease-out, transform 200ms ease-out, box-shadow 200ms ease-out;
 }
 
 .qbd-gen-card:hover,
@@ -1971,64 +1971,99 @@
 	overflow: hidden;
 }
 
-/* The art: a diagonal gradient of the subject's family colour (topic-art.ts),
-   its dotted pattern behind, and the subject's logo large on top. */
+/* The cover (topic-art.ts): a rich diagonal gradient of the subject's own
+   colour (--art-1 light, --art-2 dark, --art-3 accent), a giant ghost emblem
+   cropped at the bottom right, a crisp tile at the top left. */
 .qbd-gen-art {
 	position: relative;
-	display: grid;
-	place-items: center;
 	width: 100%;
 	height: 100%;
-	background: linear-gradient(135deg, color-mix(in srgb, var(--art-a) 34%, var(--art-fond)), var(--art-fond) 70%);
+	overflow: hidden;
+	background:
+		radial-gradient(120% 100% at 100% 100%, color-mix(in srgb, var(--art-3) 50%, transparent), transparent 58%),
+		linear-gradient(135deg, var(--art-1), color-mix(in srgb, var(--art-1) 38%, var(--art-2)) 55%, var(--art-2));
 }
 
-.qbd-gen-art-bg {
+/* Hover brightens the gradient: a light wash fades in, nothing repaints the gradient itself. */
+.qbd-gen-art-wash {
 	position: absolute;
 	inset: 0;
-	display: block;
-	width: 100%;
-	height: 100%;
-	transition: transform 300ms ease-out;
+	background: radial-gradient(90% 90% at 20% 0%, rgba(255, 255, 255, 0.2), transparent 70%);
+	opacity: 0;
+	transition: opacity 250ms ease-out;
+	pointer-events: none;
 }
 
-.qbd-gen-art-logo {
-	position: relative;
+.qbd-gen-art-ghost {
+	position: absolute;
+	right: -30px;
+	bottom: -48px;
 	display: grid;
 	place-items: center;
-	width: 72px;
-	height: 72px;
-	filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
-	transition: transform 300ms ease-out;
+	width: 190px;
+	height: 190px;
+	color: #fff;
+	opacity: 0.24;
+	transform: rotate(-14deg);
+	transition: transform 350ms ease-out, opacity 250ms ease-out;
+	pointer-events: none;
 }
 
-.qbd-gen-art-logo > img {
+.qbd-gen-art-ghost > img,
+.qbd-gen-art-ghost > svg {
 	width: 100%;
 	height: 100%;
-	max-width: 100%;
 	object-fit: contain;
 }
 
-/* A flag is wide: keep its 3:2 and round it. */
-.qbd-gen-art-logo > .qbd-categorie-drapeau {
-	width: 96px;
-	height: 64px;
-	border-radius: 8px;
+/* A logo is flattened to a white silhouette; a Lucide glyph is a thin outline, so it gets a bolder line. */
+.qbd-gen-art-ghost > img { filter: brightness(0) invert(1); }
+.qbd-gen-art-ghost > svg { stroke-width: 1.4; }
+
+.qbd-gen-art-tile {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	display: grid;
+	place-items: center;
+	width: 46px;
+	height: 46px;
+	border-radius: 12px;
+	border: 1px solid color-mix(in srgb, var(--art-3) 22%, rgba(255, 255, 255, 0.1));
+	background: rgba(8, 10, 18, 0.5);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 14px rgba(0, 0, 0, 0.28);
+	backdrop-filter: blur(6px);
 }
+
+.qbd-gen-art-tile > img { width: 34px; height: 34px; object-fit: contain; }
+
+/* A flag is wide: keep its 3:2, rounded. */
+.qbd-gen-art-tile > .qbd-categorie-drapeau { width: 36px; height: 24px; border-radius: 3px; }
+
+/* No logo: a solid tint and a white glyph, same size and corner as a logo tile. */
+.qbd-gen-art-tile.is-solid {
+	background: color-mix(in srgb, var(--art-1) 55%, var(--art-2));
+	border-color: rgba(255, 255, 255, 0.22);
+}
+
+.qbd-gen-art-tile > svg { width: 26px; height: 26px; color: #fff; stroke-width: 1.9; }
 
 .qbd-gen-card:hover,
 .qbd-gen-card:focus-visible {
-	transform: translateY(-2px);
+	transform: translateY(-4px);
 }
 
-.qbd-gen-card:hover .qbd-gen-art-logo { transform: scale(1.08); }
-.qbd-gen-card:hover .qbd-gen-art-bg { transform: scale(1.04); }
+.qbd-gen-card:hover .qbd-gen-art-ghost,
+.qbd-gen-card:focus-visible .qbd-gen-art-ghost { transform: translate(-6px, -4px) rotate(-8deg) scale(1.05); opacity: 0.3; }
+.qbd-gen-card:hover .qbd-gen-art-wash,
+.qbd-gen-card:focus-visible .qbd-gen-art-wash { opacity: 1; }
 
 .qbd-gen-card:active { transform: translateY(0) scale(0.99); }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-gen-art-bg, .qbd-gen-art-logo { transition: none; }
+	.qbd-gen-art-ghost, .qbd-gen-art-wash { transition: none; }
 	.qbd-gen-card:hover, .qbd-gen-card:focus-visible, .qbd-gen-card:active,
-	.qbd-gen-card:hover .qbd-gen-art-logo, .qbd-gen-card:hover .qbd-gen-art-bg { transform: none; }
+	.qbd-gen-card:hover .qbd-gen-art-ghost, .qbd-gen-card:focus-visible .qbd-gen-art-ghost { transform: none; }
 }
 
 .qbd-gen-foot {
@@ -2055,16 +2090,18 @@
 }
 
 .qbd-gen-date {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	flex: none;
 	white-space: nowrap;
 	color: var(--text-faint);
 	font-size: 13px;
 }
 
 .qbd-gen-topic {
-	flex: none;
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	color: var(--text-muted);
 	font-size: 12px;
 }
