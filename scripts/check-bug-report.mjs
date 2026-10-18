@@ -84,6 +84,25 @@ await withSrcModule(["src/bug-report.ts"], (BR) => {
 	r.check("scrubLog: idempotent", S(S(mix)), S(mix));
 	r.check("scrubLog: ordinary text unchanged", S("Started 12:00\nOpened quiz 'Lists' in 35 ms"), "Started 12:00\nOpened quiz 'Lists' in 35 ms");
 
+	// Fix round 1.
+	const esc = ["C:\\\\Users\\\\Ahmed\\\\x", "\\\\\\\\srv\\\\share\\\\Ahmed\\\\x", "C:\\Users\\John Smith\\x", "/mnt/c/Users/Ahmed/x"];
+	r.check("scrubLog: doubled-backslash, spaced and /mnt paths hide the name", esc.map(p => /Ahmed|John|Smith/.test(S("at " + p))), esc.map(() => false));
+	r.check("scrubLog: spaced name leaves the rest of the path", S("C:\\Users\\John Smith\\x"), "%USERPROFILE%\\x");
+	const jsonSecrets = ['{"token":"abc123"}', '{"password": "hunter2"}', '{"secret":"s3","a":1}', '{"key":"k9"}', "secret=s3", "x?sig=abc", "Authorization: Basic dXNlcjpwYXNz"];
+	r.check("scrubLog: JSON-form and other secrets", jsonSecrets.map(x => /abc|hunter2|s3|k9|dXNl/.test(S(x))), jsonSecrets.map(() => false));
+	r.check("scrubLog: Bearer does not swallow the next line", S("Bearer abc\nnext line"), "Bearer <redacted>\nnext line");
+	r.check("scrubLog: long input keeps the tail and finishes", S("x ".repeat(500000) + "\nend").endsWith("\nend"), true);
+	r.check("scrubLog: no split surrogate pair", /[\ud800-\udbff]$/.test(S("\ud83d\ude00".repeat(300))), false);
+
+	const t = (title) => BR.buildIssue({ v: 1, what: "w", title }).title;
+	r.check("title: neutralised then cut to 80", [t("<".repeat(100)).length <= 80, t("@".repeat(100)).length <= 80, /&l?t?$/.test(t("a".repeat(79) + "<"))], [true, true, false]);
+	r.check("title: newlines collapse", t("a\nb\r\nc"), "a b c");
+	r.check("title: no raw < or bare @name", [t("<b>x").includes("<"), /@[A-Za-z]/.test(t("@everyone hi"))], [false, false]);
+
+	r.check("validate: env newline refused", [ok({ v: 1, what: "x", env: { app: "1\n# h", os: "w", platform: "windows" } }), ok({ v: 1, what: "x", env: { app: "1", os: "w\nx", platform: "windows" } })], [false, false]);
+	r.check("validate: strips C1, bidi and separators", rep({ v: 1, what: "a\u0085b\u202ec\u2066d\u2028e\u2029f\ng" }).report?.what, "abcdef\ng");
+	r.check("neutralise: zero-width space is U+200B", BR.neutralise("@a"), "@\u200ba");
+
 	r.done();
 });
 

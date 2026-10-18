@@ -23,8 +23,8 @@ const KEYS = new Set(["v", "title", "what", "steps", "expected", "env", "log", "
 const ENV_KEYS = new Set(["app", "os", "platform"]);
 const ENV_MAX = 100;
 const TOKEN_MAX = 255;
-// Everything below U+0020 except \t and \n, plus DEL.
-const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f]/g;
+// C0 controls except \t and \n, DEL and C1, line/paragraph separators, bidi controls.
+const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 const bad = (reason: string): Validation => ({ ok: false, code: "invalid", reason });
 const clean = (s: string): string => s.replace(CONTROL, "");
@@ -61,6 +61,7 @@ export function validateReport(raw: unknown): Validation {
 		const ev = e as Record<string, unknown>;
 		for (const k of Object.keys(ev)) if (!ENV_KEYS.has(k)) return bad("unknown env field " + k);
 		if (typeof ev.app !== "string" || typeof ev.os !== "string") return bad("env");
+		if (ev.app.includes("\n") || ev.os.includes("\n")) return bad("env");
 		if (ev.platform !== "windows" && ev.platform !== "android") return bad("env");
 		const app = clean(ev.app), os = clean(ev.os);
 		if (app.length > ENV_MAX || os.length > ENV_MAX) return bad("env");
@@ -71,12 +72,18 @@ export function validateReport(raw: unknown): Validation {
 
 /** Defuse mentions and HTML in text a stranger wrote. */
 export function neutralise(text: string): string {
-	return text.replace(/@/g, "@​").replace(/</g, "&lt;");
+	return text.replace(/@/g, "@\u200b").replace(/</g, "&lt;");
+}
+
+/** Cut a neutralised title to the limit without leaving half an entity or half a surrogate pair. */
+function cutTitle(t: string): string {
+	if (t.length <= LIMITS.title) return t;
+	return t.slice(0, LIMITS.title).replace(/&(?:l|lt)?$/, "").replace(/[\ud800-\udbff]$/, "").trim();
 }
 
 export function buildIssue(report: BugReport, opts?: { reportedBy?: string }): { title: string; body: string } {
 	const firstLine = report.what.split("\n").map(l => l.trim()).find(l => l !== "") ?? "";
-	const title = neutralise((report.title?.trim() || firstLine).slice(0, LIMITS.title)) || "Bug report";
+	const title = cutTitle(neutralise((report.title?.trim() || firstLine).replace(/\s+/g, " "))) || "Bug report";
 
 	const parts: string[] = [];
 	if (opts?.reportedBy && /^[A-Za-z0-9-]{1,39}$/.test(opts.reportedBy)) parts.push("Reported by @" + opts.reportedBy);
@@ -98,25 +105,44 @@ export function buildIssue(report: BugReport, opts?: { reportedBy?: string }): {
 
 const RULES: Array<[RegExp, string]> = [
 	// Home paths first, so later rules never see a user name.
-	[/[A-Za-z]:[\\/]Users[\\/][^\\/\s"'<>|:]+/gi, "%USERPROFILE%"],
-	[/\\\\[^\\\s]+\\[^\\\s]+\\[^\\\s]+/g, "%USERPROFILE%"],
-	[/(?<![\w.])\/(?:Users|home)\/[^/\s"'<>|:]+/g, "%USERPROFILE%"],
+	// Doubled separators are the JSON-escaped form; a Windows user name may contain spaces.
+	[/[A-Za-z]:[\\/]+Users[\\/]+[^\\/"'<>|:\r\n]+/gi, "%USERPROFILE%"],
+	[/\\{2,}[^\\\s]+\\+[^\\\s]+\\+[^\\\s]+/g, "%USERPROFILE%"],
+	[/(?<![\w.])\/(?:mnt\/[a-z]\/)?(?:Users|home)\/[^/\s"'<>|:]+/g, "%USERPROFILE%"],
 	// Syncthing device ID: keep the first block only.
 	[/\b([A-Z2-7]{7})(?:-[A-Z2-7]{7}){7}\b/g, "$1"],
 	[/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, "<email>"],
 	[/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "<redacted>"],
 	[/\bgithub_pat_[A-Za-z0-9_]{20,}/g, "<redacted>"],
-	[/\bBearer\s+\S+/gi, "Bearer <redacted>"],
+	[/\bBearer[ \t]+\S+/gi, "Bearer <redacted>"],
+	[/(\bAuthorization:[ \t]*)Basic[ \t]+\S+/gi, "$1Basic <redacted>"],
 	[/\beyJ[\w-]+\.[\w-]+\.[\w-]+/g, "<redacted>"],
-	[/\b\w*(token|key|password)=[^&\s]+/gi, "$1=<redacted>"],
+	// JSON form: "token": "...", "password", "secret", "key".
+	[/("\w*(?:token|password|secret|key)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi, '$1"<redacted>"'],
+	[/\b(\w*(?:token|key|password|secret)|sig)=[^&\s]+/gi, "$1=<redacted>"],
 	[/\b[0-9a-fA-F]{32}\b/g, "<redacted>"],
 	[/[A-Za-z0-9_-]{32,}/g, "<redacted>"],
 ];
 
+const PRE_CHARS = 100_000;
+const PRE_LINES = 1000;
+
 export function scrubLog(text: string): string {
-	let s = text;
+	// Bound the work first; the final cut still happens after redaction.
+	let s = text.length > PRE_CHARS ? text.slice(-PRE_CHARS) : text;
+	const all = s.split(/\r?\n/);
+	if (all.length > PRE_LINES) s = all.slice(-PRE_LINES).join("\n");
 	for (const [re, to] of RULES) s = s.replace(re, to);
-	const lines = s.split(/\r?\n/).slice(-LIMITS.logLines).map(l => l.slice(0, LIMITS.logLine));
-	s = lines.join("\n");
-	return s.length > LIMITS.log ? s.slice(-LIMITS.log) : s;
+	s = s.split(/\r?\n/).slice(-LIMITS.logLines).map(cutEnd).join("\n");
+	if (s.length > LIMITS.log) {
+		s = s.slice(-LIMITS.log);
+		if (/^[\udc00-\udfff]/.test(s)) s = s.slice(1);
+	}
+	return s;
+}
+
+function cutEnd(l: string): string {
+	if (l.length <= LIMITS.logLine) return l;
+	const c = l.slice(0, LIMITS.logLine);
+	return /[\ud800-\udbff]$/.test(c) ? c.slice(0, -1) : c;
 }
