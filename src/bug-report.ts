@@ -32,7 +32,8 @@ const clean = (s: string): string => s.replace(CONTROL, "");
 export function validateReport(raw: unknown): Validation {
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return bad("not an object");
 	let size: number;
-	try { size = JSON.stringify(raw).length; } catch { return bad("not serialisable"); }
+	// A connected user's token comes on top of the report: it does not count against the limit.
+	try { const { githubToken: _token, ...withoutToken } = raw as Record<string, unknown>; size = JSON.stringify(withoutToken).length; } catch { return bad("not serialisable"); }
 	if (size > LIMITS.body) return bad("body too large");
 	const o = raw as Record<string, unknown>;
 	for (const k of Object.keys(o)) if (!KEYS.has(k)) return bad("unknown field " + k);

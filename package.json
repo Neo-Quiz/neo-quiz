@@ -111,7 +111,7 @@
     "check:share-roundtrip": "node scripts/check-share-roundtrip.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",
     "check:bug-report": "node scripts/check-bug-report.mjs",
-    "check:bug-relay": "node scripts/check-bug-relay.mjs",
+    "check:bug-relay": "tsc --noEmit -p services/bug-relay/tsconfig.json && node scripts/check-bug-relay.mjs",
     "check:bug-report-service": "node scripts/check-bug-report-service.mjs",
     "check:session": "node scripts/check-session.mjs",
     "check:test-setup": "node scripts/check-test-setup.mjs",

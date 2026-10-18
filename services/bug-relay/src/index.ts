@@ -1,6 +1,6 @@
 import { validateReport, buildIssue } from "../../../src/bug-report";
 import { installationToken, createIssue, getUser, type KVLike, type GhEnv, type Created } from "./github";
-import { admitIp, globalFull, globalBump, sha256Hex, isDuplicate, markDuplicate, MAX_BODY_BYTES } from "./limits";
+import { admitIp, globalFull, globalBump, sha256Hex, isDuplicate, markDuplicate, MAX_BODY_BYTES, MAX_READ_BYTES } from "./limits";
 
 export type { KVLike };
 export interface Env extends GhEnv { RELAY_ENABLED?: string; STATE: KVLike }
@@ -13,19 +13,19 @@ const reply = (body: unknown, status = 200): Response =>
 	new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 const fail = (code: Code): Response => reply({ ok: false, code }, STATUS[code]);
 
-/** Reads at most MAX_BODY_BYTES + 1 bytes; null when the body is over the limit. */
+/** Reads at most MAX_READ_BYTES + 1 bytes; null when the body is over the limit. */
 async function readBody(req: Request): Promise<string | null> {
 	if (!req.body) return "";
 	const reader = req.body.getReader();
 	const chunks: Uint8Array[] = [];
 	let total = 0;
-	while (total <= MAX_BODY_BYTES) {
+	while (total <= MAX_READ_BYTES) {
 		const { done, value } = await reader.read();
 		if (done) break;
 		total += value.length;
 		chunks.push(value);
 	}
-	if (total > MAX_BODY_BYTES) { await reader.cancel().catch(() => {}); return null; }
+	if (total > MAX_READ_BYTES) { await reader.cancel().catch(() => {}); return null; }
 	const all = new Uint8Array(total);
 	let o = 0;
 	for (const c of chunks) { all.set(c, o); o += c.length; }
@@ -47,6 +47,9 @@ export async function handle(req: Request, env: Env, deps: Deps = {}): Promise<R
 		const text = await readBody(req);
 		if (text === null) return fail("invalid");
 		raw = JSON.parse(text);
+		// The read cap leaves room for a connected user's token; without one the body stays within the report limit.
+		const hasToken = typeof raw === "object" && raw !== null && "githubToken" in raw;
+		if (!hasToken && new TextEncoder().encode(text).length > MAX_BODY_BYTES) return fail("invalid");
 	} catch { return fail("invalid"); }
 	const v = validateReport(raw);
 	if (!v.ok) return fail("invalid");

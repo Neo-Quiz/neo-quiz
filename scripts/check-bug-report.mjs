@@ -30,6 +30,9 @@ await withSrcModule(["src/bug-report.ts"], (BR) => {
 	const big = { v: 1, title: "t".repeat(80), what: "a".repeat(4000), steps: "b".repeat(2000), expected: "c".repeat(2000), log: "d".repeat(8000), env: { app: "e".repeat(100), os: "f".repeat(100), platform: "windows" }, githubToken: "g".repeat(255) };
 	r.check("validate: the full-size body fits the fields", JSON.stringify(big).length > L.body, true);
 	r.check("validate: a body over 16384 is refused though each field fits", ok(big), false);
+	const sized = (extra, token) => { const o = { ...big, log: "d".repeat(8000 - extra) }; if (!token) delete o.githubToken; return o; };
+	const at = JSON.stringify(sized(4, false)).length;
+	r.check("validate: the GitHub token does not count against the body limit", [at, ok(sized(4, false)), ok(sized(4, true)), ok(sized(3, false)), ok(sized(3, true))], [16384, true, true, false, false]);
 	r.check("validate: strips control characters", rep({ v: 1, what: "a\u0000b\u001b[31mc\u007f\nd\te" }).report?.what, "ab[31mc\nd\te");
 	r.check("validate: returns a fresh object", (() => { const raw = { v: 1, what: "x" }; return rep(raw).report !== raw; })(), true);
 	r.check("validate: env must be well formed", [ok({ v: 1, what: "x", env: { app: "1", os: "w", platform: "windows" } }), ok({ v: 1, what: "x", env: { app: "1", os: "w", platform: "linux" } }), ok({ v: 1, what: "x", env: { app: "1", os: "w", platform: "android", z: 1 } })], [true, false, false]);
@@ -116,7 +119,8 @@ await withSrcModule(["src/bug-report-form.ts"], (F) => {
 	const r = makeReporter("Bug report form");
 	const base = { what: "x", steps: "", expected: "", title: "", sendEnv: true, sendLog: true, env: { app: "1", os: "w", platform: "windows" }, log: "l1", sending: false };
 	r.check("form: canSend", [F.canSend({ what: "  \n", sending: false }), F.canSend({ what: "x", sending: true }), F.canSend({ what: "x", sending: false })], [false, false, true]);
-	r.check("form: defaultTitle cuts to 80 and takes the first line", [F.defaultTitle("\n  first\nsecond"), Array.from(F.defaultTitle("a".repeat(200))).length, F.defaultTitle(" \n "), Array.from(F.defaultTitle("\u{1F600}".repeat(100))).length], ["first", 80, "", 80]);
+	r.check("form: defaultTitle cuts to 80 and takes the first line", [F.defaultTitle("\n  first\nsecond"), F.defaultTitle("a".repeat(200)).length, F.defaultTitle(" \n "), F.defaultTitle("\u{1F600}".repeat(100)).length], ["first", 80, "", 80]);
+	r.check("form: defaultTitle counts UTF-16 units and never leaves half a pair", [F.defaultTitle("a".repeat(79) + "\u{1F600}").length, F.defaultTitle("a".repeat(78) + "\u{1F600}").length, /[\ud800-\udbff]$/.test(F.defaultTitle("a".repeat(79) + "\u{1F600}"))], [79, 80, false]);
 	const keys = (o) => Object.keys(o).sort().join();
 	r.check("form: reportFromForm omits blank optional fields", keys(F.reportFromForm({ ...base, sendEnv: false, sendLog: false })), "v,what");
 	r.check("form: reportFromForm omits env and log when unticked", [keys(F.reportFromForm({ ...base, sendLog: false })), keys(F.reportFromForm({ ...base, sendEnv: false })), keys(F.reportFromForm({ ...base, log: "  " }))], ["env,v,what", "log,v,what", "env,v,what"]);

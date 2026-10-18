@@ -13,6 +13,8 @@ export const WINDOW_MS = 600_000;
 export const DAY_TTL = 86_400;
 /** Hard cap on the bytes read from a request body. */
 export const MAX_BODY_BYTES = 16_384;
+/** Extra bytes read for a connected user's token, which the report limit does not count (app side: `LIMITS.body + 300`). */
+export const MAX_READ_BYTES = MAX_BODY_BYTES + 300;
 
 export const dayKey = (now: number): string => new Date(now).toISOString().slice(0, 10);
 

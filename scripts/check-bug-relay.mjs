@@ -214,6 +214,19 @@ try {
 		r.check("identified: GET /user then the issue with the USER token", [w.calls.map(c => c.method + " " + c.url.replace("https://api.github.com", "")), w.calls[0].auth, w.calls[1].auth, res.b.ok], [["GET /user", "POST /repos/Neo-Quiz/neo-quiz/issues"], "Bearer " + USER_TOKEN, "Bearer " + USER_TOKEN, true]);
 		r.check("identified: no Reported by", w.calls[1].body.body.includes("Reported by"), false);
 
+		// A connected user's token is on top of the report: same report limit, 300 more bytes read.
+		const fat = (logLen, token) => ({ v: 1, title: "t".repeat(80), what: "a".repeat(4000), steps: "b".repeat(2000), expected: "c".repeat(2000), log: "d".repeat(logLen), env: { app: "e".repeat(100), os: "f".repeat(100), platform: "windows" }, ...(token ? { githubToken: USER_TOKEN } : {}) });
+		const fatAtLimit = await go(world(), fat(7996, true));
+		const fatOver = await go(world(), fat(8000, true));
+		const tokenBody = JSON.stringify({ v: 1, what: "x", githubToken: USER_TOKEN });
+		const padTo = (n) => tokenBody + " ".repeat(n - Buffer.byteLength(tokenBody));
+		const readOk = await go(world(), null, { raw: padTo(16384 + 300) });
+		const readOver = await go(world(), null, { raw: padTo(16384 + 301) });
+		const anonPadded = await go(world(), null, { raw: '{"v":1,"what":"x"}' + " ".repeat(16385 - 18) });
+		r.check("token on top: a 16384-char report plus token passes, 16388 is refused", [fatAtLimit.b.ok, fatOver.b.code], [true, "invalid"]);
+		r.check("token on top: body read cap is 16684 bytes with a token", [readOk.b.ok, readOver.b.code], [true, "invalid"]);
+		r.check("token on top: an anonymous body keeps the 16384-byte cap", anonPadded.b.code, "invalid");
+
 		w = world();
 		w.behave.userIssue = () => json(403, { message: "forbidden" });
 		res = await go(w, rep(1, { githubToken: USER_TOKEN }));

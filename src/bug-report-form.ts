@@ -22,11 +22,11 @@ export function canSend(state: Pick<FormState, "what" | "sending">): boolean {
 	return state.what.trim() !== "" && !state.sending;
 }
 
-/** The first non-empty line of the description, cut to the title limit (never inside a surrogate pair). */
+/** The first non-empty line of the description, cut to the title limit in UTF-16 units (never inside a surrogate pair). */
 export function defaultTitle(what: string): string {
 	const line = what.split(/\r?\n/).map(l => l.trim()).find(l => l !== "") ?? "";
-	const chars = Array.from(line);
-	return chars.length <= LIMITS.title ? line : chars.slice(0, LIMITS.title).join("").trimEnd();
+	if (line.length <= LIMITS.title) return line;
+	return line.slice(0, LIMITS.title).replace(/[\ud800-\udbff]$/, "").trimEnd();
 }
 
 /** The report to hand to the main process: blank optional fields and unticked details are left out; never a token. */
