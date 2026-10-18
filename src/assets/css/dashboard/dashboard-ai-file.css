@@ -360,11 +360,11 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: 14px;
-	width: min(460px, 100%);
+	gap: 12px;
+	width: min(420px, 100%);
 	box-sizing: border-box;
-	padding: 10px 16px 10px 10px;
-	border-radius: 16px;
+	padding: 8px 12px 8px 8px;
+	border-radius: 14px;
 	border: 1px solid var(--qbd-glass-edge, var(--background-modifier-border));
 	background: var(--qbd-glass-bg, var(--background-secondary));
 	backdrop-filter: var(--qbd-glass-blur, none);
@@ -415,90 +415,73 @@
 	box-shadow: none;
 }
 
-/* The subject's tile (topic-art.ts) : its illustration on its ground colour. */
+/* The subject's tile (topic-art.ts `topicTuile`): the crisp tile of the
+   gallery cover, shrunk to a compact row. */
 .qbd-ai-resultat-icone {
 	display: block;
 	flex-shrink: 0;
-	width: 56px;
-	height: 56px;
-	overflow: hidden;
-	border-radius: 11px;
+	width: 40px;
+	height: 40px;
 }
 
-.qbd-ai-resultat-icone svg {
-	display: block;
-	width: 100%;
-	height: 100%;
-	transition: transform 0.3s ease-out;
+.qbd-ai-resultat-icone .qbd-gen-art-tile {
+	position: static;
+	width: 40px;
+	height: 40px;
+	border-radius: 10px;
+	backdrop-filter: none;
+	box-shadow: none;
 }
 
-.qbd-ai-resultat:hover .qbd-ai-resultat-icone svg {
-	transform: scale(1.08);
-}
+.qbd-ai-resultat-icone .qbd-gen-art-tile > img { width: 28px; height: 28px; }
+.qbd-ai-resultat-icone .qbd-gen-art-tile > .qbd-categorie-drapeau { width: 30px; height: 20px; }
+.qbd-ai-resultat-icone .qbd-gen-art-tile > svg { width: 22px; height: 22px; }
 
 .qbd-ai-resultat-corps {
 	display: flex;
 	flex: 1 1 auto;
 	flex-direction: column;
-	gap: 4px;
+	gap: 2px;
 	min-width: 0;
 }
 
 .qbd-ai-resultat-titre {
-	display: -webkit-box;
 	overflow: hidden;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	overflow-wrap: anywhere;
-	font-size: 15.5px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14.5px;
 	font-weight: 600;
 	line-height: 1.3;
 	color: var(--text-normal);
 }
 
 .qbd-ai-resultat-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 2px 8px;
-	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12.5px;
+	line-height: 1.3;
 	color: var(--text-muted);
 }
 
-.qbd-ai-resultat-go {
+/* A discreet chevron, centred on the row: the whole card is the button. */
+.qbd-ai-resultat-fleche {
 	display: inline-flex;
-	align-items: center;
-	gap: 6px;
 	flex-shrink: 0;
-	white-space: nowrap;
-	font-size: 14px;
-	font-weight: 600;
-	line-height: 16px;
-	color: var(--interactive-accent);
+	color: var(--text-faint);
+	transition: transform 0.2s ease, color 0.2s ease;
 }
 
-/* The label and the arrow's box share one 16 px line box, so the arrow sits
-   on the text's centre line instead of the baseline of an inline wrapper. */
-.qbd-ai-resultat-go > span {
-	display: inline-flex;
-	align-items: center;
-	height: 16px;
-}
+.qbd-ai-resultat-fleche svg { display: block; width: 18px; height: 18px; }
 
-.qbd-ai-resultat-go svg {
-	display: block;
-	width: 16px;
-	height: 16px;
-	transition: transform 0.2s ease;
-}
-
-.qbd-ai-resultat:hover .qbd-ai-resultat-go svg {
-	transform: translateX(3px);
+.qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
+	transform: translateX(2px);
+	color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-ai-resultat,
-	.qbd-ai-resultat-go svg,
-	.qbd-ai-resultat-icone svg {
+	.qbd-ai-resultat-fleche {
 		transition: none;
 	}
 
@@ -507,8 +490,7 @@
 		transform: none;
 	}
 
-	.qbd-ai-resultat:hover .qbd-ai-resultat-go svg,
-	.qbd-ai-resultat:hover .qbd-ai-resultat-icone svg {
+	.qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
 		transform: none;
 	}
 }

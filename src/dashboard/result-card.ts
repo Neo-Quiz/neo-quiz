@@ -7,7 +7,7 @@ import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
 import { detecterCategorie } from "./categorie-quiz";
-import { topicArt, topicTint } from "./topic-art";
+import { topicTuile } from "./topic-art";
 import { moduleAccent } from "./module-color";
 import type { ModuleInfo } from "./quiz-modules";
 import { libelleComptes } from "./question-count";
@@ -45,22 +45,19 @@ export function peindreCarteQuiz(
 	carte.type = "button";
 	carte.style.setProperty("--qbd-folder", moduleAccent({ folder: dossier || q.titre }));
 	carte.addEventListener("click", ouvrir);
-	/* The tile of the quiz's subject: the same illustration as its card in the
-	   gallery (`topic-art.ts`), on the subject's ground colour. */
-	const sujet = detecterCategorie({ dossier: q.chemin.split(/[\\/]/).slice(0, -1).join("/"), demande: q.titre });
+	/* The subject's tile: the same logo, flag or glyph-on-tint as the crisp tile
+	   of its gallery cover (`topic-art.ts`). The title is clipped to one line,
+	   so the full title is the accessible name (no native tooltip). */
+	const sujet = detecterCategorie({ dossier: q.chemin.split(/[\/]/).slice(0, -1).join("/"), demande: q.titre });
 	const icone = ajouter(carte, "span", "qbd-ai-resultat-icone");
-	icone.style.background = topicTint(sujet);
 	icone.setAttribute("aria-hidden", "true");
-	icone.appendChild(topicArt(sujet));
+	icone.appendChild(topicTuile(sujet));
 	const corps = ajouter(carte, "span", "qbd-ai-resultat-corps");
 	ajouter(corps, "span", "qbd-ai-resultat-titre", q.titre);
-	const meta = ajouter(corps, "span", "qbd-ai-resultat-meta");
-	const genre = [q.mode ? t(q.mode === "learn" ? "dashboard.quizMode.learn" : "dashboard.quizMode.test") : "", q.comptes ? libelleComptes(q.comptes) : ""].filter(Boolean).join(" · ");
-	if (genre) ajouter(meta, "span", undefined, genre);
-	if (dossier) ajouter(meta, "span", undefined, dossier);
-	const aller = ajouter(carte, "span", "qbd-ai-resultat-go");
-	ajouter(aller, "span", undefined, t("ai.queue.open"));
-	host.ui.setIcon(ajouter(aller, "span", "qbd-ai-resultat-fleche"), "arrow-right");
+	const genre = [q.mode ? t(q.mode === "learn" ? "dashboard.quizMode.learn" : "dashboard.quizMode.test") : "", q.comptes ? libelleComptes(q.comptes) : "", dossier].filter(Boolean).join(" · ");
+	if (genre) ajouter(corps, "span", "qbd-ai-resultat-meta", genre);
+	carte.setAttribute("aria-label", genre ? q.titre + ", " + genre : q.titre);
+	host.ui.setIcon(ajouter(carte, "span", "qbd-ai-resultat-fleche"), "chevron-right");
 	/* The folder's own colour (its settings), once known: the hover edge. */
 	void dossierDe?.(q.chemin).then(info => {
 		if (info) carte.style.setProperty("--qbd-folder", moduleAccent(info));

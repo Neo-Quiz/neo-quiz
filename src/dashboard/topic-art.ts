@@ -109,6 +109,28 @@ const glyphe = (parent: HTMLElement, nom: string): void => {
 };
 
 /**
+ * Just the crisp tile of a subject (its logo, its flag, or a white glyph on
+ * its tint), for a compact row such as the chat's quiz card. Same pieces as
+ * the tile of the gallery cover, so a subject looks the same in both.
+ */
+export function topicTuile(c: CategorieQuiz): HTMLElement {
+	const [t1, t2, t3] = TEINTES[c];
+	const tuile = document.createElement("div");
+	tuile.className = "qbd-gen-art-tile";
+	tuile.style.setProperty("--art-1", t1);
+	tuile.style.setProperty("--art-2", t2);
+	tuile.style.setProperty("--art-3", t3);
+	const impose = GLYPHE_IMPOSE[c];
+	const drapeau = estLangue(c) && c !== "langues";
+	if (!impose && (drapeau || aUneImageCategorie(c))) peindreIconeCategorie(tuile, c);
+	else {
+		tuile.classList.add("is-solid");
+		glyphe(tuile, impose?.tuile ?? glypheCategorie(c));
+	}
+	return tuile;
+}
+
+/**
  * The cover of a card. Sized by its container; the subject's tint reaches CSS
  * as `--art-1` (light), `--art-2` (dark) and `--art-3` (accent).
  */

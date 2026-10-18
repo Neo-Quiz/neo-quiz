@@ -31,7 +31,7 @@ release notes.
 - Generated quizzes gallery: each card shows the subject's colour logo large on a tinted gradient with a dotted pattern, General has its own illustration, every quiz shows a subject (General by default) and a new quiz stores the AI-picked subject in its note.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.
 - The usage popover folds the model groups you are not using (click a title to unfold), the line under the composer shows the group title on its own line, and both follow a model change at once.
-- The AI chat follows claude.ai: a pulsing dot before the first token, a rotating phrase while the model thinks and a grey one-line summary once done, a queued message with "Send now", the new message scrolled to the top, "Retry", and a result card with the quiz subject tile that opens the quiz.
+- The AI chat follows claude.ai: a pulsing dot before the first token, a rotating phrase while the model thinks and a grey one-line summary once done, a queued message with "Send now", the new message scrolled to the top, "Retry", and a compact result card (one row, the whole card opens the quiz) with the same subject tile as the gallery covers.
 
 ### Fixed
 
