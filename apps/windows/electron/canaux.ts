@@ -717,7 +717,11 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   channel returns more than a result, a code or a login. */
 	const signalement = deps.signalement;
 	const OFF = { ok: false, code: "disabled" } as const;
-	ipcMain.handle(CANAUX.signalementApercu, async () => (signalement ? { ok: true, ...await signalement.apercu() } : OFF));
+	ipcMain.handle(CANAUX.signalementApercu, async () => {
+		if (!signalement) return OFF;
+		const a = await signalement.apercu();
+		return { ok: true, env: a.env, log: a.log };
+	});
 	ipcMain.handle(CANAUX.signalementEnvoyer, async (_e, rapport: unknown) => {
 		if (!signalement) return OFF;
 		try {
@@ -729,7 +733,8 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.signalementGithubConnecter, async () => {
 		if (!signalement) return OFF;
 		try {
-			return { ok: true, ...await signalement.github.connecter() };
+			const c = await signalement.github.connecter();
+			return { ok: true, userCode: c.userCode, verificationUri: c.verificationUri, expiresIn: c.expiresIn };
 		} catch (e) {
 			const m = e instanceof Error ? e.message : "";
 			return { ok: false, code: m === "busy" || m === "refused" ? m : "failed" };

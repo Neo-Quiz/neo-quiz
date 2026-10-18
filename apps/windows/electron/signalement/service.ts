@@ -37,16 +37,22 @@ export interface DepsSignalement {
 }
 
 const CODES_RELAIS = new Set(["invalid", "rate_limited", "duplicate", "upstream", "disabled"]);
+const ESPACEMENT_MS = 5000;
 const UPSTREAM: ResultatEnvoi = { ok: false, code: "upstream" };
 
 export function creerServiceSignalement(deps: DepsSignalement): ServiceSignalement {
 	const flux = creerFlux(deps);
+	let enCours = false;
+	let dernierEnvoi: number | null = null;
+	let generation = 0;
+	let attente: Promise<{ login: string } | { error: "denied" | "expired" | "cancelled" | "failed" }> | null = null;
 	const adresseRapport = deps.relay.replace(/\/+$/, "") + "/report";
 
 	/** One POST to the relay; `token_invalid` is returned as such for the caller to handle. */
 	async function poster(rapport: BugReport): Promise<ResultatEnvoi> {
 		const corps = JSON.stringify(rapport);
-		if (Buffer.byteLength(corps) > LIMITS.body) return { ok: false, code: "invalid" };
+		// The token is added after the 16 KB check on the report itself; leave room for it only.
+		if (Buffer.byteLength(corps) > LIMITS.body + 300) return { ok: false, code: "invalid" };
 		let j: unknown;
 		try {
 			j = await appelJson(deps.transport, adresseRapport, {
@@ -76,31 +82,43 @@ export function creerServiceSignalement(deps: DepsSignalement): ServiceSignaleme
 			return { env: deps.env(), log: scrubLog(deps.journal.extrait()).slice(0, LIMITS.log) };
 		},
 		async envoyer(brut) {
+			if (enCours) return { ok: false, code: "rate_limited" };
 			const v = validateReport(brut);
 			if (!v.ok) return { ok: false, code: "invalid" };
-			// The window supplies neither the token nor the environment.
-			const base: BugReport = { ...v.report, env: deps.env() };
-			delete base.githubToken;
-			if (base.log !== undefined) base.log = scrubLog(base.log).slice(0, LIMITS.log);
-			const session = await deps.magasin.lire();
-			const r = await poster(session ? { ...base, githubToken: session.accessToken } : base);
-			if (r.ok || r.code !== "token_invalid") return r;
-			// Revoked token: forget the session, retry once anonymously.
-			await deps.magasin.effacer().catch(() => undefined);
-			const r2 = await poster(base);
-			return !r2.ok && r2.code === "token_invalid" ? UPSTREAM : r2;
+			const t = deps.maintenant();
+			if (dernierEnvoi !== null && t - dernierEnvoi < ESPACEMENT_MS) return { ok: false, code: "rate_limited" };
+			enCours = true;
+			dernierEnvoi = t;
+			try {
+				return await envoyerValide(v.report);
+			} finally {
+				enCours = false;
+			}
 		},
 		github: {
 			connecter: () => flux.demarrer(),
-			async attendre() {
-				const r = await flux.attendre();
-				if ("error" in r) return r;
-				try {
-					await deps.magasin.ecrire({ accessToken: r.accessToken, login: r.login });
-				} catch {
-					return { error: "failed" };
-				}
-				return { login: r.login };
+			attendre() {
+				attente ??= (async () => {
+					const g = generation;
+					try {
+						const r = await flux.attendre();
+						if ("error" in r) return r;
+						if (g !== generation) return { error: "cancelled" } as const;
+						try {
+							await deps.magasin.ecrire({ accessToken: r.accessToken, login: r.login });
+						} catch {
+							return { error: "failed" } as const;
+						}
+						if (g !== generation) {
+							await deps.magasin.effacer().catch(() => undefined);
+							return { error: "cancelled" } as const;
+						}
+						return { login: r.login };
+					} finally {
+						attente = null;
+					}
+				})();
+				return attente;
 			},
 			annuler: () => flux.annuler(),
 			async etat() {
@@ -108,9 +126,26 @@ export function creerServiceSignalement(deps: DepsSignalement): ServiceSignaleme
 				return s ? { login: s.login } : null;
 			},
 			async deconnecter() {
+				generation++;
 				flux.annuler();
-				await deps.magasin.effacer();
+				await deps.magasin.effacer().catch(() => undefined);
 			},
 		},
 	};
+
+	async function envoyerValide(report: BugReport): Promise<ResultatEnvoi> {
+		// The window supplies neither the token nor the environment.
+		const base: BugReport = { ...report, env: deps.env() };
+		delete base.githubToken;
+		if (base.log !== undefined) base.log = scrubLog(base.log).slice(0, LIMITS.log);
+		// Same 16 KB limit for connected and anonymous users: judged before the token is added.
+		if (Buffer.byteLength(JSON.stringify(base)) > LIMITS.body) return { ok: false, code: "invalid" };
+		const session = await deps.magasin.lire();
+		const r = await poster(session ? { ...base, githubToken: session.accessToken } : base);
+		if (r.ok || r.code !== "token_invalid") return r;
+		// Revoked token: forget the session, retry once anonymously.
+		await deps.magasin.effacer().catch(() => undefined);
+		const r2 = await poster(base);
+		return !r2.ok && r2.code === "token_invalid" ? UPSTREAM : r2;
+	}
 }

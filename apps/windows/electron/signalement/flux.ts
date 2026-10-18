@@ -89,12 +89,14 @@ export interface Flux {
 export function creerFlux(deps: DepsFlux): Flux {
 	const pause = deps.pause ?? pauseReelle;
 	let demarrage = false;
-	let actif: { deviceCode: string; intervalle: number; limite: number; ac: AbortController } | null = null;
+	let actif: { deviceCode: string; intervalle: number; limite: number; ac: AbortController; promesse?: Promise<ResultatFlux> } | null = null;
 	const appel = (url: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> =>
 		appelJson(deps.transport, url, init, deps.relay, { minuteur: deps.minuteur, signal });
 
 	return {
 		async demarrer() {
+			// A flow left behind (page reloaded, never awaited) is free once past its expiry.
+			if (actif && deps.maintenant() >= actif.limite) { actif.ac.abort(); actif = null; }
 			if (demarrage || actif) throw new Error("busy");
 			demarrage = true;
 			try {
@@ -115,9 +117,21 @@ export function creerFlux(deps: DepsFlux): Flux {
 				demarrage = false;
 			}
 		},
-		async attendre() {
+		attendre() {
 			const f = actif;
-			if (!f) return { error: "failed" };
+			if (!f) return Promise.resolve({ error: "failed" });
+			// Single flight: later callers share the one poll.
+			f.promesse ??= boucle(f);
+			return f.promesse;
+		},
+		annuler() {
+			const f = actif;
+			actif = null;
+			f?.ac.abort();
+		},
+	};
+
+	async function boucle(f: NonNullable<typeof actif>): Promise<ResultatFlux> {
 			try {
 				for (;;) {
 					await pause(f.intervalle, f.ac.signal);
@@ -158,11 +172,5 @@ export function creerFlux(deps: DepsFlux): Flux {
 			} finally {
 				if (actif === f) actif = null;
 			}
-		},
-		annuler() {
-			const f = actif;
-			actif = null;
-			f?.ac.abort();
-		},
-	};
+	}
 }

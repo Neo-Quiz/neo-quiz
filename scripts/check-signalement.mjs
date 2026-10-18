@@ -277,6 +277,68 @@ async function sections(r, { AD, JT, SV, BR }) {
 			r.check("flow: storage refused gives failed, no token leaked", JSON.stringify(await F.s.github.attendre()), JSON.stringify({ error: "failed" }));
 		}
 
+		// guards: single flight, spacing, shared poll, stale flow, disconnect race, body limit
+		{
+			const horloge = { t: 1000 };
+			let n = 0;
+			let liberer;
+			const lent = async () => { n++; await new Promise((res) => { liberer = res; }); return json(OKREP); };
+			const s = mk(lent, { maintenant: () => horloge.t });
+			const p1 = s.envoyer(RAPPORT);
+			const p2 = await s.envoyer(RAPPORT);
+			r.check("guard: a concurrent envoyer answers rate_limited with no request", [p2, n], [{ ok: false, code: "rate_limited" }, 1]);
+			liberer();
+			r.check("guard: the first send completes", await p1, OKREP);
+			horloge.t += 1000;
+			r.check("guard: a second send 1 s later is rate_limited, no request", [await s.envoyer(RAPPORT), n], [{ ok: false, code: "rate_limited" }, 1]);
+			horloge.t += 4000;
+			const p3 = s.envoyer(RAPPORT);
+			await new Promise((res) => setTimeout(res, 0));
+			liberer();
+			r.check("guard: after 5 s a send is allowed", [await p3, n], [OKREP, 2]);
+
+			const h2 = { t: 0 };
+			let modeThrow = true;
+			const s2 = mk(async () => { if (modeThrow) throw new Error("net"); return json(OKREP); }, { maintenant: () => h2.t });
+			const e1 = await s2.envoyer(RAPPORT);
+			h2.t += 5000;
+			modeThrow = false;
+			r.check("guard: the lock is released after a transport throw", [e1, await s2.envoyer(RAPPORT)], [{ ok: false, code: "upstream" }, OKREP]);
+
+			const gros = { v: 1, what: "w", steps: "s".repeat(2000), expected: "e".repeat(2000), log: "l".repeat(8000), title: "t".repeat(80) };
+			const corps = [];
+			const sg = mk(async (u, init) => { corps.push(init.body.length); return json(OKREP); }, { magasin: memoire({ accessToken: "g".repeat(255), login: "o" }) });
+			const rg = await sg.envoyer(gros);
+			r.check("guard: a report near the cap is judged before the token is added", [rg.ok, corps.length === 1 && corps[0] <= 16384 + 300], [true, true]);
+		}
+		{
+			const DEV = { device_code: "dc", user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5 };
+			const mkF = (reponses, over = {}) => {
+				const reqs = []; const h = { t: 0 }; const pauses = []; let ecrit = 0; let sess = null;
+				const t = async (url) => { reqs.push(url); return json(reponses.shift()); };
+				const magasin = { lire: async () => sess, ecrire: async (x) => { ecrit++; sess = x; if (over.surEcrire) await over.surEcrire(); }, effacer: async () => { sess = null; } };
+				const s = mk(t, { magasin, maintenant: () => h.t, pause: async (d) => { pauses.push(d); h.t += d; await Promise.resolve(); } });
+				return { s, reqs, h, pauses, get: () => ({ ecrit, sess }) };
+			};
+			let F = mkF([DEV, { error: "authorization_pending" }, { access_token: TOKEN }, { login: "octo" }]);
+			await F.s.github.connecter();
+			const [a, b] = await Promise.all([F.s.github.attendre(), F.s.github.attendre()]);
+			r.check("guard: two concurrent attendre share one poll and one session write",
+				[a, b, F.pauses, F.reqs.length, F.get().ecrit], [{ login: "octo" }, { login: "octo" }, [5000, 5000], 4, 1]);
+
+			F = mkF([DEV, DEV]);
+			await F.s.github.connecter();
+			F.h.t += 901000;
+			r.check("guard: a flow left past its expiry does not block a new one", (await F.s.github.connecter()).userCode, "ABCD-1234");
+
+			let sortie;
+			F = mkF([DEV, { access_token: TOKEN }, { login: "octo" }], { surEcrire: async () => { await F.s.github.deconnecter(); } });
+			await F.s.github.connecter();
+			const ra = await F.s.github.attendre();
+			r.check("guard: deconnecter during completion wins, no session left", [ra, F.get().sess], [{ error: "cancelled" }, null]);
+			void sortie;
+		}
+
 		// etat / disconnect
 		{
 			const f = path.join(tmp, "etat.bin");
