@@ -1971,20 +1971,64 @@
 	overflow: hidden;
 }
 
-.qbd-gen-preview > svg {
+/* The art: a diagonal gradient of the subject's family colour (topic-art.ts),
+   its dotted pattern behind, and the subject's logo large on top. */
+.qbd-gen-art {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(135deg, color-mix(in srgb, var(--art-a) 34%, var(--art-fond)), var(--art-fond) 70%);
+}
+
+.qbd-gen-art-bg {
+	position: absolute;
+	inset: 0;
 	display: block;
 	width: 100%;
 	height: 100%;
 	transition: transform 300ms ease-out;
 }
 
-.qbd-gen-card:hover .qbd-gen-preview > svg {
-	transform: scale(1.04);
+.qbd-gen-art-logo {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 72px;
+	height: 72px;
+	filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+	transition: transform 300ms ease-out;
 }
 
+.qbd-gen-art-logo > img {
+	width: 100%;
+	height: 100%;
+	max-width: 100%;
+	object-fit: contain;
+}
+
+/* A flag is wide: keep its 3:2 and round it. */
+.qbd-gen-art-logo > .qbd-categorie-drapeau {
+	width: 96px;
+	height: 64px;
+	border-radius: 8px;
+}
+
+.qbd-gen-card:hover,
+.qbd-gen-card:focus-visible {
+	transform: translateY(-2px);
+}
+
+.qbd-gen-card:hover .qbd-gen-art-logo { transform: scale(1.08); }
+.qbd-gen-card:hover .qbd-gen-art-bg { transform: scale(1.04); }
+
+.qbd-gen-card:active { transform: translateY(0) scale(0.99); }
+
 @media (prefers-reduced-motion: reduce) {
-	.qbd-gen-preview > svg { transition: none; }
-	.qbd-gen-card:hover .qbd-gen-preview > svg { transform: none; }
+	.qbd-gen-art-bg, .qbd-gen-art-logo { transition: none; }
+	.qbd-gen-card:hover, .qbd-gen-card:focus-visible, .qbd-gen-card:active,
+	.qbd-gen-card:hover .qbd-gen-art-logo, .qbd-gen-card:hover .qbd-gen-art-bg { transform: none; }
 }
 
 .qbd-gen-foot {

@@ -10,6 +10,8 @@
 
 /** Ce que `saveGeneratedQuiz` (dashboard/ai.ts) écrit, et que le scanner
  *  relit. `effort` est absent pour Ollama (pas de notion d'effort). */
+import { estCategorie, type CategorieQuiz } from "./dashboard/categorie-quiz";
+
 export interface NeoQuizFrontmatter {
 	provider: string;
 	model: string;
@@ -23,6 +25,10 @@ export interface NeoQuizFrontmatter {
 	 *  figurant plus dans le nom du fichier (2026-09-23). Déjà nettoyée des
 	 *  guillemets et sauts de ligne par `nomDeSource`. */
 	source?: string;
+	/** The quiz's SUBJECT (a `CategorieQuiz` id, `general` by default), written
+	 *  since 2026-10-18 so that every new quiz has one. Persisted key: never
+	 *  rename it. An unknown value reads as absent. */
+	subject?: CategorieQuiz;
 }
 
 /** Retire les guillemets (simples ou doubles) qui entourent une valeur YAML,
@@ -70,9 +76,9 @@ export function lireFrontmatterNeoQuiz(content: string): NeoQuizFrontmatter | nu
 		champs[m[1]] = depouiller(m[2]);
 	}
 
-	const { provider, model, effort, generatedAt, source } = champs;
+	const { provider, model, effort, generatedAt, source, subject } = champs;
 	if (!provider || !model || !generatedAt) return null;
-	return { provider, model, effort: effort || undefined, generatedAt, ...(source ? { source } : {}) };
+	return { provider, model, effort: effort || undefined, generatedAt, ...(source ? { source } : {}), ...(estCategorie(subject) ? { subject } : {}) };
 }
 
 /**
@@ -118,6 +124,7 @@ export function ecrireFrontmatterNeoQuiz(meta: NeoQuizFrontmatter): string {
 	if (meta.effort) lignes.push(`  effort: ${meta.effort}`);
 	lignes.push(`  generatedAt: ${meta.generatedAt}`);
 	if (meta.source) lignes.push(`  source: "${meta.source.replace(/["\r\n]/g, "")}"`);
+	if (meta.subject && estCategorie(meta.subject)) lignes.push(`  subject: ${meta.subject}`);
 	lignes.push("---", "");
 	return lignes.join("\n");
 }

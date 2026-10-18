@@ -2,7 +2,7 @@ import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { currentLang, t } from "../i18n";
 import type { QuizIndexEntry } from "./scanner";
-import { detecterCategorie } from "./categorie-quiz";
+import { categorieDuDossier, detecterCategorie, type CategorieQuiz } from "./categorie-quiz";
 import { topicArt } from "./topic-art";
 import { libelleCategorie } from "./categorie-affichage";
 
@@ -37,6 +37,14 @@ function modifie(ms: number, now: number): string {
 	const date = new Intl.DateTimeFormat(currentLang() === "fr" ? "fr-FR" : "en-US",
 		{ day: "numeric", month: "short", ...(d.getFullYear() !== new Date(now).getFullYear() ? { year: "numeric" } : {}) }).format(d);
 	return t("ai.gallery.modifiedOn", { date });
+}
+
+/** A card's subject: the one stored in the note, else its folder's, else a guess from the title and source, else General. */
+export function sujetDe(q: QuizIndexEntry): CategorieQuiz {
+	if (q.generated?.subject) return q.generated.subject;
+	const dossier = categorieDuDossier(q.path.split("/").slice(0, -1).join("/"), undefined);
+	if (dossier !== "general") return dossier;
+	return detecterCategorie({ pieces: q.generated?.source ? [q.generated.source] : [], demande: q.title });
 }
 
 export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalleryDeps): void {
@@ -91,14 +99,14 @@ export function renderGeneratedGallery(parent: HTMLElement, deps: GeneratedGalle
 		c.setAttribute("aria-label", q.title);
 		// The preview: a flat illustration of the quiz's subject (`topic-art.ts`).
 		const apercu = ajouter(c, "div", "qbd-gen-preview");
-		const sujet = detecterCategorie({ pieces: q.generated?.source ? [q.generated.source] : [], demande: q.title });
+		const sujet = sujetDe(q);
 		apercu.appendChild(topicArt(sujet));
 		const pied = ajouter(c, "div", "qbd-gen-foot");
 		ajouter(pied, "span", "qbd-gen-name", q.title);
 		// The kind and the date on the left, the subject at the bottom right.
 		const bas = ajouter(pied, "div", "qbd-gen-foot-row");
 		ajouter(bas, "span", "qbd-gen-date", `${t(learn ? "ai.gallery.kindLearn" : "ai.gallery.kindTest")} · ${modifie(q.mtime, now)}`);
-		if (sujet !== "general") ajouter(bas, "span", "qbd-gen-topic", libelleCategorie(sujet));
+		ajouter(bas, "span", "qbd-gen-topic", libelleCategorie(sujet));
 		c.addEventListener("click", () => deps.open(q));
 	};
 

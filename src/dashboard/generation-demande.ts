@@ -283,6 +283,7 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 			generatedAt: new Date().toISOString(),
 			learn: mode === "practice" ? e.noteLearn : undefined,
 			source,
+			subject: e.categorie ?? "general",
 		});
 		await host.fs.write(path, frontmatter + exportAllWithFence(e.draft.questions, e.draft.examOptions) + "\n");
 

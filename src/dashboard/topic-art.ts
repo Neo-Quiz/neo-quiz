@@ -1,5 +1,6 @@
 import type { CategorieQuiz } from "./categorie-quiz";
 import { estLangue } from "./categorie-quiz";
+import { aUneImageCategorie, peindreIconeCategorie } from "./categorie-affichage";
 
 /* ══════════════════════════════════════════════════════════
    A SMALL FLAT ILLUSTRATION PER SUBJECT (2026-10-17)
@@ -12,7 +13,7 @@ import { estLangue } from "./categorie-quiz";
    string, nothing taken from the quiz.
 ══════════════════════════════════════════════════════════ */
 
-type Famille = "code" | "data" | "maths" | "reseau" | "secu" | "ia" | "science" | "langue" | "lettres" | "doc";
+type Famille = "general" | "code" | "data" | "maths" | "reseau" | "secu" | "ia" | "science" | "langue" | "lettres" | "doc";
 
 const FAMILLE: Partial<Record<CategorieQuiz, Famille>> = {
 	python: "code", c: "code", cpp: "code", java: "code", csharp: "code", web: "code", rust: "code", go: "code", algo: "code", genie: "code", git: "code", bash: "code",
@@ -36,6 +37,7 @@ const TEINTES: Record<Famille, { fond: string; a: string; b: string; c: string }
 	science: { fond: "#173d2c", a: "#4ade80", b: "#86efac", c: "#15803d" },
 	langue: { fond: "#4a3214", a: "#f6ad55", b: "#fbd38d", c: "#c05621" },
 	lettres: { fond: "#47361a", a: "#e9b872", b: "#f6dfb2", c: "#a0703a" },
+	general: { fond: "#3a2f5b", a: "#f0abfc", b: "#fcd34d", c: "#a78bfa" },
 	doc: { fond: "#26324a", a: "#7f9cc9", b: "#b8c7e0", c: "#4d6390" },
 };
 
@@ -92,6 +94,14 @@ function formes(f: Famille, t: { a: string; b: string; c: string }): Forme[] {
 			["path", { d: "M80 34 C90 28 102 28 112 32 V72 C102 68 90 68 80 74 Z", fill: t.b }],
 			["path", { d: "M80 34 V74", stroke: t.c, "stroke-width": 2.5 }],
 		];
+		case "general": return [
+			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: t.c, opacity: 0.45, transform: "rotate(-9 80 50)" }],
+			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: t.a, opacity: 0.55, transform: "rotate(7 80 50)" }],
+			["rect", { x: 52, y: 30, width: 56, height: 40, rx: 8, fill: "#ffffff", opacity: 0.92 }],
+			ligne(60, 40, 30, t.c), ligne(60, 50, 38, t.a), ligne(60, 60, 22, t.c),
+			["path", { d: "M112 16 L115 25 L124 28 L115 31 L112 40 L109 31 L100 28 L109 25 Z", fill: t.b }],
+			["path", { d: "M46 62 L48 68 L54 70 L48 72 L46 78 L44 72 L38 70 L44 68 Z", fill: t.b, opacity: 0.8 }],
+		];
 		default: return [
 			["rect", { x: 60, y: 20, width: 40, height: 60, rx: 5, fill: t.c, opacity: 0.6 }],
 			ligne(66, 28, 22, t.a), ligne(66, 38, 28, t.b), ligne(66, 46, 24, t.b), ["circle", { cx: 68.5, cy: 58.5, r: 2.5, fill: t.a }], ligne(74, 56, 18, t.b), ligne(66, 66, 26, t.b),
@@ -99,38 +109,49 @@ function formes(f: Famille, t: { a: string; b: string; c: string }): Forme[] {
 	}
 }
 
-/** The illustration of a subject, sized by its container (viewBox 160 x 100). */
-export function topicArt(c: CategorieQuiz): SVGSVGElement {
+const aUnLogo = aUneImageCategorie;
+
+const svgEl = (tag: string, attrs: Record<string, string | number>): SVGElement => {
+	const el = document.createElementNS(NS, tag);
+	for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+	return el;
+};
+
+/**
+ * The preview of a card: a soft diagonal gradient in the subject's family
+ * colour, a faint dot pattern and two blurred discs, and on it the subject's
+ * logo drawn large (or, where no logo exists, the family's flat drawing).
+ * Sized by its container; the family colour reaches CSS as `--art-a`/`--art-b`.
+ */
+export function topicArt(c: CategorieQuiz): HTMLElement {
 	const f = familleDe(c);
 	const t = TEINTES[f];
+	const racine = document.createElement("div");
+	racine.className = "qbd-gen-art";
+	racine.style.setProperty("--art-fond", t.fond);
+	racine.style.setProperty("--art-a", t.a);
+	racine.style.setProperty("--art-c", t.c);
 	const svg = document.createElementNS(NS, "svg");
-	/* A wide frame around the 160 x 100 drawing: the shapes keep a modest size
-	   in a large card instead of filling it. */
 	svg.setAttribute("viewBox", "-22 -4 204 108");
 	svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
 	svg.setAttribute("aria-hidden", "true");
-	const id = `nq-art-${f}`;
+	svg.classList.add("qbd-gen-art-bg");
+	const id = `nq-dots-${f}`;
 	const defs = document.createElementNS(NS, "defs");
-	const grad = document.createElementNS(NS, "linearGradient");
-	grad.setAttribute("id", id);
-	grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0"); grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
-	// The colour fades into the card itself: no separate block for the picture.
-	for (const [offset, couleur, op] of [["0", t.fond, "0.9"], ["1", t.fond, "0"]] as const) {
-		const stop = document.createElementNS(NS, "stop");
-		stop.setAttribute("offset", offset);
-		stop.setAttribute("stop-color", couleur);
-		stop.setAttribute("stop-opacity", op);
-		grad.appendChild(stop);
-	}
-	defs.appendChild(grad);
+	const motif = svgEl("pattern", { id, width: 10, height: 10, patternUnits: "userSpaceOnUse" });
+	motif.appendChild(svgEl("circle", { cx: 2, cy: 2, r: 1, fill: t.b, opacity: 0.35 }));
+	defs.appendChild(motif);
 	svg.appendChild(defs);
-	const poser = ([tag, attrs]: Forme): void => {
-		const el = document.createElementNS(NS, tag);
-		for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-		svg.appendChild(el);
-	};
-	poser(["rect", { x: -22, y: -4, width: 204, height: 108, fill: `url(#${id})` }]);
-	// No panel behind the shapes: no tile inside the card's tile.
-	for (const forme of formes(f, t)) poser(forme);
-	return svg;
+	svg.appendChild(svgEl("rect", { x: -22, y: -4, width: 204, height: 108, fill: `url(#${id})` }));
+	svg.appendChild(svgEl("circle", { cx: 150, cy: 8, r: 46, fill: t.a, opacity: 0.16 }));
+	svg.appendChild(svgEl("circle", { cx: 6, cy: 98, r: 38, fill: t.c, opacity: 0.22 }));
+	if (!aUnLogo(c)) for (const [tag, attrs] of formes(f, t)) svg.appendChild(svgEl(tag, attrs));
+	racine.appendChild(svg);
+	if (aUnLogo(c)) {
+		const logo = document.createElement("div");
+		logo.className = "qbd-gen-art-logo";
+		peindreIconeCategorie(logo, c);
+		racine.appendChild(logo);
+	}
+	return racine;
 }

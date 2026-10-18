@@ -227,6 +227,13 @@ const TAG_LANGAGE: Partial<Record<CategorieQuiz, string>> = {
    menu draws every subject on each open. */
 const LOGO_MATIERE_SRC = new Map<CategorieQuiz, string>();
 
+/** Does the subject have an image (logo or flag), rather than only a Lucide glyph? */
+export function aUneImageCategorie(c: CategorieQuiz): boolean {
+	if (SUBJECT_LOGOS[c]) return true;
+	if (TAG_LANGAGE[c] && codeLanguageOf(TAG_LANGAGE[c])?.logo) return true;
+	return estLangue(c) && c !== "langues" && !!DRAPEAUX[c as LangueQuiz];
+}
+
 /** Draws a subject's icon in `el`: its colour logo (a programming language's
     official one first), a human language's flag, the code catalogue's logo
     for a language with no colour logo, otherwise its Lucide glyph. */
