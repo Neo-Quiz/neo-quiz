@@ -20,7 +20,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts", "src/code-catalogue.ts", "src/code-logos.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }, { codeLanguageOf, codeLanguageBadgeSrc }, { CODE_LOGOS }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts", "src/code-catalogue.ts", "src/code-logos.ts", "src/dashboard/thinking-label.ts", "src/dashboard/queued-send.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }, { codeLanguageOf, codeLanguageBadgeSrc }, { CODE_LOGOS }, { verbAt, thoughtSummary, thinkingLabel, avantPremierJeton }, { lignesAArreter, premiereEnAttente }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -246,18 +246,27 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("rien d'en cours ou en erreur dans le groupe", groupes[0] ? groupes[0].querySelectorAll(".is-running, .is-error").length : -1, 0);
 	}
 
-	// 12. Thinking: elapsed and tokens shown; the live sheen only while running.
+	// 12. Thinking, as claude.ai: a pulsing dot and a rotating phrase while it runs; never a timer or a token count.
 	{
 		const root = document.createElement("div");
 		renderThread(root, fil([{ kind: "thinking", text: "", tokens: 1240 }], false), deps);
 		r.check("réflexion finie : pas de temps écoulé", root.querySelector(".qbd-work-elapsed"), null);
-		r.check("réflexion : jetons", root.querySelector(".qbd-work-tokens")?.textContent, "~1240 tokens");
-		r.check("réflexion finie : pas de reflet", root.querySelectorAll(".is-live").length, 0);
+		r.check("réflexion : aucun compteur de jetons", root.querySelector(".qbd-work-tokens"), null);
+		r.check("réflexion finie sans texte : « Thought » seul", root.querySelector(".qbd-work-thinking-label")?.textContent, "Thought");
+		r.check("réflexion finie : pas de reflet ni de point", root.querySelectorAll(".is-live,.qbd-pulse-dot").length, 0);
 		const vivant = document.createElement("div");
-		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5 }], true), deps);
+		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5, started: Date.now() - 5000 }], true), deps);
 		r.check("réflexion en cours : reflet", vivant.querySelectorAll(".qbd-work-thinking-label.is-live").length, 1);
+		r.check("réflexion en cours : point qui pulse", vivant.querySelectorAll(".qbd-pulse-dot").length, 1);
+		r.check("réflexion en cours : la phrase suit item.started (5 s -> 2e mot)", vivant.querySelector(".qbd-work-thinking-label")?.textContent, "Reading the documents");
+		r.check("réflexion en cours : ni minuteur ni jetons", vivant.querySelectorAll(".qbd-work-elapsed,.qbd-work-tokens").length, 0);
+		r.check("réflexion en cours : pas de chevron sans texte", vivant.querySelectorAll(".qbd-work-chevron").length, 0);
 		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5 }], false), deps);
 		r.check("réflexion arrêtée : reflet retiré", vivant.querySelectorAll(".is-live").length, 0);
+		const texte = document.createElement("div");
+		renderThread(texte, fil([{ kind: "thinking", text: "Weighing the options. Then more detail follows here." }], false), deps);
+		r.check("réflexion finie avec texte : résumé gris", texte.querySelector(".qbd-work-thinking-label")?.textContent, "Weighing the options.");
+		r.check("réflexion finie avec texte : repliée sous un chevron", [texte.querySelectorAll(".qbd-work-chevron").length, texte.querySelector(".qbd-work-body")?.hidden], [1, true]);
 	}
 
 	// 13. Keyboard: an expandable row is a button; Enter opens it.
@@ -480,16 +489,29 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("groupe réussi : pastille verte", groupe.querySelector(".qbd-work-group-head .qbd-work-dot")?.classList.contains("is-ok"), true);
 	}
 
-	// 20. A finished thinking row says how long it thought, or just "Thought"; never "0:00".
+	// 20. Pure labels: rotation, summary, the dot before the first token, queued "Send now".
 	{
-		const root = document.createElement("div");
-		renderThread(root, fil([{ kind: "thinking", text: "", started: 0, ended: 12000 }], false), deps);
-		r.check("réflexion finie avec durée : « Thought for 0:12 »", root.querySelector(".qbd-work-thinking-label")?.textContent, "Thought for 0:12");
-		r.check("réflexion finie : pas de compteur", root.querySelector(".qbd-work-elapsed"), null);
-		const sansDuree = document.createElement("div");
-		renderThread(sansDuree, fil([{ kind: "thinking", text: "", tokens: 222 }], false), deps);
-		r.check("réflexion finie sans durée : « Thought »", sansDuree.querySelector(".qbd-work-thinking-label")?.textContent, "Thought");
-		r.check("réflexion finie : jetons gardés", sansDuree.querySelector(".qbd-work-tokens")?.textContent, "~222 tokens");
+		const mots = "A|B|C";
+		r.check("phrase : 0 s", verbAt(mots, 0), "A");
+		r.check("phrase : 4 s", verbAt(mots, 4000), "B");
+		r.check("phrase : reboucle", verbAt(mots, 12000), "A");
+		r.check("phrase : liste vide", verbAt("", 5000), "");
+		r.check("résumé : première phrase", thoughtSummary("**Plan.** Then more."), "Plan.");
+		r.check("résumé : coupé à 100 caractères", thoughtSummary("x".repeat(300)).length, 100);
+		r.check("résumé : vide", thoughtSummary("  "), "");
+		r.check("étiquette finie sans texte", thinkingLabel({ live: false, text: "", verbs: mots, elapsedMs: 0, fallback: "Thought" }), "Thought");
+		r.check("étiquette en cours", thinkingLabel({ live: true, text: "ignored", verbs: mots, elapsedMs: 4100, fallback: "Thinking" }), "B");
+		const vide = { text: "", thinking: "", thinkingTokens: 0, tools: [] };
+		r.check("point : préparation sans rien", avantPremierJeton("preparation", vide), true);
+		r.check("point : pas de transcript", avantPremierJeton("preparation", null), true);
+		r.check("point : premier jeton reçu", avantPremierJeton("preparation", { ...vide, thinking: "x" }), false);
+		r.check("point : étape de lecture garde ses mots", avantPremierJeton("lecture", vide), false);
+		const file = [{ id: 1, etat: "cours" }, { id: 2, etat: "attente" }, { id: 3, etat: "attente" }];
+		r.check("envoyer maintenant : arrête la ligne en cours", lignesAArreter(file, 2), [1]);
+		r.check("envoyer maintenant : rien à arrêter", lignesAArreter([{ id: 2, etat: "attente" }], 2), []);
+		r.check("envoyer maintenant : ligne non en attente", lignesAArreter(file, 1), []);
+		r.check("Ctrl+Entrée : la plus ancienne en attente", premiereEnAttente(file), 2);
+		r.check("Ctrl+Entrée : rien ne tourne", premiereEnAttente([{ id: 2, etat: "attente" }]), null);
 	}
 
 	// 21. Claude Code's Update view: a Write is a file preview (numbers, no marker, no add class);
@@ -661,6 +683,13 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		}
 
 	}
+
+	/* The repaint of the thread keeps the live transcript blocks attached: they
+	   are MOVED into the new tour (`moveBefore`) and the old paint goes only once
+	   the new one stands. A detached block loses hover and the pressed state and
+	   restarts its shine: the run header blinked and swallowed clicks (2026-10-18). */
+	const vue = readFileSync(new URL("../src/dashboard/file-generation-vue.ts", import.meta.url), "utf8");
+	r.check("repaint moves transcript blocks, never detaches them", /moveBefore!\(ancien, null\)/.test(vue) && !/zone\.replaceChildren\(\)/.test(vue) && /for \(const n of anciens\) n\.remove\(\)/.test(vue), true);
 
 	r.done();
 });

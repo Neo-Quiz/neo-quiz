@@ -268,7 +268,7 @@ export function peindreProgressionDistante(parent: HTMLElement, entry: RunningEn
 	const p = entry.progress;
 	/* Before the first question, the PC's model is reasoning: its size says it
 	   is at work (2026-10-08), where "Question 0" said nothing. */
-	if (p.question === 0 && p.thinking) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.thinking", { count: compterJetons(p.thinking) }));
+	if (p.question === 0 && p.thinking) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.thinking"));
 	else ajouter(corps, "span", "qbd-ai-reponse-texte", p.total ? t("ai.remote.progress", { n: p.question, total: p.total }) : t("ai.remote.progressNoTotal", { n: p.question }));
 	if (p.quiz !== undefined && p.quizTotal !== undefined) ajouter(corps, "span", "qbd-ai-reponse-texte", t("ai.remote.quiz", { n: p.quiz, total: p.quizTotal }));
 }

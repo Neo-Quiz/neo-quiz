@@ -1314,10 +1314,10 @@
 	inset: 0;
 	background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text-normal) 7.5%, transparent), transparent);
 	transform: translateX(-100%);
-	animation: qbd-ai-reflet 2s linear infinite;
+	animation: qbd-ai-voile-reflet 2s linear infinite;
 }
 
-@keyframes qbd-ai-reflet {
+@keyframes qbd-ai-voile-reflet {
 	0% { transform: translateX(-100%); }
 	100% { transform: translateX(100%); }
 }

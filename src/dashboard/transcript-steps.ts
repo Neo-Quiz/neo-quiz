@@ -10,7 +10,6 @@
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
-import { compterJetons } from "./chat-record-vue";
 import { resumeTravail } from "./transcript";
 import type { ToolStep, Transcript } from "./transcript";
 
@@ -110,7 +109,7 @@ export function creerBlocTravail(): BlocTravail {
 		} else if (tr.thinkingTokens > 0) {
 			// PRIVATE reasoning (its size only): a click says why there is no text.
 			specs.push({
-				cle: "thinking", icone: "brain", libelle: t(vivant && !tr.text ? "ai.transcript.privateThinkingLive" : "ai.transcript.privateThought", { count: compterJetons(tr.thinkingTokens) }),
+				cle: "thinking", icone: "brain", libelle: t(vivant && !tr.text ? "ai.transcript.privateThinkingLive" : "ai.transcript.privateThought"),
 				detail: corps => {
 					const d = (corps.firstElementChild as HTMLElement | null) ?? ajouter(corps, "div", "qbd-ai-transcript-reflexion");
 					const v = t("ai.transcript.privateThinkingNote");

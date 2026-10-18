@@ -270,6 +270,28 @@
 	to   { background-position: -150% 0; }
 }
 
+/* The small solid dot that pulses where the answer will appear, as claude.ai
+   draws it before the first token and while the model thinks (2026-10-18). It
+   only exists while something is pending, and carries no text. */
+.qbd-pulse-dot {
+	display: inline-block;
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	animation: qbd-pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes qbd-pulse-dot {
+	0%, 100% { transform: scale(0.8); opacity: 0.55; }
+	50% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-pulse-dot { animation: none; }
+}
+
 .qbd-ai-file-temps {
 	font-variant-numeric: tabular-nums;
 	font-size: 13px;
@@ -341,8 +363,8 @@
 	gap: 14px;
 	width: min(460px, 100%);
 	box-sizing: border-box;
-	padding: 14px 16px 14px 18px;
-	border-radius: 14px;
+	padding: 10px 16px 10px 10px;
+	border-radius: 16px;
 	border: 1px solid var(--qbd-glass-edge, var(--background-modifier-border));
 	background: var(--qbd-glass-bg, var(--background-secondary));
 	backdrop-filter: var(--qbd-glass-blur, none);
@@ -354,16 +376,10 @@
 	transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Le filet de gauche, à la couleur du dossier. */
-.qbd-ai-resultat::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 14px;
-	bottom: 14px;
-	width: 3px;
-	border-radius: 0 3px 3px 0;
-	background: var(--qbd-folder, var(--interactive-accent));
+.qbd-ai-resultat:active {
+	transform: translateY(0) scale(0.985);
+	box-shadow: none;
+	transition-duration: 0.08s;
 }
 
 .qbd-ai-resultat:hover {
@@ -381,22 +397,43 @@
 	cursor: default;
 }
 
+.qbd-ai-resultat--inerte .qbd-ai-resultat-icone {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	color: var(--text-muted);
+}
+
+.qbd-ai-resultat--inerte .qbd-ai-resultat-icone svg {
+	width: 22px;
+	height: 22px;
+}
+
 .qbd-ai-resultat--inerte:hover {
 	transform: none;
 	box-shadow: none;
 }
 
+/* The subject's tile (topic-art.ts) : its illustration on its ground colour. */
 .qbd-ai-resultat-icone {
-	display: inline-grid;
-	place-items: center;
+	display: block;
 	flex-shrink: 0;
-	width: 34px;
-	color: var(--qbd-folder, var(--interactive-accent));
+	width: 56px;
+	height: 56px;
+	overflow: hidden;
+	border-radius: 11px;
 }
 
 .qbd-ai-resultat-icone svg {
-	width: 22px;
-	height: 22px;
+	display: block;
+	width: 100%;
+	height: 100%;
+	transition: transform 0.3s ease-out;
+}
+
+.qbd-ai-resultat:hover .qbd-ai-resultat-icone svg {
+	transform: scale(1.08);
 }
 
 .qbd-ai-resultat-corps {
@@ -435,10 +472,20 @@
 	white-space: nowrap;
 	font-size: 14px;
 	font-weight: 600;
+	line-height: 16px;
 	color: var(--interactive-accent);
 }
 
+/* The label and the arrow's box share one 16 px line box, so the arrow sits
+   on the text's centre line instead of the baseline of an inline wrapper. */
+.qbd-ai-resultat-go > span {
+	display: inline-flex;
+	align-items: center;
+	height: 16px;
+}
+
 .qbd-ai-resultat-go svg {
+	display: block;
 	width: 16px;
 	height: 16px;
 	transition: transform 0.2s ease;
@@ -450,15 +497,18 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-ai-resultat,
-	.qbd-ai-resultat-go svg {
+	.qbd-ai-resultat-go svg,
+	.qbd-ai-resultat-icone svg {
 		transition: none;
 	}
 
-	.qbd-ai-resultat:hover {
+	.qbd-ai-resultat:hover,
+	.qbd-ai-resultat:active {
 		transform: none;
 	}
 
-	.qbd-ai-resultat:hover .qbd-ai-resultat-go svg {
+	.qbd-ai-resultat:hover .qbd-ai-resultat-go svg,
+	.qbd-ai-resultat:hover .qbd-ai-resultat-icone svg {
 		transform: none;
 	}
 }
@@ -660,6 +710,56 @@
 	align-items: center;
 	gap: 4px;
 	margin-top: -2px;
+}
+
+/* The quiz cards of an answer stack, with the retry action under them. */
+.qbd-ai-reponse--prete {
+	flex-wrap: wrap;
+}
+
+.qbd-ai-reponse--prete > .qbd-ai-chat-pied {
+	flex-basis: 100%;
+	margin-top: 0;
+}
+
+/* "Send now" of a message queued behind a running answer: a grey line under
+   its bubble, as claude.ai draws it, with the shortcut beside the words. */
+.qbd-ai-envoyer-maintenant {
+	all: unset;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 10px;
+	border-radius: 8px;
+	font-size: 13px;
+	line-height: 20px;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: color 120ms ease, background-color 120ms ease;
+}
+
+.qbd-ai-envoyer-maintenant:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.qbd-ai-envoyer-maintenant:active {
+	background: var(--background-modifier-border);
+}
+
+.qbd-ai-envoyer-maintenant:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+.qbd-ai-envoyer-touche {
+	font: inherit;
+	font-size: 12px;
+	color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-envoyer-maintenant { transition: none; }
 }
 
 /* Code in a chat answer keeps a code line height: the prose's 1.7 spread

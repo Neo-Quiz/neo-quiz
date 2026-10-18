@@ -51,6 +51,8 @@ import { modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./tran
 import { splitCardEdit } from "../explain-edit";
 import { explainMarkOf } from "./explain-chat";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
+import { avantPremierJeton, verbAt } from "./thinking-label";
+import { lignesAArreter, premiereEnAttente } from "./queued-send";
 import type { LiveTurnView } from "./live-generation";
 import { mathifyElement } from "../engine/mathjax";
 import { poserProseAvecCadres } from "./prose-frames";
@@ -70,14 +72,11 @@ function duree(ms: number): string {
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** How long each word of the working line stays (`ai.queue.verbs`). */
-const MOT_MS = 4000;
 
 /** The rotating word of the working line: it follows the elapsed time, so
     every repaint and the clock's tick agree on it without any state. */
 function verbeCourant(ecoule: number): string {
-	const mots = t("ai.queue.verbs").split("|").map(m => m.trim()).filter(Boolean);
-	return mots.length ? mots[Math.floor(Math.max(0, ecoule) / MOT_MS) % mots.length] : "";
+	return verbAt(t("ai.queue.verbs"), ecoule);
 }
 
 /** "Opus 5.5 · Weighing the options…" (a line with no transcript to show). */
@@ -153,7 +152,6 @@ function texteActivite(tr: Transcript | null | undefined): string {
 	   the reasoning's size moves to the transcript's own line. */
 	const parts: string[] = [];
 	if (tr.inputTokens > 0) parts.push(t("ai.queue.inputTokens", { count: compterJetons(tr.inputTokens) }));
-	if (!tr.text && !tr.thinking && tr.thinkingTokens > 0) parts.push(t("ai.queue.thinkingTokens", { count: compterJetons(tr.thinkingTokens) }));
 	return parts.join(" · ");
 }
 
@@ -232,9 +230,26 @@ export function creerVueFile(opts: {
 		desabonnerChats = null;
 		desabonnerDistant?.();
 		desabonnerDistant = null;
+		document.removeEventListener("keydown", surToucheEnvoi, true);
 		if (relecture !== null) { window.clearInterval(relecture); relecture = null; }
 		arreterHorloge();
 		zone = null;
+	}
+
+	/** "Send now": stops the answers running before this queued line; the queue
+	    then starts it on its own (the same stop as the composer's). */
+	function envoyerMaintenant(id: number): void {
+		for (const s of lignesAArreter(opts.file.lignes(), id)) opts.file.annuler(s);
+	}
+
+	/** Ctrl+Enter (Cmd+Enter): "Send now" for the oldest queued message that waits behind a run. */
+	function surToucheEnvoi(e: KeyboardEvent): void {
+		if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.defaultPrevented) return;
+		const id = premiereEnAttente(opts.file.lignes());
+		if (id === null) return;
+		e.preventDefault();
+		e.stopPropagation();
+		envoyerMaintenant(id);
 	}
 
 	/** Un bouton-icône, nommé pour le lecteur d'écran. */
@@ -319,6 +334,9 @@ export function creerVueFile(opts: {
 		if (texte.includes("$")) void mathifyElement(prose);
 	}
 
+	/** Id of the last live line of the chat on screen (-1: none), set by each paint. */
+	let derniereLigneId = -1;
+
 	function peindreReponseProse(parent: HTMLElement, l: LigneGeneration): void {
 		const rep = ajouter(parent, "div", "qbd-ai-chat-reponse");
 		const tete = ajouter(rep, "div", "qbd-ai-chat-tete");
@@ -341,6 +359,8 @@ export function creerVueFile(opts: {
 					void opts.copier?.(texte).then(ok => host.ui.notice(t(ok ? "ai.chat.copied" : "ai.chat.copyFailed")));
 				});
 			}
+			// Retry: the same request again, on the last answer only (as claude.ai).
+			if (l.id === derniereLigneId) boutonIcone(pied, "rotate-cw", t("ai.chat.retry"), () => relancer(l));
 		}
 	}
 
@@ -367,11 +387,21 @@ export function creerVueFile(opts: {
 			   their own words; the model's own work is named after the model. */
 			const providerId = l.demande.reglages.aiProvider || "";
 			const fournisseur = providerId ? aiProviders.getProvider(providerId) : null;
+			const etape = l.etat === "enregistrement" ? "enregistrement" : (opts.file.etape(l.id) ?? "preparation");
+			/* BEFORE THE FIRST TOKEN (claude.ai): only a small pulsing dot, its
+			   words kept as the accessible label. The provider's logo comes with
+			   the first sign of work; real steps (reading, saving) keep their words. */
+			if (avantPremierJeton(etape, opts.file.transcript(l.id))) {
+				rep.classList.add("qbd-ai-reponse--point");
+				const point = ajouter(rep, "span", "qbd-pulse-dot");
+				point.setAttribute("role", "img");
+				point.setAttribute("aria-label", t(TEXTE_ETAPE[etape]));
+				return;
+			}
 			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
 			logo.setAttribute("aria-hidden", "true");
 			if (fournisseur) aiProviders.setBrandLogo(ajouter(logo, "span", "qbd-provider-logo qbd-provider-logo--" + fournisseur.logo), fournisseur.logo);
 			else host.ui.setIcon(logo, "sparkles");
-			const etape = l.etat === "enregistrement" ? "enregistrement" : (opts.file.etape(l.id) ?? "preparation");
 			const idModele = l.demande.reglages.aiModel || fournisseur?.defaultModel || "";
 			const nomModele = fournisseur ? (idModele ? aiProviders.libelleModele(providerId, idModele) : fournisseur.name) : "";
 			const debut = l.debut ?? Date.now();
@@ -398,6 +428,20 @@ export function creerVueFile(opts: {
 			return;
 		}
 		if (l.etat === "attente") {
+			/* Sent while an answer runs (claude.ai): the request is the user's
+			   bubble above; here, a grey "Send now" that stops the running answer
+			   and lets this one start, with its shortcut. With nothing to stop
+			   (the line just waits its turn) the plain waiting line stays. */
+			if (lignesAArreter(opts.file.lignes(), l.id).length > 0) {
+				rep.classList.add("qbd-ai-reponse--envoi");
+				const b = ajouter(rep, "button", "qbd-ai-envoyer-maintenant");
+				b.type = "button";
+				ajouter(b, "span", undefined, t("ai.queue.sendNow"));
+				ajouter(b, "kbd", "qbd-ai-envoyer-touche", t("ai.queue.sendNowKey"));
+				b.addEventListener("click", () => envoyerMaintenant(l.id));
+				boutonIcone(ajouter(rep, "span", "qbd-ai-reponse-fin"), "x", t("ai.queue.cancel"), () => opts.file.annuler(l.id));
+				return;
+			}
 			host.ui.setIcon(ajouter(rep, "span", "qbd-ai-reponse-icone"), "clock");
 			ajouter(rep, "span", "qbd-ai-reponse-texte", t("ai.queue.waiting"));
 			boutonIcone(ajouter(rep, "span", "qbd-ai-reponse-fin"), "square", t("ai.queue.cancel"), () => opts.file.annuler(l.id));
@@ -435,6 +479,7 @@ export function creerVueFile(opts: {
 			   Open; the close button sits on the last one. */
 			const quiz = r.quiz && r.quiz.length > 0 ? r.quiz : [{ titre: r.titre, chemin: r.chemin, questions: r.questions ?? 0, readings: r.readings ?? 0, mode: r.mode }];
 			for (const q of quiz) peindreCarteQuiz(rep, { titre: q.titre, chemin: q.chemin, comptes: { questions: q.questions, readings: q.readings ?? 0 }, mode: q.mode }, () => opts.ouvrir(q.chemin), opts.dossierDe);
+			if (l.id === derniereLigneId) boutonIcone(ajouter(rep, "div", "qbd-ai-chat-pied"), "rotate-cw", t("ai.chat.retry"), () => relancer(l));
 			return;
 		}
 		if (l.etat === "echouee") {
@@ -650,12 +695,10 @@ export function creerVueFile(opts: {
 			const ecrit = !!texte;
 			/* PRIVATE reasoning (Claude Code with Opus 5.5 sends its size, not
 			   its text): one line with the size, and a click says why there is
-			   no text. While the model still only thinks, the working line
-			   above shows the same count, live. */
+			   no text (no size shown, as on claude.ai). */
 			if (!tr.thinking && tr.thinkingTokens > 0 && (ecrit || !vivant)) {
-				const count = compterJetons(tr.thinkingTokens);
 				specs.push({
-					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.privateThinkingLive" : "ai.transcript.privateThought", { count }), ouvertParDefaut: false,
+					cle: "thinking", icone: "brain", libelle: t(vivant && !ecrit ? "ai.transcript.privateThinkingLive" : "ai.transcript.privateThought"), ouvertParDefaut: false,
 					detail: corps => {
 						const el = (corps.firstElementChild as HTMLElement | null) ?? ajouter(corps, "div", "qbd-ai-transcript-reflexion");
 						const v = t("ai.transcript.privateThinkingNote");
@@ -818,7 +861,8 @@ export function creerVueFile(opts: {
 		const ancien = blocsAReprendre.get(String(l.id));
 		if (ancien) {
 			blocsAReprendre.delete(String(l.id));
-			parent.appendChild(ancien);
+			// `moveBefore` keeps hover, focus and running animations; older engines append.
+			try { (parent as Element & { moveBefore?: (n: Node, c: Node | null) => void }).moveBefore!(ancien, null); } catch { parent.appendChild(ancien); }
 			remplirTranscript(ancien, tr, vivant, l, prose);
 			return;
 		}
@@ -870,13 +914,26 @@ export function creerVueFile(opts: {
 		const enBas = !fil || fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
 		blocsAReprendre.clear();
 		zone.querySelectorAll<HTMLElement>(".qbd-ai-transcript[data-ligne]").forEach(b => { if (b.dataset.ligne) blocsAReprendre.set(b.dataset.ligne, b); });
-		zone.replaceChildren();
+		/* The previous paint stays in place until the new one is complete, so a
+		   transcript block can be MOVED (not detached) into its new tour: a
+		   detached node loses its hover, its pressed state and restarts its CSS
+		   animations, which made the run header blink and swallowed clicks
+		   (2026-10-18). The old nodes go once the new tree stands. */
+		const anciens = Array.from(zone.childNodes);
 		// Always full width (2026-09-30): no chat layout any more.
 		zone.classList.add("qbd-ai-file--full");
 		const { id: chatId, record } = opts.chat();
 		const remote = getRemoteGenerations();
 		const items = threadItems(record, opts.file.lignes(), chatId, remote, Date.now(), getOwnRequests());
 		const explainChat = !!explainMarkOf(record, opts.file.lignes(), chatId);
+		// The last live answer of the chat, the one that offers "Retry".
+		derniereLigneId = -1;
+		for (let i = items.length - 1; i >= 0 && derniereLigneId < 0; i--) {
+			const it = items[i];
+			if (it.kind !== "live") continue;
+			const vues = it.lines.filter(x => x.etat !== "arret");
+			if (vues.length) derniereLigneId = vues[vues.length - 1].id;
+		}
 		for (const item of items) {
 			if (item.kind === "pending") { peindreEnAttente(zone, item, pcReachable(item.target, remote, Date.now(), getPeerConnected()), opts.ouvrirPiece); continue; }
 			if (item.kind === "remote") { peindreProgressionDistante(zone, item.entry, item.stale, item.device); continue; }
@@ -913,19 +970,30 @@ export function creerVueFile(opts: {
 			if (attente.documents.length) peindrePieces(ajouter(message, "div", "qbd-ai-message-pieces"), attente.documents, opts.ouvrirPiece);
 			if (attente.text.trim()) ajouter(message, "div", "qbd-ai-bulle", attente.text.trim());
 			const rep = ajouter(tour, "div", "qbd-ai-reponse qbd-ai-reponse--cours");
-			const logo = ajouter(rep, "span", "qbd-ai-logo-travail");
-			logo.setAttribute("aria-hidden", "true");
-			host.ui.setIcon(logo, "sparkles");
-			ajouter(rep, "span", "qbd-ai-reponse-etape", t("ai.clarify.deciding"));
+			rep.classList.add("qbd-ai-reponse--point");
+			const point = ajouter(rep, "span", "qbd-pulse-dot");
+			point.setAttribute("role", "img");
+			point.setAttribute("aria-label", t("ai.clarify.deciding"));
 		}
 		const relais = opts.relais?.() ?? null;
 		if (relais) peindreRelais(zone, relais, opts.ouvrirPiece);
+		for (const n of anciens) n.remove();
+		/* A rebuilt label restarts its shine from zero: pin the phase to the wall
+		   clock so every repaint continues the same sweep (no visible blink). */
+		const phase = `-${Date.now() % 2200}ms`;
+		zone.querySelectorAll<HTMLElement>(".qbd-ai-reponse-etape, .qbd-ai-transcript-chrono").forEach(el => { if (!el.style.animationDelay) el.style.animationDelay = phase; });
 		/* A NEW item is read from the key of the last one, not from the count: a
 		   reply closed while a request goes out leaves the count unchanged. */
 		const dernier = relais ? "relais" : attente ? "waiting" : items.length ? items[items.length - 1].key : "";
 		const nouveau = dernier !== dernierPeint;
+		const premierRendu = dernierPeint === "";
 		dernierPeint = dernier;
-		if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
+		/* A NEW message goes to the TOP of the view (claude.ai), its bubble first
+		   and the answer filling the space under it; opening a chat, or following
+		   an answer already at the bottom, stays at the bottom. */
+		const bulleNeuve = !premierRendu && nouveau ? Array.from(zone.querySelectorAll<HTMLElement>(":scope > .qbd-ai-tour")).pop() ?? null : null;
+		if (bulleNeuve) bulleNeuve.scrollIntoView({ block: "start" });
+		else if (fil && (enBas || nouveau)) fil.scrollTop = fil.scrollHeight;
 		const visibles = items.flatMap(i => (i.kind === "live" ? i.lines.filter(l => l.etat !== "arret") : []));
 		const enCours = visibles.some(l => l.etat === "cours");
 		travaille = enCours;
@@ -979,6 +1047,7 @@ export function creerVueFile(opts: {
 			zone.setAttribute("role", "list");
 			zone.setAttribute("aria-label", t("ai.queue.label"));
 			zone.setAttribute("aria-live", "polite");
+			document.addEventListener("keydown", surToucheEnvoi, true);
 			if (!desabonner) desabonner = opts.file.abonner(peindre, affichee);
 			if (!desabonnerTranscript) desabonnerTranscript = opts.file.abonnerTranscript(surTranscript);
 			if (!desabonnerChats) desabonnerChats = onChatsChanged(peindre);

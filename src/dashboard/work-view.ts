@@ -32,6 +32,7 @@ import { PREVIEW_LINES, type Thread, type ThreadItem } from "./live-thread";
 import { codeLanguageOf, codeLanguageBadgeSrc } from "../code-catalogue";
 import { prettyHtml } from "./pretty-code";
 import { quizProgress } from "./transcript";
+import { thinkingLabel, thoughtSummary, verbAt } from "./thinking-label";
 
 refractor.register(bash);
 refractor.register(powershell);
@@ -194,41 +195,33 @@ function textBlock(className: string, text: string): HTMLElement {
 
 function thinkingBlock(item: ThinkingItem, live: boolean, prev: HTMLElement | undefined): HTMLElement {
 	const block = el("div", "qbd-work-item qbd-work-thinking");
-	const label = el("div", "qbd-work-label");
+	const head = el("div", "qbd-work-label qbd-work-thinking-head");
+	/* The phrase follows the time since the thought STARTED (the stream's own
+	   stamp), never the moment this node was built. */
+	const since = item.started ?? (prev && SINCE.has(prev) ? (SINCE.get(prev) as number) : Date.now());
 	if (live) {
-		const since = prev && SINCE.has(prev) ? (SINCE.get(prev) as number) : Date.now();
 		SINCE.set(block, since);
-		label.appendChild(el("span", "qbd-work-thinking-label is-live", t("ai.work.thinking")));
-		label.appendChild(el("span", "qbd-work-sep", " · "));
-		const elapsed = el("span", "qbd-work-elapsed", formatElapsed(Date.now() - since));
-		elapsed.setAttribute("data-since", String(since));
-		label.appendChild(elapsed);
-	} else {
-		label.appendChild(el("span", "qbd-work-thinking-label", thoughtLabel(item)));
+		const dot = el("span", "qbd-pulse-dot");
+		dot.setAttribute("aria-hidden", "true");
+		head.appendChild(dot);
 	}
-	if (item.tokens) {
-		label.appendChild(el("span", "qbd-work-sep", " · "));
-		label.appendChild(el("span", "qbd-work-tokens", t("ai.work.thinkingTokens", { n: item.tokens })));
+	const label = el("span", "qbd-work-thinking-label" + (live ? " is-live" : ""), thinkingLabel({
+		live, text: item.text, verbs: t("ai.queue.verbs"), elapsedMs: Date.now() - since, fallback: t(live ? "ai.work.thinking" : "ai.work.thought"),
+	}));
+	if (live) label.setAttribute("data-since", String(since));
+	head.appendChild(label);
+	block.appendChild(head);
+	const text = item.text.trim();
+	if (text && (live || text !== thoughtSummary(text))) {
+		const body = el("div", "qbd-work-body", item.text);
+		setOpen(block, body, prev ? prev.classList.contains("is-open") : false);
+		expandable(head, block, body);
+		block.appendChild(body);
 	}
-	block.appendChild(label);
-	if (item.text) block.appendChild(el("div", "qbd-work-body", item.text));
 	return block;
 }
 
-/** A finished thinking row: its duration when the stream gave both ends, else "Thought". */
-function thoughtLabel(item: ThinkingItem): string {
-	if (item.started !== undefined && item.ended !== undefined && item.ended - item.started >= 1000) {
-		return t("ai.work.thoughtFor", { time: formatElapsed(item.ended - item.started) });
-	}
-	return t("ai.work.thought");
-}
-
-function formatElapsed(ms: number): string {
-	const s = Math.max(0, Math.floor(ms / 1000));
-	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** Refreshes the elapsed counter of a live thinking row once a second; the
+/** Refreshes the rotating phrase of a live thinking row once a second; the
     timer stops when the thread is no longer running or its root is detached. */
 function syncTicker(root: HTMLElement, live: boolean): void {
 	const timer = TICKERS.get(root);
@@ -248,9 +241,11 @@ function tick(root: HTMLElement, id: ReturnType<typeof setInterval>): void {
 		return;
 	}
 	const now = Date.now();
-	root.querySelectorAll(".qbd-work-elapsed").forEach(node => {
+	root.querySelectorAll(".qbd-work-thinking-label.is-live").forEach(node => {
 		const since = Number(node.getAttribute("data-since"));
-		if (Number.isFinite(since)) node.textContent = formatElapsed(now - since);
+		if (!Number.isFinite(since)) return;
+		const word = verbAt(t("ai.queue.verbs"), now - since);
+		if (word && node.textContent !== word) node.textContent = word;
 	});
 }
 

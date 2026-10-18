@@ -23,7 +23,7 @@ const KNOWN = {
 	"quiz-code-run-spin": "transient", // a running code block
 	"quiz-command-caret-blink": "transient", // the caret of a terminal block
 	"qbd-effort-rainbow": "transient", // Generate page
-	"qbd-ai-logo-travail": "transient", "qbd-ai-reflet": "transient", "qbd-ai-plan-tourne": "transient", "qbd-ai-plan-respire": "transient",
+	"qbd-ai-logo-travail": "transient", "qbd-ai-reflet": "transient", "qbd-ai-voile-reflet": "transient", "qbd-pulse-dot": "transient", "qbd-ai-plan-tourne": "transient", "qbd-ai-plan-respire": "transient",
 	"qbd-ai-nudge-float": "transient", "qbd-install-spin": "transient", "qbd-video-install-balayage": "transient",
 	"qbd-web-sonar": "transient", "qbd-glide": "transient", "qbd-usage-spin": "transient", // Generate page and its installers
 	"qbd-work-shimmer": "transient", "qbd-work-spin": "transient", "qbd-work-pulse": "transient", // live AI work view: only while a turn runs

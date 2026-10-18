@@ -31,10 +31,12 @@ release notes.
 - Generated quizzes gallery: each card shows the subject's colour logo large on a tinted gradient with a dotted pattern, General has its own illustration, every quiz shows a subject (General by default) and a new quiz stores the AI-picked subject in its note.
 - Folding and unfolding a model group in the usage popover now animates: smooth height, fading content, turning chevron, and the bars fill from zero.
 - The usage popover folds the model groups you are not using (click a title to unfold), the line under the composer shows the group title on its own line, and both follow a model change at once.
+- The AI chat follows claude.ai: a pulsing dot before the first token, a rotating phrase while the model thinks and a grey one-line summary once done, a queued message with "Send now", the new message scrolled to the top, "Retry", and a result card with the quiz subject tile that opens the quiz.
 
 ### Fixed
 
 - Sync no longer stays stopped after Syncthing exits twice: it is relaunched with growing delays (2 s, 5 s, 15 s, 1 min, then every 5 min) for as long as sync is on, and meanwhile the Sync page keeps your devices listed as not connected instead of showing sync as off. On Android a launch that fails is retried the same way, a network change or opening the app retries at once, the pinned listen port is checked before Syncthing starts (it was tested after, so the app's own listener made every restart fall back to a random port), and Syncthing's output is kept in a bounded private log shown by the Sync page's log dialog when Syncthing is not answering.
+- The running header of an AI answer no longer blinks and can be clicked or hovered while it updates: a repaint of the conversation kept replacing its nodes, which dropped the hover and press and restarted its shine.
 
 ## [1.21.14] - 2026-10-17
 
