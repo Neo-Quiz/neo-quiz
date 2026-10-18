@@ -177,6 +177,20 @@ const pont: Pont = {
 		relancer: () => appeler("systeme.relancer"),
 	},
 
+	/* The in-app bug report. Kotlin holds the relay URL, the Client ID and the GitHub token (Keystore);
+	   the page only learns a login. */
+	signalement: {
+		apercu: () => appeler("signalement.apercu"),
+		envoyer: (rapport) => appeler("signalement.envoyer", [rapport]),
+		github: {
+			connecter: () => appeler("signalement.github.connecter"),
+			attendre: () => appeler("signalement.github.attendre"),
+			annuler: () => appeler<void>("signalement.github.annuler"),
+			etat: () => appeler("signalement.github.etat"),
+			deconnecter: () => appeler<void>("signalement.github.deconnecter"),
+		},
+	},
+
 	reseau: {
 		fetch: (req, requeteId) => appeler("reseau.fetch", [req, requeteId]),
 		annuler: (requeteId) => appeler("reseau.annuler", [requeteId]),

@@ -26,6 +26,10 @@ import { chargerLangue, lireLangue, reglerLangue } from "./langue";
 import { lireFormatHeure, reglerFormatHeure } from "./format-heure";
 import { pont } from "../host/pont";
 import { monterLigneMajAndroid } from "./mise-a-jour";
+import { openBugReportModal } from "./bug-report-modal";
+import { urlSignalement } from "./menu-app-arbre";
+import { bugReportConfigured } from "../../../../src/bug-report-config";
+import application from "../../package.json";
 import { createSelect } from "../../../../src/dashboard/ui-select";
 import { getProvider, MARQUES, resoudreApresMasquage } from "../../../../src/dashboard/ai-providers";
 import type { AiSettingsHost } from "../../../../src/dashboard/ai-settings-host";
@@ -385,6 +389,15 @@ export function renderSettings(
 		const controle = row(general, t("app.update.android.row"), " ");
 		const aide = controle.parentElement!.querySelector<HTMLElement>(".nq-set-ligne-aide")!;
 		demonterMajAndroid = monterLigneMajAndroid(controle, aide);
+		/* The in-app bug report, only once the relay is configured; the form's fallback (and the
+		   whole row's absence before that) is today's prefilled GitHub issue, opened by the system. */
+		if (bugReportConfigured() && pont().signalement) {
+			const signaler = ajouter(row(general, t("app.menu.reportBug")), "button", "nq-reglages-changer", t("bugReport.title"));
+			signaler.type = "button";
+			signaler.addEventListener("click", () => {
+				openBugReportModal({ fallbackUrl: () => urlSignalement(application.version, navigator.userAgent) });
+			});
+		}
 	}
 
 	/* ═══ AI ═══ */

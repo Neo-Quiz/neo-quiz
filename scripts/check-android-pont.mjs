@@ -208,6 +208,19 @@ function main() {
 	if (!ktFrameHtml.includes('const val MIME = "text/html"') || !ktFrameHtml.includes('return "$stem.html"')) fail("Kotlin frame HTML save does not force .html / text/html");
 	if (!/FRAME_HTML_MAX_BYTES = FRAME_MAX_BYTES;/.test(read("apps/windows/electron/frame-export.ts"))) fail("frame-export.ts cap is not the frame page cap");
 
+	// Bug report constants: the page is untrusted, so Kotlin holds its own copies of the relay URL and the Client ID.
+	const cfgTs = read("src/bug-report-config.ts");
+	const cfgKt = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/SignalementRules.kt");
+	for (const [tsName, ktName] of [["BUG_RELAY_URL", "RELAY_URL"], ["GITHUB_APP_CLIENT_ID", "GITHUB_CLIENT_ID"]]) {
+		const ts = new RegExp(`export const ${tsName} = "([^"]*)";`).exec(cfgTs)?.[1];
+		const kt = new RegExp(`const val ${ktName} = "([^"]*)"`).exec(cfgKt)?.[1];
+		if (ts === undefined || kt === undefined) fail(`bug report constant ${tsName} / ${ktName} not found (parser broken?)`);
+		else if (ts !== kt) fail(`bug report constant differs: TS ${tsName} = "${ts}" / Kotlin ${ktName} = "${kt}"`);
+	}
+	const bugKtMax = /const val BODY_MAX_BYTES = (\d+)/.exec(cfgKt)?.[1];
+	const bugTsMax = /body: (\d+)/.exec(read("src/bug-report.ts"))?.[1];
+	if (!bugKtMax || bugKtMax !== bugTsMax) fail(`bug report body cap differs: TS ${bugTsMax} / Kotlin ${bugKtMax}`);
+
 	console.log(`check:android-pont  channels sent ${sent.size}, listed ${listed.size}, Pont leaves ${pontLeaves.size}, shim leaves ${shimLeaves.size}, executable extensions ${windows.size}`);
 }
 
