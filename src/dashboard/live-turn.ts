@@ -13,7 +13,8 @@
  * so a live run and a one-shot run are summed up alike.
  */
 import type { Thread } from "./live-thread";
-import { resumeEntree, transcriptVide } from "./transcript";
+import { claudeResultChained, foldClaudeChain, newClaudeChain, resumeEntree, transcriptVide } from "./transcript";
+import type { ClaudeChain } from "./transcript";
 import type { ToolStep, Transcript } from "./transcript";
 
 type Rec = Record<string, unknown>;
@@ -30,10 +31,12 @@ export interface TurnOutcome {
 	codexText: string;
 	/** A Codex error said in the turn (`error` notification, failed turn). */
 	codexError: string | null;
+	/** The messages of a Claude answer cut by the output limit (`foldClaudeChain`). */
+	chain: ClaudeChain;
 }
 
 export function emptyOutcome(): TurnOutcome {
-	return { ended: false, claudeResult: null, codexText: "", codexError: null };
+	return { ended: false, claudeResult: null, codexText: "", codexError: null, chain: newClaudeChain() };
 }
 
 /** Folds one CLI line (received) into the outcome of its turn. */
@@ -47,10 +50,11 @@ export function collectLine(o: TurnOutcome, line: unknown): TurnOutcome {
 		return o;
 	}
 	if (line.type === "result") {
-		o.claudeResult = line;
+		o.claudeResult = claudeResultChained(o.chain, line);
 		o.ended = true;
 		return o;
 	}
+	foldClaudeChain(o.chain, line);
 	const params = isRec(line.params) ? line.params : {};
 	switch (line.method) {
 		case "item/completed": {

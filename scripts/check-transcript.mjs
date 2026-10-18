@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere, modeleDeRepli }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, newClaudeChain, foldClaudeChain, claudeResultChained, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere, modeleDeRepli }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -270,5 +270,24 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 		]);
 	r.check("agy: a repeated ACTIVE line opens its step once; garbage and non-JSON lines give nothing",
 		createTranscriptDecoder("agy")(agyLignes.split("\n")[2] + "\n" + agyLignes.split("\n")[2] + "\nnot json\n{\"event\":42}\n").length, 1);
+
+	/* A MESSAGE CUT BY THE OUTPUT LIMIT (2026-10-18): the result carries only the
+	   last message, which began mid-string; the answer is every message from the
+	   cut one on. Measured stream order: the whole message line, then the
+	   message_delta saying max_tokens. */
+	const msg = text => ({ type: "assistant", message: { content: [{ type: "text", text }] } });
+	const delta = stop => ({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: stop } } });
+	const cutDelta = delta("max_tokens");
+	const endDelta = delta("end_turn");
+	const ndjson = lines => lines.map(l => JSON.stringify(l)).join("\n");
+	const joined = ndjson([msg("Hello, "), msg("[ { title: 'A', prompt: 'very lo"), cutDelta, msg("ng text' } ]"), endDelta, { type: "result", result: "ng text' } ]", usage: { output_tokens: 7 } }]);
+	const res = claudeResultDuFlux(joined);
+	r.check("cut message: the result text is the whole chain from the cut message on (the head is not lost)", res?.result, "[ { title: 'A', prompt: 'very long text' } ]");
+	r.check("cut message: the other fields of the result are kept", res?.usage, { output_tokens: 7 });
+	r.check("no cut: the result is the CLI one, untouched", claudeResultDuFlux(ndjson([msg("intro"), endDelta, { type: "result", result: "final" }]))?.result, "final");
+	r.check("cut message with an error result: the error text is kept", claudeResultDuFlux(ndjson([msg("a"), cutDelta, msg("b"), { type: "result", result: "boom", is_error: true }]))?.result, "boom");
+	const chain2 = newClaudeChain();
+	[msg("one"), cutDelta, cutDelta, msg("two")].forEach(l => foldClaudeChain(chain2, l));
+	r.check("a second cut does not start the chain again", claudeResultChained(chain2, { type: "result", result: "two" })?.result, "onetwo");
 	r.done();
 });

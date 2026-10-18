@@ -546,6 +546,53 @@ export function createTranscriptDecoder(tool: TranscriptTool): (chunk: string) =
 	};
 }
 
+/* ── A MESSAGE CUT BY THE OUTPUT LIMIT (2026-10-18) ──
+   When a message stops on `max_tokens`, Claude Code feeds itself "Output
+   token limit hit. Resume directly" and the model goes on in a NEW message;
+   the final `result` carries only that last message. A quiz cut in the
+   middle of a string then reached the parser starting mid-string (JSON5
+   "invalid character 'c' at 1:1", measured on a 25-question Learn with a
+   long thinking budget). The whole answer is the text of every message from
+   the cut one to the end, joined as they were written. */
+export interface ClaudeChain {
+	/** The text of the last assistant message line read. */
+	last: string;
+	/** The texts from the first cut message on. */
+	chain: string[];
+	cut: boolean;
+}
+
+export function newClaudeChain(): ClaudeChain { return { last: "", chain: [], cut: false }; }
+
+/** Folds one line of the stream into the chain (stream events and whole messages). */
+export function foldClaudeChain(c: ClaudeChain, line: Rec): void {
+	const type = str(line.type);
+	if (type === "assistant") {
+		const content = rec(line.message)?.content;
+		const text = Array.isArray(content)
+			? content.map(b => (rec(b) && str(rec(b)?.type) === "text" ? str(rec(b)?.text) ?? "" : "")).join("")
+			: "";
+		if (!text) return;
+		c.last = text;
+		if (c.cut && c.chain.length < 50) c.chain.push(text);
+		return;
+	}
+	if (type === "stream_event") {
+		const e = rec(line.event);
+		if (e && str(e.type) === "message_delta" && str(rec(e.delta)?.stop_reason) === "max_tokens" && !c.cut) {
+			c.cut = true;
+			if (c.last) c.chain.push(c.last);
+		}
+	}
+}
+
+/** The `result` line, its text replaced by the whole chain when a message was cut. */
+export function claudeResultChained(c: ClaudeChain, result: Rec | null): Rec | null {
+	if (!result || !c.cut || c.chain.length < 2 || result.is_error === true) return result;
+	return { ...result, result: c.chain.join("") };
+}
+
+/** The answer of a run whose stream is already read (the `result` line stays untouched when no message was cut). */
 /**
  * The final `result` object of a Claude Code `stream-json` output: the same
  * fields as `--output-format json` gave in one object (`result`, `is_error`,
@@ -553,16 +600,18 @@ export function createTranscriptDecoder(tool: TranscriptTool): (chunk: string) =
  * the CLI stopped before answering.
  */
 export function claudeResultDuFlux(stdout: string): Rec | null {
-	const lines = String(stdout || "").split("\n");
-	for (let i = lines.length - 1; i >= 0; i--) {
-		const line = lines[i].trim();
+	const chain = newClaudeChain();
+	let result: Rec | null = null;
+	for (const raw of String(stdout || "").split("\n")) {
+		const line = raw.trim();
 		if (!line.startsWith("{")) continue;
 		try {
 			const r = rec(JSON.parse(line));
-			if (r && str(r.type) === "result") return r;
+			if (!r) continue;
+			if (str(r.type) === "result") result = r; else foldClaudeChain(chain, r);
 		} catch { /* not JSON: skipped */ }
 	}
-	return null;
+	return claudeResultChained(chain, result);
 }
 
 /* ── PROGRESS OF A QUIZ BEING WRITTEN (2026-10-02) ──

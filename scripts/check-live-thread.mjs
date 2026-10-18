@@ -175,6 +175,11 @@ await withSrcModule(["src/dashboard/live-turn.ts", "src/dashboard/live-turn-stor
 	const result = { type: "result", is_error: false, result: "[1]", usage: { input_tokens: 3 } };
 	T.collectLine(o, result);
 	r.check("a Claude result ends the turn and is kept whole", [o.ended, o.claudeResult], [true, result]);
+	/* A message cut by the output limit (2026-10-18): the turn text is the whole chain, not the last message alone. */
+	const k = T.emptyOutcome();
+	const assistant = text => ({ type: "assistant", message: { content: [{ type: "text", text }] } });
+	[assistant("[ { a: 'very lo"), { type: "stream_event", event: { type: "message_delta", delta: { stop_reason: "max_tokens" } } }, assistant("ng' } ]"), { type: "result", result: "ng' } ]" }].forEach(l => T.collectLine(k, l));
+	r.check("a cut Claude message: the turn result holds the head and the continuation", k.claudeResult?.result, "[ { a: 'very long' } ]");
 	const c = T.emptyOutcome();
 	T.collectLine(c, { method: "item/completed", params: { item: { type: "agentMessage", text: "first" } } });
 	T.collectLine(c, { method: "item/completed", params: { item: { type: "agentMessage", text: "[quiz]" } } });
