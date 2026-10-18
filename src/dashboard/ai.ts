@@ -2086,7 +2086,16 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		if (planTool && readPlan) {
 			const slot = ajouter(formCol, "div", "qbd-ai-usage-slot");
 			composer.after(slot);
-			planLine = mountUsageLine(slot, planTool, (tool) => readPlan.call(host.process, tool), () => settings().aiModel || "");
+			/* The model the chip shows, not the raw setting: an empty `aiModel`
+			   means the provider's default (Antigravity: its first model), and the
+			   line must pick that model's group too (2026-10-18). */
+			const shownModel = (): string => {
+				const p = settings().aiProvider || "";
+				const m = settings().aiModel || "";
+				if (p === "antigravity-cli") return aiProviders.resolveAntigravityModel(m);
+				return m || (p ? aiProviders.getProvider(p).defaultModel : "");
+			};
+			planLine = mountUsageLine(slot, planTool, (tool) => readPlan.call(host.process, tool), shownModel);
 		}
 
 		// Groupe droite : logo fournisseur, sélecteur modèle + effort, puis
