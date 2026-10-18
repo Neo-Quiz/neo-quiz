@@ -1680,7 +1680,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			// Effort réel : niveau `think` (low/medium/high/max) passé à l'API
 			// pour les modèles à raisonnement (ignoré sinon, cf. callOllama).
 			const effort = resolveEffort("ollama", settings.get().aiEffort);
-			return callOllama(model, systemPrompt, userPrompt, ollamaUrl, authHeader, images, effort);
+			return avecRelances(() => callOllama(model, systemPrompt, userPrompt, ollamaUrl, authHeader, images, effort), () => aborted);
 		} else if (provider === "codex") {
 			// Effort clampé aux niveaux supportés par CE modèle (ex. ultra
 			// persisté + gpt-5.5 → xhigh), sinon le CLI rejetterait la valeur.
@@ -2290,7 +2290,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			// illisible, réseau) devient le diagnostic serveur.
 			const e = err as UserFacingError;
 			if (e.userFacing) throw err;
-			throw userError(t("ai.err.ollamaUnreachable", { url: ollamaUrl }));
+			// A server that restarts or drops a connection is asked again by the caller (`avecRelances`); the message is the one the learner reads if it stays down.
+			throw Object.assign(new TransientCliError(t("ai.err.ollamaUnreachable", { url: ollamaUrl })), { userFacing: true });
 		}
 
 		// Le modèle expose-t-il un raisonnement (`think`) ? Cloud → oui (le param
