@@ -15,6 +15,7 @@ release notes.
 
 ### Changed
 
+- Picking a model, an effort level or an agent mode in the Generate or Explain composer now returns the focus to the text field, ready to type.
 - Neutral, professional placeholders in the Explain composer, the clarification answer field and the written answer fields; the Explain icon keeps its colour logo and the window drops its title.
 - The Explain window composer now takes the focus on a single click anywhere on its card, shows the same hover and active contour as the Generate page, and the field is focused as the window opens.
 - On narrow windows the Generate composer row and the bottom bar now fit 360 to 430 px: the agent mode chip shows its icon only and the model labels ellipsize, and the five tabs share the width.

@@ -1,5 +1,5 @@
 import type { ModuleInfo } from "./quiz-modules";
-import { focusFieldOnCardPress } from "./composer-focus";
+import { focusFieldOnCardPress, refocusField } from "./composer-focus";
 import JSON5 from "json5";
 import type { AiPreset, DashboardViewName, NavigateData } from "../types/dashboard-ctx";
 import type { ModeGeneration } from "../quiz-format";
@@ -335,6 +335,8 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 	   recrée le textarea, et sans ça tout attachement (chip, image, mention)
 	   renvoie le curseur en fin de texte. */
 	let composerCaret: number | null = null;
+	// Hands the focus back to the composer field after a menu pick (set once the field exists).
+	let refocusComposer: () => void = () => {};
 	// Sources texte attachées (PLUSIEURS — maquette 2026-07-11 231626) :
 	// notes du vault (path) et fichiers texte du disque (.md/.txt).
 	let noteAttachments: NoteAttachment[] = []; // [{ name, content, path? }]
@@ -1484,11 +1486,13 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 							await saveSettings({ aiModel: v });
 							refresh();
 							planLine?.redraw();
+							refocusComposer();
 						},
 						onPickLevel: async (v, niveau) => {
 							await saveSettings({ aiModel: v, aiAntigravityLevels: { ...(settings().aiAntigravityLevels || {}), [v]: niveau } });
 							refresh();
 							planLine?.redraw();
+							refocusComposer();
 						}
 					});
 				});
@@ -1578,6 +1582,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 						onPickModel: async (v) => {
 							await saveSettings({ aiModel: v });
 							refreshTriggers();
+							refocusComposer();
 						}
 					});
 				});
@@ -1601,6 +1606,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 						onPickEffort: async (v) => {
 							await saveSettings({ aiEffort: v });
 							refreshTriggers();
+							refocusComposer();
 						}
 					});
 				});
@@ -1699,10 +1705,12 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 						onPickModel: async (v) => {
 							await saveSettings({ aiModel: v });
 							refreshTrigger();
+							refocusComposer();
 						},
 						onPickEffort: async (v) => {
 							await saveSettings({ aiEffort: v });
 							refreshTrigger();
+							refocusComposer();
 						}
 					});
 				});
@@ -2164,6 +2172,7 @@ export function createAiHandlers(deps: AiPageDeps): AiHandlers {
 		// un clic hors des contrôles focus le champ, caret en fin de texte.
 		// mousedown natif du textarea préservé (positionnement du caret).
 		focusFieldOnCardPress(composer, composerInput, (len) => { composerCaret = len; });
+		refocusComposer = () => refocusField(composerInput, (len) => { composerCaret = len; });
 
 		// Glisser-déposer de fichiers (images, .md, .txt) sur tout le composer
 		composer.addEventListener("dragover", (e) => {

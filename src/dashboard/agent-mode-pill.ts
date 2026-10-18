@@ -18,6 +18,8 @@ export interface AgentModePillDeps {
 	save: (mode: ModeAgent) => Promise<void>;
 	/** Codex words "accept edits" its own way. */
 	isClaude: () => boolean;
+	/** Called once a mode is picked and saved (the composer takes the focus back). */
+	onPicked?: () => void;
 }
 
 /** Adds the chip to `parent` and returns its repaint. */
@@ -42,7 +44,7 @@ export function mountAgentModePill(parent: HTMLElement, deps: AgentModePillDeps)
 			label: t(`ai.agentMode.${m}`),
 			sub: t(!deps.isClaude() && m === "acceptEdits" ? "ai.agentMode.acceptEditsCodexSub" : `ai.agentMode.${m}Sub`),
 			checked: m === courant,
-			onClick: () => { void deps.save(m).then(paint); },
+			onClick: () => { void deps.save(m).then(() => { paint(); deps.onPicked?.(); }); },
 		})), { className: "qbd-agent-mode-menu" });
 	});
 	return { el: modeBtn, paint };

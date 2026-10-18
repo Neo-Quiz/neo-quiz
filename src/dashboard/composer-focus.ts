@@ -18,3 +18,17 @@ export function focusFieldOnCardPress(card: HTMLElement, field: HTMLTextAreaElem
 		onFocused?.(len);
 	});
 }
+
+/* After a pick in the model, effort or agent-mode menu, focus falls back to
+   <body>: hand it back to the composer field, caret at the end, so typing can
+   start at once. A locked (disabled) field is left alone. Deferred one frame so
+   the closing menu cannot take the focus back. */
+export function refocusField(field: HTMLTextAreaElement, onFocused?: (caret: number) => void): void {
+	requestAnimationFrame(() => {
+		if (field.disabled || !field.isConnected) return;
+		field.focus();
+		const len = field.value.length;
+		field.setSelectionRange(len, len);
+		onFocused?.(len);
+	});
+}

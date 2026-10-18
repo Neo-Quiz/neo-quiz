@@ -44,7 +44,7 @@ import { mathifyElement } from "../../../../src/engine/mathjax";
 import { brancherCadres, htmlFrameMarkup } from "../../../../src/engine/html-frame";
 import { splitHtmlBlocks } from "../../../../src/engine/html-frame-core";
 import { consigneExplication, contexteQuiz, positionCourante } from "../../../../src/explain-prompt";
-import { focusFieldOnCardPress } from "../../../../src/dashboard/composer-focus";
+import { focusFieldOnCardPress, refocusField } from "../../../../src/dashboard/composer-focus";
 import { composerOpen } from "../../../../src/explain-follow";
 import { ancrerImagesCitees } from "../../../../src/explain-images";
 import type { ImageJointe } from "../../../../src/explain-images";
@@ -912,6 +912,7 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					save: m => deps.settings.save({ aiAgentMode: m }),
 					// Only Codex's middle modes differ (an AI reviewer approves).
 					isClaude: () => deps.settings.get().aiProvider !== "codex",
+						onPicked: () => { refocusField(champ); },
 				});
 				pastilleMode.el.hidden = !fournisseurAgent();
 				const envoi = ajouter(outils, "button", "qbd-ai-composer-send");
@@ -1014,14 +1015,14 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 					if (!modeleBtn.isConnected) return;
 					if (courant === "antigravity-cli") await aiProviders.refreshAntigravityModels();
 					if (!modeleBtn.isConnected) return;
-					ouvrirMenuModeles(modeleBtn, peindreOutils);
+					ouvrirMenuModeles(modeleBtn, () => { peindreOutils(); refocusField(champ); });
 				});
 				effortBtn.addEventListener("click", () => {
 					openEffortSlider(effortBtn, {
 						variant: courant === "claude-code" ? "claude" : "codex",
 						efforts: efforts(),
 						currentEffort: effortCourant(),
-						onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); peindreOutils(); },
+						onPickEffort: async (v) => { await deps.settings.save({ aiEffort: v }); peindreOutils(); refocusField(champ); },
 					});
 				});
 
