@@ -78,9 +78,12 @@ import { decide, HIDDEN_FLAG, isHiddenLaunch, RELAUNCH_HIDDEN_KEY } from "./tray
 import type { LifecycleState } from "./tray-lifecycle";
 import type { BacASable } from "./code-sandbox";
 import { creerJournalMemoire, installerJournalMemoire } from "./journal-memoire";
+import { creerServiceSignalement } from "./signalement/service";
+import { creerMagasinJetonGithub } from "./signalement/jeton";
+import { BUG_RELAY_URL, GITHUB_APP_CLIENT_ID, bugReportConfigured } from "../../../src/bug-report-config";
 
-/** Bug-report log buffer, installed at module load so early warnings count.
-    Task 4 hands it to the bug report service. */
+/** Bug-report log buffer, installed at module load so early warnings count;
+    the bug report service reads it for the log preview and the report. */
 export const journalMemoire = creerJournalMemoire();
 installerJournalMemoire(journalMemoire);
 
@@ -1005,7 +1008,23 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				dechiffrer: chiffre => safeStorage.decryptString(chiffre),
 			},
 		});
+		const signalement = bugReportConfigured()
+			? creerServiceSignalement({
+				transport: (url, init) => fetch(url, init),
+				magasin: creerMagasinJetonGithub(path.join(donnees, "signalement-github.bin"), {
+					disponible: () => safeStorage.isEncryptionAvailable(),
+					chiffrer: clair => safeStorage.encryptString(clair),
+					dechiffrer: chiffre => safeStorage.decryptString(chiffre),
+				}),
+				journal: journalMemoire,
+				env: () => ({ app: app.getVersion(), os: `${os.version()} ${os.release()}`.slice(0, 100), platform: "windows" }),
+				maintenant: () => Date.now(),
+				relay: BUG_RELAY_URL,
+				clientId: GITHUB_APP_CLIENT_ID,
+			})
+			: null;
 		const canaux = enregistrerCanaux({
+			signalement,
 			moodle,
 			planning,
 			perimetre,

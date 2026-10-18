@@ -306,6 +306,19 @@ const pont: Pont = {
 		},
 	},
 
+	/* BUG REPORT: text in, result out; the GitHub token stays in the main process. */
+	signalement: process.platform !== "win32" ? undefined : {
+		apercu: () => ipcRenderer.invoke(CANAUX.signalementApercu),
+		envoyer: rapport => ipcRenderer.invoke(CANAUX.signalementEnvoyer, rapport),
+		github: {
+			connecter: () => ipcRenderer.invoke(CANAUX.signalementGithubConnecter),
+			attendre: () => ipcRenderer.invoke(CANAUX.signalementGithubAttendre),
+			annuler: () => ipcRenderer.invoke(CANAUX.signalementGithubAnnuler),
+			etat: () => ipcRenderer.invoke(CANAUX.signalementGithubEtat),
+			deconnecter: () => ipcRenderer.invoke(CANAUX.signalementGithubDeconnecter),
+		},
+	},
+
 	miseAJour: {
 		etat: () => ipcRenderer.invoke(CANAUX.miseAJourEtatLire),
 		surEtat(rappel) {

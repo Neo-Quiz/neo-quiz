@@ -681,6 +681,29 @@ export interface Pont {
 	};
 
 	/**
+	 * THE BUG REPORT (`./signalement/`, Windows only; absent elsewhere). The
+	 * window hands text and gets back a result; the GitHub token never crosses
+	 * (only the login). Every method answers `{ ok: false, code: "disabled" }`
+	 * (or a `failed` / `null` equivalent) while the relay is not configured.
+	 */
+	signalement?: {
+		/** What would be sent besides the text: this app's environment and the scrubbed log tail. */
+		apercu(): Promise<{ ok: true; env: { app: string; os: string; platform: "windows" | "android" }; log: string } | { ok: false; code: "disabled" }>;
+		/** `rapport` is a `BugReport` (`src/bug-report.ts`) without token; main re-validates it and replaces `env`. Codes: invalid, rate_limited, duplicate, upstream, disabled. */
+		envoyer(rapport: unknown): Promise<{ ok: true; url: string; number: number } | { ok: false; code: string }>;
+		github: {
+			/** Starts the device flow: show `userCode`, open `verificationUri`, then call `attendre()`. `code`: busy (a flow runs), refused (foreign host), failed, disabled. */
+			connecter(): Promise<{ ok: true; userCode: string; verificationUri: string; expiresIn: number } | { ok: false; code: "busy" | "refused" | "failed" | "disabled" }>;
+			/** Resolves when the user finished, refused, ran out of time or `annuler()` was called. Stores the session; returns the login only. */
+			attendre(): Promise<{ login: string } | { error: "denied" | "expired" | "cancelled" | "failed" }>;
+			annuler(): Promise<void>;
+			/** The connected login, or null. */
+			etat(): Promise<{ login: string } | null>;
+			deconnecter(): Promise<void>;
+		};
+	};
+
+	/**
 	 * THE SYNC of the quiz folder (embedded Syncthing, `./syncthing.ts`). Absent
 	 * where there is no embedded binary (Linux): the Sync page is then not
 	 * offered. The window reaches THREE verbs and two pushes, nothing more:
@@ -1278,6 +1301,13 @@ export const CANAUX = {
 	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */
 	moodleNouveaux: "neo:moodle/nouveaux",
 	moodleNouveauxPrendre: "neo:moodle/nouveaux-prendre",
+	signalementApercu: "neo:signalement/apercu",
+	signalementEnvoyer: "neo:signalement/envoyer",
+	signalementGithubConnecter: "neo:signalement/github-connecter",
+	signalementGithubAttendre: "neo:signalement/github-attendre",
+	signalementGithubAnnuler: "neo:signalement/github-annuler",
+	signalementGithubEtat: "neo:signalement/github-etat",
+	signalementGithubDeconnecter: "neo:signalement/github-deconnecter",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",
