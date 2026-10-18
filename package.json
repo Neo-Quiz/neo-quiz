@@ -110,6 +110,7 @@
     "check:share-lock": "node scripts/check-share-lock.mjs",
     "check:share-roundtrip": "node scripts/check-share-roundtrip.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",
+    "check:bug-report": "node scripts/check-bug-report.mjs",
     "check:session": "node scripts/check-session.mjs",
     "check:test-setup": "node scripts/check-test-setup.mjs",
     "check:learn-loop": "node scripts/check-learn-loop.mjs",

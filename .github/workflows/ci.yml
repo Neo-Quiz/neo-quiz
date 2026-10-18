@@ -236,6 +236,9 @@ jobs:
       - name: Moodle sync
         run: npm run check:moodle
 
+      # The in-app bug report format: caps, escaping, fence, log scrubber.
+      - name: Bug report format
+        run: npm run check:bug-report
 
       # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
       # perdre de réponses, même si le quiz a changé entre deux sessions.
