@@ -2008,6 +2008,14 @@ export function lancer(spec: {
 	    constant command; the run still ends by its exit, its timeout or its
 	    abort, which kills the tree. */
 	garderStdin?: boolean;
+	/** A COMPLETE line of the standard output that ends the answer (2026-10-18):
+	    Antigravity prints its `result` event and may then never exit (its
+	    language server stayed up after a network error of its own, measured:
+	    a generation hung for 17 minutes with the answer already printed). A
+	    run that reaches it gets `graceFinMs` to exit by itself, then its tree
+	    is killed and the run resolves with what was printed, code 0. */
+	finParLigne?: (ligne: string) => boolean;
+	graceFinMs?: number;
 }, parCmd = false): Promise<{ stdout: string; stderr: string; code: number | null }> {
 	return new Promise((resolve, reject) => {
 		const tuer = spec.tuer || tuerArbre;
@@ -2068,6 +2076,7 @@ export function lancer(spec: {
 			if (minuteur) clearTimeout(minuteur);
 			if (filet) clearTimeout(filet);
 			spec.signal?.removeEventListener("abort", surAbandon);
+			if (finArmee) clearTimeout(finArmee);
 			fn();
 		};
 		/* LE MOTIF, ET NON LE RÈGLEMENT (ruling 15). Un abandon ou un délai
@@ -2086,13 +2095,14 @@ export function lancer(spec: {
 		   de mort (un `taskkill` qui échoue, un zombie), on rejette QUAND MÊME
 		   avec le motif, et on le DIT — un `run` ne doit jamais pendre, ce
 		   serait un bouton Stop qui ne rend jamais la main. */
-		let motif: "annule" | "timeout" | null = null;
-		const demanderLaMort = (cause: "annule" | "timeout"): void => {
+		let motif: "annule" | "timeout" | "resultat" | null = null;
+		const demanderLaMort = (cause: "annule" | "timeout" | "resultat"): void => {
 			if (fini || motif) return;
 			motif = cause;
 			void tuer(enfant.pid);
 			filet = setTimeout(() => {
 				console.warn(LOG_PREFIX, "CLI", spec.executable, ": l'enfant n'a pas fermé", delaiGardeMs, "ms après", cause, "— rejeté quand même (pid", enfant.pid, ")");
+				if (cause === "resultat") { sortir(() => resolve({ stdout, stderr, code: 0 })); return; }
 				sortir(() => reject(erreurCli(cause, "CLI " + (cause === "annule" ? "annulé" : "expiré") + ", sans confirmation de sa mort : " + spec.executable)));
 			}, delaiGardeMs);
 		};
@@ -2104,9 +2114,19 @@ export function lancer(spec: {
 		   JSON d'un CLI illisible dès qu'il écrit un avertissement. */
 		let stdout = "";
 		let stderr = "";
+		let ligneEnCours = "";
+		let finArmee: ReturnType<typeof setTimeout> | null = null;
 		enfant.stdout?.on("data", (d: unknown) => {
 			const texte = String(d);
 			stdout += texte;
+			if (spec.finParLigne && !finArmee) {
+				const lignes = (ligneEnCours + texte).split("\n");
+				ligneEnCours = lignes.pop() ?? "";
+				if (ligneEnCours.length > 1_000_000) ligneEnCours = "";
+				if (lignes.some(l => { try { return spec.finParLigne!(l.trim()); } catch { return false; } })) {
+					finArmee = setTimeout(() => demanderLaMort("resultat"), spec.graceFinMs ?? 10_000);
+				}
+			}
 			if (spec.surStdout) { try { spec.surStdout(texte); } catch { /* the transcript never stops a run */ } }
 		});
 		enfant.stderr?.on("data", (d: unknown) => { stderr += String(d); });
@@ -2121,6 +2141,7 @@ export function lancer(spec: {
 			)));
 		});
 		enfant.on("close", (code: number | null) => sortir(() => {
+			if (motif === "resultat") { resolve({ stdout, stderr, code: 0 }); return; }
 			if (motif) {
 				reject(erreurCli(motif, "CLI " + (motif === "annule" ? "annulé" : "expiré") + " : " + spec.executable));
 				return;
@@ -2306,6 +2327,11 @@ export function ollamaLocal(url: unknown): string | null {
 	return u.origin;
 }
 
+/** Antigravity's terminal event, one complete line of its `stream-json` output. */
+export function ligneResultatAgy(ligne: string): boolean {
+	return ligne.startsWith("{\"event\":\"result\"");
+}
+
 export async function run(spec: {
 	tool: string;
 	args: string[];
@@ -2334,6 +2360,8 @@ export async function run(spec: {
 	attenteVerrouMs?: number;
 	/** The standard output as it arrives, passed to `lancer`. */
 	surStdout?: (texte: string) => void;
+	/** The grace given to Antigravity after its `result` line (a control shortens it). */
+	graceFinMs?: number;
 } = {}): Promise<{
 	stdout: string; stderr: string; code: number | null; sortie?: string;
 }> {
@@ -2418,6 +2446,7 @@ export async function run(spec: {
 				tuer: options.tuer,
 				delaiGardeMs: options.delaiGardeMs,
 				surStdout: options.surStdout,
+				...(spec.tool === "agy" ? { finParLigne: ligneResultatAgy, graceFinMs: options.graceFinMs } : {}),
 			});
 		}, env);
 		return Object.assign({}, resultat, { sortie });

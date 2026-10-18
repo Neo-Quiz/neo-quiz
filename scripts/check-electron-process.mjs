@@ -1321,6 +1321,29 @@ await withSrcModule(["apps/windows/electron/process.ts", "src/host/claude-outils
 			r.check("Antigravity: a stopped run releases the lock at the stop", { ensuite: ensuite.stdout, arrete: await arrete }, { ensuite: "OUT:2:", arrete: "annule" });
 		});
 
+/* ANTIGRAVITY THAT PRINTS ITS RESULT AND NEVER EXITS (2026-10-18): its
+		   language server stayed up after a network error of its own and the
+		   generation hung 17 minutes with the answer already printed. The result
+		   line starts the grace; past it the tree is killed and the run resolves
+		   with what was printed. A run that never printed its result is left alone. */
+		await cas(r, "Antigravity: after its result line a process that never exits is killed and the run resolves", async () => {
+			const colle = join(racine, "resultat-puis-dort.js");
+			writeFileSync(colle, "process.stdout.write('{\"event\":\"step_update\"}\\n{\"event\":\"result\",\"result\":{\"status\":\"SUCCESS\",\"response\":\"[1]\"}}\\n'); setTimeout(() => {}, 30000);");
+			const debut = Date.now();
+			const fin = await run({ tool: "agy", args: [colle], stdin: "" }, { env: envNode, graceFinMs: 400 });
+			const duree = Date.now() - debut;
+			r.check("the run resolves shortly after the result line, code 0, the whole output kept",
+				{ code: fin.code, aLeResultat: fin.stdout.includes('"event":"result"'), rapide: duree < 10000 }, { code: 0, aLeResultat: true, rapide: true });
+			const coupe = join(racine, "resultat-coupe.js");
+			writeFileSync(coupe, "process.stdout.write('{\"event\":\"resu'); setTimeout(() => process.exit(3), 1200);");
+			const sans = await run({ tool: "agy", args: [coupe], stdin: "" }, { env: envNode, graceFinMs: 200 });
+			r.check("a result line cut short does not end the run: its own exit code is kept", sans.code, 3);
+			const claude = join(racine, "claude-resultat.js");
+			writeFileSync(claude, "process.stdout.write('{\"event\":\"result\"}\\n'); setTimeout(() => process.exit(5), 1500);");
+			const autre = await run({ tool: "codex", args: [claude], stdin: "" }, { env: envNode, graceFinMs: 200 });
+			r.check("only Antigravity gets the grace: another tool exits by itself", autre.code, 5);
+		});
+
 		await cas(r, "le verrou est relâché sur TOUTES les issues, y compris un échec", async () => {
 			/* UNE FUITE DU VERROU REND LE FOURNISSEUR INUTILISABLE jusqu'au
 			   redémarrage de l'application, sans qu'aucun message ne dise
