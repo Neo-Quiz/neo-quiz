@@ -1,5 +1,9 @@
 package com.ahmedmili.neoquiz.bridge
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -7,6 +11,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,10 +27,16 @@ class BugReportChannelTest {
     private val calls = mutableListOf<Pair<String, JSONObject?>>()
     private var clock = 1_000_000L
 
-    private fun channel(store: SessionStore, relayUrl: String = relay, clientId: String = "Iv1.abc", http: BugReportHttp) =
+    private fun channel(
+        store: SessionStore,
+        relayUrl: String = relay,
+        clientId: String = "Iv1.abc",
+        pause: suspend (Long, CompletableDeferred<Unit>) -> Unit = { _, _ -> },
+        http: BugReportHttp,
+    ) =
         BugReportChannel(
             CoroutineScope(Dispatchers.Default), store, http, { JSONObject().put("app", "9.9").put("os", "Android 15").put("platform", "android") },
-            relayUrl, clientId, { clock }, { _, _ -> },
+            relayUrl, clientId, { clock }, pause,
         ).handlers()
 
     private fun call(h: Map<String, suspend (JSONArray) -> Any?>, name: String, vararg args: Any?): Any? =
@@ -126,5 +137,111 @@ class BugReportChannelTest {
             JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://evil.example/device","expires_in":900}""")
         }
         assertEquals("refused", (call(h, "bugReport.github.connect") as JSONObject).getString("code"))
+    }
+
+    @Test fun `disconnect wins over a late wait and writes no session`() {
+        val store = Store()
+        val reachedUser = CountDownLatch(1)
+        val released = CountDownLatch(1)
+        val h = channel(store) { _, url, _, _ ->
+            when (url) {
+                "https://github.com/login/device/code" -> JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}""")
+                "https://github.com/login/oauth/access_token" -> JSONObject("""{"access_token":"secret-token"}""")
+                "https://api.github.com/user" -> {
+                    reachedUser.countDown()
+                    assertTrue(released.await(10, TimeUnit.SECONDS))
+                    JSONObject("""{"login":"octo"}""")
+                }
+                else -> error(url)
+            }
+        }
+        call(h, "bugReport.github.connect")
+        val answer = AtomicReference<JSONObject>()
+        val waiter = Thread { runBlocking { answer.set(call(h, "bugReport.github.wait") as JSONObject) } }
+        waiter.start()
+        assertTrue(reachedUser.await(10, TimeUnit.SECONDS))
+        call(h, "bugReport.github.disconnect")
+        released.countDown()
+        waiter.join(10_000)
+        val r = answer.get()
+        assertNotNull(r)
+        assertEquals("cancelled", r!!.getString("error"))
+        assertFalse(r.toString().contains("secret-token"))
+        assertNull(store.session)
+    }
+
+    @Test fun `a flow left past its expiry is free again`() {
+        var codes = 0
+        val h = channel(Store()) { _, url, _, _ ->
+            when (url) {
+                "https://github.com/login/device/code" -> {
+                    codes++
+                    JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}""")
+                }
+                else -> error(url)
+            }
+        }
+        assertEquals("ABCD-1234", (call(h, "bugReport.github.connect") as JSONObject).getString("userCode"))
+        assertEquals("busy", (call(h, "bugReport.github.connect") as JSONObject).getString("code"))
+        clock += 900_001
+        assertEquals("ABCD-1234", (call(h, "bugReport.github.connect") as JSONObject).getString("userCode"))
+        assertEquals(2, codes)
+    }
+
+    @Test fun `wait reports expired once the flow is past its limit`() {
+        val h = channel(Store()) { _, url, _, _ ->
+            when (url) {
+                "https://github.com/login/device/code" -> JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}""")
+                else -> error(url) // the poll must stop before asking for a token
+            }
+        }
+        call(h, "bugReport.github.connect")
+        clock += 900_001
+        assertEquals("expired", (call(h, "bugReport.github.wait") as JSONObject).getString("error"))
+    }
+
+    @Test fun `wait reports a denial as denied and an expired token as expired`() {
+        var tokenError = "access_denied"
+        val h = channel(Store()) { _, url, _, _ ->
+            when (url) {
+                "https://github.com/login/device/code" -> JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}""")
+                "https://github.com/login/oauth/access_token" -> JSONObject("""{"error":"$tokenError"}""")
+                else -> error(url)
+            }
+        }
+        call(h, "bugReport.github.connect")
+        assertEquals("denied", (call(h, "bugReport.github.wait") as JSONObject).getString("error"))
+        tokenError = "expired_token"
+        call(h, "bugReport.github.connect")
+        assertEquals("expired", (call(h, "bugReport.github.wait") as JSONObject).getString("error"))
+    }
+
+    @Test fun `cancel during the poll reports cancelled and writes no session`() {
+        val store = Store()
+        val paused = CountDownLatch(1)
+        val h = channel(
+            store,
+            http = { _, url, _, _ ->
+                when (url) {
+                    "https://github.com/login/device/code" -> JSONObject("""{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}""")
+                    else -> error(url)
+                }
+            },
+            pause = { _, abort ->
+                paused.countDown()
+                abort.await()
+            },
+        )
+        call(h, "bugReport.github.connect")
+        val answer = AtomicReference<JSONObject>()
+        val waiter = Thread { runBlocking { answer.set(call(h, "bugReport.github.wait") as JSONObject) } }
+        waiter.start()
+        assertTrue(paused.await(10, TimeUnit.SECONDS))
+        call(h, "bugReport.github.cancel")
+        waiter.join(10_000)
+        val r = answer.get()
+        assertNotNull(r)
+        assertEquals("cancelled", r!!.getString("error"))
+        assertNull(store.session)
     }
 }
