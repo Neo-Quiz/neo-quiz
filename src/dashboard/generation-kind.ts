@@ -134,12 +134,22 @@ export function parseClarifyAnswer(raw: string): ClarifyAnswer {
 	return { questions, ...extra };
 }
 
+/** A question that asks, in words, how many quizzes (or Learns, or Tests) to make. */
+const QUIZ_COUNT_WORDS = /\b(?:combien de (?:quiz|learns?|tests?|parcours)|nombre de (?:quiz|learns?|tests?)|how many (?:quizzes|quiz|learns?|tests?)|number of (?:quizzes|learns?|tests?))\b/i;
+
 /** The number of quizzes asked (`"auto"`: the model decides), or `null` when
     the model asked no valid "how many quizzes" question. A skipped question
     takes its default; a typed answer counts when it holds a number from 1 to
     MAX_QUIZZES ("3", "3 quiz"), else `null`. */
+
 export function quizCountFromClarifications(questions: readonly ClarifyQuestion[], answers: readonly (readonly string[])[]): QuizzesChoice | null {
-	const index = questions.findIndex(question => question.purpose === "quizzes");
+	/* The model marks this question `purpose: "quizzes"` and gives every option
+	   a `quizzes` value, but not always: a real run asked "how many quizzes?"
+	   without them, the answer "Un seul Learn" was read as nothing, and three
+	   documents made THREE quizzes (2026-10-19). A question that asks it in
+	   words is read by its answer's words. */
+	let index = questions.findIndex(question => question.purpose === "quizzes");
+	if (index < 0) index = questions.findIndex(question => !question.purpose && QUIZ_COUNT_WORDS.test(question.question));
 	if (index < 0) return null;
 	const question = questions[index];
 	const selected = answers[index]?.length ? answers[index] : [question.options[question.default]?.label ?? ""];
@@ -149,6 +159,8 @@ export function quizCountFromClarifications(questions: readonly ClarifyQuestion[
 		const typed = /\b(\d{1,2})\b/.exec(label);
 		const n = typed ? Number(typed[1]) : NaN;
 		if (isQuizzesChoice(n)) return n;
+		if (/\b(un seul|une seule|seul|seule|single|only one|one)\b/i.test(label)) return 1;
+		if (/^\s*auto\b/i.test(label)) return "auto";
 	}
 	return null;
 }

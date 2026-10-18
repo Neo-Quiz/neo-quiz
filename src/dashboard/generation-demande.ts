@@ -15,6 +15,7 @@ import { compterItems } from "./question-count";
 import type { AiSettings } from "../types/dashboard-ctx";
 import type { EditorExamOptions } from "../types/editor-ctx";
 import type { ModeGeneration } from "../quiz-format";
+import { exportBaseName } from "./share-names";
 import { fusionnerConfigsFinales, modeDuBloc, nomDeNote, verifierFormat } from "../quiz-format";
 import { nomDeSource, trouverLearn, lirePlanLearn, messagesDesManques } from "./ai-sources";
 import { currentHost } from "../host/current";
@@ -265,7 +266,12 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		const pieces = e.demande?.notes ?? [];
 		const source = nomDeSource(pieces, e.demande?.text ?? "", defaut, folderName(folder));
 		const mode = modeDuBloc(e.questions);
-		const base = e.titreImpose || (pieces.length ? source : nomDeSource([], e.titreModele || e.demande?.text || "", defaut));
+		/* The model's title names the note, written by the same rules as an export
+		   (`exportBaseName`): a Learn of "cours1.pdf" was saved as "cours1 — Learn",
+		   a raw file name (2026-10-19). The document name stays in the frontmatter
+		   `source`, which is what a Practice uses to find its Learn. */
+		const titreDuModele = e.titreModele ? exportBaseName(e.titreModele, "") : "";
+		const base = e.titreImpose || titreDuModele || (pieces.length ? source : nomDeSource([], e.demande?.text || "", defaut));
 		const path = await freeNotePath(folder, nomDeNote(base, mode));
 		const provider = e.reglages.aiProvider || "";
 		/* Sur un SITE, le modèle et l'effort sont les siens : `model` porte le

@@ -275,11 +275,11 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 	const scanner = { scanFile: async () => {}, getQuiz: (p) => ({ path: p }), getQuizzes: () => [] };
 	const reglages = { aiProvider: "claude-cli", aiModel: "m", aiEffort: "medium" };
 	const question = { title: "Q", prompt: "Énoncé ?", options: ["a", "b"], correctIndex: 0, explain: "Parce que." };
-	const enregistrer = async (mode, docs, { destination = "R/Cours/Réseaux", noteLearn } = {}) => {
+	const enregistrer = async (mode, docs, { destination = "R/Cours/Réseaux", noteLearn, titreModele } = {}) => {
 		const questions = [question];
 		const entry = await gd.enregistrerQuiz({
 			draft: gd.brouillonDe(questions), questions, modeDemande: mode, demande: { text: "Fais un quiz", notes: docs.map(n => ({ name: n })) },
-			destination, reglages, usage: null, noteLearn, planTranches: undefined, scanner,
+			destination, reglages, usage: null, noteLearn, planTranches: undefined, scanner, titreModele,
 		});
 		return { path: entry?.path, contenu: entry ? ecrits.get(entry.path) : undefined };
 	};
@@ -292,6 +292,12 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 		[e.path, /\n\s+source: "Réseaux"\n/.test(e.contenu)], ["R/Cours/Réseaux/Réseaux — Practice.md", true]);
 	e = await enregistrer("practice", ["CM1.pdf", "CM2.pdf"]);
 	r.check("the same module, a second Test: freeNotePath's counter", e.path, "R/Cours/Réseaux/Réseaux — Practice (2).md");
+	/* The model's title names a document-based note (2026-10-19): written by the rules of an export name, the document stays the `source`. */
+	const titre = async (titreModele) => { const x = await enregistrer("practice", ["cours1.pdf"], { destination: "R/Titres", titreModele }); return { chemin: x.path, source: /\n\s+source: "([^"]*)"/.exec(x.contenu ?? "")?.[1] }; };
+	r.check("a note takes the model's title, the file name stays its source", await titre("Cours 1 — Régression linéaire et descente de gradient"), { chemin: "R/Titres/Cours 1 — Régression linéaire et descente de gradient — Practice.md", source: "cours1" });
+	r.check("the title is cleaned like an export name: forbidden characters, a device name, a path, a blank or missing title",
+		[(await titre("Cours: <A|B>?")).chemin, (await titre("CON")).chemin, (await titre("../../x")).chemin, (await titre("   ")).chemin, (await titre(undefined)).chemin],
+		["R/Titres/Cours- -A-B-- — Practice.md", "R/Titres/CON_ — Practice.md", "R/Titres/-..-x — Practice.md", "R/Titres/cours1 — Practice.md", "R/Titres/cours1 — Practice (2).md"]);
 	e = await enregistrer("practice", ["CM1.pdf", "CM2.pdf"], { destination: "R" });
 	r.check("a module that is the root itself: the root's name", e.path, "R/Neo Quiz — Practice.md");
 	e = await enregistrer("practice", ["CM1.pdf"], { noteLearn: "CM1 — Learn" });
@@ -379,9 +385,9 @@ await withSrcModule(["src/dashboard/generation-demande.ts", "src/host/current.ts
 
 	/* The names of the per-document generation, as a reference. */
 	const refs = [];
-	for (const d of noms3) {
+	for (const [i, d] of noms3.entries()) {
 		const questions = [q(1)];
-		const e = await gd.enregistrerQuiz({ ...base, draft: gd.brouillonDe(questions), questions, titreModele: "x", demande: { text: "Fais un quiz", notes: [{ name: d }] } });
+		const e = await gd.enregistrerQuiz({ ...base, draft: gd.brouillonDe(questions), questions, titreModele: lot[i].titre, demande: { text: "Fais un quiz", notes: [{ name: d }] } });
 		refs.push(e.path);
 	}
 	ecrits.clear(); existants.clear();
@@ -459,8 +465,8 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	r.check("one request: ONE line and ONE CLI call", [file.lignes().length, appels.length], [1, 1]);
 	r.check("the one call carries EVERY document, named in order", noms3.every((n, i) => appels[0].stdin.includes("--- " + n + " ---") && appels[0].stdin.includes(`${i + 1}. ${n}`)), true);
 	r.check("the line is ready, with one result per document", [l.etat, l.resultat?.quiz?.length], ["prete", 3]);
-	r.check("three notes saved, one per document, named as for a single document",
-		[...ecrits.keys()].sort(), ["R/Cours/CM1 — Practice.md", "R/Cours/CM2 — Practice.md", "R/Cours/CM3 — Practice.md"]);
+	r.check("three notes saved, one per document, each named by the MODEL's title (never the attachment's file name)",
+		[...ecrits.keys()].sort(), ["R/Cours/Titre 1 — Practice.md", "R/Cours/Titre 2 — Practice.md", "R/Cours/Titre 3 — Practice.md"]);
 	r.check("each note holds its own quiz", [...ecrits.entries()].sort().map(([, c]) => /Énoncé (\d)/.exec(c)?.[1]), ["1", "2", "3"]);
 
 	/* A wrong count: an error on the line, nothing saved, the one CLI call made. */

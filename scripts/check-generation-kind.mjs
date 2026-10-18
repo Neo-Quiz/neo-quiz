@@ -200,5 +200,17 @@ await withSrcModule("src/dashboard/generation-kind.ts", (K) => {
 	const pCnt = K.clarifyPrompt("Fais 5 questions sur Python", []), pn = K.clarifyPrompt("Quiz sur Python", []);
 	r.check("count prompt: told not to ask when the request names a count, and asked (with the mark) when it does not",
 		[pCnt.system.includes("Do NOT ask about the number of questions"), pCnt.system.includes("(5)"), pn.system.includes("Always ask one question about the NUMBER OF QUESTIONS"), pn.system.includes('Mark it "purpose":"count"')], [true, true, true, true]);
+	/* ── "HOW MANY QUIZZES?" ANSWERED WITHOUT THE MODEL'S MARKS (2026-10-19) ──
+	   A real run: three documents, the answer "Un seul Learn", three notes. */
+	const oq = (question, labels, extra = {}) => ({ header: "Quiz", question, multiple: false, options: labels.map(l => o(l)), default: 0, ...extra });
+	const unSeul = oq("Combien de Learns veux-tu pour ces 3 documents ?", ["Auto", "Un seul Learn", "Un par document"]);
+	r.check("quizzes: an unmarked question read by the words of its answer (one, digits, auto)", [
+		K.quizCountFromClarifications([unSeul], [["Un seul Learn"]]), K.quizCountFromClarifications([unSeul], [["Un par document"]]), K.quizCountFromClarifications([unSeul], [["Auto"]]),
+		K.quizCountFromClarifications([oq("How many quizzes?", ["Auto", "1 quiz", "3 quizzes"])], [["3 quizzes"]]), K.quizCountFromClarifications([oq("How many quizzes?", ["Auto", "A single quiz"])], [["A single quiz"]]),
+		K.quizCountFromClarifications([unSeul], [[]]),
+	], [1, null, "auto", 3, 1, "auto"]);
+	r.check("quizzes: only a question that asks it counts (a level question answered 'one' is not a quiz count)",
+		K.quizCountFromClarifications([oq("Quel niveau ?", ["Un peu", "Beaucoup"])], [["Un peu"]]), null);
+	r.check("quizzes: a marked question still wins", K.quizCountFromClarifications([{ ...oq("Combien ?", ["Auto", "2"]), purpose: "quizzes", options: [{ ...o("Auto"), quizzes: "auto" }, { ...o("2"), quizzes: 2 }] }], [["2"]]), 2);
 	r.done();
 });

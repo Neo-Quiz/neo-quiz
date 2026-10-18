@@ -37,6 +37,8 @@ release notes.
 
 ### Fixed
 
+- Answering "one quiz" to the "how many quizzes?" question now makes one quiz over all the attached documents, even when the AI forgot to mark the question: the answer is read by its words ("Un seul Learn", "1 quiz", "Auto").
+- A quiz made from attached documents is named after the title the AI wrote for it, not after the attachment's file name ("Cours 1 - Regression lineaire et descente de gradient", not "cours1"). The file name stays the quiz's source.
 - The work of an Antigravity CLI run now shows what the model writes (the quiz progress and "Wrote N lines"), as for Claude Code and Codex.
 - A request that says how many questions it wants ("5 questions", "cinq QCM", "une seule question", "20 questions max") now gets exactly that many, in a Learn too, and the AI no longer asks "how many questions?" with an Auto default that overrode it.
 - A generation stopped with Stop keeps its work: the request still shows what the AI had done (tools, reasoning, the text written so far), marked as stopped, instead of only "Stopped". Every AI run (Antigravity CLI, Claude Code, Ollama models run in Claude Code, Codex) now keeps its raw output on the PC with the same size limit as live sessions.
