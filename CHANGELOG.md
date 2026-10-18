@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.15] - 2026-10-18
+
 ### Added
 
 - The composer accepts .html and .htm pages (course sites): the page is turned into plain text, keeping headings, lists, code blocks, tables and picture descriptions, without ever running it. Other unsupported types are still refused with the same message.
