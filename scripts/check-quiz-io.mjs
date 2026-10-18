@@ -942,6 +942,55 @@ await withSrcModule(
 			const replay = vault(depart, { process: async (etat, mutate) => { mutate(etat.contenu); etat.contenu = mutate(etat.contenu); } });
 			r.check("17f. a replayed callback ends with the same note", [await io.saveQuizSubject(replay.chemin, replay.contenu.match(RE_BLOC)[1], undefined, "algo"), subj.lireSujetNote(replay.contenu)], [true, "algo"]);
 		}
+
+		// g. mixed endings, blank lines in the block, near-miss keys, quoting, `---` in the body
+		{
+			// LF everywhere except two CRLF lines (one in the block, one in the quiz block): only the subject line may change.
+			const mixte = ["---", "neo-quiz:", "  provider: claude", "  model: opus", "  generatedAt: 2026-10-01T10:00:00Z", "---", ""].join(LF)
+				.replace("provider: claude" + LF, "provider: claude" + CRLF) + note({ eol: LF }).replace("[" + LF, "[" + CRLF);
+			const apres = subj.reecrireSujet(mixte, "python");
+			r.check("17g. mixed endings: only the subject line is added (clearing restores every byte)", subj.reecrireSujet(apres, null), mixte);
+			r.check("17g. mixed endings: the CRLF lines are still CRLF, the count of CRLF is unchanged",
+				[apres.split(CRLF).length, mixte.split(CRLF).length], [mixte.split(CRLF).length, mixte.split(CRLF).length]);
+			const remplace = subj.reecrireSujet(apres, "maths");
+			r.check("17g. mixed endings: a replaced subject changes that line's bytes only",
+				remplace.replace("maths", "python"), apres);
+
+			// a blank line inside the block does not end it: no duplicate `subject:`
+			const trou = ["---", "neo-quiz:", "  provider: claude", "", "  model: opus", "  subject: algo", "---", "", "Body"].join(LF);
+			r.check("17g. a blank line inside neo-quiz: keeps the block open (read)", subj.lireSujetNote(trou), "algo");
+			const t2 = subj.reecrireSujet(trou, "maths");
+			r.check("17g. a blank line inside neo-quiz: (replace, one subject line)", [t2.split("subject:").length - 1, subj.lireSujetNote(t2)], [1, "maths"]);
+			const trou2 = trou.replace("  subject: algo" + LF, "");
+			const t3 = subj.reecrireSujet(trou2, "maths");
+			r.check("17g. a blank line inside neo-quiz: (add after the last child, one subject line)", [t3.split("subject:").length - 1, subj.lireSujetNote(t3)], [1, "maths"]);
+
+			// the key is matched exactly
+			const proche = ["---", "neo-quiz-extra:", "  subject: algo", "neo-quizz:", "---", "", "Body"].join(LF);
+			r.check("17g. neo-quiz-extra: is not neo-quiz: (not read)", subj.lireSujetNote(proche), undefined);
+			const colle = ["---", "neo-quiz:foo", "  subject: algo", "---", "", "Body"].join(LF);
+			r.check("17g. neo-quiz:foo is another key (not read, a real block is added)",
+				[subj.lireSujetNote(colle), subj.lireSujetNote(subj.reecrireSujet(colle, "maths"))], [undefined, "maths"]);
+
+			// quoted value, trailing comment, unknown id already in the note
+			const cite = ["---", "neo-quiz:", "  subject: \"algo\" # picked", "---", "", "Body"].join(LF);
+			r.check("17g. a quoted value with a comment reads", subj.lireSujetNote(cite), "algo");
+			r.check("17g. replacing a quoted value keeps the comment", subj.reecrireSujet(cite, "maths"),
+				["---", "neo-quiz:", "  subject: maths # picked", "---", "", "Body"].join(LF));
+			const inconnu = ["---", "neo-quiz:", "  subject: from-the-future", "---", "", "Body"].join(LF);
+			r.check("17g. an unknown id in the note reads as absent and can be replaced or cleared",
+				[subj.lireSujetNote(inconnu), subj.lireSujetNote(subj.reecrireSujet(inconnu, "bio")), subj.reecrireSujet(inconnu, null)],
+				[undefined, "bio", "Body"]);
+
+			// `---` in the body or the quiz block is never a frontmatter
+			const corps = "Intro" + LF + "---" + LF + "neo-quiz:" + LF + "  subject: algo" + LF + "---" + LF + note();
+			r.check("17g. a `---` pair after the first line is not a frontmatter", [subj.lireSujetNote(corps), subj.reecrireSujet(corps, null)], [undefined, corps]);
+			const avec = subj.reecrireSujet(corps, "droit");
+			r.check("17g. ... a frontmatter is created on top and the body is untouched", [avec.endsWith(corps), subj.lireSujetNote(avec)], [true, "droit"]);
+			const dansBloc = ["---", "neo-quiz:", "  provider: x", "---", "", "```quiz-blocks", "[ { prompt: 'a' } ]", "---", "neo-quiz:", "  subject: algo", "```"].join(LF);
+			r.check("17g. a `---` and subject inside the quiz block are never read or touched",
+				[subj.lireSujetNote(dansBloc), subj.reecrireSujet(dansBloc, "maths").endsWith(["```quiz-blocks", "[ { prompt: 'a' } ]", "---", "neo-quiz:", "  subject: algo", "```"].join(LF))], [undefined, true]);
+		}
 	}
 
 	r.done();

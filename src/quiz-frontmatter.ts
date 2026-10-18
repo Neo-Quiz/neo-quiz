@@ -42,6 +42,14 @@ function depouiller(valeur: string): string {
 	return v;
 }
 
+/** A trailing YAML comment (` # ...`) is not part of the value, as `lireSujetNote`
+ *  reads it: after a quoted value, or after an unquoted one. */
+function sansCommentaire(valeur: string): string {
+	const q = valeur.match(/^(["'])(.*?)\1\s*(?:#.*)?$/);
+	if (q) return q[1] + q[2] + q[1];
+	return valeur.replace(/\s+#.*$/, "");
+}
+
 /**
  * Lit le frontmatter `neo-quiz:` en tête de `content`, s'il existe.
  *
@@ -70,10 +78,11 @@ export function lireFrontmatterNeoQuiz(content: string): NeoQuizFrontmatter | nu
 		// Une ligne non indentée referme la clé neo-quiz: (retour au niveau
 		// racine du frontmatter) — un `---` de fermeture n'atteint jamais
 		// cette boucle puisque `bloc` s'arrête avant.
+		if (ligne.trim() === "") continue;
 		if (!/^\s/.test(ligne)) break;
 		const m = ligne.match(/^\s+([a-zA-Z]+):\s*(.*)$/);
 		if (!m) continue;
-		champs[m[1]] = depouiller(m[2]);
+		champs[m[1]] = depouiller(sansCommentaire(m[2]));
 	}
 
 	const { provider, model, effort, generatedAt, source, subject } = champs;

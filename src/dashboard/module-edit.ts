@@ -9,7 +9,7 @@ import { openActionMenu } from "./ui-select";
 import { openColorPicker } from "./color-picker";
 import { openIconPicker } from "./icon-picker";
 import { openSubjectPicker } from "./subject-picker";
-import { estCategorie, type CategorieQuiz } from "./categorie-quiz";
+import { estCategorie } from "./categorie-quiz";
 import { libelleCategorie, peindreIconeCategorie } from "./categorie-affichage";
 import { moduleIcon } from "./module-icons";
 import { MODULE_PALETTE, moduleAccent } from "./module-color";
@@ -49,8 +49,9 @@ export function buildModuleOverride(folder: string, state: ModuleEditState): Mod
 	if (state.ue !== undefined) ov.ue = state.ue;
 	if (state.color) ov.color = state.color;
 	if (state.icon) ov.icon = state.icon;
-	// Only a known subject id is written; "Automatic" is the absence of the key.
-	if (estCategorie(state.subject)) ov.subject = state.subject;
+	/* Carried as is, even an id this build does not know (a newer device wrote it):
+	   only "Automatic" (absent here) clears it, never an unrelated edit. */
+	if (state.subject) ov.subject = state.subject;
 	/* CARRIED OVER AS IS, never recomputed: this modal designates no folder,
 	   it edits a name and colours. The caller passes it the path ALREADY
 	   DECLARED (and nothing when there is none). Without this, renaming a
@@ -97,8 +98,7 @@ export function openModuleEditModal(
 	let icon = group.icon;
 	/* The subject chosen by hand, read from the override (the group's may be
 	   a deduced one). Absent = Automatic. */
-	let subject: CategorieQuiz | undefined = estCategorie(ctx.settings.quizzesModuleOverrides?.[group.folder]?.subject)
-		? ctx.settings.quizzesModuleOverrides?.[group.folder]?.subject as CategorieQuiz : undefined;
+	let subject: string | undefined = ctx.settings.quizzesModuleOverrides?.[group.folder]?.subject || undefined;
 	/* The DECLARED path, read from the override and not from the group: the
 	   group's may be deduced from a quiz, and persisting it would freeze in
 	   the settings a value that is, today, recomputed on its own. Same for
@@ -196,7 +196,7 @@ export function openModuleEditModal(
 			currentHost().ui.setIcon(ajouter(subjBtn, "span", "qbd-select-chevron"), "chevron-down");
 			const paintSubject = () => {
 				subjLabel.replaceChildren();
-				if (subject) {
+				if (estCategorie(subject)) {
 					peindreIconeCategorie(ajouter(subjLabel, "span", "qbd-quizzes-subject-icon"), subject);
 					ajouter(subjLabel, "span", undefined, libelleCategorie(subject));
 				} else {
@@ -206,7 +206,7 @@ export function openModuleEditModal(
 			};
 			paintSubject();
 			subjBtn.addEventListener("click", () => {
-				openSubjectPicker(subjBtn, subject, (picked) => { subject = picked ?? undefined; paintSubject(); apply(); }, m.panelEl);
+				openSubjectPicker(subjBtn, estCategorie(subject) ? subject : undefined, (picked) => { subject = picked ?? undefined; paintSubject(); apply(); }, m.panelEl);
 			});
 
 			/* « Gérer les examens » (tâche 4, 2026-09-26) remplace le champ de

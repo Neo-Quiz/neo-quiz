@@ -34,6 +34,13 @@ await withSrcModule("src/dashboard/module-edit.ts", async ({ buildModuleOverride
 		icon: "network",
 	});
 
+	// A subject written by a newer device, with an id this build does not know, survives an unrelated edit.
+	r.check("an unknown stored subject is carried over, never erased by another edit",
+		buildModuleOverride(folder, { name: "Reseaux", color: "#336699", subject: "from-the-future" }),
+		{ color: "#336699", subject: "from-the-future" });
+	r.check("Automatic (no subject in the state) writes no subject key",
+		buildModuleOverride(folder, { name: "Reseaux", color: "#336699" }), { color: "#336699" });
+
 	const nomIdentique = buildModuleOverride(folder, {
 		name: "Reseaux",
 		ue: "UE 3",

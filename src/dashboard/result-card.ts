@@ -6,7 +6,7 @@
 import { ajouter } from "../dom";
 import { currentHost } from "../host/current";
 import { t } from "../i18n";
-import { detecterCategorie } from "./categorie-quiz";
+import { categorieEffective } from "./categorie-quiz";
 import { topicTuile } from "./topic-art";
 import { moduleAccent } from "./module-color";
 import type { ModuleInfo } from "./quiz-modules";
@@ -48,7 +48,7 @@ export function peindreCarteQuiz(
 	/* The subject's tile: the same logo, flag or glyph-on-tint as the crisp tile
 	   of its gallery cover (`topic-art.ts`). The title is clipped to one line,
 	   so the full title is the accessible name (no native tooltip). */
-	const sujet = detecterCategorie({ dossier: q.chemin.split(/[\/]/).slice(0, -1).join("/"), demande: q.titre });
+	const sujet = categorieEffective({ chemin: q.chemin.split(/[\/]/).slice(0, -1).join("/"), titre: q.titre });
 	const icone = ajouter(carte, "span", "qbd-ai-resultat-icone");
 	icone.setAttribute("aria-hidden", "true");
 	icone.appendChild(topicTuile(sujet));

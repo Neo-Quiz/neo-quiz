@@ -103,6 +103,16 @@ await withSrcModule("src/dashboard/scanner.ts", async ({ createScanner }) => {
 		notifications[0]?.[0]?.items?.[1], { id: "dup", role: "recall", slice: 9 });
 
 	const validContent = content;
+	// The subject written in the note (`neo-quiz: subject:`) is indexed on its own, with no generation record.
+	content = "---\r\nneo-quiz:\r\n  subject: maths\r\n---\r\n" + validContent;
+	await scanner.scanFile(fichierHote);
+	r.check("QuizIndexEntry.subject: a note with only a subject is indexed with it",
+		[scanner.getQuiz(fichierHote.path)?.subject, scanner.getQuiz(fichierHote.path)?.generated], ["maths", undefined]);
+	content = "---\r\nneo-quiz:\r\n  subject: not-a-subject\r\n---\r\n" + validContent;
+	await scanner.scanFile(fichierHote);
+	r.check("QuizIndexEntry.subject: an unknown id reads as absent", scanner.getQuiz(fichierHote.path)?.subject, undefined);
+	content = validContent;
+	await scanner.scanFile(fichierHote);
 	content = "Cette note ne contient plus de quiz.";
 	await scanner.scanFile(fichierHote);
 	r.check("une note sans bloc retire son ancienne entrée du cache",
@@ -397,6 +407,10 @@ await withSrcModule("src/quiz-frontmatter.ts", async ({ lireFrontmatterNeoQuiz, 
 	r.check("aller-retour de la source",
 		lireFrontmatterNeoQuiz(ecrireFrontmatterNeoQuiz({ provider: "claude-code", model: "claude-sonnet-5", generatedAt: "2026-09-23T00:00:00Z", source: "CM1 - Python : les bases" }))?.source,
 		"CM1 - Python : les bases");
+	// The generator's reader and the subject reader agree on a trailing comment, a quoted value and a blank line in the block.
+	r.check("frontmatter: a trailing comment is not part of a value (same as the subject reader)",
+		lireFrontmatterNeoQuiz(["---", "neo-quiz:", "  provider: claude-code # cli", "", "  model: \"m\" # x", "  generatedAt: 2026-09-23T00:00:00Z", "  subject: \"maths\" # picked", "---", ""].join("\n")),
+		{ provider: "claude-code", model: "m", effort: undefined, generatedAt: "2026-09-23T00:00:00Z", subject: "maths" });
 	r.check("une note avec source et lien learn reste « rien que le frontmatter » de l'app",
 		neContientQueLeFrontmatterNeoQuiz(ecrireFrontmatterNeoQuiz({ provider: "claude-code", model: "m", generatedAt: "2026-09-23T00:00:00Z", source: "CM1", learn: "Parcours CM1" }) + "\n"),
 		true);
