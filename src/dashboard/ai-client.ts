@@ -321,6 +321,31 @@ export class NoQuizAnswer extends Error {
 	}
 }
 
+/** A failure of the CLI's own connection (a stream cut by the network, a
+    server that is busy): asking again is the cure, never a message to the
+    learner (2026-10-18: an Antigravity run ended with "The stream was
+    interrupted. Please continue the task you were working on." after its own
+    retry failed, the generation lost with it). */
+export class TransientCliError extends Error {}
+
+/** Does this error text of a CLI describe a connection or server hiccup? */
+export function estTransitoire(texte: string): boolean {
+	return /stream was interrupted|interrupted|connection (reset|aborted|closed|refused)|connexion .{0,40}(abandonn|interrompu|ferm)|econnreset|etimedout|socket hang up|temporarily unavailable|service unavailable|overloaded|try again|\b50[234]\b/i.test(String(texte || "").slice(0, 600));
+}
+
+/** A call retried when it fails with a `TransientCliError`: at most `max` more
+    times, a pause between them; a Stop is never retried. */
+export async function avecRelances<T>(appel: () => Promise<T>, annule: () => boolean, max = 2, pause = (ms: number) => new Promise<void>(r => setTimeout(r, ms)), delaiMs = 4000): Promise<T> {
+	for (let i = 0; ; i++) {
+		try {
+			return await appel();
+		} catch (e) {
+			if (!(e instanceof TransientCliError) || i >= max || annule()) throw e;
+			await pause(delaiMs * (i + 1));
+		}
+	}
+}
+
 /** Thrown before any CLI starts when a run sent with `neverAskTrust` meets a
     folder that is not already trusted: the queue pauses the line as
     "untrusted" (its "Trust this folder" button), never asks by itself. */
@@ -1614,7 +1639,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   niveau de raisonnement est DANS le nom du modèle (`…-high`, `…-low`),
 	   donc pas d'effort à passer. */
 	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lireOuReparer(suite => callAntigravityTexte(model, systemPrompt, userPrompt + suite, images), lire, () => aborted);
+		return lireOuReparer(suite => avecRelances(() => callAntigravityTexte(model, systemPrompt, userPrompt + suite, images), () => aborted), lire, () => aborted);
 	}
 
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
@@ -1691,7 +1716,11 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		if (res.code !== 0) throw erreurAntigravity(execErrorDepuisCode(res));
 
 		const resultat = lireResultatAntigravity(res.stdout);
-		if (resultat.erreur) throw erreurAntigravity({ message: resultat.erreur, stdout: res.stdout, stderr: res.stderr } as ExecError);
+		if (resultat.erreur) {
+			const e = erreurAntigravity({ message: resultat.erreur, stdout: res.stdout, stderr: res.stderr } as ExecError);
+			// The CLI lost its connection mid-run: asked again by the caller (`avecRelances`), not shown.
+			throw estTransitoire(resultat.erreur) ? new TransientCliError(e.message) : e;
+		}
 		const raw = resultat.reponse;
 		if (!raw.trim()) {
 			throw new Error(t("ai.err.antigravityEmpty"));

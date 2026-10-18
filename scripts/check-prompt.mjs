@@ -440,7 +440,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, diagnosticAntigravity, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -483,6 +483,24 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	const echecAgy = JSON.stringify({ event: "result", result: { status: "ERROR", error: "Authentication required" } });
 	r.check("the result event's error is kept, with the tool noise left out", [diagnosticAntigravity([outilAgy, echecAgy].join("\n")).includes("Authentication required"), diagnosticAntigravity([outilAgy, echecAgy].join("\n")).includes("introuvable")], [true, false]);
 	r.check("a plain text error (no stream) is taken as it is", diagnosticAntigravity("Fetching available models...\nError: Please sign in to view available models.").includes("Please sign in"), true);
+
+	/* A CLI THAT LOSES ITS CONNECTION IS ASKED AGAIN (2026-10-18): Antigravity ended a run with its own "stream was interrupted" result after its retry failed. */
+	r.check("estTransitoire: the stream interruption and connection errors are transient; sign-in and quota errors are not",
+		["The stream was interrupted. Please continue the task you were working on.", "read tcp: wsarecv: connection aborted", "HTTP 503", "Authentication required", "RESOURCE_EXHAUSTED quota", "Prompt is too long"].map(estTransitoire),
+		[true, true, true, false, false, false]);
+	const pauses = [];
+	let essais = 0;
+	const reussi = await avecRelances(async () => { essais++; if (essais < 3) throw new TransientCliError("cut"); return "ok"; }, () => false, 2, async ms => { pauses.push(ms); }, 10);
+	r.check("avecRelances: two transient failures then a success returns the success after three calls, pausing longer each time", [reussi, essais, pauses], ["ok", 3, [10, 20]]);
+	let n3 = 0;
+	const troisieme = await avecRelances(async () => { n3++; throw new TransientCliError("still cut"); }, () => false, 2, async () => {}, 1).catch(e => e);
+	r.check("avecRelances: still failing after the allowed retries throws the last transient error (three calls in all)", [n3, troisieme instanceof TransientCliError], [3, true]);
+	let n4 = 0;
+	await avecRelances(async () => { n4++; throw new Error("Authentication required"); }, () => false, 2, async () => {}, 1).catch(() => undefined);
+	r.check("avecRelances: an ordinary error is never retried", n4, 1);
+	let n5 = 0;
+	await avecRelances(async () => { n5++; throw new TransientCliError("cut"); }, () => true, 2, async () => {}, 1).catch(() => undefined);
+	r.check("avecRelances: a Stop is never retried", n5, 1);
 
 	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
 	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
