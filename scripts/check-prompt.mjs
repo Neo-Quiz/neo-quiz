@@ -440,7 +440,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, reparerTableauNonFerme, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireEtCorriger, validerQuestions, composerPrompts, reparerTableauNonFerme, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -518,29 +518,51 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("a valid quiz goes through the repair untouched", reparerTableauNonFerme(quizTexte), quizTexte);
 	r.check("a key-like word inside a string never closes an array", reparerTableauNonFerme("[{ a: ['x', \"un texte, html: oui\", 'y'] }]"), "[{ a: ['x', \"un texte, html: oui\", 'y'] }]");
 
-	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
-	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
+	/* THE MODEL CORRECTS ITS OWN MISTAKE (2026-10-18): an unreadable or schema-invalid answer goes back to the same model with the exact error and the numbered lines around it, up to 3 rounds; a fake provider returns scripted answers. */
+	const bon = "[{ title: 'T', prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
 	const coupe = "[{ title: 'A', prompt: 'very lo";
-	const appels = [];
-	const rep = await lireOuReparer(async (suite) => { appels.push(suite); return appels.length === 1 ? coupe : bon; }, parseReponseQuiz);
-	r.check("a broken then a good answer: the quiz is read, after exactly two calls", [rep.questions.length, appels.length], [1, 2]);
-	r.check("the first call has no note, the second quotes the parser error and the start of the broken answer",
-		[appels[0], appels[1].includes("AUTOMATIC SECOND ATTEMPT"), appels[1].includes("very lo"), appels[1].includes("could not be read")], ["", true, true, true]);
-	const toujoursCasse = [];
-	const errCasse = await lireOuReparer(async (suite) => { toujoursCasse.push(suite); return coupe; }, parseReponseQuiz).catch(e => e);
-	r.check("two broken answers: ONE repair only, then the error of the FIRST answer", [toujoursCasse.length, errCasse instanceof Error, errCasse.message.includes("very lo")], [2, true, true]);
-	const sansCoupure = [];
-	await lireOuReparer(async (suite) => { sansCoupure.push(suite); return bon; }, parseReponseQuiz);
-	r.check("a good answer is never repeated", sansCoupure.length, 1);
-	const aucun = [];
-	const nq = await lireOuReparer(async (suite) => { aucun.push(suite); return "NO_QUIZ\nnothing to quiz"; }, parseReponseQuiz).catch(e => e);
-	r.check("an explicit 'no quiz' is not repaired", [aucun.length, nq instanceof NoQuizAnswer], [1, true]);
-	let annule = false;
-	const stopped = [];
-	await lireOuReparer(async (suite) => { stopped.push(suite); annule = true; return coupe; }, parseReponseQuiz, () => annule).catch(() => undefined);
-	r.check("a Stop during the first call is not repaired", stopped.length, 1);
-	const echecReparation = await lireOuReparer(async (suite) => { if (suite) throw new Error("cli down"); return coupe; }, parseReponseQuiz).catch(e => e);
-	r.check("a failing repair call reports the first answer's error", echecReparation.message.includes("very lo"), true);
+	const scenario = async (reponses, extra = {}) => {
+		const appels = []; const rounds = [];
+		let err = null, res = null;
+		try {
+			res = await lireEtCorriger({ appel: async (c) => { appels.push(c); return reponses[Math.min(appels.length - 1, reponses.length - 1)]; }, lire: parseReponseQuiz, surCorrection: (t, m, e) => rounds.push([t, m, e.slice(0, 160)]), ...extra });
+		} catch (e) { err = e; }
+		return { appels, rounds, err, res };
+	};
+	const r1 = await scenario([coupe, bon]);
+	r1.note = r1.appels[1]?.note ?? "";
+	r.check("broken then good: fixed on round 1 after two calls, the first call asks the request (no correction), the round is announced",
+		[r1.res?.questions.length, r1.appels.length, r1.appels[0], r1.appels[1]?.tour, r1.rounds.length], [1, 2, null, 1, 1]);
+	r.check("the correction quotes the exact error, its place, and asks for the whole block again",
+		[r1.note.includes("AUTOMATIC CORRECTION 1/3"), r1.note.includes("The error, word for word:"), r1.note.includes("COMPLETE corrected quiz"), r1.appels[1]?.precedent === coupe], [true, true, true, true]);
+	const r3 = await scenario([coupe, coupe, coupe, bon]);
+	r.check("broken twice more: fixed on round 3 (four calls, three announced rounds)", [r3.res?.questions.length, r3.appels.length, r3.rounds.map(x => x[0])], [1, 4, [1, 2, 3]]);
+	const r4 = await scenario([coupe, coupe, coupe, coupe, bon]);
+	r.check("broken four times: the error is shown after the 3 rounds (four calls, the fifth answer never asked)", [r4.err instanceof Error, r4.appels.length, r4.res], [true, 4, null]);
+	const sansIndex = "[{ title: 'Sans reponse', prompt: 'p', options: ['a','b'] }]";
+	const rs = await scenario([sansIndex, bon]);
+	r.check("a question with options and no correctIndex is a schema error, corrected like a syntax error",
+		[rs.res?.questions.length, rs.appels.length, rs.rounds[0]?.[2].includes("correctIndex"), rs.appels[1]?.note.includes("correctIndex")], [1, 2, true, true]);
+	const horsIndex = await scenario(["[{ title: 'X', prompt: 'p', options: ['a','b'], correctIndex: 5 }]", bon]);
+	r.check("a correctIndex outside the options is corrected too", [horsIndex.res?.questions.length, horsIndex.appels.length], [1, 2]);
+	const multiligne = ["// title: Mon quiz", "[", "  {", "    title: 'T',", "    prompt: 'une question',", "    options: ['a', 'b'], correctIndex: 0,", "    explain: \"un \"mot\" mal ferme\",", "    hint: 'h',", "  }", "]"].join("\n");
+	const rl = await scenario([multiligne, bon]);
+	const noteLigne = rl.appels[1]?.note ?? "";
+	r.check("the correction carries the numbered lines around the error, the faulty line and a caret",
+		[/ at \d+, column \d+|It is at line \d+, column \d+/.test(noteLigne), noteLigne.includes("explain: \"un \"mot\" mal ferme\""), noteLigne.includes("^ here"), /\n\s+\d+ \| /.test(noteLigne)], [true, true, true, true]);
+	const longueLigne = "[\n  { title: 'T', prompt: 'x', options: ['a','b'], correctIndex: 0, html: \"" + "y".repeat(3000) + "\" oups \"fin\" }\n]";
+	const rg = await scenario([longueLigne, bon]);
+	r.check("a 3000-character line is cut around the error column in the excerpt (the note stays short)", [(rg.appels[1]?.note.length ?? 99999) < 2500, rg.res?.questions.length], [true, 1]);
+	r.check("an explicit 'no quiz' is never corrected", await scenario(["NO_QUIZ\nnothing to quiz"]).then(x => [x.appels.length, x.err instanceof NoQuizAnswer]), [1, true]);
+	const rStop = await scenario([coupe, bon], { annule: () => true });
+	r.check("a Stop is never corrected", [rStop.appels.length, rStop.err instanceof Error], [1, true]);
+	const rEchec = await lireEtCorriger({ appel: async (c) => { if (c) throw new Error("cli down"); return coupe; }, lire: parseReponseQuiz }).catch(e => e);
+	r.check("a correction call that fails reports the answer's own error", [rEchec instanceof Error, rEchec.message.includes("very lo")], [true, true]);
+	r.check("validerQuestions: reading cards, ordering and numeric questions without correctIndex are sound",
+		validerQuestions([{ role: "read", title: "R", prompt: "lire" }, { title: "O", prompt: "p", options: ["a", "b"], ordering: true }, { title: "N", prompt: "p", options: ["1", "2"], numeric: true, answer: "3" }, { title: "M", prompt: "p", options: ["a", "b"], correctIndices: [0, 1] }]), null);
+	/* A FOLLOW-UP TURN KEEPS THE FORMAT (2026-10-18): "Ajoute aussi une question sur les tableaux" is a generation like any other, with the whole format. */
+	const suite = composerPrompts("Ajoute aussi une question sur les tableaux", {});
+	r.check("a follow-up request still carries the JSON5 array format instructions", [suite.systemPrompt.includes("JSON5 array"), suite.systemPrompt.includes("correctIndex")], [true, true]);
 
 	const dossier = mkdtempDiag(joinDiag(tmpdirDiag(), "quiz-diag-"));
 	try {

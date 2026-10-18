@@ -301,31 +301,127 @@ export function extraireTableauQuiz(texte: string): unknown[] | null {
 	return null;
 }
 
-/** The note appended to the request for the ONE automatic second attempt: what
-    the app could not read, and what to send instead. */
-export function noteDeReparation(erreur: unknown, brut: string): string {
-	const detail = (erreur instanceof Error ? erreur.message : String(erreur)).slice(0, 300);
-	return "\n\nAUTOMATIC SECOND ATTEMPT: your previous answer could not be read by the app (" + detail + "). It began with: “" + apercuReponse(brut) + "”. Answer again with the COMPLETE quiz: ONE valid JSON5 array, nothing before or after it, every object and string closed. If the previous answer was long, make it more compact (shorter readings and explanations) so that it fits in one message.";
+/** One correction round asked of the model (2026-10-18): what its previous
+    answer was, and the message that tells it what is wrong with it. */
+export interface Correction {
+	/** The message sent to the model: the exact error, an excerpt of ITS answer, the instruction. */
+	note: string;
+	/** Its previous answer, resent with the request when no live session holds the conversation. */
+	precedent: string;
+	/** 1-based round and the number of rounds allowed. */
+	tour: number;
+	max: number;
 }
 
+/** The text a parser read, kept on its error so the excerpt of a correction
+    quotes the lines the error numbers (the answer after the fence and LaTeX
+    repairs), not the raw answer. */
+export type ErreurLecture = Error & { texteLu?: string };
+
+/** The `L:C` of a JSON5 error message ("invalid character 'c' at 153:1375"). */
+export function positionDErreur(message: string): { ligne: number; colonne: number } | null {
+	const m = /\bat (\d+):(\d+)\b/.exec(message);
+	return m ? { ligne: Number(m[1]), colonne: Number(m[2]) } : null;
+}
+
+/** Lines `ligne - 5 .. ligne + 5` of `texte`, numbered; a line longer than 240
+    characters shows the 200 around the error column, with a caret under it. */
+export function extraitNumerote(texte: string, ligne: number, colonne: number, marge = 5): string {
+	const lignes = texte.split("\n");
+	const debut = Math.max(1, ligne - marge);
+	const fin = Math.min(lignes.length, ligne + marge);
+	const sortie: string[] = [];
+	for (let n = debut; n <= fin; n++) {
+		let l = (lignes[n - 1] ?? "").replace(/\r$/, "");
+		let decalage = 0;
+		if (l.length > 240) {
+			const de = n === ligne ? Math.max(0, colonne - 100) : 0;
+			decalage = de;
+			l = (de > 0 ? "…" : "") + l.slice(de, de + (n === ligne ? 200 : 160)) + (l.length > de + 200 ? "…" : "");
+		}
+		sortie.push(String(n).padStart(5) + " | " + l);
+		if (n === ligne) {
+			const pos = Math.max(0, colonne - 1 - decalage) + (decalage > 0 ? 1 : 0);
+			sortie.push("      | " + " ".repeat(Math.min(pos, 240)) + "^ here");
+		}
+	}
+	return sortie.join("\n");
+}
+
+/** The message of one correction round: the error word for word, where it is,
+    the lines around it in the model's own answer, and what to send back. */
+export function noteDeCorrection(erreur: unknown, texteLu: string, tour: number, max: number): string {
+	const brute = (erreur as { erreurBrute?: string } | undefined)?.erreurBrute;
+	const message = (brute ?? (erreur instanceof Error ? erreur.message : String(erreur))).slice(0, 600);
+	const pos = positionDErreur(message);
+	const source = (erreur as ErreurLecture | undefined)?.texteLu ?? texteLu;
+	const extrait = pos ? "\n\nThe lines around the error, numbered, taken from your own answer as the app read it:\n" + extraitNumerote(source, pos.ligne, pos.colonne) : "";
+	return "AUTOMATIC CORRECTION " + tour + "/" + max + ": the app could not accept your last answer.\n\nThe error, word for word: " + message
+		+ (pos ? "\nIt is at line " + pos.ligne + ", column " + pos.colonne + "." : "")
+		+ extrait
+		+ "\n\nFix that mistake yourself and resend the COMPLETE corrected quiz: the whole JSON5 array in one answer, nothing before it except the first line comment, nothing after it, every object, array and string closed. Do not apologise and do not explain.";
+}
+
+/** The model's mistakes the app can name as a fixed schema (2026-10-18): a
+    question that offers options without saying which is right, or whose
+    answer points outside them. `null` when every question is sound. */
+export function validerQuestions(questions: readonly unknown[]): string | null {
+	let n = 0;
+	for (const q of questions) {
+		if (typeof q !== "object" || q === null || Array.isArray(q)) continue;
+		const o = q as Record<string, unknown>;
+		if (!Array.isArray(o.options)) continue;
+		n++;
+		const nom = "Question " + n + (typeof o.title === "string" && o.title ? " (" + o.title.slice(0, 50) + ")" : "");
+		if (o.options.length < 2) return nom + ": \"options\" has fewer than 2 entries.";
+		const indices = Array.isArray(o.correctIndices) ? o.correctIndices : o.correctIndex !== undefined ? [o.correctIndex] : null;
+		if (o.ordering === true || o.matching === true || o.cloze !== undefined || o.numeric === true || typeof o.answer === "string") continue;
+		if (!indices || indices.length === 0) return nom + ": it has \"options\" but neither \"correctIndex\" nor \"correctIndices\".";
+		for (const i of indices) {
+			if (!Number.isInteger(i) || (i as number) < 0 || (i as number) >= (o.options as unknown[]).length) return nom + ": the correct index " + JSON.stringify(i) + " is not an index of its " + (o.options as unknown[]).length + " options (0 to " + ((o.options as unknown[]).length - 1) + ").";
+		}
+	}
+	return null;
+}
+
+/** An answer the app refused for its schema, not for its syntax. */
+export class ErreurSchema extends Error {}
+
 /**
- * One model call and its reading, with ONE automatic repair (2026-10-18):
- * an answer the app cannot read (cut off, malformed, prose instead of the
- * quiz) must not stop the generation. The call is made again with a note that
- * quotes the parser error (`noteDeReparation`; a live session answers it in
- * the same conversation); only when the second answer is unreadable too, or
- * its call fails, is the error of the FIRST answer reported. Never repaired:
- * a model's explicit "no quiz", a usage limit, a context limit, a Stop.
+ * One model call and its reading, with the model's own CORRECTION (2026-10-18,
+ * "we're talking about an AI: it can fix its mistake itself"): an answer the
+ * app cannot read (cut, malformed, prose) or that fails the question schema
+ * is sent back to THE SAME model with the exact error, the numbered lines
+ * around it and the order to resend the whole block, up to `tours` rounds.
+ * `appel` asks the model (round 0: the request; after: the correction, which
+ * a live session answers in the same conversation and a one-shot call gets
+ * with the previous answer attached). Never corrected: a model's explicit "no
+ * quiz", a usage limit, a context limit, a Stop. After the last round the
+ * error of the LAST answer is thrown.
  */
-export async function lireOuReparer(appel: (suite: string) => Promise<string>, lire: LireReponse, annule: () => boolean = () => false): Promise<ReponseQuiz & { lot?: ReponseDocument[] }> {
-	const brut = await appel("");
-	try {
-		return lire(brut);
-	} catch (e) {
-		if (annule() || e instanceof NoQuizAnswer || e instanceof UsageLimitError || (e instanceof Error && e.message === t("ai.err.contextLimit"))) throw e;
-		let second: string;
-		try { second = await appel(noteDeReparation(e, brut)); } catch { throw e; }
-		try { return lire(second); } catch { throw e; }
+export async function lireEtCorriger(o: {
+	appel: (correction: Correction | null) => Promise<string>;
+	lire: LireReponse;
+	annule?: () => boolean;
+	tours?: number;
+	/** Called before each correction round (the transcript shows it as a step). */
+	surCorrection?: (tour: number, max: number, erreur: string) => void;
+}): Promise<ReponseQuiz & { lot?: ReponseDocument[] }> {
+	const max = o.tours ?? 3;
+	let brut = await o.appel(null);
+	for (let tour = 1; ; tour++) {
+		try {
+			const r = o.lire(brut);
+			const faute = validerQuestions(r.lot ? r.lot.flatMap(d => d.questions) : r.questions);
+			if (faute) throw Object.assign(new ErreurSchema(faute), { texteLu: brut });
+			return r;
+		} catch (e) {
+			if ((o.annule && o.annule()) || e instanceof NoQuizAnswer || e instanceof UsageLimitError || (e instanceof Error && e.message === t("ai.err.contextLimit")) || tour > max) throw e;
+			o.surCorrection?.(tour, max, e instanceof Error ? e.message : String(e));
+			try {
+				brut = await o.appel({ note: noteDeCorrection(e, brut, tour, max), precedent: brut, tour, max });
+			} catch { throw e; }
+		}
 	}
 }
 
@@ -1197,7 +1293,7 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		/* The parser's position AND the start of the answer (2026-10-10): "invalid
 		   character 'R' at 1:1" alone could not tell what the model had written
 		   on line 1. */
-		if (looksLikeQuiz) throw new Error(t("ai.err.malformedQuiz", { error: err instanceof Error ? err.message : String(err), preview: apercuReponse(content) }));
+		if (looksLikeQuiz) throw Object.assign(new Error(t("ai.err.malformedQuiz", { error: err instanceof Error ? err.message : String(err), preview: apercuReponse(content) })), { texteLu: cleaned, erreurBrute: err instanceof Error ? err.message : String(err) });
 		throw nonQuizResponseError(content);
 	}
 
@@ -1465,8 +1561,25 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    sent when the session already holds the conversation. Never set by a
 	    generation or a plan. */
 	let texteSuite: string | null = null;
-	/** The repair note of the second attempt (`lireOuReparer`): a follow-up turn sends `texteSuite`, not the prompt it would be appended to. */
-	let noteReparation = "";
+	/** The correction round being asked (`lireEtCorriger`): a live session gets its note alone (it holds the conversation), a one-shot call the request, the previous answer and the note (`suiteCorrection`). */
+	let correctionCourante: Correction | null = null;
+	/** What a one-shot call appends to its request during a correction round. */
+	function suiteCorrection(): string {
+		const c = correctionCourante;
+		if (!c) return "";
+		return "\n\nYOUR PREVIOUS ANSWER (the app could not accept it):\n<<<\n" + c.precedent.slice(0, 150000) + "\n>>>\n\n" + c.note;
+	}
+	/** Runs one call of a correction loop with its round set, whatever the outcome. */
+	async function avecCorrection<T>(c: Correction | null, appel: () => Promise<T>): Promise<T> {
+		correctionCourante = c;
+		try { return await appel(); } finally { correctionCourante = null; }
+	}
+	/** The round shows in the transcript as a step of the AI's own work, with the error it fixes. */
+	function signalerCorrection(tour: number, max: number, erreur: string): void {
+		const id = "fix-" + tour + "-" + Date.now();
+		transcriptSink?.({ kind: "tool", name: t("ai.fix.step"), id, input: tour + "/" + max + " \u00b7 " + erreur.replace(/\s+/g, " ").slice(0, 160) });
+		transcriptSink?.({ kind: "toolResult", id, status: "ok" });
+	}
 
 	/* ── Compteurs de la génération en cours ──
 	   Chaque `callX` dépose ici ce que SON fournisseur a publié ; generate()
@@ -1549,8 +1662,8 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		abortCurrent = () => { aborted = true; arreter?.(); };
 		try {
 			return await runLiveTurn({
-				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: texteSuite ? texteSuite + noteReparation : texte,
-				...(texteSuite ? { freshText: texte } : {}),
+				tool, chatId: ctx.chatId, key: ctx.key, model, mode, text: correctionCourante ? correctionCourante.note : (texteSuite ?? texte),
+				...(texteSuite && !correctionCourante ? { freshText: texte } : {}),
 				...(effort ? { effort } : {}),
 				images: images.map(i => ({ mediaType: i.mediaType || "image/png", base64: i.base64 })),
 				abortable: stop => { arreter = stop; if (aborted) stop(); },
@@ -1680,7 +1793,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 			// Effort réel : niveau `think` (low/medium/high/max) passé à l'API
 			// pour les modèles à raisonnement (ignoré sinon, cf. callOllama).
 			const effort = resolveEffort("ollama", settings.get().aiEffort);
-			return avecRelances(() => callOllama(model, systemPrompt, userPrompt, ollamaUrl, authHeader, images, effort), () => aborted);
+			return avecRelances(() => callOllama(model, systemPrompt, userPrompt, ollamaUrl, authHeader, images, effort, lire), () => aborted);
 		} else if (provider === "codex") {
 			// Effort clampé aux niveaux supportés par CE modèle (ex. ultra
 			// persisté + gpt-5.5 → xhigh), sinon le CLI rejetterait la valeur.
@@ -1731,12 +1844,13 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   niveau de raisonnement est DANS le nom du modèle (`…-high`, `…-low`),
 	   donc pas d'effort à passer. */
 	async function callAntigravity(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lireOuReparer(suite => avecRelances(() => callAntigravityTexte(model, systemPrompt, userPrompt + suite, images), () => aborted), lire, () => aborted);
+		return lireEtCorriger({ appel: c => avecCorrection(c, () => avecRelances(() => callAntigravityTexte(model, systemPrompt, userPrompt, images), () => aborted)), lire, annule: () => aborted, surCorrection: signalerCorrection });
 	}
 
 	/** The call itself, returning the model's TEXT: a quiz for `generate`, a
 	    prose answer for `chat`. */
 	async function callAntigravityTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = []): Promise<string> {
+		userPrompt = userPrompt + suiteCorrection();
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.antigravityDesktopOnly"));
 		}
@@ -1847,7 +1961,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   compte Pro/Max/Team/Enterprise. Prompt complet par stdin
 	   (aucun échappement d'argument), sortie --output-format json. */
 	async function callClaudeCode(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lireOuReparer(suite => { noteReparation = suite; return callClaudeCodeTexte(model, systemPrompt, userPrompt + suite, images); }, lire, () => aborted);
+		return lireEtCorriger({ appel: c => avecCorrection(c, () => callClaudeCodeTexte(model, systemPrompt, userPrompt, images)), lire, annule: () => aborted, surCorrection: signalerCorrection });
 	}
 
 	/** The effort chosen in the composer, as `claude --effort` reads it. It
@@ -1860,6 +1974,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	    prose answer for `chat` (2026-09-29). `effort`: the level passed to the
 	    CLI, the composer's by default. */
 	async function callClaudeCodeTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort: string | null = effortClaude(), imageInstruction = "First read these images with the Read tool, then base the quiz on their content:"): Promise<string> {
+		userPrompt = userPrompt + suiteCorrection();
 		if (!currentHost().platform.isDesktopApp) {
 			throw new Error(t("ai.hint.claudeDesktopOnly"));
 		}
@@ -2041,11 +2156,12 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 	   écrite dans un fichier (-o) pour un parsing propre. Sandbox read-only et
 	   --ignore-user-config isolent la génération (pas de MCP/hooks perso). */
 	async function callCodex(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false, lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
-		return lireOuReparer(suite => callCodexTexte(model, systemPrompt, userPrompt + suite, images, effort, fast), lire, () => aborted);
+		return lireEtCorriger({ appel: c => avecCorrection(c, () => callCodexTexte(model, systemPrompt, userPrompt, images, effort, fast)), lire, annule: () => aborted, surCorrection: signalerCorrection });
 	}
 
 	/** The call itself, returning the model's TEXT (see `callClaudeCodeTexte`). */
 	async function callCodexTexte(model: string, systemPrompt: string, userPrompt: string, images: ImagePayload[] = [], effort = "medium", fast = false): Promise<string> {
+		userPrompt = userPrompt + suiteCorrection();
 		if (!currentHost().platform.isDesktopApp) {
 			// Même libellé que le hint du composer (« Codex CLI » explicite).
 			throw new Error(t("ai.hint.codexDesktopOnly"));
@@ -2230,16 +2346,29 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 		}
 	}
 
-	async function callOllama(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null): Promise<ReponseQuiz> {
-		const agent = await ollamaParClaude(model, systemPrompt, userPrompt, images);
-		if (agent !== null) return parseReponseQuiz(agent);
-		return parseOllamaResponse(await callOllamaTexte(model, systemPrompt, userPrompt, ollamaUrl, authHeaders, images, effort, true));
+	async function callOllama(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null, lire: LireReponse = parseReponseQuiz): Promise<ReponseQuiz> {
+		/* As an agent in a trusted folder (Claude Code on the Ollama server) or by the API: decided at the first call, kept for the correction rounds. */
+		let viaAgent: boolean | null = null;
+		return lireEtCorriger({
+			appel: c => avecCorrection(c, async () => {
+				if (viaAgent !== false) {
+					const agent = await ollamaParClaude(model, systemPrompt, userPrompt, images);
+					if (agent !== null) { viaAgent = true; return agent; }
+					viaAgent = false;
+				}
+				return await callOllamaTexte(model, systemPrompt, userPrompt, ollamaUrl, authHeaders, images, effort, true);
+			}),
+			lire: texte => (viaAgent ? lire(texte) : parseOllamaResponse(texte)),
+			annule: () => aborted,
+			surCorrection: signalerCorrection,
+		});
 	}
 
 	/** The call itself, returning the model's TEXT. `quizSchema` constrains the
 	    answer to the quiz JSON schema (generation); `chat` passes false and gets
 	    free prose. */
 	async function callOllamaTexte(model: string, systemPrompt: string, userPrompt: string, ollamaUrl?: string, authHeaders?: Record<string, string>, images: ImagePayload[] = [], effort: string | null = null, quizSchema = false): Promise<string> {
+		userPrompt = userPrompt + suiteCorrection();
 		if (!ollamaUrl) {
 			ollamaUrl = (settings.get().aiOllamaUrl || "http://localhost:11434").replace(/\/+$/, "");
 		}

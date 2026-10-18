@@ -768,6 +768,7 @@ export const EN_AI = {
 	"ai.err.noFileAccess": "The quiz generator has no access to your files — it only sees what is in the composer. Paths written in your request are attached automatically when they can be found; when they cannot, attach the notes or documents with “+” or “@”, or paste their content.",
 	"ai.err.notQuiz": "The model replied with text instead of a quiz: “{preview}…”",
 	"ai.err.outputLimit": "The answer was too long for the model (output limit reached). Ask for a shorter quiz or split the course.",
+	"ai.fix.step": "Fixing the quiz",
 	"ai.err.contextLimit": "The request was too long for the model (context limit reached). Attach fewer or shorter documents, or split the course.",
 	"ai.err.malformedQuiz": "The quiz the model wrote could not be read ({error}). Its answer starts with: “{preview}…”",
 	"ai.err.invalidModelClaude": "Invalid Claude model name: {model}",

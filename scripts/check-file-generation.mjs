@@ -497,15 +497,15 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	file.envoyer(unSeul);
 	await attendre();
 	const l4 = file.lignes()[0];
-	r.check("a broken answer: the line fails showing the answer's start, each raw answer (the first and the automatic second attempt) goes to the diagnostic file",
-		[l4.etat, (l4.erreur ?? "").includes("Reading the course."), diagnostics.slice(avantDiag)], ["echouee", true, [reponse, reponse]]);
+	r.check("a broken answer: the line fails showing the answer's start, each raw answer (the first and the three automatic corrections) goes to the diagnostic file",
+		[l4.etat, (l4.erreur ?? "").includes("Reading the course."), diagnostics.slice(avantDiag)], ["echouee", true, [reponse, reponse, reponse, reponse]]);
 	file.fermer(l4.id);
 	reponse = "!ERR:API Error: Claude's response exceeded the 32000 output token maximum. To configure this behavior, set the CLAUDE_CODE_MAX_OUTPUT_TOKENS environment variable.";
 	file.envoyer(unSeul);
 	await attendre();
 	const l5 = file.lignes()[0];
 	r.check("Claude Code's output limit: a clear 'too long' error, nothing more kept",
-		[l5.etat, /output limit|limite de sortie/.test(l5.erreur ?? ""), diagnostics.length - avantDiag], ["echouee", true, 2]);
+		[l5.etat, /output limit|limite de sortie/.test(l5.erreur ?? ""), diagnostics.length - avantDiag], ["echouee", true, 4]);
 
 	/* AN AUTOMATIC LINE: gated, then run in the Supervised form in its folder. */
 	confiant = true;

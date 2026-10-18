@@ -715,6 +715,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.err.noFileAccess": "Le générateur de quiz n'a pas accès à vos fichiers — il ne voit que le contenu du composer. Les chemins écrits dans votre demande sont joints automatiquement quand ils sont trouvés ; sinon, joignez les notes ou documents avec « + » ou « @ », ou collez leur contenu.",
 	"ai.err.notQuiz": "Le modèle a répondu par du texte au lieu d'un quiz : « {preview}… »",
 	"ai.err.outputLimit": "La réponse était trop longue pour le modèle (limite de sortie atteinte). Demandez un quiz plus court ou découpez le cours.",
+	"ai.fix.step": "Corrige le quiz",
 	"ai.err.contextLimit": "La demande était trop longue pour le modèle (limite de contexte atteinte). Joignez moins de documents ou des documents plus courts, ou découpez le cours.",
 	"ai.err.malformedQuiz": "Le quiz écrit par le modèle n'a pas pu être lu ({error}). Sa réponse commence par : « {preview}… »",
 	"ai.err.invalidModelClaude": "Nom de modèle Claude invalide : {model}",
