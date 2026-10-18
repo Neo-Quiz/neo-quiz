@@ -24,7 +24,7 @@
 .nq-bug-modal .nqb-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .nq-bug-modal .nqb-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .nq-bug-modal .nqb-label { font-weight: 600; font-size: 13px; }
-.nq-bug-modal .nqb-counter { color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.nq-bug-modal .nqb-counter { white-space: nowrap; flex: none; color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .nq-bug-modal .nqb-input {
 	box-sizing: border-box;
