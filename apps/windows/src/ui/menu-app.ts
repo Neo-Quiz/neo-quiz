@@ -95,6 +95,10 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		while (panneaux.length > depuis) {
 			panneaux.pop()!.el.remove();
 		}
+		/* The row that opened a closed submenu goes dark with it: `aria-expanded`
+		   lights a row (shell.css), and a row left expanded stayed lit next to
+		   the hovered one, two highlights at once (2026-10-18). */
+		panneaux[depuis - 1]?.lignes.forEach(l => l.removeAttribute("aria-expanded"));
 	}
 
 	/** Positionne un panneau déjà construit, rabattu dans la fenêtre s'il
@@ -280,10 +284,11 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		// The pointer coming back from the submenu onto its own row: the
 		// panel is already there, rebuilding it made it blink.
 		if (panneaux[niveauParent + 1]?.proprietaire === ligneEl) return;
-		panneaux[niveauParent].lignes.forEach(l => l.removeAttribute("aria-expanded"));
-		ligneEl.setAttribute("aria-expanded", "true");
 		const rect = ligneEl.getBoundingClientRect();
+		// Opening the level closes the previous submenu first (`fermerDepuis`,
+		// which darkens its row): only then is this row marked expanded.
 		ouvrirNiveau(niveauParent + 1, entree.items, ecran(rect.right) - 4, ecran(rect.top) - 12, ligneEl);
+		ligneEl.setAttribute("aria-expanded", "true");
 	}
 
 	function activer(entree: EntreeMenu, ligneEl: HTMLElement): void {
@@ -451,8 +456,10 @@ export function ouvrirMenuApp(ancre: HTMLElement, deps: ActionsMenu): () => void
 		} else if (e.key === "ArrowLeft") {
 			if (panneaux.length > 1) {
 				e.preventDefault();
+				// The row that opened this submenu, read before the close darkens it.
+				const parent = panneaux[niveau - 1].lignes.find(l => l.getAttribute("aria-expanded") === "true") ?? null;
 				fermerDepuis(niveau);
-				allumer(niveau - 1, panneaux[niveau - 1].lignes.find(l => l.getAttribute("aria-expanded") === "true") ?? null);
+				allumer(niveau - 1, parent);
 			}
 		} else if (e.key === "Enter") {
 			if (p.actif >= 0) {
