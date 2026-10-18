@@ -150,6 +150,11 @@ async function sections(r, { AD, JT, SV, BR }) {
 			const co = mk(t, { tokenStore: memoire({ accessToken: TOKEN, login: "octo" }) });
 			await co.send({ ...RAPPORT, githubToken: "gho_FROMWINDOW" });
 			r.check("send: connected body carries the stored token only", vus[1].corps.githubToken, TOKEN);
+			{
+				const noEnv = []; const { env: _e, ...WITHOUT_ENV } = RAPPORT;
+				await mk(async (u, i) => { noEnv.push(JSON.parse(i.body)); return json(OKREP); }).send(WITHOUT_ENV);
+				r.check("send: no env key from the window means no env is sent", [noEnv.length, "env" in noEnv[0]], [1, false]);
+			}
 			r.check("send: invalid input is refused before any request", [await anon.send({ v: 2 }), await anon.send("x"), vus.length], [{ ok: false, code: "invalid" }, { ok: false, code: "invalid" }, 2]);
 		}
 

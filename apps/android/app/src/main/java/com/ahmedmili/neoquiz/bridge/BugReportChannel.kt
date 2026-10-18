@@ -137,11 +137,12 @@ class BugReportChannel(
             lastSend = t
         }
         try {
-            // The page supplies neither the token, the environment nor a log (none exists on Android).
+            // The page supplies neither the token, the environment's value nor a log (none exists on Android):
+            // it only says whether to send the environment (its `env` key present), and we fill it in.
             val base = JSONObject(report.toString())
             base.remove("githubToken")
             base.remove("log")
-            base.put("env", env())
+            if (report.has("env")) base.put("env", env()) else base.remove("env")
             if (base.toString().toByteArray(Charsets.UTF_8).size > BugReportRules.BODY_MAX_BYTES) return failure("invalid")
             val session = store.read()
             val r = post(if (session != null) JSONObject(base.toString()).put("githubToken", session.accessToken) else base)

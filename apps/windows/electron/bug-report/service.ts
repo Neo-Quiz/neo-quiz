@@ -134,9 +134,11 @@ export function createBugReportService(deps: BugReportDeps): BugReportService {
 	};
 
 	async function sendValid(report: BugReport): Promise<SendResult> {
-		// The window supplies neither the token nor the environment.
-		const base: BugReport = { ...report, env: deps.env() };
+		// The window supplies neither the token nor the environment's value: it only
+		// says whether to send one (its `env` key present), and main fills it in.
+		const base: BugReport = { ...report };
 		delete base.githubToken;
+		if (report.env !== undefined) base.env = deps.env(); else delete base.env;
 		if (base.log !== undefined) base.log = scrubLog(base.log).slice(0, LIMITS.log);
 		// Same 16 KB limit for connected and anonymous users: judged before the token is added.
 		if (Buffer.byteLength(JSON.stringify(base)) > LIMITS.body) return { ok: false, code: "invalid" };

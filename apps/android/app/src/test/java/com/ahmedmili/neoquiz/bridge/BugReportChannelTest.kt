@@ -31,7 +31,7 @@ class BugReportChannelTest {
     private fun call(h: Map<String, suspend (JSONArray) -> Any?>, name: String, vararg args: Any?): Any? =
         runBlocking { h.getValue(name)(JSONArray(args.toList())) }
 
-    private fun report() = JSONObject("""{"v":1,"what":"It crashed","log":"leak","githubToken":"forged"}""")
+    private fun report() = JSONObject("""{"v":1,"what":"It crashed","env":{"app":"evil","os":"evil","platform":"windows"},"log":"leak","githubToken":"forged"}""")
 
     @Test fun `disabled while a constant is empty`() {
         val h = channel(Store(), relayUrl = "") { _, _, _, _ -> error("no network") }
@@ -59,6 +59,17 @@ class BugReportChannelTest {
         assertFalse(sent[0].has("githubToken"))
         assertFalse(sent[0].has("log"))
         assertEquals("9.9", sent[0].getJSONObject("env").getString("app"))
+    }
+
+    @Test fun `send without an env key sends no env`() {
+        val sent = mutableListOf<JSONObject>()
+        val h = channel(Store()) { _, _, _, body ->
+            sent += JSONObject(body!!)
+            JSONObject("""{"ok":true,"url":"https://github.com/o/r/issues/7","number":7}""")
+        }
+        val r = call(h, "bugReport.send", JSONObject("""{"v":1,"what":"It crashed"}""")) as JSONObject
+        assertEquals(7, r.getInt("number"))
+        assertFalse(sent[0].has("env"))
     }
 
     @Test fun `second send within 5 seconds is rate limited`() {
