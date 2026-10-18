@@ -65,8 +65,11 @@ Smoke test: `curl https://<worker-host>/health` answers `{"ok":true}`.
 
 ## 3. The app
 
-Paste the Worker URL and the App's Client ID into `src/bug-report-config.ts`
-(`BUG_RELAY_URL`, `GITHUB_APP_CLIENT_ID`). No client secret is needed anywhere.
+Paste the Worker URL and the App's Client ID into BOTH copies of the constants:
+`src/bug-report-config.ts` (`BUG_RELAY_URL`, `GITHUB_APP_CLIENT_ID`) and the Kotlin
+`BugReportConfig` in `apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/BugReportRules.kt`
+(`RELAY_URL`, `GITHUB_CLIENT_ID`). `npm run check:android-pont` fails when the two differ.
+No client secret is needed anywhere.
 
 ## Kill switch
 
