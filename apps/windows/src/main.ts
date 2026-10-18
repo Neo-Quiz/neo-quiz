@@ -69,6 +69,7 @@ import type { SensEcran } from "./ui/transition-etat";
 import { renderSettings, viserAjoutAppareil } from "./ui/settings";
 import { amorcerCacheComptes } from "./ui/comptes";
 import { monterBarreTitre } from "./ui/barre-titre";
+import { monterToastMiseAJour } from "./ui/mise-a-jour-toast";
 import { estMobile } from "./host/platform";
 import { installRipple } from "./ui/ripple";
 import { installBarreNative } from "./ui/barre-native";
@@ -584,6 +585,9 @@ async function demarrer(): Promise<void> {
 		fondSuivant: () => { void fondSuivant(); },
 		choisirFond: () => { void choisirFond(); },
 	});
+	// Desktop only (the phone updates from Settings): the bottom-right update toast.
+	if (!estMobile()) monterToastMiseAJour();
+
 	/* Le dossier du fond est DÉJÀ admis au périmètre par le principal
 	   (`perimetreInitial`, avant l'ouverture de la fenêtre) : le rendu n'a
 	   qu'à poser l'image, sans attendre les dossiers de quiz ci-dessous. */

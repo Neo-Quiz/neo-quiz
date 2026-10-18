@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- "Report a bug" in the application menu opens a new GitHub issue prefilled with the app and Windows versions and the headings What happened, Steps to reproduce and Expected.
+- A toast at the bottom right announces a new version once it is downloaded (or waits for a click on a metered connection), with a Restart and update (or Download) button and a close button that hides it for that version until the next launch.
+
 ### Changed
 
 - Picking a model, an effort level or an agent mode in the Generate or Explain composer now returns the focus to the text field, ready to type.

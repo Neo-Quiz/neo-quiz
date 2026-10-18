@@ -16,14 +16,12 @@ import { pont } from "../host/pont";
 import { poserIcone } from "../host/ui";
 import { poserGlyphe } from "./glyphes-fenetre";
 import { ouvrirMenuApp } from "./menu-app";
-import { palierZoomVoisin } from "./menu-app-arbre";
+import { palierZoomVoisin, URL_DEPOT, urlSignalement } from "./menu-app-arbre";
 import { createZoomBubble } from "./zoom-bubble";
 import { CLE_REGLAGES_ZOOM, borneZoom } from "../../electron/pont";
 import type { EtatFenetre } from "../../electron/pont";
 import application from "../../package.json";
 
-/** The repository URL, for the "Source code" entry of the application menu. */
-const URL_DEPOT = "https://github.com/Neo-Quiz/neo-quiz";
 import { verifierMaintenant } from "./mise-a-jour";
 
 /** The toggle of the application menu, set by `monterBarreTitre`: the bar
@@ -200,6 +198,9 @@ export function monterBarreTitre(root: HTMLElement, deps: {
 					   le `<a target="_blank">` de l'ancienne section
 					   « À propos ». */
 					window.open(URL_DEPOT, "_blank", "noopener");
+				} else if (id === "report-bug") {
+					// Same path as the repository link above (the main process hands it to the browser).
+					window.open(urlSignalement(application.version, navigator.userAgent), "_blank", "noopener");
 				} else if (id === "change-wallpaper") {
 					deps.choisirFond();
 				} else if (id === "reload") {

@@ -41,6 +41,34 @@ export function palierZoomVoisin(courant: number, sens: 1 | -1): number {
 	return [...PALIERS_ZOOM].reverse().find(p => p < base - 0.001) ?? PALIERS_ZOOM[0];
 }
 
+/** The repository, and the page a bug report starts from. */
+export const URL_DEPOT = "https://github.com/Neo-Quiz/neo-quiz";
+
+/** "Windows 10.0" from a user agent ("Windows NT 10.0"), or "Windows" when it does not say. */
+export function versionWindows(userAgent: string): string {
+	const m = /Windows NT (\d+(?:\.\d+)?)/.exec(userAgent);
+	return m ? `Windows ${m[1]}` : "Windows";
+}
+
+/** The new-issue URL with a prefilled template: versions, then three headings.
+    The headings are the repository's public (English) issue language, not the UI's. */
+export function urlSignalement(version: string, userAgent: string): string {
+	const corps = `**App version:** ${version}
+**System:** ${versionWindows(userAgent)}
+
+## What happened
+
+
+## Steps to reproduce
+
+1. 
+
+## Expected
+
+`;
+	return `${URL_DEPOT}/issues/new?body=${encodeURIComponent(corps)}`;
+}
+
 export function buildMenu(ctx: { version: string }): EntreeMenu[] {
 	return [
 		/* The repository link came to this menu on 2026-09-17, when the
@@ -64,5 +92,6 @@ export function buildMenu(ctx: { version: string }): EntreeMenu[] {
 			{ kind: "action", id: "fullscreen", label: t("app.menu.fullscreen"), shortcut: "F11" },
 			{ kind: "action", id: "devtools", label: t("app.menu.devtools"), shortcut: "Ctrl+Alt+I" },
 		] },
+		{ kind: "action", id: "report-bug", label: t("app.menu.reportBug") },
 	];
 }

@@ -85,3 +85,74 @@
 	color: var(--text-faint);
 	cursor: default;
 }
+
+/* =========================================================
+   THE UPDATE TOAST (`ui/mise-a-jour-toast.ts`)
+   Bottom right, over the page; the zoom bubble is at the top, so they never
+   meet. Slide up + fade in, and the same out; nothing moves under
+   reduced motion.
+   ========================================================= */
+.nq-maj-toast {
+	position: fixed;
+	right: 16px;
+	bottom: 16px;
+	z-index: 100;
+	display: flex;
+	gap: 12px;
+	width: min(360px, calc(100vw - 32px));
+	padding: 14px 40px 14px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: 0 18px 36px -8px rgba(0,0,0,.45), 0 3px 8px -2px rgba(0,0,0,.24);
+	font-family: var(--font-interface);
+	font-size: 13px;
+	opacity: 0;
+	transform: translateY(16px);
+	transition: opacity 250ms cubic-bezier(.2,.8,.2,1), transform 250ms cubic-bezier(.2,.8,.2,1);
+}
+.nq-maj-toast.is-visible { opacity: 1; transform: none; }
+.nq-maj-toast:not(.is-visible) { transition-duration: 200ms; pointer-events: none; }
+.nq-maj-toast-icone { flex: none; display: flex; margin-top: 1px; color: var(--text-muted); }
+.nq-maj-toast-icone svg { width: 18px; height: 18px; }
+.nq-maj-toast-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nq-maj-toast-titre { font-weight: 600; font-size: 14px; }
+.nq-maj-toast-texte { color: var(--text-muted); line-height: 1.4; }
+.nq-maj-toast-bouton {
+	align-self: flex-end;
+	margin-top: 10px;
+	height: 30px;
+	padding: 0 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font: inherit;
+	cursor: pointer;
+	transition: background-color 120ms ease-out, transform 120ms ease-out;
+}
+.nq-maj-toast-bouton:hover { background: var(--background-modifier-hover); }
+.nq-maj-toast-bouton:active { transform: scale(.98); }
+.nq-maj-toast-bouton:disabled { opacity: .6; cursor: default; }
+.nq-maj-toast-fermer {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.nq-maj-toast-fermer:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.nq-maj-toast-fermer svg { width: 14px; height: 14px; }
+.nq-maj-toast-bouton:focus-visible, .nq-maj-toast-fermer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+	.nq-maj-toast, .nq-maj-toast:not(.is-visible) { transition: none; transform: none; }
+}

@@ -7,10 +7,10 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/electron/pont.ts"], ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin }, { ZOOM_MIN, ZOOM_MAX, borneZoom }) => {
+await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/electron/pont.ts"], ({ buildMenu, PALIERS_ZOOM, palierZoomVoisin, urlSignalement, URL_DEPOT }, { ZOOM_MIN, ZOOM_MAX, borneZoom }) => {
 	const r = makeReporter("Application menu — tree");
 	const menu = buildMenu({ version: "2.5.2" });
-	r.check("the about row, a rule, then the Display submenu (no Edit)", menu.map(e => e.id), ["about", "about-sep", "view"]);
+	r.check("the about row, a rule, then the Display submenu (no Edit)", menu.map(e => e.id), ["about", "about-sep", "view", "report-bug"]);
 	const ids = [];
 	const visit = (entries) => { for (const e of entries) { ids.push(e.id); if (e.kind === "submenu") visit(e.items); } };
 	visit(menu);
@@ -48,5 +48,13 @@ await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts", "apps/windows/elec
 	r.check("out of bounds above, back into the list", palierZoomVoisin(2, 1), 1.5);
 	r.check("out of bounds below, back into the list", palierZoomVoisin(0.2, -1), 0.75);
 	r.check("a value that is not a number counts as 100 %", palierZoomVoisin(Number.NaN, 1), 1.1);
+	/* THE BUG REPORT: a new issue on the public repository, prefilled. */
+	const u = new URL(urlSignalement("1.21.14", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140"));
+	r.check("bug report targets the repository's new-issue page", u.origin + u.pathname, `${URL_DEPOT}/issues/new`);
+	const corps = u.searchParams.get("body") ?? "";
+	r.check("bug report body carries both versions", [corps.includes("1.21.14"), corps.includes("Windows 10.0")], [true, true]);
+	r.check("bug report body carries the three headings",
+		["## What happened", "## Steps to reproduce", "## Expected"].every(h => corps.includes(h)), true);
+	r.check("an unknown user agent still names Windows", urlSignalement("1", "x").includes(encodeURIComponent("Windows")), true);
 	r.done();
 });

@@ -150,3 +150,19 @@ await withSrcModule("apps/windows/electron/expected-update.ts", ({ expectedUpdat
 	r.check("autoInstallOnAppQuit set exactly once, to false", sets, ["false"]);
 	r.done();
 }
+
+/* THE UPDATE TOAST (2026-10-18): when it shows and which button it carries. */
+await withSrcModule("apps/windows/src/ui/mise-a-jour-toast-pur.ts", ({ decisionToast }) => {
+	const r = makeReporter("Update toast decision");
+	r.check("ready: toast with install", decisionToast({ phase: "prete", version: "1.22.0" }, null), { action: "install", version: "1.22.0" });
+	r.check("available on a metered connection: toast with download",
+		decisionToast({ phase: "disponible", version: "1.22.0", limitee: true }, null), { action: "download", version: "1.22.0" });
+	r.check("available without the metered flag: nothing (Android's row, not the toast)", decisionToast({ phase: "disponible", version: "1.22.0" }, null), null);
+	r.check("downloading, checking, up to date, error: nothing",
+		["telechargement", "verification", "a-jour", "erreur", "inactif"].map(phase => decisionToast({ phase, version: "1.22.0" }, null)),
+		[null, null, null, null, null]);
+	r.check("closed for V stays closed for V", decisionToast({ phase: "prete", version: "1.22.0" }, "1.22.0"), null);
+	r.check("closed for V comes back for V+1", decisionToast({ phase: "prete", version: "1.22.1" }, "1.22.0"), { action: "install", version: "1.22.1" });
+	r.check("no version: nothing", decisionToast({ phase: "prete" }, null), null);
+	r.done();
+});
