@@ -9,48 +9,48 @@ import type { Chiffrement } from "../moodle/jeton";
 
 export interface Session { accessToken: string; login: string }
 
-export interface MagasinJetonGithub {
+export interface GithubTokenStore {
 	/** The stored session, or null when none or unreadable. */
-	lire(): Promise<Session | null>;
+	read(): Promise<Session | null>;
 	/** Throws `nostorage` when encryption is unavailable: nothing is written. */
-	ecrire(s: Session): Promise<void>;
-	effacer(): Promise<void>;
+	write(s: Session): Promise<void>;
+	clear(): Promise<void>;
 }
 
-function valide(v: unknown): v is Session {
+function isValid(v: unknown): v is Session {
 	if (!v || typeof v !== "object") return false;
 	const s = v as Record<string, unknown>;
 	return typeof s.accessToken === "string" && s.accessToken.length > 0 && s.accessToken.length <= 255
 		&& typeof s.login === "string" && s.login.length > 0;
 }
 
-export function creerMagasinJetonGithub(fichier: string, chiffrement: Chiffrement): MagasinJetonGithub {
+export function createGithubTokenStore(file: string, cipher: Chiffrement): GithubTokenStore {
 	return {
-		async lire() {
-			let brut: Buffer;
+		async read() {
+			let raw: Buffer;
 			try {
-				brut = await fs.readFile(fichier);
+				raw = await fs.readFile(file);
 			} catch {
 				return null;
 			}
-			if (!chiffrement.disponible()) return null;
+			if (!cipher.disponible()) return null;
 			try {
-				const v: unknown = JSON.parse(chiffrement.dechiffrer(brut));
-				return valide(v) ? { accessToken: v.accessToken, login: v.login } : null;
+				const v: unknown = JSON.parse(cipher.dechiffrer(raw));
+				return isValid(v) ? { accessToken: v.accessToken, login: v.login } : null;
 			} catch {
 				return null;
 			}
 		},
-		async ecrire(s) {
-			if (!chiffrement.disponible()) throw new Error("nostorage");
-			const chiffre = chiffrement.chiffrer(JSON.stringify({ accessToken: s.accessToken, login: s.login }));
-			await fs.mkdir(path.dirname(fichier), { recursive: true });
-			const tmp = `${fichier}.${process.pid}.tmp`;
-			await fs.writeFile(tmp, chiffre);
-			await fs.rename(tmp, fichier);
+		async write(s) {
+			if (!cipher.disponible()) throw new Error("nostorage");
+			const encrypted = cipher.chiffrer(JSON.stringify({ accessToken: s.accessToken, login: s.login }));
+			await fs.mkdir(path.dirname(file), { recursive: true });
+			const tmp = `${file}.${process.pid}.tmp`;
+			await fs.writeFile(tmp, encrypted);
+			await fs.rename(tmp, file);
 		},
-		async effacer() {
-			await fs.rm(fichier, { force: true });
+		async clear() {
+			await fs.rm(file, { force: true });
 		},
 	};
 }

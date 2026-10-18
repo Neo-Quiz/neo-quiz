@@ -57,7 +57,7 @@ import { hoteEcoleARetirer, origineSite, validerReglagesMoodle } from "./moodle/
 import { siteVerifie, verifierSite } from "./moodle/compat";
 import { ECOLES } from "./moodle/ecoles";
 import type { ServiceMoodle } from "./moodle/service";
-import type { ServiceSignalement } from "./signalement/service";
+import type { BugReportService } from "./bug-report/service";
 import type { ServicePlanning } from "./moodle/planning";
 import { HOTES_PLANNING_CONNUS, lienPlanning } from "./moodle/planning-pur";
 import { CLE_DOSSIERS, CLE_DOSSIER_LEGACY, cheminsDeDossiers } from "./perimetre";
@@ -187,8 +187,8 @@ export interface DependancesCanaux {
 	moodle: ServiceMoodle;
 	/** The timetable of the Moodle window (`./moodle/planning.ts`). */
 	planning: ServicePlanning;
-	/** The bug report (`./signalement/service.ts`); `null` while the relay is not configured. */
-	signalement: ServiceSignalement | null;
+	/** The bug report (`./bug-report/service.ts`); `null` while the relay is not configured. */
+	bugReport: BugReportService | null;
 	/** The pairing link Windows handed to the app (`lienAppairageExterne`,
 	    already validated), forgotten once taken; `null` when there is none. */
 	prendreLienAppairage?: () => string | null;
@@ -715,42 +715,42 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	ipcMain.handle(CANAUX.moodleNouveauxPrendre, () => deps.moodle.prendreNouveaux());
 	/* BUG REPORT: every payload is `unknown` and validated by the service; no
 	   channel returns more than a result, a code or a login. */
-	const signalement = deps.signalement;
+	const bugReport = deps.bugReport;
 	const OFF = { ok: false, code: "disabled" } as const;
-	ipcMain.handle(CANAUX.signalementApercu, async () => {
-		if (!signalement) return OFF;
-		const a = await signalement.apercu();
+	ipcMain.handle(CANAUX.bugReportPreview, async () => {
+		if (!bugReport) return OFF;
+		const a = await bugReport.preview();
 		return { ok: true, env: a.env, log: a.log };
 	});
-	ipcMain.handle(CANAUX.signalementEnvoyer, async (_e, rapport: unknown) => {
-		if (!signalement) return OFF;
+	ipcMain.handle(CANAUX.bugReportSend, async (_e, report: unknown) => {
+		if (!bugReport) return OFF;
 		try {
-			return await signalement.envoyer(rapport);
+			return await bugReport.send(report);
 		} catch {
 			return { ok: false, code: "upstream" };
 		}
 	});
-	ipcMain.handle(CANAUX.signalementGithubConnecter, async () => {
-		if (!signalement) return OFF;
+	ipcMain.handle(CANAUX.bugReportGithubConnect, async () => {
+		if (!bugReport) return OFF;
 		try {
-			const c = await signalement.github.connecter();
+			const c = await bugReport.github.connect();
 			return { ok: true, userCode: c.userCode, verificationUri: c.verificationUri, expiresIn: c.expiresIn };
 		} catch (e) {
 			const m = e instanceof Error ? e.message : "";
 			return { ok: false, code: m === "busy" || m === "refused" ? m : "failed" };
 		}
 	});
-	ipcMain.handle(CANAUX.signalementGithubAttendre, async () => {
-		if (!signalement) return { error: "failed" };
+	ipcMain.handle(CANAUX.bugReportGithubWait, async () => {
+		if (!bugReport) return { error: "failed" };
 		try {
-			return await signalement.github.attendre();
+			return await bugReport.github.wait();
 		} catch {
 			return { error: "failed" };
 		}
 	});
-	ipcMain.handle(CANAUX.signalementGithubAnnuler, () => { signalement?.github.annuler(); });
-	ipcMain.handle(CANAUX.signalementGithubEtat, () => (signalement ? signalement.github.etat().catch(() => null) : null));
-	ipcMain.handle(CANAUX.signalementGithubDeconnecter, async () => { await signalement?.github.deconnecter().catch(() => undefined); });
+	ipcMain.handle(CANAUX.bugReportGithubCancel, () => { bugReport?.github.cancel(); });
+	ipcMain.handle(CANAUX.bugReportGithubState, () => (bugReport ? bugReport.github.state().catch(() => null) : null));
+	ipcMain.handle(CANAUX.bugReportGithubDisconnect, async () => { await bugReport?.github.disconnect().catch(() => undefined); });
 	ipcMain.handle(CANAUX.moodleDevoirs, () => deps.moodle.devoirs());
 	ipcMain.handle(CANAUX.moodleOuvrirDevoir, (_e, cmid: unknown) => deps.moodle.ouvrirDevoir(cmid));
 	ipcMain.handle(CANAUX.moodleOuvrirActivite, (_e, type: unknown, cmid: unknown) => deps.moodle.ouvrirActivite(type, cmid));

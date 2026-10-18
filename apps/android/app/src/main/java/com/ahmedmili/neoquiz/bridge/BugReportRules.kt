@@ -6,16 +6,16 @@ import org.json.JSONObject
 /**
  * The deployment constants of the in-app bug report, copies of `src/bug-report-config.ts`
  * (`check:android-pont` asserts they are equal). The page is untrusted, so it never supplies
- * them. While either is empty every `signalement.*` channel answers `disabled`.
+ * them. While either is empty every `bugReport.*` channel answers `disabled`.
  */
-object SignalementConfig {
+object BugReportConfig {
     const val RELAY_URL = ""
     const val GITHUB_CLIENT_ID = ""
     val configured: Boolean get() = RELAY_URL.isNotEmpty() && GITHUB_CLIENT_ID.isNotEmpty()
 }
 
-/** Pure rules of the bug report channels; mirrors `signalement/adresse.ts` and `src/bug-report.ts`. */
-object SignalementRules {
+/** Pure rules of the bug report channels; mirrors `bug-report/host-rule.ts` and `src/bug-report.ts`. */
+object BugReportRules {
     const val BODY_MAX_BYTES = 16384
     const val RESPONSE_MAX_BYTES = 64 * 1024
     const val TIMEOUT_MS = 15_000

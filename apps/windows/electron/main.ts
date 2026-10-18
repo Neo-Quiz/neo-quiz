@@ -77,16 +77,16 @@ import { createTray } from "./tray";
 import { decide, HIDDEN_FLAG, isHiddenLaunch, RELAUNCH_HIDDEN_KEY } from "./tray-lifecycle";
 import type { LifecycleState } from "./tray-lifecycle";
 import type { BacASable } from "./code-sandbox";
-import { creerJournalMemoire, installerJournalMemoire } from "./journal-memoire";
-import { creerServiceSignalement } from "./signalement/service";
-import { creerMagasinJetonGithub } from "./signalement/jeton";
+import { createMemoryLog, installMemoryLog } from "./memory-log";
+import { createBugReportService } from "./bug-report/service";
+import { createGithubTokenStore } from "./bug-report/token-store";
 import { BUG_RELAY_URL, GITHUB_APP_CLIENT_ID, bugReportConfigured } from "../../../src/bug-report-config";
 import paquetApplication from "../package.json";
 
 /** Bug-report log buffer, installed at module load so early warnings count;
     the bug report service reads it for the log preview and the report. */
-export const journalMemoire = creerJournalMemoire();
-installerJournalMemoire(journalMemoire);
+export const memoryLog = createMemoryLog();
+installMemoryLog(memoryLog);
 
 /** Le serveur de développement de Vite. Le port vient de `vite.config.ts`
     (`strictPort: true`) : s'il change là-bas, il change ici. */
@@ -1009,23 +1009,23 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 				dechiffrer: chiffre => safeStorage.decryptString(chiffre),
 			},
 		});
-		const signalement = bugReportConfigured()
-			? creerServiceSignalement({
+		const bugReport = bugReportConfigured()
+			? createBugReportService({
 				transport: (url, init) => fetch(url, init),
-				magasin: creerMagasinJetonGithub(path.join(donnees, "signalement-github.bin"), {
+				tokenStore: createGithubTokenStore(path.join(donnees, "bug-report-github.bin"), {
 					disponible: () => safeStorage.isEncryptionAvailable(),
 					chiffrer: clair => safeStorage.encryptString(clair),
 					dechiffrer: chiffre => safeStorage.decryptString(chiffre),
 				}),
-				journal: journalMemoire,
+				log: memoryLog,
 				env: () => ({ app: paquetApplication.version /* app.getVersion() is Electron's version unpackaged */, os: `${os.version()} ${os.release()}`.slice(0, 100), platform: "windows" }),
-				maintenant: () => Date.now(),
+				now: () => Date.now(),
 				relay: BUG_RELAY_URL,
 				clientId: GITHUB_APP_CLIENT_ID,
 			})
 			: null;
 		const canaux = enregistrerCanaux({
-			signalement,
+			bugReport,
 			moodle,
 			planning,
 			perimetre,

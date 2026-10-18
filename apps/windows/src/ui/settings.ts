@@ -391,7 +391,7 @@ export function renderSettings(
 		demonterMajAndroid = monterLigneMajAndroid(controle, aide);
 		/* The in-app bug report, only once the relay is configured; the form's fallback (and the
 		   whole row's absence before that) is today's prefilled GitHub issue, opened by the system. */
-		if (bugReportConfigured() && pont().signalement) {
+		if (bugReportConfigured() && pont().bugReport) {
 			const signaler = ajouter(row(general, t("app.menu.reportBug")), "button", "nq-reglages-changer", t("bugReport.title"));
 			signaler.type = "button";
 			signaler.addEventListener("click", () => {

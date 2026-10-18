@@ -210,7 +210,7 @@ function main() {
 
 	// Bug report constants: the page is untrusted, so Kotlin holds its own copies of the relay URL and the Client ID.
 	const cfgTs = read("src/bug-report-config.ts");
-	const cfgKt = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/SignalementRules.kt");
+	const cfgKt = read("apps/android/app/src/main/java/com/ahmedmili/neoquiz/bridge/BugReportRules.kt");
 	for (const [tsName, ktName] of [["BUG_RELAY_URL", "RELAY_URL"], ["GITHUB_APP_CLIENT_ID", "GITHUB_CLIENT_ID"]]) {
 		const ts = new RegExp(`export const ${tsName} = "([^"]*)";`).exec(cfgTs)?.[1];
 		const kt = new RegExp(`const val ${ktName} = "([^"]*)"`).exec(cfgKt)?.[1];

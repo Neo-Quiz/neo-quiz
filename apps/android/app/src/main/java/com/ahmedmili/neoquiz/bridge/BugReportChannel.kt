@@ -14,19 +14,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** One blocking HTTPS request; returns the parsed JSON body or throws. Judges the JSON shape, never the status. */
-fun interface SignalementHttp {
+fun interface BugReportHttp {
     fun request(method: String, url: String, headers: Map<String, String>, body: String?): JSONObject
 }
 
 /** Real transport: https, redirects never followed, 15 s timeouts, response capped at 64 KB. */
-class UrlSignalementHttp : SignalementHttp {
+class UrlBugReportHttp : BugReportHttp {
     override fun request(method: String, url: String, headers: Map<String, String>, body: String?): JSONObject {
         val conn = URI(url).toURL().openConnection() as HttpURLConnection
         try {
             conn.instanceFollowRedirects = false
             conn.requestMethod = method
-            conn.connectTimeout = SignalementRules.TIMEOUT_MS
-            conn.readTimeout = SignalementRules.TIMEOUT_MS
+            conn.connectTimeout = BugReportRules.TIMEOUT_MS
+            conn.readTimeout = BugReportRules.TIMEOUT_MS
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (body != null) {
                 conn.doOutput = true
@@ -41,7 +41,7 @@ class UrlSignalementHttp : SignalementHttp {
                 while (true) {
                     val n = s.read(chunk)
                     if (n < 0) break
-                    if (buf.size() + n > SignalementRules.RESPONSE_MAX_BYTES) throw IOException("answer too large")
+                    if (buf.size() + n > BugReportRules.RESPONSE_MAX_BYTES) throw IOException("answer too large")
                     buf.write(chunk, 0, n)
                 }
             }
@@ -53,17 +53,17 @@ class UrlSignalementHttp : SignalementHttp {
 }
 
 /**
- * The seven `signalement.*` channels, the Android twin of `electron/signalement/service.ts` and
- * `flux.ts`. The page hands text and gets a result; the GitHub token goes to the Keystore store
+ * The seven `bugReport.*` channels, the Android twin of `electron/bug-report/service.ts` and
+ * `device-flow.ts`. The page hands text and gets a result; the GitHub token goes to the Keystore store
  * and never appears in a return value (only the login does). No log on Android in v1.
  */
-class SignalementChannel(
+class BugReportChannel(
     private val scope: CoroutineScope,
     private val store: SessionStore,
-    private val http: SignalementHttp,
+    private val http: BugReportHttp,
     private val env: () -> JSONObject,
-    private val relay: String = SignalementConfig.RELAY_URL,
-    private val clientId: String = SignalementConfig.GITHUB_CLIENT_ID,
+    private val relay: String = BugReportConfig.RELAY_URL,
+    private val clientId: String = BugReportConfig.GITHUB_CLIENT_ID,
     private val now: () -> Long = System::currentTimeMillis,
     private val pause: suspend (Long, CompletableDeferred<Unit>) -> Unit = { ms, abort -> withTimeoutOrNull(ms) { abort.await() }; Unit },
 ) {
@@ -85,24 +85,24 @@ class SignalementChannel(
     private fun error(code: String) = JSONObject().put("error", code)
 
     fun handlers(): Map<String, suspend (JSONArray) -> Any?> = mapOf(
-        "signalement.apercu" to { _ -> apercu() },
-        "signalement.envoyer" to { a -> envoyer(a.opt(0)) },
-        "signalement.github.connecter" to { _ -> connecter() },
-        "signalement.github.attendre" to { _ -> attendre() },
-        "signalement.github.annuler" to { _ -> annuler() },
-        "signalement.github.etat" to { _ -> etat() },
-        "signalement.github.deconnecter" to { _ -> deconnecter() },
+        "bugReport.preview" to { _ -> preview() },
+        "bugReport.send" to { a -> send(a.opt(0)) },
+        "bugReport.github.connect" to { _ -> connect() },
+        "bugReport.github.wait" to { _ -> awaitLogin() },
+        "bugReport.github.cancel" to { _ -> cancel() },
+        "bugReport.github.state" to { _ -> state() },
+        "bugReport.github.disconnect" to { _ -> disconnect() },
     )
 
-    private fun apercu(): JSONObject =
+    private fun preview(): JSONObject =
         if (!enabled) disabled() else JSONObject().put("ok", true).put("env", env()).put("log", "")
 
     private suspend fun post(report: JSONObject): JSONObject {
         val body = report.toString()
         // The token is added after the 16 KB check on the report itself; leave room for it only.
-        if (body.toByteArray(Charsets.UTF_8).size > SignalementRules.BODY_MAX_BYTES + 300) return failure("invalid")
+        if (body.toByteArray(Charsets.UTF_8).size > BugReportRules.BODY_MAX_BYTES + 300) return failure("invalid")
         val url = relay.trimEnd('/') + "/report"
-        if (!SignalementRules.isAllowedHost(url, relay)) return failure("upstream")
+        if (!BugReportRules.isAllowedHost(url, relay)) return failure("upstream")
         val j = try {
             withContext(Dispatchers.IO) {
                 http.request("POST", url, mapOf("Content-Type" to "application/json", "Accept" to "application/json"), body)
@@ -114,7 +114,7 @@ class SignalementChannel(
             val u = j.opt("url") as? String
             val n = j.opt("number")
             val isInt = n is Int || n is Long
-            return if (u != null && SignalementRules.isAllowedHost(u, relay) && isInt) {
+            return if (u != null && BugReportRules.isAllowedHost(u, relay) && isInt) {
                 JSONObject().put("ok", true).put("url", u).put("number", n)
             } else {
                 failure("upstream")
@@ -124,15 +124,15 @@ class SignalementChannel(
         return if (j.opt("ok") == false && code != null && code in CODES) failure(code) else failure("upstream")
     }
 
-    private suspend fun envoyer(raw: Any?): JSONObject {
+    private suspend fun send(raw: Any?): JSONObject {
         if (!enabled) return disabled()
         val report = raw as? JSONObject ?: return failure("invalid")
-        if (!SignalementRules.acceptsBody(report.toString())) return failure("invalid")
+        if (!BugReportRules.acceptsBody(report.toString())) return failure("invalid")
         val t = now()
         synchronized(lock) {
             if (sending) return failure("rate_limited")
             val last = lastSend
-            if (last != null && t - last < SignalementRules.MIN_INTERVAL_MS) return failure("rate_limited")
+            if (last != null && t - last < BugReportRules.MIN_INTERVAL_MS) return failure("rate_limited")
             sending = true
             lastSend = t
         }
@@ -142,7 +142,7 @@ class SignalementChannel(
             base.remove("githubToken")
             base.remove("log")
             base.put("env", env())
-            if (base.toString().toByteArray(Charsets.UTF_8).size > SignalementRules.BODY_MAX_BYTES) return failure("invalid")
+            if (base.toString().toByteArray(Charsets.UTF_8).size > BugReportRules.BODY_MAX_BYTES) return failure("invalid")
             val session = store.read()
             val r = post(if (session != null) JSONObject(base.toString()).put("githubToken", session.accessToken) else base)
             if (r.optBoolean("ok") || r.optString("code") != "token_invalid") return r
@@ -155,7 +155,7 @@ class SignalementChannel(
         }
     }
 
-    private suspend fun connecter(): JSONObject {
+    private suspend fun connect(): JSONObject {
         if (!enabled) return disabled()
         synchronized(lock) {
             val f = flow
@@ -180,7 +180,7 @@ class SignalementChannel(
             val uri = j.opt("verification_uri") as? String
             val expires = (j.opt("expires_in") as? Number)?.toInt()
             if (device == null || user == null || uri == null || expires == null || expires <= 0) return failure("failed")
-            if (user.length > 32 || !SignalementRules.isAllowedHost(uri, relay)) return failure("refused")
+            if (user.length > 32 || !BugReportRules.isAllowedHost(uri, relay)) return failure("refused")
             val interval = (j.opt("interval") as? Number)?.toInt() ?: 0
             synchronized(lock) { flow = Flow(device, interval, now() + expires * 1000L) }
             return JSONObject().put("ok", true).put("userCode", user).put("verificationUri", uri).put("expiresIn", expires)
@@ -189,7 +189,7 @@ class SignalementChannel(
         }
     }
 
-    private suspend fun attendre(): JSONObject {
+    private suspend fun awaitLogin(): JSONObject {
         val job = synchronized(lock) {
             // Single flight: later callers share the one poll.
             waiting ?: scope.async {
@@ -226,7 +226,7 @@ class SignalementChannel(
         val f = synchronized(lock) { flow } ?: return error("failed")
         try {
             while (true) {
-                pause(SignalementRules.deviceFlowDelayMs(f.interval, false), f.abort)
+                pause(BugReportRules.deviceFlowDelayMs(f.interval, false), f.abort)
                 if (f.abort.isCompleted) return error("cancelled")
                 if (now() >= f.limit) return error("expired")
                 val j = try {
@@ -268,16 +268,16 @@ class SignalementChannel(
         }
     }
 
-    private fun annuler() {
+    private fun cancel() {
         val f = synchronized(lock) { flow.also { flow = null } }
         f?.abort?.complete(Unit)
     }
 
-    private fun etat(): JSONObject? = store.read()?.let { JSONObject().put("login", it.login) }
+    private fun state(): JSONObject? = store.read()?.let { JSONObject().put("login", it.login) }
 
-    private fun deconnecter() {
+    private fun disconnect() {
         synchronized(lock) { generation++ }
-        annuler()
+        cancel()
         runCatching { store.clear() }
     }
 

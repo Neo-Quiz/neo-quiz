@@ -1,9 +1,9 @@
 /* Address rule of the bug report network use (main process): https only, on
    exactly three hosts (the relay, github.com, api.github.com), default port,
-   no credentials in the URL. Redirects are never followed (see `flux.ts`). */
+   no credentials in the URL. Redirects are never followed (see `device-flow.ts`). */
 
 /** True when `url` may be requested (or shown to the user) for a bug report. */
-export function hoteAutorise(url: string, relay: string): boolean {
+export function isAllowedHost(url: string, relay: string): boolean {
 	let u: URL;
 	let r: URL;
 	try {

@@ -307,15 +307,15 @@ const pont: Pont = {
 	},
 
 	/* BUG REPORT: text in, result out; the GitHub credential stays in the main process. */
-	signalement: process.platform !== "win32" ? undefined : {
-		apercu: () => ipcRenderer.invoke(CANAUX.signalementApercu),
-		envoyer: rapport => ipcRenderer.invoke(CANAUX.signalementEnvoyer, rapport),
+	bugReport: process.platform !== "win32" ? undefined : {
+		preview: () => ipcRenderer.invoke(CANAUX.bugReportPreview),
+		send: report => ipcRenderer.invoke(CANAUX.bugReportSend, report),
 		github: {
-			connecter: () => ipcRenderer.invoke(CANAUX.signalementGithubConnecter),
-			attendre: () => ipcRenderer.invoke(CANAUX.signalementGithubAttendre),
-			annuler: () => ipcRenderer.invoke(CANAUX.signalementGithubAnnuler),
-			etat: () => ipcRenderer.invoke(CANAUX.signalementGithubEtat),
-			deconnecter: () => ipcRenderer.invoke(CANAUX.signalementGithubDeconnecter),
+			connect: () => ipcRenderer.invoke(CANAUX.bugReportGithubConnect),
+			wait: () => ipcRenderer.invoke(CANAUX.bugReportGithubWait),
+			cancel: () => ipcRenderer.invoke(CANAUX.bugReportGithubCancel),
+			state: () => ipcRenderer.invoke(CANAUX.bugReportGithubState),
+			disconnect: () => ipcRenderer.invoke(CANAUX.bugReportGithubDisconnect),
 		},
 	},
 

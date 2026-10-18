@@ -179,15 +179,15 @@ const pont: Pont = {
 
 	/* The in-app bug report. Kotlin holds the relay URL, the Client ID and the GitHub token (Keystore);
 	   the page only learns a login. */
-	signalement: {
-		apercu: () => appeler("signalement.apercu"),
-		envoyer: (rapport) => appeler("signalement.envoyer", [rapport]),
+	bugReport: {
+		preview: () => appeler("bugReport.preview"),
+		send: (report) => appeler("bugReport.send", [report]),
 		github: {
-			connecter: () => appeler("signalement.github.connecter"),
-			attendre: () => appeler("signalement.github.attendre"),
-			annuler: () => appeler<void>("signalement.github.annuler"),
-			etat: () => appeler("signalement.github.etat"),
-			deconnecter: () => appeler<void>("signalement.github.deconnecter"),
+			connect: () => appeler("bugReport.github.connect"),
+			wait: () => appeler("bugReport.github.wait"),
+			cancel: () => appeler<void>("bugReport.github.cancel"),
+			state: () => appeler("bugReport.github.state"),
+			disconnect: () => appeler<void>("bugReport.github.disconnect"),
 		},
 	},
 

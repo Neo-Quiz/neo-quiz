@@ -3,7 +3,7 @@
    relay is configured. Modelled on VS Code's issue reporter and Chrome's
    feedback form: what happened, steps, expected, a title, and a "details
    sent" block whose boxes can be unticked, with a preview of the log.
-   Everything goes through `pont().signalement`: the window hands text and
+   Everything goes through `pont().bugReport`: the window hands text and
    gets a result back, it never sees a token.
 ══════════════════════════════════════════════════════════ */
 
@@ -17,245 +17,245 @@ import { t } from "../../../../src/i18n";
 import type { TransKey } from "../../../../src/i18n";
 import { pont } from "../host/pont";
 
-let ouverte: HostModalHandle | null = null;
+let openModal: HostModalHandle | null = null;
 
 /** Codes after which GitHub itself is the way forward, so that button leads. */
-const CODES_REPLI = new Set(["disabled", "upstream"]);
-const CODES_CONNUS = new Set(["invalid", "rate_limited", "duplicate", "upstream", "disabled"]);
+const FALLBACK_CODES = new Set(["disabled", "upstream"]);
+const KNOWN_CODES = new Set(["invalid", "rate_limited", "duplicate", "upstream", "disabled"]);
 
 export function openBugReportModal(deps: { fallbackUrl: () => string }): void {
-	if (ouverte || !pont().signalement) return;
-	let nettoyer: () => void = () => undefined;
-	ouverte = requireHost("modals").open({
+	if (openModal || !pont().bugReport) return;
+	let cleanup: () => void = () => undefined;
+	openModal = requireHost("modals").open({
 		className: "nq-bug-modal",
 		title: t("bugReport.title"),
-		onOpen: poignee => { nettoyer = monter(poignee.contentEl, deps, () => poignee.close()); },
-		onClose: () => { ouverte = null; nettoyer(); },
+		onOpen: handle => { cleanup = mount(handle.contentEl, deps, () => handle.close()); },
+		onClose: () => { openModal = null; cleanup(); },
 	});
 }
 
-function icone(el: HTMLElement, nom: string): void { currentHost().ui.setIcon(el, nom); }
+function icon(el: HTMLElement, name: string): void { currentHost().ui.setIcon(el, name); }
 
-function bouton(parent: HTMLElement, classe: string, texte: string, surClic: () => void): HTMLButtonElement {
-	const b = ajouter(parent, "button", `nqb-btn ${classe}`, texte);
+function button(parent: HTMLElement, className: string, text: string, onClick: () => void): HTMLButtonElement {
+	const b = ajouter(parent, "button", `nqb-btn ${className}`, text);
 	b.type = "button";
-	b.addEventListener("click", surClic);
+	b.addEventListener("click", onClick);
 	return b;
 }
 
-interface Champ { el: HTMLInputElement | HTMLTextAreaElement; maj(): void }
+interface Field { el: HTMLInputElement | HTMLTextAreaElement; refresh(): void }
 
-function monter(contenu: HTMLElement, deps: { fallbackUrl: () => string }, fermer: () => void): () => void {
-	const api = pont().signalement!;
-	let detruit = false;
-	const etat: FormState = {
+function mount(content: HTMLElement, deps: { fallbackUrl: () => string }, close: () => void): () => void {
+	const api = pont().bugReport!;
+	let destroyed = false;
+	const state: FormState = {
 		what: "", steps: "", expected: "", title: "",
 		sendEnv: true, sendLog: true, env: null, log: "", sending: false,
 	};
-	let titreModifie = false;
-	let connexion = false;
+	let titleEdited = false;
+	let connecting = false;
 
-	const racine = ajouter(contenu, "div", "nqb-root");
-	const formulaire = ajouter(racine, "div", "nqb-form");
+	const root = ajouter(content, "div", "nqb-root");
+	const form = ajouter(root, "div", "nqb-form");
 
 	/* ─── Fields ─── */
-	function champ(label: TransKey, placeholder: TransKey | null, max: number, lignes: number, valeur: (v: string) => void): Champ {
-		const bloc = ajouter(formulaire, "label", "nqb-field");
-		const tete = ajouter(bloc, "span", "nqb-field-head");
-		ajouter(tete, "span", "nqb-label", t(label));
-		const compteur = ajouter(tete, "span", "nqb-counter");
+	function field(label: TransKey, placeholder: TransKey | null, max: number, rows: number, onValue: (v: string) => void): Field {
+		const block = ajouter(form, "label", "nqb-field");
+		const head = ajouter(block, "span", "nqb-field-head");
+		ajouter(head, "span", "nqb-label", t(label));
+		const counter = ajouter(head, "span", "nqb-counter");
 		let el: HTMLInputElement | HTMLTextAreaElement;
-		if (lignes > 0) {
-			el = ajouter(bloc, "textarea", "nqb-input nqb-area");
-			(el as HTMLTextAreaElement).rows = lignes;
+		if (rows > 0) {
+			el = ajouter(block, "textarea", "nqb-input nqb-area");
+			(el as HTMLTextAreaElement).rows = rows;
 		} else {
-			el = ajouter(bloc, "input", "nqb-input");
+			el = ajouter(block, "input", "nqb-input");
 			(el as HTMLInputElement).type = "text";
 		}
 		if (placeholder) el.placeholder = t(placeholder);
 		el.maxLength = max;
-		const maj = (): void => { compteur.textContent = t("bugReport.counter", { count: el.value.length, max }); };
-		el.addEventListener("input", () => { valeur(el.value); maj(); majBoutons(); });
-		maj();
-		return { el, maj };
+		const refresh = (): void => { counter.textContent = t("bugReport.counter", { count: el.value.length, max }); };
+		el.addEventListener("input", () => { onValue(el.value); refresh(); refreshButtons(); });
+		refresh();
+		return { el, refresh };
 	}
 
-	const quoi = champ("bugReport.what", "bugReport.whatPlaceholder", LIMITS.what, 4, v => {
-		etat.what = v;
+	const whatField = field("bugReport.what", "bugReport.whatPlaceholder", LIMITS.what, 4, v => {
+		state.what = v;
 		// The title follows the description until the user edits it.
-		if (!titreModifie) { etat.title = defaultTitle(v); titre.el.value = etat.title; titre.maj(); }
+		if (!titleEdited) { state.title = defaultTitle(v); titleField.el.value = state.title; titleField.refresh(); }
 	});
-	champ("bugReport.steps", "bugReport.stepsPlaceholder", LIMITS.text, 3, v => { etat.steps = v; });
-	champ("bugReport.expected", "bugReport.expectedPlaceholder", LIMITS.text, 2, v => { etat.expected = v; });
-	const titre = champ("bugReport.reportTitle", null, LIMITS.title, 0, v => { titreModifie = true; etat.title = v; });
+	field("bugReport.steps", "bugReport.stepsPlaceholder", LIMITS.text, 3, v => { state.steps = v; });
+	field("bugReport.expected", "bugReport.expectedPlaceholder", LIMITS.text, 2, v => { state.expected = v; });
+	const titleField = field("bugReport.reportTitle", null, LIMITS.title, 0, v => { titleEdited = true; state.title = v; });
 
 	/* ─── Details sent ─── */
-	const details = ajouter(formulaire, "div", "nqb-details");
+	const details = ajouter(form, "div", "nqb-details");
 	ajouter(details, "div", "nqb-label", t("bugReport.details"));
-	const envLigne = ajouter(details, "label", "nqb-check");
-	const envCase = ajouter(envLigne, "input");
-	envCase.type = "checkbox";
-	envCase.checked = true;
-	envCase.addEventListener("change", () => { etat.sendEnv = envCase.checked; });
-	const envTexte = ajouter(envLigne, "span", "nqb-check-text");
-	ajouter(envTexte, "span", "nqb-check-label", t("bugReport.envLabel"));
-	const envValeur = ajouter(envTexte, "span", "nqb-check-value");
+	const envRow = ajouter(details, "label", "nqb-check");
+	const envBox = ajouter(envRow, "input");
+	envBox.type = "checkbox";
+	envBox.checked = true;
+	envBox.addEventListener("change", () => { state.sendEnv = envBox.checked; });
+	const envText = ajouter(envRow, "span", "nqb-check-text");
+	ajouter(envText, "span", "nqb-check-label", t("bugReport.envLabel"));
+	const envValue = ajouter(envText, "span", "nqb-check-value");
 
-	const logLigne = ajouter(details, "div", "nqb-log");
-	const logTete = ajouter(logLigne, "div", "nqb-check nqb-log-head");
-	const logCase = ajouter(logTete, "input");
-	logCase.type = "checkbox";
-	logCase.checked = true;
-	logCase.id = "nqb-log-case";
-	logCase.addEventListener("change", () => { etat.sendLog = logCase.checked; });
-	const logLabel = ajouter(logTete, "label", "nqb-check-label", t("bugReport.logLabel"));
-	logLabel.htmlFor = logCase.id;
-	const logBascule = ajouter(logTete, "button", "nqb-link");
-	logBascule.type = "button";
-	logBascule.setAttribute("aria-expanded", "false");
-	const logBasculeTexte = ajouter(logBascule, "span", undefined, t("bugReport.logShow"));
-	const logChevron = ajouter(logBascule, "span", "nqb-chevron");
-	icone(logChevron, "chevron-down");
+	const logRow = ajouter(details, "div", "nqb-log");
+	const logHead = ajouter(logRow, "div", "nqb-check nqb-log-head");
+	const logBox = ajouter(logHead, "input");
+	logBox.type = "checkbox";
+	logBox.checked = true;
+	logBox.id = "nqb-log-case";
+	logBox.addEventListener("change", () => { state.sendLog = logBox.checked; });
+	const logLabel = ajouter(logHead, "label", "nqb-check-label", t("bugReport.logLabel"));
+	logLabel.htmlFor = logBox.id;
+	const logToggle = ajouter(logHead, "button", "nqb-link");
+	logToggle.type = "button";
+	logToggle.setAttribute("aria-expanded", "false");
+	const logToggleText = ajouter(logToggle, "span", undefined, t("bugReport.logShow"));
+	const logChevron = ajouter(logToggle, "span", "nqb-chevron");
+	icon(logChevron, "chevron-down");
 	// Grid rows 0fr to 1fr: the preview opens and closes smoothly, whatever its height.
-	const logZone = ajouter(logLigne, "div", "nqb-log-zone");
-	const logInterieur = ajouter(logZone, "div", "nqb-log-inner");
-	const logPre = ajouter(logInterieur, "pre", "nqb-log-pre");
-	logBascule.addEventListener("click", () => {
-		const ouvert = logZone.classList.toggle("is-open");
-		logBascule.setAttribute("aria-expanded", String(ouvert));
-		logBasculeTexte.textContent = t(ouvert ? "bugReport.logHide" : "bugReport.logShow");
-		logChevron.classList.toggle("is-open", ouvert);
+	const logZone = ajouter(logRow, "div", "nqb-log-zone");
+	const logInner = ajouter(logZone, "div", "nqb-log-inner");
+	const logPre = ajouter(logInner, "pre", "nqb-log-pre");
+	logToggle.addEventListener("click", () => {
+		const isOpen = logZone.classList.toggle("is-open");
+		logToggle.setAttribute("aria-expanded", String(isOpen));
+		logToggleText.textContent = t(isOpen ? "bugReport.logHide" : "bugReport.logShow");
+		logChevron.classList.toggle("is-open", isOpen);
 	});
 	details.hidden = true;
-	logLigne.hidden = true;
+	logRow.hidden = true;
 
-	void api.apercu().then(r => {
-		if (detruit || !r.ok) return;
-		etat.env = r.env;
-		envValeur.textContent = `${r.env.app} · ${r.env.os}`;
-		etat.log = r.log;
+	void api.preview().then(r => {
+		if (destroyed || !r.ok) return;
+		state.env = r.env;
+		envValue.textContent = `${r.env.app} · ${r.env.os}`;
+		state.log = r.log;
 		logPre.textContent = r.log;
-		logLigne.hidden = r.log.trim() === "";
+		logRow.hidden = r.log.trim() === "";
 		details.hidden = false;
 	}).catch(() => undefined);
 
 	/* ─── GitHub account ─── */
-	const compte = ajouter(formulaire, "div", "nqb-github");
-	function dessinerCompte(connecte: string | null, code?: { userCode: string; uri: string }, erreur?: string): void {
-		compte.replaceChildren();
-		if (connecte) {
-			const ligne = ajouter(compte, "div", "nqb-github-row");
-			icone(ajouter(ligne, "span", "nqb-github-mark"), "github");
-			ajouter(ligne, "span", "nqb-github-text", t("bugReport.githubAs", { login: connecte }));
-			bouton(ligne, "nqb-quiet", t("bugReport.githubDisconnect"), () => {
-				void api.github.deconnecter().then(() => { if (!detruit) dessinerCompte(null); });
+	const account = ajouter(form, "div", "nqb-github");
+	function drawAccount(connected: string | null, code?: { userCode: string; uri: string }, error?: string): void {
+		account.replaceChildren();
+		if (connected) {
+			const row = ajouter(account, "div", "nqb-github-row");
+			icon(ajouter(row, "span", "nqb-github-mark"), "github");
+			ajouter(row, "span", "nqb-github-text", t("bugReport.githubAs", { login: connected }));
+			button(row, "nqb-quiet", t("bugReport.githubDisconnect"), () => {
+				void api.github.disconnect().then(() => { if (!destroyed) drawAccount(null); });
 			});
 			return;
 		}
 		if (code) {
-			ajouter(compte, "div", "nqb-github-title", t("bugReport.githubCode"));
-			ajouter(compte, "div", "nqb-code", code.userCode);
-			const ligne = ajouter(compte, "div", "nqb-github-row");
-			bouton(ligne, "nqb-secondary", t("bugReport.githubOpen"), () => { window.open(code.uri, "_blank", "noopener"); });
-			bouton(ligne, "nqb-quiet", t("bugReport.githubCancel"), () => { void api.github.annuler(); });
-			ajouter(compte, "div", "nqb-hint", t("bugReport.githubWaiting"));
+			ajouter(account, "div", "nqb-github-title", t("bugReport.githubCode"));
+			ajouter(account, "div", "nqb-code", code.userCode);
+			const row = ajouter(account, "div", "nqb-github-row");
+			button(row, "nqb-secondary", t("bugReport.githubOpen"), () => { window.open(code.uri, "_blank", "noopener"); });
+			button(row, "nqb-quiet", t("bugReport.githubCancel"), () => { void api.github.cancel(); });
+			ajouter(account, "div", "nqb-hint", t("bugReport.githubWaiting"));
 			return;
 		}
-		const ligne = ajouter(compte, "div", "nqb-github-row");
-		icone(ajouter(ligne, "span", "nqb-github-mark"), "github");
-		const texte = ajouter(ligne, "span", "nqb-github-text");
-		ajouter(texte, "span", "nqb-check-label", t("bugReport.github"));
-		ajouter(texte, "span", "nqb-hint", t("bugReport.githubHint"));
-		bouton(ligne, "nqb-secondary", t("bugReport.githubConnect"), () => { void connecter(); });
-		if (erreur) ajouter(compte, "div", "nqb-error-inline", erreur);
+		const row = ajouter(account, "div", "nqb-github-row");
+		icon(ajouter(row, "span", "nqb-github-mark"), "github");
+		const text = ajouter(row, "span", "nqb-github-text");
+		ajouter(text, "span", "nqb-check-label", t("bugReport.github"));
+		ajouter(text, "span", "nqb-hint", t("bugReport.githubHint"));
+		button(row, "nqb-secondary", t("bugReport.githubConnect"), () => { void connect(); });
+		if (error) ajouter(account, "div", "nqb-error-inline", error);
 	}
-	async function connecter(): Promise<void> {
-		if (connexion) return;
-		connexion = true;
+	async function connect(): Promise<void> {
+		if (connecting) return;
+		connecting = true;
 		try {
-			const d = await api.github.connecter();
-			if (detruit) return;
+			const d = await api.github.connect();
+			if (destroyed) return;
 			if (!d.ok) {
-				dessinerCompte(null, undefined, t(d.code === "busy" ? "bugReport.githubError.busy" : "bugReport.githubError.failed"));
+				drawAccount(null, undefined, t(d.code === "busy" ? "bugReport.githubError.busy" : "bugReport.githubError.failed"));
 				return;
 			}
-			dessinerCompte(null, { userCode: d.userCode, uri: d.verificationUri });
-			const fin = await api.github.attendre();
-			if (detruit) return;
-			if ("login" in fin) dessinerCompte(fin.login);
-			else if (fin.error === "cancelled") dessinerCompte(null);
-			else dessinerCompte(null, undefined, t(`bugReport.githubError.${fin.error}`));
+			drawAccount(null, { userCode: d.userCode, uri: d.verificationUri });
+			const outcome = await api.github.wait();
+			if (destroyed) return;
+			if ("login" in outcome) drawAccount(outcome.login);
+			else if (outcome.error === "cancelled") drawAccount(null);
+			else drawAccount(null, undefined, t(`bugReport.githubError.${outcome.error}`));
 		} catch {
-			if (!detruit) dessinerCompte(null, undefined, t("bugReport.githubError.failed"));
+			if (!destroyed) drawAccount(null, undefined, t("bugReport.githubError.failed"));
 		} finally {
-			connexion = false;
+			connecting = false;
 		}
 	}
-	void api.github.etat().then(e => { if (!detruit) dessinerCompte(e?.login ?? null); }).catch(() => { if (!detruit) dessinerCompte(null); });
+	void api.github.state().then(e => { if (!destroyed) drawAccount(e?.login ?? null); }).catch(() => { if (!destroyed) drawAccount(null); });
 
 	/* ─── Notice, error, actions ─── */
-	ajouter(formulaire, "p", "nqb-notice", t("bugReport.notice"));
-	const erreurZone = ajouter(formulaire, "div", "nqb-error");
-	erreurZone.hidden = true;
-	erreurZone.setAttribute("role", "alert");
-	const actions = ajouter(formulaire, "div", "nqb-actions");
-	const repli = bouton(actions, "nqb-secondary", t("bugReport.openOnGithub"), () => { window.open(deps.fallbackUrl(), "_blank", "noopener"); });
-	repli.hidden = true;
-	const annuler = bouton(actions, "nqb-secondary", t("bugReport.cancel"), fermer);
-	const envoyer = bouton(actions, "nqb-primary", t("bugReport.send"), () => { void soumettre(); });
-	function majBoutons(): void {
-		envoyer.disabled = !canSend(etat);
-		annuler.disabled = etat.sending;
+	ajouter(form, "p", "nqb-notice", t("bugReport.notice"));
+	const errorBox = ajouter(form, "div", "nqb-error");
+	errorBox.hidden = true;
+	errorBox.setAttribute("role", "alert");
+	const actions = ajouter(form, "div", "nqb-actions");
+	const fallbackBtn = button(actions, "nqb-secondary", t("bugReport.openOnGithub"), () => { window.open(deps.fallbackUrl(), "_blank", "noopener"); });
+	fallbackBtn.hidden = true;
+	const cancelBtn = button(actions, "nqb-secondary", t("bugReport.cancel"), close);
+	const sendBtn = button(actions, "nqb-primary", t("bugReport.send"), () => { void submit(); });
+	function refreshButtons(): void {
+		sendBtn.disabled = !canSend(state);
+		cancelBtn.disabled = state.sending;
 	}
-	majBoutons();
-	quoi.el.focus();
+	refreshButtons();
+	whatField.el.focus();
 
 	/* ─── Sent ─── */
-	const envoye = ajouter(racine, "div", "nqb-sent");
-	envoye.hidden = true;
+	const sentBox = ajouter(root, "div", "nqb-sent");
+	sentBox.hidden = true;
 
-	async function soumettre(): Promise<void> {
-		if (!canSend(etat)) return;
-		etat.sending = true;
-		erreurZone.hidden = true;
-		envoyer.textContent = t("bugReport.sending");
-		majBoutons();
+	async function submit(): Promise<void> {
+		if (!canSend(state)) return;
+		state.sending = true;
+		errorBox.hidden = true;
+		sendBtn.textContent = t("bugReport.sending");
+		refreshButtons();
 		let code = "failed";
 		try {
-			const r = await api.envoyer(reportFromForm(etat));
-			if (detruit) return;
-			if (r.ok) { montrerEnvoye(r.url, r.number); return; }
+			const r = await api.send(reportFromForm(state));
+			if (destroyed) return;
+			if (r.ok) { showSent(r.url, r.number); return; }
 			code = r.code;
 		} catch {
-			if (detruit) return;
+			if (destroyed) return;
 		}
-		etat.sending = false;
-		envoyer.textContent = t("bugReport.retry");
-		erreurZone.hidden = false;
-		erreurZone.textContent = CODES_CONNUS.has(code) ? t(`bugReport.error.${code}` as TransKey) : t("bugReport.error.failed");
+		state.sending = false;
+		sendBtn.textContent = t("bugReport.retry");
+		errorBox.hidden = false;
+		errorBox.textContent = KNOWN_CODES.has(code) ? t(`bugReport.error.${code}` as TransKey) : t("bugReport.error.failed");
 		// For disabled / upstream, GitHub itself is the way forward: that button leads.
-		const prioritaire = CODES_REPLI.has(code);
-		repli.hidden = false;
-		repli.classList.toggle("nqb-primary", prioritaire);
-		repli.classList.toggle("nqb-secondary", !prioritaire);
-		envoyer.classList.toggle("nqb-primary", !prioritaire);
-		envoyer.classList.toggle("nqb-secondary", prioritaire);
-		majBoutons();
+		const leads = FALLBACK_CODES.has(code);
+		fallbackBtn.hidden = false;
+		fallbackBtn.classList.toggle("nqb-primary", leads);
+		fallbackBtn.classList.toggle("nqb-secondary", !leads);
+		sendBtn.classList.toggle("nqb-primary", !leads);
+		sendBtn.classList.toggle("nqb-secondary", leads);
+		refreshButtons();
 	}
 
-	function montrerEnvoye(url: string, numero: number): void {
-		formulaire.hidden = true;
-		envoye.hidden = false;
-		icone(ajouter(envoye, "div", "nqb-sent-mark"), "circle-check");
-		ajouter(envoye, "div", "nqb-sent-title", t("bugReport.sentTitle"));
-		ajouter(envoye, "p", "nqb-sent-body", t("bugReport.sentBody", { number: numero }));
-		const ligne = ajouter(envoye, "div", "nqb-actions");
-		bouton(ligne, "nqb-secondary", t("bugReport.viewIssue"), () => { window.open(url, "_blank", "noopener"); });
-		bouton(ligne, "nqb-primary", t("bugReport.close"), fermer);
+	function showSent(url: string, number: number): void {
+		form.hidden = true;
+		sentBox.hidden = false;
+		icon(ajouter(sentBox, "div", "nqb-sent-mark"), "circle-check");
+		ajouter(sentBox, "div", "nqb-sent-title", t("bugReport.sentTitle"));
+		ajouter(sentBox, "p", "nqb-sent-body", t("bugReport.sentBody", { number: number }));
+		const row = ajouter(sentBox, "div", "nqb-actions");
+		button(row, "nqb-secondary", t("bugReport.viewIssue"), () => { window.open(url, "_blank", "noopener"); });
+		button(row, "nqb-primary", t("bugReport.close"), close);
 	}
 
 	return () => {
-		detruit = true;
-		if (connexion) void api.github.annuler();
+		destroyed = true;
+		if (connecting) void api.github.cancel();
 	};
 }

@@ -77,7 +77,7 @@ export function urlSignalement(version: string, userAgent: string, platformVersi
 }
 
 /** The form once the relay is configured, today's prefilled GitHub URL until then. */
-export function choisirSignalement(configured: boolean): "form" | "url" {
+export function chooseBugReportRoute(configured: boolean): "form" | "url" {
 	return configured ? "form" : "url";
 }
 

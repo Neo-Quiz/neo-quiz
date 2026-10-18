@@ -681,25 +681,25 @@ export interface Pont {
 	};
 
 	/**
-	 * THE BUG REPORT (`./signalement/`, Windows only; absent elsewhere). The
+	 * THE BUG REPORT (`./bug-report/`, Windows only; absent elsewhere). The
 	 * window hands text and gets back a result; the GitHub token never crosses
 	 * (only the login). Every method answers `{ ok: false, code: "disabled" }`
 	 * (or a `failed` / `null` equivalent) while the relay is not configured.
 	 */
-	signalement?: {
+	bugReport?: {
 		/** What would be sent besides the text: this app's environment and the scrubbed log tail. */
-		apercu(): Promise<{ ok: true; env: { app: string; os: string; platform: "windows" | "android" }; log: string } | { ok: false; code: "disabled" }>;
-		/** `rapport` is a `BugReport` (`src/bug-report.ts`) without token; main re-validates it and replaces `env`. Codes: invalid, rate_limited, duplicate, upstream, disabled. */
-		envoyer(rapport: unknown): Promise<{ ok: true; url: string; number: number } | { ok: false; code: string }>;
+		preview(): Promise<{ ok: true; env: { app: string; os: string; platform: "windows" | "android" }; log: string } | { ok: false; code: "disabled" }>;
+		/** `report` is a `BugReport` (`src/bug-report.ts`) without token; main re-validates it and replaces `env`. Codes: invalid, rate_limited, duplicate, upstream, disabled. */
+		send(report: unknown): Promise<{ ok: true; url: string; number: number } | { ok: false; code: string }>;
 		github: {
-			/** Starts the device flow: show `userCode`, open `verificationUri`, then call `attendre()`. `code`: busy (a flow runs), refused (foreign host), failed, disabled. */
-			connecter(): Promise<{ ok: true; userCode: string; verificationUri: string; expiresIn: number } | { ok: false; code: "busy" | "refused" | "failed" | "disabled" }>;
-			/** Resolves when the user finished, refused, ran out of time or `annuler()` was called. Stores the session; returns the login only. */
-			attendre(): Promise<{ login: string } | { error: "denied" | "expired" | "cancelled" | "failed" }>;
-			annuler(): Promise<void>;
+			/** Starts the device flow: show `userCode`, open `verificationUri`, then call `wait()`. `code`: busy (a flow runs), refused (foreign host), failed, disabled. */
+			connect(): Promise<{ ok: true; userCode: string; verificationUri: string; expiresIn: number } | { ok: false; code: "busy" | "refused" | "failed" | "disabled" }>;
+			/** Resolves when the user finished, refused, ran out of time or `cancel()` was called. Stores the session; returns the login only. */
+			wait(): Promise<{ login: string } | { error: "denied" | "expired" | "cancelled" | "failed" }>;
+			cancel(): Promise<void>;
 			/** The connected login, or null. */
-			etat(): Promise<{ login: string } | null>;
-			deconnecter(): Promise<void>;
+			state(): Promise<{ login: string } | null>;
+			disconnect(): Promise<void>;
 		};
 	};
 
@@ -1301,13 +1301,13 @@ export const CANAUX = {
 	/** Pushed to the window, no payload: a full sync downloaded new files (`moodleNouveauxPrendre` reads them). */
 	moodleNouveaux: "neo:moodle/nouveaux",
 	moodleNouveauxPrendre: "neo:moodle/nouveaux-prendre",
-	signalementApercu: "neo:signalement/apercu",
-	signalementEnvoyer: "neo:signalement/envoyer",
-	signalementGithubConnecter: "neo:signalement/github-connecter",
-	signalementGithubAttendre: "neo:signalement/github-attendre",
-	signalementGithubAnnuler: "neo:signalement/github-annuler",
-	signalementGithubEtat: "neo:signalement/github-etat",
-	signalementGithubDeconnecter: "neo:signalement/github-deconnecter",
+	bugReportPreview: "neo:bug-report/preview",
+	bugReportSend: "neo:bug-report/send",
+	bugReportGithubConnect: "neo:bug-report/github-connect",
+	bugReportGithubWait: "neo:bug-report/github-wait",
+	bugReportGithubCancel: "neo:bug-report/github-cancel",
+	bugReportGithubState: "neo:bug-report/github-state",
+	bugReportGithubDisconnect: "neo:bug-report/github-disconnect",
 	reseauFetch: "neo:reseau/fetch",
 	reseauAnnuler: "neo:reseau/annuler",
 	processusRun: "neo:process/run",

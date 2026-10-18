@@ -246,7 +246,7 @@ jobs:
 
       # The bug report main-process pieces: scrubbed in-memory log.
       - name: Bug report main process
-        run: npm run check:signalement
+        run: npm run check:bug-report-service
 
       # LA PHOTO DE SESSION d'un quiz : reprendre là où on s'était arrêté sans
       # perdre de réponses, même si le quiz a changé entre deux sessions.

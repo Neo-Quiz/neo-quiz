@@ -24,7 +24,7 @@ class BridgeTest {
             ClipboardChannel { }.handlers() +
             ShareChannel(File(base, "share"), { _, _ -> true }).handlers() +
             RelayChannel(File(base, "share"), { _, _ -> true }, { }, { null }).handlers() +
-            SignalementChannel(CoroutineScope(Dispatchers.Default), object : SessionStore {
+            BugReportChannel(CoroutineScope(Dispatchers.Default), object : SessionStore {
                 override fun read(): GithubSession? = null
                 override fun write(session: GithubSession) {}
                 override fun clear() {}

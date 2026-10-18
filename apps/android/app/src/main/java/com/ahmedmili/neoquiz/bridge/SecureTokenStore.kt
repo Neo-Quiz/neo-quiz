@@ -23,7 +23,7 @@ interface SessionStore {
 /**
  * AES-GCM with a key that never leaves the AndroidKeyStore (alias `neoquiz.bugreport`); the
  * ciphertext (12-byte IV first) lives in a private file. The token is handed to no caller but
- * `SignalementChannel`, which never passes it to the page.
+ * `BugReportChannel`, which never passes it to the page.
  */
 class SecureTokenStore(private val file: File) : SessionStore {
     private fun key(create: Boolean): SecretKey? {

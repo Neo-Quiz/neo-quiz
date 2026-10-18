@@ -147,8 +147,8 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val updateChannel = UpdateChannel.create(activity, scope) { state -> bridge?.emit("miseAJour.etat", state) }
     val calendarChannel = CalendarChannel(DueCalendar.of(activity)) { ReviewAlarm.scheduleNext(activity) }
     val chatNotifyChannel = ChatNotifyChannel(ChatNotifier.store(activity))
-    val signalementChannel = SignalementChannel(
-        scope, SecureTokenStore(File(activity.filesDir, "bugreport.session")), UrlSignalementHttp(),
+    val bugReportChannel = BugReportChannel(
+        scope, SecureTokenStore(File(activity.filesDir, "bugreport.session")), UrlBugReportHttp(),
         {
             val version = try { activity.packageManager.getPackageInfo(activity.packageName, 0).versionName } catch (_: Exception) { null }
             JSONObject().put("app", version ?: "unknown").put("os", "Android " + android.os.Build.VERSION.RELEASE).put("platform", "android")
@@ -156,7 +156,7 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     )
     val created = Bridge(
         scope,
-        Unavailable.handlers() + signalementChannel.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + RelayChannel(File(activity.cacheDir, "share"), AndroidPromptSender(activity), AndroidClipboard(activity), AndroidClipboardSource(activity)).handlers() + IncomingChannel().handlers() + HtmlFrameChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { ownWrites.onWrite(it); hub.signalWrite(it) }.handlers() + scan.handlers() +
+        Unavailable.handlers() + bugReportChannel.handlers() + ShareChannel(File(activity.cacheDir, "share"), AndroidShareSender(activity)).handlers() + RelayChannel(File(activity.cacheDir, "share"), AndroidPromptSender(activity), AndroidClipboard(activity), AndroidClipboardSource(activity)).handlers() + IncomingChannel().handlers() + HtmlFrameChannel().handlers() + ClipboardChannel(AndroidClipboard(activity)).handlers() + CodeChannel(codeSandbox) { event, data -> bridge?.emit(event, data) }.handlers() + FilesChannel(perimeter, allowed) { ownWrites.onWrite(it); hub.signalWrite(it) }.handlers() + scan.handlers() +
             settings.handlers() + system.handlers() + syncChannel.handlers() + backChannel.handlers() + calendarChannel.handlers() + chatNotifyChannel.handlers() + updateChannel.handlers() + NavBarChannel(navBar::apply, { navBar.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK) }).handlers() + HourFormatChannel { android.text.format.DateFormat.is24HourFormat(activity) }.handlers(),
     )
     bridge = created
