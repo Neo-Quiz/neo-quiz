@@ -119,8 +119,8 @@
 
 		<p class="resume">Neo Quiz has no account, no telemetry, no analytics and no ads. It runs
 		on your device and keeps your data there. Its author, Ahmed Mili, operates no server and
-		receives nothing from the app. The only network connections are listed below, one by
-		one.</p>
+		receives nothing from the app, except a bug report you choose to send (section 4). The
+		only network connections are listed below, one by one.</p>
 
 		<h2>1. What is stored, and where</h2>
 		<p>Everything Neo Quiz stores stays on your computer, in plain files you can open, copy or
@@ -150,6 +150,10 @@
 			<li><strong>Ollama</strong> (<code>ollama.com</code>, and the Ollama server you
 			configure, local by default): the list of available models, when you open the AI
 			generation page. See <a href="https://ollama.com/privacy">Ollama’s privacy policy</a>.</li>
+			<li><strong>Bug report relay</strong> (Cloudflare Workers): only when you press Send in
+			the bug report form. It sees your IP address and standard request metadata, and the
+			report text, which it forwards to GitHub (see section 4). See
+			<a href="https://www.cloudflare.com/privacypolicy/">Cloudflare’s privacy policy</a>.</li>
 		</ul>
 
 		<h2>3. AI generation</h2>
@@ -165,22 +169,42 @@
 		disk by itself. Only what you explicitly attach is sent, and Neo Quiz never sees or keeps
 		a copy of the exchange beyond the quiz it writes into your note.</p>
 
-		<h2>4. This website</h2>
+		<h2>4. Bug reports</h2>
+		<p>The in-app bug report form sends nothing until you press Send. A report becomes a
+		<strong>public issue</strong> on
+		<a href="https://github.com/Neo-Quiz/neo-quiz/issues">Neo-Quiz/neo-quiz</a>: anyone can
+		read it, so do not write anything private in it.</p>
+		<ul>
+			<li><strong>What is attached</strong>: the app version and your system, plus (on
+			Windows) a recent part of the app log. The form shows every part before sending and you
+			can remove each one. No screenshot is taken or sent.</li>
+			<li><strong>Without an account</strong>: the report goes through a small relay
+			(Cloudflare Workers) that creates the issue for you. The relay keeps a hash of each
+			report for 24 hours to filter duplicates, plus per-IP and daily counters against abuse.
+			It stores no report text. The project owner can switch the relay off at any time.</li>
+			<li><strong>With GitHub sign-in (optional)</strong>: the issue is created under your own
+			account. The token does not expire and is stored encrypted on your device. The app only
+			asks for what the GitHub App permits, which is creating issues on this repository.
+			<em>Disconnect</em> erases the token from the device.</li>
+			<li><strong>Android</strong> sends no app log, only the version and system.</li>
+		</ul>
+
+		<h2>5. This website</h2>
 		<p>The download pages are static files hosted on GitHub Pages, which logs requests under
 		the GitHub Privacy Statement above. They set no cookies and run no analytics. The only
 		thing kept in your browser is your language choice, in <code>localStorage</code>, once
 		you pick one from the menu.</p>
 
-		<h2>5. Sharing, children, your rights</h2>
+		<h2>6. Sharing, children, your rights</h2>
 		<p>No personal data is collected, so none is shared, sold or transferred, and there is
 		nothing to request access to or deletion of: your data is the files above, under your
 		control. Neo Quiz is not directed at children and collects nothing from anyone.</p>
 
-		<h2>6. Changes</h2>
+		<h2>7. Changes</h2>
 		<p>If a future version connects to a new service or stores something new, this page will
 		say so, with a new date above.</p>
 
-		<h2>7. Contact</h2>
+		<h2>8. Contact</h2>
 		<p>Questions go through the project’s
 		<a href="https://github.com/Neo-Quiz/neo-quiz/issues">GitHub issues</a>.</p>
 	</article>
