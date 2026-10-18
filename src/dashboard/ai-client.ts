@@ -1171,6 +1171,15 @@ export function parseReponseQuiz(content: string): ReponseQuiz {
 		   Only PREFIXING `[` is attempted (never appending `]`): a truncated
 		   answer whose last object is cut off stays malformed and is reported,
 		   rather than silently accepted as a shorter quiz. */
+		/* A forgotten `]` before the next field of the object: see `reparerTableauNonFerme`. */
+		for (const base of [cleaned, repare]) {
+			const ferme = reparerTableauNonFerme(base);
+			if (ferme === base) continue;
+			try {
+				const v = JSON5.parse(ferme) as unknown;
+				if (Array.isArray(v)) return { questions: inertRemoteImages(sansFauxTitres(v)), titre: titreEnCommentaire(cleaned) };
+			} catch { /* the original error follows */ }
+		}
 		const enveloppe = envelopperEnTableau(cleaned) ?? envelopperEnTableau(repare);
 		if (enveloppe && enveloppe.length > 0) return { questions: inertRemoteImages(sansFauxTitres(enveloppe)), titre: titreEnCommentaire(cleaned) };
 		/* Un quiz MAL FORMÉ garde l'erreur du parseur : elle situe le défaut
@@ -1297,6 +1306,58 @@ export function reparerVirgulesManquantes(source: string): string {
 		if (j < lignes.length && debutDElement.test(lignes[j])) lignes[i] = cur.replace(/\s*$/, ",");
 	}
 	return lignes.join("\n");
+}
+
+/**
+ * An array a model forgot to close (2026-10-18): `"etapes": [ "a", "b",` then,
+ * with no `]`, the next FIELD of the object (`"html": "…"`) — GLM-5.3 Flash did
+ * it on a 10-question Learn, the parser stopping at "invalid character ':'".
+ * Inside an array a key can only mean the array ended: the scanner (strings,
+ * comments and brackets tracked, nothing else touched) writes the missing `],`
+ * before it. Anything it does not recognise is left exactly as it was.
+ */
+export function reparerTableauNonFerme(source: string): string {
+	const pile: string[] = [];
+	let sortie = "";
+	let i = 0;
+	const n = source.length;
+	let repare = false;
+	while (i < n) {
+		const c = source[i];
+		// A value starts here: is it really a `key:` of the object the array was in?
+		if (pile[pile.length - 1] === "[" && pile.length > 1 && pile[pile.length - 2] === "{" && !/\s/.test(c) && /[\s,]/.test(source[i - 1] ?? "[")
+			&& /^(?:"[A-Za-z_][\w-]*"|'[A-Za-z_][\w-]*'|[A-Za-z_]\w*)\s*:/.test(source.slice(i, i + 80))) {
+			sortie = sortie.replace(/,?\s*$/, "") + "\n],\n";
+			pile.pop();
+			repare = true;
+		}
+		if (c === "\"" || c === "'") {
+			let j = i + 1;
+			while (j < n && source[j] !== c) j += source[j] === "\\" ? 2 : 1;
+			sortie += source.slice(i, j + 1);
+			i = j + 1;
+			continue;
+		}
+		if (c === "/" && source[i + 1] === "/") {
+			const j = source.indexOf("\n", i);
+			const fin = j < 0 ? n : j;
+			sortie += source.slice(i, fin);
+			i = fin;
+			continue;
+		}
+		if (c === "/" && source[i + 1] === "*") {
+			const j = source.indexOf("*/", i + 2);
+			const fin = j < 0 ? n : j + 2;
+			sortie += source.slice(i, fin);
+			i = fin;
+			continue;
+		}
+		if (c === "{" || c === "[") pile.push(c);
+		else if (c === "}" || c === "]") pile.pop();
+		sortie += c;
+		i++;
+	}
+	return repare ? sortie : source;
 }
 
 /** Retire les faux titres de section qu'un modèle glisse entre les

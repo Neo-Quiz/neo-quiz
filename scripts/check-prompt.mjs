@@ -440,7 +440,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireOuReparer, reparerTableauNonFerme, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -510,6 +510,13 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("a cut quiz after notes stays unreadable (never a shorter quiz taken for the answer)",
 		(() => { try { parseReponseQuiz(notes + quizTexte.slice(0, quizTexte.length - 40)); return "(read)"; } catch (e) { return e instanceof Error; } })(), true);
 	r.check("prose with no quiz inside is still the non-quiz error, not a salvage", (() => { try { parseReponseQuiz("Voici mon avis [\n {un exemple}\n] sur la question."); return "(read)"; } catch (e) { return e instanceof Error; } })(), true);
+
+	/* A FORGOTTEN `]` (2026-10-18): GLM-5.3 Flash wrote `etapes: [ "a", "b",` then went on with the next field of the object, "html", never closing the array. */
+	const sansFerme = "[\n  {\n    title: 'Les limites',\n    prompt: 'Que vaut la limite ?',\n    etapes: [\n      'Premier pas avec $f(x) = \\\\frac{1}{x}$ : on regarde.',\n      \"Second pas, l'idee : la valeur voisine.\",\n      \"html\": \"<p>a: b</p>\",\n    accroche: { forme: 'analogie' },\n  },\n  {\n    title: 'La derivee',\n    prompt: 'Que vaut f prime ?',\n    options: ['1', '2'],\n    correctIndex: 1,\n  }\n]";
+	const ferme = parseReponseQuiz(sansFerme);
+	r.check("an array left open before the next field of its object is closed there: the quiz is read whole", [ferme.questions.length, ferme.questions[0].etapes.length, ferme.questions[0].html, ferme.questions[0].accroche.forme], [2, 2, "<p>a: b</p>", "analogie"]);
+	r.check("a valid quiz goes through the repair untouched", reparerTableauNonFerme(quizTexte), quizTexte);
+	r.check("a key-like word inside a string never closes an array", reparerTableauNonFerme("[{ a: ['x', \"un texte, html: oui\", 'y'] }]"), "[{ a: ['x', \"un texte, html: oui\", 'y'] }]");
 
 	/* SELF-HEALING (2026-10-18): an unreadable answer is asked for ONCE more, with a note quoting the parser error; a fake provider returns a broken answer, then a good one. */
 	const bon = "[{ prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
