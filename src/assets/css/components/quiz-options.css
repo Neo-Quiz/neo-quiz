@@ -264,10 +264,12 @@
   cursor: default;
 }
 
+/* Its box stays EMPTY, dashed: a right answer the learner did not tick.
+   Filled like a ticked one, it read as "I ticked it" (2026-10-19). */
 .quiz-option.missed::before{
-  border-color: var(--quiz-success);
-  background: color-mix(in srgb, var(--quiz-success) 15%, var(--background-primary));
-  box-shadow: inset 0 0 0 4px var(--quiz-success);
+  border: 2px dashed var(--quiz-success);
+  background: transparent;
+  box-shadow: none;
 }
 
 .quiz-option.missed::after{

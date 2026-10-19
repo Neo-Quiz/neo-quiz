@@ -26,6 +26,7 @@ release notes.
 ### Fixed
 
 - An explanation that names wrong options by their letter now uses the letters shown on screen, which are shuffled; in a multiple choice, which shows no letters, it names the options by their words.
+- A right answer you did not tick in a multiple choice shows an empty dashed box, no longer one that looks ticked.
 
 ## [1.21.19] - 2026-10-19
 
