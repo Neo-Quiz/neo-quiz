@@ -17,7 +17,9 @@
  */
 
 /** The colour of each token class, in the frame's variables. */
-export const FRAME_CODE_CSS = "pre,code{font-family:var(--nq-mono);font-size:.92em}"
+/* A long line of code WRAPS inside the page (2026-10-19): at 360 px a
+   generated page's code pushed the page sideways, with a scrollbar. */
+export const FRAME_CODE_CSS = "pre,code{font-family:var(--nq-mono);font-size:.92em}pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}"
 	+ ".nq-tk-k{color:var(--nq-code-keyword)}.nq-tk-s{color:var(--nq-code-string)}"
 	+ ".nq-tk-n{color:var(--nq-code-number)}.nq-tk-c{color:var(--nq-code-comment);font-style:italic}"
 	+ ".nq-tk-f{color:var(--nq-code-function)}";
