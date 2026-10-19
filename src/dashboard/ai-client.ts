@@ -393,6 +393,39 @@ export function validerQuestions(questions: readonly unknown[]): string | null {
 /** An answer the app refused for its schema, not for its syntax. */
 export class ErreurSchema extends Error {}
 
+/** A title that is a file name, not a name for a student: "cours1",
+    "cours1_linear_fit", "CM2", or the attached document's own name. */
+export function titreDeFichier(titre: string, document?: string): boolean {
+	const t = titre.trim();
+	const nom = (document ?? "").replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "").trim();
+	return /_/.test(t) || /^[\p{L}]+-?\d+$/u.test(t) || (nom !== "" && t.localeCompare(nom, undefined, { sensitivity: "base" }) === 0);
+}
+
+/** The quizzes of an answer that have no real title (missing, or a file name),
+    named for the model; empty when every quiz has one. */
+export function titresManquants(r: ReponseQuiz & { lot?: ReponseDocument[] }): string[] {
+	if (r.lot) return r.lot.filter(d => !d.titre || titreDeFichier(d.titre, d.document)).map(d => d.document);
+	return !r.titre || titreDeFichier(r.titre) ? [""] : [];
+}
+
+/** The message of a title round: the quiz was read, only its name is missing,
+    so the model sends the title line(s) alone, never the whole quiz again. */
+export function noteDeTitre(manquants: readonly string[], lot: boolean, tour: number, max: number): string {
+	const quoi = lot ? "These quizzes have no real title: " + manquants.map(d => "\"" + d + "\"").join(", ") + "." : "Your quiz has no real title.";
+	const forme = lot ? "Answer with one line per quiz listed, in that order, and nothing else: '// title: <name>'." : "Answer with ONE line and nothing else: '// title: <name>'.";
+	return "AUTOMATIC CORRECTION " + tour + "/" + max + ": " + quoi + " A title is what a student would write on the cover: 3 to 8 words naming the subject and scope, in the language of the content, never a file name (no \"cours1\", no underscore). " + forme + " Do not resend the quiz.";
+}
+
+/** The titles of a title round's answer, in order. */
+function titresDeReponse(texte: string): string[] {
+	const titres: string[] = [];
+	for (const m of texte.matchAll(/\/\/\s*title\s*:\s*(.+?)\s*$/gim)) {
+		const t = nettoyerTitre(m[1]);
+		if (t) titres.push(t);
+	}
+	return titres;
+}
+
 /**
  * One model call and its reading, with the model's own CORRECTION (2026-10-18,
  * "we're talking about an AI: it can fix its mistake itself"): an answer the
@@ -416,11 +449,12 @@ export async function lireEtCorriger(o: {
 	const max = o.tours ?? 3;
 	let brut = await o.appel(null);
 	for (let tour = 1; ; tour++) {
+		let lu: (ReponseQuiz & { lot?: ReponseDocument[] }) | null = null;
 		try {
 			const r = o.lire(brut);
 			const faute = validerQuestions(r.lot ? r.lot.flatMap(d => d.questions) : r.questions);
 			if (faute) throw Object.assign(new ErreurSchema(faute), { texteLu: brut });
-			return r;
+			lu = r;
 		} catch (e) {
 			if ((o.annule && o.annule()) || e instanceof NoQuizAnswer || e instanceof UsageLimitError || (e instanceof Error && e.message === t("ai.err.contextLimit")) || tour > max) throw e;
 			o.surCorrection?.(tour, max, e instanceof Error ? e.message : String(e));
@@ -428,7 +462,31 @@ export async function lireEtCorriger(o: {
 				brut = await o.appel({ note: noteDeCorrection(e, brut, tour, max), precedent: brut, tour, max });
 			} catch { throw e; }
 		}
+		if (lu) return await avecTitres(lu, brut, o);
 	}
+}
+
+/** Title rounds (2026-10-19): a quiz read whole but named after its file
+    ("cours1_linear_fit") or not named at all goes back to the model for its
+    title alone, at most twice. The quiz is never lost for a title: after the
+    rounds, it keeps what it has. */
+async function avecTitres(lu: ReponseQuiz & { lot?: ReponseDocument[] }, brut: string, o: { appel: (c: Correction | null) => Promise<string>; annule?: () => boolean; surCorrection?: (tour: number, max: number, erreur: string) => void }): Promise<ReponseQuiz & { lot?: ReponseDocument[] }> {
+	const max = 2;
+	for (let tour = 1; tour <= max; tour++) {
+		const manquants = titresManquants(lu);
+		if (!manquants.length || (o.annule && o.annule())) break;
+		o.surCorrection?.(tour, max, lu.lot ? "quizzes without a real title" : "quiz without a real title");
+		let reponse: string;
+		try { reponse = await o.appel({ note: noteDeTitre(manquants, !!lu.lot, tour, max), precedent: brut, tour, max }); } catch { break; }
+		const titres = titresDeReponse(reponse);
+		if (lu.lot) {
+			lu = { ...lu, lot: lu.lot.map(d => {
+				const titre = titres[manquants.indexOf(d.document)];
+				return titre && !titreDeFichier(titre, d.document) ? { ...d, titre } : d;
+			}) };
+		} else if (titres[0] && !titreDeFichier(titres[0])) lu = { ...lu, titre: titres[0] };
+	}
+	return lu;
 }
 
 /** The quiz of ONE document in the answer of a one-pass generation. */
@@ -2561,7 +2619,7 @@ export function createAiClient(settings: AiSettingsHost): AiClient {
 								}
 							}
 						},
-						required: ["questions"]
+						required: ["title", "questions"]
 					} } : {})
 				})
 			}), ac.signal);

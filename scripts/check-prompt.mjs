@@ -447,7 +447,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts"], ({ com
 import { mkdtempSync as mkdtempDiag, readdirSync as readdirDiag, statSync as statDiag, rmSync as rmDiag, readFileSync as readDiag } from "node:fs";
 import { tmpdir as tmpdirDiag } from "node:os";
 import { join as joinDiag } from "node:path";
-await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireEtCorriger, validerQuestions, composerPrompts, reparerTableauNonFerme, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts", "apps/windows/electron/diagnostic-reponse.ts"], async ({ lireOuDiagnostiquer, lireEtCorriger, validerQuestions, titreDeFichier, composerPrompts, reparerTableauNonFerme, diagnosticAntigravity, estTransitoire, avecRelances, TransientCliError, noteDeReparation, parseReponseQuiz, NoQuizAnswer, APERCU_REPONSE }, { detectModelLimit }, { ecrireDiagnostic, nomDiagnostic, DIAGNOSTIC_MAX_OCTETS, DIAGNOSTICS_GARDES }) => {
 	const r = makeReporter("Unreadable answers: limits, preview, diagnostic file");
 	const echec = (texte, erreurCli = "") => {
 		const gardes = [];
@@ -526,7 +526,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("a key-like word inside a string never closes an array", reparerTableauNonFerme("[{ a: ['x', \"un texte, html: oui\", 'y'] }]"), "[{ a: ['x', \"un texte, html: oui\", 'y'] }]");
 
 	/* THE MODEL CORRECTS ITS OWN MISTAKE (2026-10-18): an unreadable or schema-invalid answer goes back to the same model with the exact error and the numbered lines around it, up to 3 rounds; a fake provider returns scripted answers. */
-	const bon = "[{ title: 'T', prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
+	const bon = "// title: Les boucles en Python\n[{ title: 'T', prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
 	const coupe = "[{ title: 'A', prompt: 'very lo";
 	const scenario = async (reponses, extra = {}) => {
 		const appels = []; const rounds = [];
@@ -565,6 +565,20 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/dashboard/model-limit.ts
 	r.check("a Stop is never corrected", [rStop.appels.length, rStop.err instanceof Error], [1, true]);
 	const rEchec = await lireEtCorriger({ appel: async (c) => { if (c) throw new Error("cli down"); return coupe; }, lire: parseReponseQuiz }).catch(e => e);
 	r.check("a correction call that fails reports the answer's own error", [rEchec instanceof Error, rEchec.message.includes("very lo")], [true, true]);
+	/* NO FILE NAME AS A TITLE (2026-10-19): three Learns came out as "cours1", "cours1_linear_fit" and "cours1_gradient_descent". A quiz read whole but without a real title goes back for its title ALONE (two rounds at most), and is never lost for it. */
+	const sansTitre = "[{ title: 'T', prompt: 'p', options: ['a','b'], correctIndex: 0 }]";
+	const rt = await scenario([sansTitre, "// title: Regression lineaire et descente de gradient"]);
+	r.check("a quiz without a title asks for the title alone and takes it, the quiz kept from the first answer",
+		[rt.res?.titre, rt.res?.questions.length, rt.appels.length, rt.appels[1]?.note.includes("Do not resend the quiz"), rt.rounds.length], ["Regression lineaire et descente de gradient", 1, 2, true, 1]);
+	const rf = await scenario(["// title: cours1_linear_fit\n" + sansTitre, "// title: cours1", "// title: La droite de regression"]);
+	r.check("a file-name title is refused, and so is a file name sent back: the second round names it", [rf.res?.titre, rf.appels.length], ["La droite de regression", 3]);
+	const rn = await scenario([sansTitre, "rien", "toujours rien"]);
+	r.check("no title after two rounds: the quiz is kept, untitled (never an error)", [rn.err, rn.res?.questions.length, rn.res?.titre, rn.appels.length], [null, 1, undefined, 3]);
+	const lotSans = { questions: [], lot: [{ document: "cours1.html", questions: [], titre: "cours1" }, { document: "td2.html", questions: [], titre: "Les arbres binaires" }] };
+	const rLot = await lireEtCorriger({ appel: async (c) => c ? "// title: Introduction a l'apprentissage" : "x", lire: () => lotSans });
+	r.check("a batch: only the untitled quiz is asked, and gets its title", rLot.lot.map(d => d.titre), ["Introduction a l'apprentissage", "Les arbres binaires"]);
+	r.check("titreDeFichier: a file stem, an underscore or the document's own name is a file name, a real title is not",
+		[titreDeFichier("cours1"), titreDeFichier("CM2"), titreDeFichier("cours1_linear_fit"), titreDeFichier("Récursivité", "Récursivité.pdf"), titreDeFichier("Python : listes et tuples"), titreDeFichier("Régression linéaire")], [true, true, true, true, false, false]);
 	r.check("validerQuestions: reading cards, ordering and numeric questions without correctIndex are sound",
 		validerQuestions([{ role: "read", title: "R", prompt: "lire" }, { title: "O", prompt: "p", options: ["a", "b"], ordering: true }, { title: "N", prompt: "p", options: ["1", "2"], numeric: true, answer: "3" }, { title: "M", prompt: "p", options: ["a", "b"], correctIndices: [0, 1] }]), null);
 	/* A FOLLOW-UP TURN KEEPS THE FORMAT (2026-10-18): "Ajoute aussi une question sur les tableaux" is a generation like any other, with the whole format. */

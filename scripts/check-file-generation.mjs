@@ -488,7 +488,8 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	const l3 = file.lignes()[0];
 	r.check("a remote line on Codex fails at launch and no CLI is started", [l3.etat, appels.length - avant], ["echouee", 0]);
 	file.fermer(l3.id);
-	reponse = "```json5\n[" + [bloc(noms3[0], 1)].join(",\n") + "]\n```";
+	// Titled, so the count is the launch alone (an untitled quiz asks its title back).
+	reponse = "```json5\n// title: Les piles et les files\n[" + [bloc(noms3[0], 1)].join(",\n") + "]\n```";
 	file.envoyer({ ...demande, parDocument: false, notes: [], fromDevice: "phone-1" });
 	await attendre();
 	r.check("a remote line on Claude does launch", appels.length - avant, 1);

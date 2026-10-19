@@ -271,7 +271,11 @@ export async function enregistrerQuiz(e: Enregistrement): Promise<QuizIndexEntry
 		   a raw file name (2026-10-19). The document name stays in the frontmatter
 		   `source`, which is what a Practice uses to find its Learn. */
 		const titreDuModele = e.titreModele ? exportBaseName(e.titreModele, "") : "";
-		const base = e.titreImpose || titreDuModele || (pieces.length ? source : nomDeSource([], e.demande?.text || "", defaut));
+		/* A model that gave no title after its title rounds (`avecTitres`) falls
+		   back on the document's name, its underscores read as spaces, through the
+		   export rules again (a reserved name keeps its guard). */
+		const repli = pieces.length ? exportBaseName(source.replace(/_+/g, " ").replace(/\s+/g, " ").trim(), "") || source : nomDeSource([], e.demande?.text || "", defaut);
+		const base = e.titreImpose || titreDuModele || repli;
 		const path = await freeNotePath(folder, nomDeNote(base, mode));
 		const provider = e.reglages.aiProvider || "";
 		/* Sur un SITE, le modèle et l'effort sont les siens : `model` porte le
