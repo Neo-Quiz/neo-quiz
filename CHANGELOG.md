@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.18] - 2026-10-19
+
 ### Fixed
 
 - An interactive diagram sized by its window no longer makes its frame grow on its own, which drifted the Explain panel's scrollbar.
