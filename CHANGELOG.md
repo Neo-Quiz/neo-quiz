@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.16] - 2026-10-19
+
 ### Fixed
 
 - A generated quiz is never named after its file ("cours1", "cours1_linear_fit"): when the model gives no real title, it is asked for the title alone, and the last-resort name reads underscores as spaces.
