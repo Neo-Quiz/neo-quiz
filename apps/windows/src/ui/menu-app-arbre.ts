@@ -57,21 +57,18 @@ export function versionWindows(userAgent: string, platformVersion?: string): str
 	return m ? `Windows NT ${m[1]}` : "Windows";
 }
 
-/** The new-issue URL with a prefilled template: versions, then three headings.
-    The headings are the repository's public (English) issue language, not the UI's. */
+/** The new-issue URL with a prefilled body: an empty space to write in, the
+    versions at the bottom. No headings to fill since 2026-10-19 (three
+    sections asked the user to sort their thoughts before writing a word);
+    the hint is an HTML comment, invisible once posted. In English: the
+    repository's public issue language, not the UI's. */
 export function urlSignalement(version: string, userAgent: string, platformVersion?: string): string {
-	const corps = `**App version:** ${version}
-**System:** ${versionWindows(userAgent, platformVersion)}
-
-## What happened
+	const corps = `<!-- Describe the problem in your own words, in any language. -->
 
 
-## Steps to reproduce
 
-1. 
-
-## Expected
-
+---
+Neo Quiz ${version} · ${versionWindows(userAgent, platformVersion)}
 `;
 	return `${URL_DEPOT}/issues/new?body=${encodeURIComponent(corps)}`;
 }
