@@ -83,9 +83,12 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	r.check("Test explain rule unchanged", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.'), true);
 	r.check("Learn: several notions in a slice become bold, unnumbered parts",
 		learnP.includes("opened by a **bold** subheading (never numbered"), true);
-	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram. */
-	r.check("Learn: interactive pages name the explorable, structured-course and annotated-diagram styles",
-		["EXPLORABLE", "STRUCTURED COURSE", "ANNOTATED DIAGRAM", "MIXED"].map(m => learnP.includes(m)), [true, true, true, true]);
+	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram.
+	   2026-10-19: the model is FREE among every relevant form and picks the best one per page, after picturing several; no default form. */
+	r.check("Learn: interactive pages offer every form, explorable, structured course and annotated diagram among them",
+		["EXPLORABLE", "TWO CASES COMPARED", "STEPS:", "STRUCTURED COURSE", "ANNOTATED DIAGRAM", "SORT OR CLASSIFY", "REVEAL", "PREDICT THEN SEE", "TIMELINE", "METAPHOR", "MIXED"].map(m => learnP.includes(m)), Array(11).fill(true));
+	r.check("Learn: the model chooses each page's form freely, after picturing several, never a default",
+		[learnP.includes("you are FREE"), learnP.includes("picture two or three forms"), learnP.includes("the default whenever"), learnP.includes("never the same style or the same interaction twice in a row")], [true, true, false, false]);
 	/* 2026-10-09: the readings carry ALL of the course, rephrased to be easier, never copied, and may add related knowledge. */
 	r.check("Learn: readings keep every piece of the course, rephrased, never copied, related additions allowed",
 		["EVERY piece of information", "never copy the course sentence by sentence", "REPHRASE", "ADD related knowledge"].map(m => learnP.includes(m)), [true, true, true, true]);
