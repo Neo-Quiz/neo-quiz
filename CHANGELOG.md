@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.17] - 2026-10-19
+
 ### Added
 
 - A flashcard has an optional "Your answer" field under it: write your answer before turning the card (Enter turns it), and the turned card shows it above the ratings. The card still turns without it, and the verdict stays yours.
