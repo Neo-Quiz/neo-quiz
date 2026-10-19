@@ -665,7 +665,8 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 		   `anchorEl`; without it, the same entries stay flat. */
 		const editItems: ActionMenuItem[] = [];
 		editItems.push({
-			icon: "pencil",
+			// In the submenu, not the pencil of "Edit" itself: two pencils one above the other.
+			icon: anchorEl ? "list-checks" : "pencil",
 			label: t(anchorEl ? "dashboard.quizzes.menuEditQuestions" : "dashboard.detail.edit"),
 			// La page du quiz, en ÉDITION, DANS le dashboard : ouvrir un
 			// onglet à côté ferait deux surfaces pour le même quiz, alors
