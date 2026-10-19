@@ -242,6 +242,41 @@ button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
   gap: 14px;
 }
 
+/* The optional answer field under the card (text-only.ts, 2026-10-19): one
+   line that grows with the text, the card's width, never the 140 px of a
+   written explanation. */
+.quiz-fc .quiz-textarea.quiz-textonly-textarea.quiz-fc-own{
+  width: min(560px, 100%);
+  min-height: 0;
+  margin-top: -14px;
+  padding: 11px 16px;
+  text-align: center;
+}
+
+/* Turned: what the learner wrote, as text above the ratings, never a tile. */
+.quiz-fc-own-answer{
+  width: min(560px, 100%);
+  box-sizing: border-box;
+  margin-top: -14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 10px;
+  text-align: center;
+}
+
+.quiz-fc-own-label{
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.quiz-fc-own-text{
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
 .quiz-fc-rate{
   --quiz-fc-rate-face: var(--quiz-fc-face);
   --quiz-fc-rate-edge: var(--quiz-fc-edge);

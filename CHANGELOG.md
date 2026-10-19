@@ -13,6 +13,14 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- A flashcard has an optional "Your answer" field under it: write your answer before turning the card (Enter turns it), and the turned card shows it above the ratings. The card still turns without it, and the verdict stays yours.
+
+### Fixed
+
+- The "Thinking…" line of the Explain panel fades in and carries a moving sheen while the answer is being prepared.
+
 ## [1.21.16] - 2026-10-19
 
 ### Fixed

@@ -410,14 +410,28 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 				<div class="quiz-question quiz-fc-text">${ctx.cards.renderQuizPromptHtml(q)}</div>
 				<span class="quiz-fc-tip">${t("engine.flashcard.flipTip")} <kbd class="quiz-flashcard-kbd">${t("engine.flashcard.flipHint")}</kbd></span>
 			</span>`;
+		/* An OPTIONAL answer field under the card (2026-10-19, as Anki's "type
+		   in the answer" and Quizlet's Write): writing the answer before turning
+		   the card is the better recall, but nothing asks for it — the card turns
+		   with or without it, and the verdict stays the learner's own. Enter
+		   turns the card; Shift+Enter is a new line. */
+		const own = typeof ctx.quizState.textOnlyAnswers?.[qi] === "string" ? ctx.quizState.textOnlyAnswers[qi] : "";
 		if (!isChecked(qi)) {
 			return `<div class="quiz-flashcard quiz-fc" data-flashcard="1">
 				<button class="quiz-fc-card quiz-textonly-check-btn quiz-flashcard-flip-btn" type="button" aria-keyshortcuts="Space" aria-label="${ctx.escapeHtmlAttr(t("engine.flashcard.flip"))}">
 					<span class="quiz-fc-inner">${front}</span>
 				</button>
+				<textarea class="quiz-textarea quiz-textonly-textarea quiz-fc-own" data-textonly-answer="1" rows="1"
+					aria-label="${ctx.escapeHtmlAttr(t("engine.flashcard.ownPlaceholder"))}"
+					placeholder="${ctx.escapeHtmlAttr(t("engine.flashcard.ownPlaceholder"))}"
+					spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off">${ctx.escapeHtmlAttr(own)}</textarea>
 				${ctx.stepSlides ? selfRatingHtml(qi, true) : ""}
 			</div>`;
 		}
+		// Turned: what the learner wrote, next to the card's answer, as plain text rendered inline.
+		const mine = own.trim()
+			? `<div class="quiz-fc-own-answer"><span class="quiz-fc-own-label">${t("engine.flashcard.ownLabel")}</span><span class="quiz-fc-own-text">${ctx.sanitize.renderInlineText(own.trim())}</span></div>`
+			: "";
 		const verso = typeof q.answer === "string" && q.answer.trim()
 			? ctx.sanitize.renderInlineText(q.answer)
 			: `<span class="quiz-flashcard-missing">${t("engine.flashcard.missingAnswer")}</span>`;
@@ -438,6 +452,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					</span>
 				</span>
 			</div>
+			${mine}
 			${ctx.stepSlides ? `${selfRatingHtml(qi)}${flashcardZoneHtml(q, qi)}` : `${learningHtml(q)}${selfRatingHtml(qi)}`}
 		</div>`;
 	}
@@ -614,6 +629,15 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 			textarea.addEventListener("paste", () => requestAnimationFrame(commitAnswer));
 			textarea.addEventListener("focus", syncLayout);
 			textarea.addEventListener("blur", () => { persistAnswer(); syncLayout(); });
+			// The optional field of a flashcard: Enter turns the card, Shift+Enter is a new line.
+			if (textarea.classList.contains("quiz-fc-own")) {
+				textarea.addEventListener("keydown", e => {
+					if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+					e.preventDefault();
+					persistAnswer();
+					trackItem.querySelector<HTMLButtonElement>(".quiz-flashcard-flip-btn")?.click();
+				});
+			}
 			syncLayout();
 		}
 

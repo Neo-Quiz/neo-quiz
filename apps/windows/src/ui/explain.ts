@@ -1307,7 +1307,8 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 						poserImagesCitees(prose, ancre.images);
 						if (decoupe.shown.includes("$")) void mathifyElement(prose);
 					}
-					else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente", t("ai.chat.thinking"));
+					// The live label sweeps a sheen across its word, as the AI's work view does (claude.ai's "Thinking").
+					else if (msg.enCours) ajouter(prose, "span", "qbd-ai-chat-attente qbd-work-thinking-label is-live", t("ai.chat.thinking"));
 					const prop = etat.propositions.get(msg.key);
 					if (prop) peindreProposition(rep, prop);
 					return rep;

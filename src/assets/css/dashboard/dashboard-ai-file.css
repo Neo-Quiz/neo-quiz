@@ -685,6 +685,26 @@
 
 .qbd-ai-chat-attente {
 	color: var(--text-faint);
+	animation: qbd-ai-chat-attente-in 240ms ease-out;
+}
+
+/* The waiting label fades in instead of appearing at once; the sheen
+   (`.qbd-work-thinking-label.is-live`, work-view.css) runs on top. */
+@keyframes qbd-ai-chat-attente-in {
+	from { opacity: 0; transform: translateY(3px); }
+	to { opacity: 1; transform: none; }
+}
+
+.qbd-ai-chat-attente.qbd-work-thinking-label.is-live {
+	display: inline-block;
+	animation: qbd-ai-chat-attente-in 240ms ease-out, qbd-work-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.qbd-ai-chat-attente,
+	.qbd-ai-chat-attente.qbd-work-thinking-label.is-live {
+		animation: none;
+	}
 }
 
 .qbd-ai-chat-pied {

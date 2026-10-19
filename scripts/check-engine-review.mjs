@@ -606,8 +606,16 @@ await withSrcModule(
 		r.check("une carte est auto-évaluée même hors Leçon", ctx.textOnly.isTextOnlyFor(0), true);
 		r.check("non notée : incomplète", ctx.isComplete(0), false);
 		const html = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
-		r.check("recto : un bouton Retourner, aucune zone de saisie",
-			[html.includes("quiz-flashcard-flip-btn"), html.includes("<textarea")], [true, false]);
+		// Since 2026-10-19 the front has ONE optional answer field, never required: the card still turns without it.
+		r.check("front: a Turn button and one optional answer field, no other input",
+			[html.includes("quiz-flashcard-flip-btn"), (html.match(/<textarea/g) ?? []).length, html.includes("quiz-fc-own"), html.includes("required")], [true, 1, true, false]);
+		ctx.quizState.textOnlyAnswers[0] = "une liste";
+		ctx.quizState.textOnlyChecked[0] = true;
+		const versoOwn = ctx.textOnly.questionCardBodyHtml(quiz[0], 0);
+		r.check("back: the learner's own answer is shown above the ratings (through renderInlineText, which escapes)",
+			[versoOwn.includes("quiz-fc-own-answer"), versoOwn.includes("une liste"), versoOwn.indexOf("quiz-fc-own-answer") < versoOwn.indexOf("quiz-fc-ratings")], [true, true, true]);
+		ctx.quizState.textOnlyAnswers[0] = "";
+		ctx.quizState.textOnlyChecked[0] = false;
 		r.check("front: the prompt is on the card, the answer is not in the DOM yet",
 			[html.includes("Que renvoie"), html.includes("quiz-flashcard-back"), html.includes(">list<")], [true, false, false]);
 

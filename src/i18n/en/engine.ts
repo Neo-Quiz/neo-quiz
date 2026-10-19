@@ -202,6 +202,8 @@ export const EN_ENGINE = {
 	"engine.flashcard.again": "Review again",
 	"engine.flashcard.knew": "I knew it",
 	"engine.flashcard.missingAnswer": "No answer on the back of this card.",
+	"engine.flashcard.ownPlaceholder": "Your answer (optional)",
+	"engine.flashcard.ownLabel": "Your answer",
 
 	/* ── Slide de soumission ── */
 	"engine.submit.back": "Back",

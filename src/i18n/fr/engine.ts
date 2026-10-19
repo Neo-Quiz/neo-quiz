@@ -183,6 +183,8 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.flashcard.again": "À revoir",
 	"engine.flashcard.knew": "Je savais",
 	"engine.flashcard.missingAnswer": "Pas de réponse au verso de cette carte.",
+	"engine.flashcard.ownPlaceholder": "Ta réponse (facultatif)",
+	"engine.flashcard.ownLabel": "Ta réponse",
 
 	/* ── Slide de soumission ── */
 	"engine.submit.back": "Retour",
