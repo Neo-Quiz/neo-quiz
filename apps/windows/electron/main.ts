@@ -61,6 +61,7 @@ import { estLienPageMoodle, jetonDansArguments } from "./moodle/pur";
 import { origineSite } from "./moodle/garde";
 import type { GestionSync } from "./syncthing";
 import { creerMiseAJour } from "./mise-a-jour";
+import { createUpdaterLog } from "./updater-log";
 import { expectedUpdateOutcome } from "./expected-update";
 import type { MiseAJour } from "./mise-a-jour";
 import { creerReglages } from "./reglages";
@@ -889,6 +890,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 		servirRessources(perimetre);
 		miseAJour = creerMiseAJour({
 			limitee: () => sondeLimitee.limitee(),
+			journal: createUpdaterLog(app.getPath("logs")),
 			surPrete: () => { void traiterCycleMiseAJour("update-ready"); },
 			envoyer: etat => {
 				if (fenetre && !fenetre.isDestroyed()) fenetre.webContents.send(CANAUX.miseAJourEtat, etat);

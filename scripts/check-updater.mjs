@@ -166,3 +166,100 @@ await withSrcModule("apps/windows/src/ui/mise-a-jour-toast-pur.ts", ({ decisionT
 	r.check("no version: nothing", decisionToast({ phase: "prete" }, null), null);
 	r.done();
 });
+
+/* A STALLED CONNECTION (2026-10-19): electron-updater's timeout listens for a
+   "socket" event that Electron's net requests never emit, so a stalled check
+   or download stayed pending until a restart. `updater-timeout.ts` replaces
+   the hook with an inactivity timer. */
+await withSrcModule("apps/windows/electron/updater-timeout.ts", async ({ armInactivityTimeout, installInactivityTimeout }) => {
+	const { EventEmitter } = await import("node:events");
+	const r = makeReporter("Updater request timeout");
+
+	/* Fake timers: `tick(ms)` moves time forward and runs what is due. */
+	const fakeTimers = () => {
+		let now = 0, id = 0;
+		const due = new Map();
+		return {
+			set: (fn, ms) => { due.set(++id, { at: now + ms, fn }); return id; },
+			clear: h => { due.delete(h); },
+			tick(ms) {
+				now += ms;
+				for (const [h, t] of [...due]) if (t.at <= now) { due.delete(h); t.fn(); }
+			},
+		};
+	};
+	const fakeRequest = () => {
+		const req = new EventEmitter();
+		req.aborted = 0;
+		req.abort = () => { req.aborted++; };
+		return req;
+	};
+	const run = scenario => {
+		const timers = fakeTimers();
+		const req = fakeRequest();
+		const errors = [];
+		armInactivityTimeout(req, e => errors.push(e.message), 1000, timers);
+		scenario(req, timers);
+		return { errors: errors.length, aborted: req.aborted };
+	};
+
+	r.check("silence before any response: fails once and aborts",
+		run((req, t) => { t.tick(1000); t.tick(5000); }), { errors: 1, aborted: 1 });
+	r.check("a response then silence: fails",
+		run((req, t) => { const res = new EventEmitter(); t.tick(900); req.emit("response", res); t.tick(900); res.emit("data", Buffer.alloc(1)); t.tick(1000); }),
+		{ errors: 1, aborted: 1 });
+	r.check("data that keeps coming never fails, even past the timeout in total",
+		run((req, t) => { const res = new EventEmitter(); req.emit("response", res); for (let i = 0; i < 20; i++) { t.tick(900); res.emit("data", Buffer.alloc(1)); } res.emit("end"); t.tick(10_000); }),
+		{ errors: 0, aborted: 0 });
+	r.check("an aborted or failed request is never failed afterwards",
+		[run((req, t) => { req.emit("abort"); t.tick(5000); }), run((req, t) => { req.emit("error", new Error("x")); t.tick(5000); })],
+		[{ errors: 0, aborted: 0 }, { errors: 0, aborted: 0 }]);
+	/* Electron's ClientRequest emits "close" right after `end()`, BEFORE the
+	   response: stopping there left the stalled download pending forever. */
+	r.check("close before the response does not disarm the timer (Electron order)",
+		run((req, t) => { req.emit("finish"); req.emit("close"); const res = new EventEmitter(); req.emit("response", res); res.emit("data", Buffer.alloc(1)); t.tick(1000); }),
+		{ errors: 1, aborted: 1 });
+	r.check("a timeout followed by close or error reports once",
+		run((req, t) => { t.tick(1000); req.emit("close"); req.emit("error", new Error("x")); t.tick(1000); }), { errors: 1, aborted: 1 });
+
+	/* On a REAL silent server, with a real request and real timers. */
+	const http = await import("node:http");
+	const server = http.createServer((req, res) => {
+		res.writeHead(200, { "Content-Length": "100000" });
+		res.write(Buffer.alloc(512));
+	});
+	await new Promise(ok => server.listen(0, "127.0.0.1", ok));
+	const started = Date.now();
+	const outcome = await new Promise(ok => {
+		const req = http.request({ host: "127.0.0.1", port: server.address().port, path: "/" }, res => res.resume());
+		req.on("error", () => {});
+		armInactivityTimeout(req, e => ok(e.message), 300);
+		req.end();
+		setTimeout(() => ok("still pending"), 3000);
+	});
+	server.closeAllConnections?.();
+	server.close();
+	r.check("real silent server: the request fails after the timeout, not later",
+		[/timed out/.test(outcome), Date.now() - started < 2000], [true, true]);
+
+	const updater = { httpExecutor: { addTimeOutHandler() { return "library"; } } };
+	r.check("installed on the updater's executor", [installInactivityTimeout(updater), updater.httpExecutor.addTimeOutHandler.name !== "addTimeOutHandler"], [true, true]);
+	r.check("no executor or no hook: not installed", [installInactivityTimeout({ httpExecutor: null }), installInactivityTimeout({ httpExecutor: {} })], [false, false]);
+	r.done();
+});
+
+/* THE HOOK STILL EXISTS: if electron-updater or builder-util-runtime renames
+   it, the override above silently does nothing and stalls come back. */
+{
+	const r = makeReporter("Updater timeout hook in the installed library");
+	const { createRequire } = await import("node:module");
+	const req = createRequire(new URL("../apps/windows/package.json", import.meta.url));
+	const updaterDir = req.resolve("electron-updater/out/AppUpdater.js");
+	const appUpdater = readFileSync(updaterDir, "utf8");
+	const executor = readFileSync(createRequire(updaterDir).resolve("builder-util-runtime/out/httpExecutor.js"), "utf8");
+	r.check("the updater owns an ElectronHttpExecutor on this.httpExecutor", /this\.httpExecutor = new \w+\.ElectronHttpExecutor\(/.test(appUpdater), true);
+	r.check("every request timeout goes through this.addTimeOutHandler", /addErrorAndTimeoutHandlers\(request, reject, timeout = [^)]*\) \{\s*this\.addTimeOutHandler\(request, reject, timeout\);/.test(executor), true);
+	const src = readFileSync(new URL("../apps/windows/electron/mise-a-jour.ts", import.meta.url), "utf8");
+	r.check("mise-a-jour.ts installs the timeout on autoUpdater", /installInactivityTimeout\(autoUpdater\)/.test(src), true);
+	r.done();
+}

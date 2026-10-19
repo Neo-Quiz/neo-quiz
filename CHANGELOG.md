@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- An update no longer stays stuck downloading, or goes unnoticed, after the connection drops or the PC wakes from sleep: a silent download stops after a minute and starts again two minutes later. Update steps are now kept in `updater.log` in the app's logs folder.
+
 ## [1.21.18] - 2026-10-19
 
 ### Fixed

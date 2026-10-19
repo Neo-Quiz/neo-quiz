@@ -1,15 +1,22 @@
 /* ══════════════════════════════════════════════════════════
-   LA MISE À JOUR AUTOMATIQUE — le câblage d'electron-updater
+   AUTOMATIC UPDATE: the electron-updater wiring
 
-   Tout vit ici, dans le PRINCIPAL : le rendu ne voit qu'un état poussé par
-   le pont (`CANAUX.miseAJourEtat`) et donne trois ordres. Le flux est
-   `resources/app-update.yml`, écrit par electron-builder (clé `publish` de
-   la config) : les releases GitHub du dépôt, et rien d'autre.
+   Everything lives here, in the MAIN process: the renderer only sees a state
+   pushed through the bridge (`CANAUX.miseAJourEtat`) and gives three orders.
+   The feed is `resources/app-update.yml`, written by electron-builder (the
+   `publish` key of the config): the repository's GitHub releases, nothing else.
 
-   QUAND ON VÉRIFIE : au démarrage (après la fenêtre, jamais avant : une
-   erreur réseau au boot ne doit rien retarder), au retour du focus avec un
-   garde de quinze minutes, et toutes les quatre heures. Hors ligne est un
-   état NORMAL : l'erreur est journalisée, jamais affichée en Notice.
+   WHEN IT CHECKS: at startup (after the window, never before: a network
+   error at boot must not delay anything), when the window regains focus
+   with a fifteen-minute guard, and every four hours. Offline is a NORMAL
+   state: the error is logged, never shown as a Notice.
+
+   A STALLED CONNECTION (2026-10-19): electron-updater's own request timeout
+   never fires under Electron (`updater-timeout.ts`), so a check or a download
+   that stalled stayed pending until a restart. The timeout is now real, and
+   a failed check or download is tried again two minutes later, three times
+   in a row at most; after that the usual checks (focus, four hours) take
+   over. Every updater line also goes to `logs/updater.log` (`updater-log.ts`).
 
    HOW IT INSTALLS: through the existing CLOSE path. `installer()` arms a
    flag then closes the window; `main.ts` flushes the renderer's deferred
@@ -21,17 +28,17 @@
    anyone asking; it now waits, shown as "ready", until the user clicks
    Install. `check:updater` pins the flag.
 
-   CONNEXION LIMITÉE (2026-10-07) : `autoDownload` est COUPÉ ; c'est ce module
-   qui décide, à chaque `update-available`, selon `deps.limitee()` (voir
-   `connexion-limitee.ts` : en cas de doute, NON limitée). Libre : on
-   télécharge aussitôt, comme avant. Limitée : phase « disponible », rien ne
-   descend avant le clic sur « Télécharger » (le canal `miseAJourInstaller`,
-   qui sur Windows ne servait qu'à l'état « prête »). Tant qu'une version
-   attend, on remesure toutes les cinq minutes (et au focus) : si la
-   connexion redevient libre, le téléchargement part tout seul.
+   METERED CONNECTION (2026-10-07): `autoDownload` is OFF; this module
+   decides, on each `update-available`, from `deps.limitee()` (see
+   `connexion-limitee.ts`: when in doubt, NOT metered). Free: the download
+   starts at once, as before. Metered: phase "disponible", nothing comes
+   down before the click on Download (the `miseAJourInstaller` channel,
+   which on Windows only served the "ready" state). While a version waits,
+   the connection is measured again every five minutes (and on focus): once
+   it is free again, the download starts by itself.
 
-   EN DÉVELOPPEMENT (`app.isPackaged === false`) : rien, dit une fois.
-   electron-updater n'a pas d'`app-update.yml` à lire hors d'un paquet.
+   IN DEVELOPMENT (`app.isPackaged === false`): nothing, said once.
+   electron-updater has no `app-update.yml` to read outside a package.
 ══════════════════════════════════════════════════════════ */
 
 import { app } from "electron";
@@ -39,29 +46,33 @@ import { autoUpdater } from "electron-updater";
 import { LOG_PREFIX } from "../../../src/branding";
 import { ETAT_INITIAL, transition } from "./mise-a-jour-etat";
 import type { EtatMiseAJour, EvenementMiseAJour } from "./mise-a-jour-etat";
+import { installInactivityTimeout } from "./updater-timeout";
+import type { LogLevel } from "./updater-log";
 
 const GARDE_FOCUS_MS = 15 * 60 * 1000;
 const PERIODE_MS = 4 * 60 * 60 * 1000;
 /** While a version waits on a metered connection: how often to ask again. */
 const REMESURE_MS = 5 * 60 * 1000;
+/** After a failed check or download: how long before trying again, and how many times in a row. */
+const RETRY_MS = 2 * 60 * 1000;
+const MAX_RETRIES = 3;
 
 export interface MiseAJour {
 	etat(): EtatMiseAJour;
-	/** Au démarrage, APRÈS la fenêtre : arme le minuteur et lance la première
-	    vérification. SANS PARAMÈTRE depuis le 2026-09-17 — il n'y a plus de
-	    réglage à lire, la mise à jour automatique est le seul mode. */
+	/** At startup, AFTER the window: arms the timer and runs the first check.
+	    NO PARAMETER since 2026-09-17: there is no setting left to read,
+	    automatic update is the only mode. */
 	initialiser(): void;
 	/** False when no check ran (a dev build, `app.isPackaged` false): the
 	    "Check for updates" menu entry then says so instead of staying silent. */
 	verifier(): Promise<boolean>;
-	/** Vrai si une mise à jour prête a été armée pour l'installation : c'est
-	    à l'appelant de fermer la fenêtre, puis d'appeler `installerArmee()`
-	    quand tout est fermé. */
+	/** True when a ready update was armed for installation: the caller then
+	    closes the window, and calls `installerArmee()` once everything is closed. */
 	armerInstallation(): boolean;
 	installationArmee(): boolean;
 	/** Sizes of the downloaded installer and of the installed software (`null` when unpublished), for the update window. */
 	tailles(): { paquet: number; installe: number | null };
-	/** `quitAndInstall` : ne revient pas si tout va bien. */
+	/** `quitAndInstall`: does not return when all goes well. */
 	installerArmee(): void;
 	/** Starts the download of a version that waits on a metered connection (the click on Download). */
 	telecharger(): Promise<boolean>;
@@ -79,6 +90,8 @@ export function creerMiseAJour(deps: {
 	surPrete?: () => void;
 	/** True when Windows says the connection is metered; false when unknown (never rejects). */
 	limitee(): Promise<boolean>;
+	/** Where each updater line is kept on disk (`updater-log.ts`); the console always gets it. */
+	journal?: (level: LogLevel, message: string) => void;
 }): MiseAJour {
 	let etat: EtatMiseAJour = ETAT_INITIAL;
 	let armee = false;
@@ -90,6 +103,16 @@ export function creerMiseAJour(deps: {
 	/** The decision (metered or not) of the last `update-available`: a manual check waits for it, so its answer reads the settled state. */
 	let decision: Promise<void> = Promise.resolve();
 	let tailles: { paquet: number; installe: number | null } = { paquet: 0, installe: null };
+	let retry: NodeJS.Timeout | null = null;
+	let retries = 0;
+
+	const log = (level: LogLevel, m: unknown): void => {
+		const text = m instanceof Error ? (m.stack ?? m.message) : String(m);
+		if (level === "error") console.error(LOG_PREFIX, "update:", text);
+		else if (level === "warn") console.warn(LOG_PREFIX, "update:", text);
+		else console.log(LOG_PREFIX, "update:", text);
+		deps.journal?.(level, text);
+	};
 
 	const appliquer = (ev: EvenementMiseAJour): void => {
 		const phasePrecedente = etat.phase;
@@ -102,14 +125,15 @@ export function creerMiseAJour(deps: {
 	autoUpdater.autoInstallOnAppQuit = false;
 	autoUpdater.allowPrerelease = false;
 	autoUpdater.logger = {
-		info: (m: unknown) => console.log(LOG_PREFIX, "mise à jour:", m),
-		warn: (m: unknown) => console.warn(LOG_PREFIX, "mise à jour:", m),
-		error: (m: unknown) => console.error(LOG_PREFIX, "mise à jour:", m),
+		info: (m: unknown) => log("info", m),
+		warn: (m: unknown) => log("warn", m),
+		error: (m: unknown) => log("error", m),
 		debug: () => {},
 	};
+	if (!installInactivityTimeout(autoUpdater)) log("warn", "request timeout not installed: electron-updater has no addTimeOutHandler hook");
 	autoUpdater.on("checking-for-update", () => appliquer({ type: "checking-for-update" }));
-	autoUpdater.on("update-available", info => { decision = surDisponible(info.version).catch(e => console.warn(LOG_PREFIX, "mise à jour:", e)); });
-	autoUpdater.on("update-not-available", () => appliquer({ type: "update-not-available" }));
+	autoUpdater.on("update-available", info => { decision = surDisponible(info.version).catch(e => log("warn", e)); });
+	autoUpdater.on("update-not-available", () => { retries = 0; appliquer({ type: "update-not-available" }); });
 	autoUpdater.on("download-progress", p => appliquer({ type: "download-progress", percent: p.percent, transferred: p.transferred, total: p.total }));
 	autoUpdater.on("update-downloaded", info => {
 		/* The update window measures the installation against these two sizes
@@ -123,12 +147,28 @@ export function creerMiseAJour(deps: {
 			paquet: Number.isSafeInteger(paquet) && paquet > 0 ? paquet : 0,
 			installe: Number.isSafeInteger(installe) && installe > 0 ? installe : null,
 		};
+		retries = 0;
 		appliquer({ type: "update-downloaded", version: info.version });
 	});
-	// Le type de l'événement est `(error: Error, message?: string) => void` :
-	// `error` n'est jamais absent, contrairement à ce qu'un `catch` laisserait
-	// penser.
-	autoUpdater.on("error", error => appliquer({ type: "error", message: error.message }));
+	// The event's type is `(error: Error, message?: string) => void`: `error`
+	// is never missing, whatever a `catch` would suggest.
+	autoUpdater.on("error", error => {
+		appliquer({ type: "error", message: error.message });
+		planifierNouvelEssai();
+	});
+
+	/** A failed check or download is tried again RETRY_MS later, MAX_RETRIES
+	    times in a row; a downloaded version, or a check that finds nothing,
+	    resets the count. A ready version is never fetched again. */
+	function planifierNouvelEssai(): void {
+		if (etat.phase === "prete" || retry || retries >= MAX_RETRIES || !app.isPackaged) return;
+		retries++;
+		log("info", `retry ${retries}/${MAX_RETRIES} in ${RETRY_MS / 60_000} min`);
+		retry = setTimeout(() => {
+			retry = null;
+			void verifier();
+		}, RETRY_MS);
+	}
 
 	function lancerTelechargement(version: string): void {
 		if (versionDemandee === version) return;
@@ -137,7 +177,7 @@ export function creerMiseAJour(deps: {
 		   keeps the rejected promise from surfacing as "unhandled". */
 		autoUpdater.downloadUpdate().catch(e => {
 			versionDemandee = null;
-			console.warn(LOG_PREFIX, "mise à jour: téléchargement impossible:", e);
+			log("warn", `download failed: ${e instanceof Error ? e.message : String(e)}`);
 		});
 	}
 
@@ -176,7 +216,7 @@ export function creerMiseAJour(deps: {
 
 	async function verifier(): Promise<boolean> {
 		if (!app.isPackaged) {
-			console.log(LOG_PREFIX, "mise à jour: ignorée hors d'un paquet (app.isPackaged faux)");
+			console.log(LOG_PREFIX, "update: skipped outside a package (app.isPackaged false)");
 			return false;
 		}
 		derniereVerification = Date.now();
@@ -184,9 +224,9 @@ export function creerMiseAJour(deps: {
 			await autoUpdater.checkForUpdates();
 			await decision;
 		} catch (e) {
-			// Déjà traduit en état par l'événement `error` ; ici seulement pour
-			// qu'une promesse rejetée ne remonte pas en « unhandled ».
-			console.warn(LOG_PREFIX, "mise à jour: vérification impossible:", e);
+			// Already turned into a state by the `error` event; caught here only
+			// so that a rejected promise does not surface as "unhandled".
+			log("warn", `check failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 		return true;
 	}
@@ -224,14 +264,15 @@ export function creerMiseAJour(deps: {
 		arreter() {
 			if (minuteur) clearInterval(minuteur);
 			minuteur = null;
+			if (retry) clearTimeout(retry);
+			retry = null;
 			arreterRemesure();
 		},
 	};
 }
 
-/* PLUS DE `lireReglageAuto` NI DE `CLE_REGLAGES_MAJ` (2026-09-17) : la mise à
-   jour automatique ne se coupe plus. Retirer la seule LECTURE de cette clé
-   était le point important — l'interrupteur parti, un `{ auto: false }` déjà
-   écrit sur une installation aurait éteint ses mises à jour pour toujours,
-   sans plus rien pour les rallumer. Ce qui reste dans `settings.json` est
-   ignoré, jamais effacé. */
+/* NO MORE `lireReglageAuto` NOR `CLE_REGLAGES_MAJ` (2026-09-17): automatic
+   update can no longer be turned off. Removing the only READ of that key was
+   the point: with the switch gone, a `{ auto: false }` already written on an
+   install would have turned its updates off forever, with nothing left to
+   turn them back on. What remains in `settings.json` is ignored, never erased. */
