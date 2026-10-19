@@ -17,7 +17,7 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	const r = makeReporter("Cadre HTML isolé (noyau)");
 	const {
 		FRAME_SANDBOX, FRAME_CSP, FRAME_MAX_BYTES, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT, FRAME_DEFAULT_THEME,
-		buildSrcdoc, acceptHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
+		buildSrcdoc, acceptHeight, nextFrameHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
 	} = m;
 	const labels = { title: "T", tooLarge: "Too large" };
 
@@ -82,6 +82,19 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	r.check("non-object payloads are ignored", [acceptHeight("nq-height", true), acceptHeight(null, true), acceptHeight([1], true), acceptHeight(300, true)], [null, null, null, null]);
 	r.check("the height is bounded to [40, 4000]", [acceptHeight({ type: "nq-height", h: 1 }, true), acceptHeight({ type: "nq-height", h: 99999 }, true), acceptHeight({ type: "nq-height", h: -5 }, true)], [FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT, FRAME_MIN_HEIGHT]);
 	r.check("bounds are 40 and 4000", [FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT], [40, 4000]);
+	/* A PAGE SIZED BY ITS VIEWPORT (2026-10-19): each resize made it report a few pixels more, the frame crept to 4000 px. Simulated: a page always 8 px taller than its frame, answering 50 ms after each resize. */
+	{
+		let h = 300, creeps = 0, resizes = 0;
+		for (let i = 0; i < 50; i++) {
+			const next = nextFrameHeight(h, h + 8, creeps, 50);
+			creeps = next.creeps;
+			if (next.height !== null && next.height !== h) { h = next.height; resizes++; }
+		}
+		r.check("a page that answers every resize with 8 px more stops growing after two creeps", [h, resizes], [316, 2]);
+	}
+	r.check("a first real growth (300 -> 900) is followed", nextFrameHeight(300, 900, 0, 50), { height: 900, creeps: 0 });
+	r.check("a small growth long after the last resize (an opened detail) is followed and resets the count", nextFrameHeight(316, 340, 2, 5000), { height: 340, creeps: 0 });
+	r.check("a shrink is always followed", nextFrameHeight(900, 400, 2, 50), { height: 400, creeps: 0 });
 
 	// --- markup escaping -----------------------------------------------
 	const piege = frameMarkup('"><img src=x onerror=alert(1)>', FRAME_DEFAULT_THEME, labels);

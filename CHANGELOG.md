@@ -13,6 +13,11 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- An interactive diagram sized by its window no longer makes its frame grow on its own, which drifted the Explain panel's scrollbar.
+- Interactive diagrams in an Explain answer sit on a solid background, readable over the wallpaper.
+
 ## [1.21.17] - 2026-10-19
 
 ### Added

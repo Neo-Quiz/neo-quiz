@@ -146,6 +146,23 @@ export function acceptHeight(data: unknown, fromFrame: boolean): number | null {
 	return Math.min(FRAME_MAX_HEIGHT, Math.max(FRAME_MIN_HEIGHT, Math.round(m.h)));
 }
 
+/** A page sized by its own viewport (`100vh`, `height: 100%` plus a margin)
+    reports a height a few pixels taller than the frame; the frame grows, the
+    viewport with it, and the page reports again: the frame crept down to
+    4000 px and the panel's scrollbar drifted on its own (2026-10-19). A small
+    growth that answers our own resize within a second is a creep; after
+    three in a row the frame keeps its height. A shrink, or a growth the
+    learner caused later, is followed as before. */
+export const FRAME_CREEP_PX = 48;
+export const FRAME_CREEP_MS = 1000;
+export const FRAME_CREEP_LIMIT = 3;
+export function nextFrameHeight(current: number, asked: number, creeps: number, sinceResizeMs: number): { height: number | null; creeps: number } {
+	const creep = asked > current && asked - current <= FRAME_CREEP_PX && sinceResizeMs <= FRAME_CREEP_MS;
+	if (!creep) return { height: asked, creeps: 0 };
+	if (creeps + 1 >= FRAME_CREEP_LIMIT) return { height: null, creeps: creeps + 1 };
+	return { height: asked, creeps: creeps + 1 };
+}
+
 /** The only path a host may answer `publishHtmlFrame` with (Android: `bridge/HtmlFrameRoute.kt`): same origin, 128-bit id. */
 const FRAME_ROUTE = /^\/__frame\/[0-9a-f]{32}$/;
 

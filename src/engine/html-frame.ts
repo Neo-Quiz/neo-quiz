@@ -3,7 +3,7 @@ import { currentHost } from "../host/current";
 import { openActionMenu } from "../dashboard/ui-select";
 import type { ActionMenuItem } from "../dashboard/ui-select";
 import {
-	FRAME_DEFAULT_THEME, FRAME_MAX_BYTES, acceptFrameUrl, acceptHeight, escapeAttr, frameFileName, frameMarkup,
+	FRAME_DEFAULT_THEME, FRAME_MAX_BYTES, acceptFrameUrl, acceptHeight, escapeAttr, frameFileName, frameMarkup, nextFrameHeight,
 } from "./html-frame-core";
 import { colorerCode } from "./code-highlight";
 import type { FrameTheme } from "./html-frame-core";
@@ -94,7 +94,14 @@ function poserEcouteur(): void {
 		for (const f of document.querySelectorAll<HTMLIFrameElement>("iframe.nq-html-frame-view")) {
 			if (f.contentWindow && f.contentWindow === e.source) {
 				const h = acceptHeight(e.data, true);
-				if (h !== null) { f.style.height = h + "px"; f.dataset.nqHeard = "1"; }
+				if (h !== null) {
+					f.dataset.nqHeard = "1";
+					// A page sized by its viewport would creep the frame down forever (`nextFrameHeight`).
+					const now = Date.now();
+					const next = nextFrameHeight(parseFloat(f.style.height) || 0, h, Number(f.dataset.nqCreeps) || 0, now - (Number(f.dataset.nqResizedAt) || 0));
+					f.dataset.nqCreeps = String(next.creeps);
+					if (next.height !== null && next.height !== parseFloat(f.style.height)) { f.style.height = next.height + "px"; f.dataset.nqResizedAt = String(now); }
+				}
 				return;
 			}
 		}
