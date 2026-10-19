@@ -17,7 +17,7 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	const r = makeReporter("Cadre HTML isolé (noyau)");
 	const {
 		FRAME_SANDBOX, FRAME_CSP, FRAME_MAX_BYTES, FRAME_MIN_HEIGHT, FRAME_MAX_HEIGHT, FRAME_DEFAULT_THEME,
-		buildSrcdoc, acceptHeight, nextFrameHeight, frameMarkup, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
+		buildSrcdoc, acceptHeight, nextFrameHeight, frameMarkup, frameTitle, splitHtmlBlocks, htmlDeLecture, acceptFrameUrl, escapeAttr,
 	} = m;
 	const labels = { title: "T", tooLarge: "Too large" };
 
@@ -64,6 +64,12 @@ await withSrcModule("src/engine/html-frame-core.ts", (m) => {
 	// Size is in UTF-8 BYTES, not characters: 70000 x 3-byte characters is 210 KB.
 	r.check("size counts UTF-8 bytes", buildSrcdoc("€".repeat(70000)).reason, "tooLarge");
 	r.check("an empty or non-string page is refused", [buildSrcdoc("  ").reason, buildSrcdoc(42).reason, buildSrcdoc(null).reason], ["empty", "empty", "empty"]);
+	/* 2026-10-19: a head row inside the frame, the page's title at the top left. */
+	r.check("title: the page's own <title>, entities decoded", frameTitle("<title>Plus d&#39;exemples &amp; mieux ?</title><p>x", "Lecture"), "Plus d'exemples & mieux ?");
+	r.check("title: without <title>, the reading's name", frameTitle("<p>x</p>", "Apprendre"), "Apprendre");
+	r.check("title: neither, empty", frameTitle("<p>x</p>"), "");
+	r.check("title: shown escaped in the head row", frameMarkup("<title>&lt;img src=x onerror=alert(1)&gt;</title>", FRAME_DEFAULT_THEME, labels).includes('<div class="nq-html-frame-head"><span class="nq-html-frame-title">&lt;img src=x onerror=alert(1)&gt;</span></div>'), true);
+	r.check("title: no title, an empty head row for the menu", frameMarkup("<p>hi</p>", FRAME_DEFAULT_THEME, labels).includes('<div class="nq-html-frame-head"></div><iframe'), true);
 	r.check("a too large page shows the message, not a frame", frameMarkup("x".repeat(FRAME_MAX_BYTES + 1), FRAME_DEFAULT_THEME, labels).includes("<iframe"), false);
 
 	// --- theme ---------------------------------------------------------

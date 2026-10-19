@@ -2,24 +2,38 @@
    The iframe itself is built by engine/html-frame-core.ts (sandbox,
    CSP, height message). It takes the height of its content: never an inner
    scrollbar, the page scrolls instead. */
-/* The top margin is exactly the height of the ⋯ button (28px), which sits in it
-   just above the frame. Adjacent margins collapse, so the gap is 28px, not more. */
 .nq-html-frame {
 	position: relative;
 	display: block;
-	margin: 28px 0 16px;
+	margin: 16px 0;
 	max-width: 100%;
 }
 
-/* The ⋯ menu of a page (copy as image, download as HTML, view the code): small,
-   in the margin just above the frame, its right edge on the frame's, so it never
-   covers the page. Shown on hover or focus; always on touch screens, which have no hover. */
+/* The head row, INSIDE the frame (2026-10-19): the page's title at the top
+   left, so one sees what the page is for before acting on it, and the ⋯
+   menu (copy as image, download as HTML, view the code) at the top right.
+   The ⋯ used to float in the margin above the frame. */
+.nq-html-frame-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 28px;
+	margin: -4px -6px 10px 0;
+}
+.nq-html-frame-title {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-weight: 650;
+	font-size: 15px;
+	line-height: 1.35;
+	color: var(--text-normal);
+	text-wrap: balance;
+}
+/* Shown on hover or focus; always on touch screens, which have no hover. */
 .nq-html-frame-more {
 	appearance: none;
-	position: absolute;
-	top: -28px;
-	right: 0;
-	z-index: 1;
+	flex: none;
+	margin-left: auto;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -28,21 +42,21 @@
 	padding: 0;
 	border: 0;
 	border-radius: 8px;
-	background: rgba(0, 0, 0, 0.45);
-	color: #fff;
+	background: transparent;
+	color: var(--text-muted);
 	cursor: pointer;
 	opacity: 0;
-	transition: opacity 120ms ease, background-color 120ms ease;
+	transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 .nq-html-frame-more svg { width: 16px; height: 16px; }
-.nq-html-frame:hover > .nq-html-frame-more,
+.nq-html-frame:hover .nq-html-frame-more,
 .nq-html-frame-more:focus-visible,
 .nq-html-frame-more:focus { opacity: 1; }
-.nq-html-frame-more:hover { background: rgba(0, 0, 0, 0.62); }
+.nq-html-frame-more:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
 @media (hover: none) { .nq-html-frame-more { opacity: 1; } }
 body.is-mobile .nq-html-frame-more { opacity: 1; }
 /* Out of the picture while "Copy as image" captures the frame. */
-.nq-html-frame.is-capturing > .nq-html-frame-more { visibility: hidden; transition: none; }
+.nq-html-frame.is-capturing .nq-html-frame-more { visibility: hidden; transition: none; }
 
 .nq-html-frame-view {
 	display: block;

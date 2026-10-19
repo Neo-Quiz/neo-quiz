@@ -16,7 +16,7 @@ release notes.
 ### Changed
 
 - "Report a bug" opens an issue with nothing to fill in: you just describe the problem, and the app and Windows versions are added at the bottom.
-- Interactive pages in a reading sit on their own background, so they stand apart from the text around them.
+- Interactive pages sit on their own background, with their title at the top left and their ⋯ menu inside the frame, so you see what each page is for.
 - The Copy button of a page's source is the same icon button as every other code block.
 - Generated interactive pages are smaller and laid out across the width, and the AI picks the best form for each notion among all of them (one control and its effect, two cases compared, steps, sorting, reveal, predict then see, timeline, diagram...).
 - Quotes written as a quote callout (`> [!quote]`) show centred in italics with their author under them, and generated Learns may end a reading with a real quote that sums it up.

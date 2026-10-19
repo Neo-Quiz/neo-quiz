@@ -185,6 +185,21 @@ export function frameFileName(name: string | undefined, source: string, fallback
 	return (pick ?? fallback).slice(0, 100);
 }
 
+/** The title shown at the top left of a frame (2026-10-19: without it one
+    could not tell what a page was for): the page's own `<title>`, which the
+    generation prompt asks to state its goal, else `name` (the reading's
+    title), else nothing. One short line of TEXT: entities decoded here, the
+    caller escapes it again. */
+export function frameTitle(source: string, name = ""): string {
+	const raw = /<title[^>]*>([^<]{1,300})<\/title>/i.exec(source)?.[1] ?? "";
+	const decoded = raw
+		.replace(/&#(\d{1,6});/g, (_m, n: string) => { const c = Number(n); return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : ""; })
+		.replace(/&#x([0-9a-f]{1,6});/gi, (_m, n: string) => { const c = parseInt(n, 16); return c > 0 && c < 0x110000 ? String.fromCodePoint(c) : ""; })
+		.replace(/&quot;/g, "\"").replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+	const pick = [decoded, name].map(v => v.replace(/[*_`$#]/g, "").replace(/\s+/g, " ").trim()).find(v => v.length > 0) ?? "";
+	return pick.slice(0, 120);
+}
+
 /** The markup of one frame: the iframe and its (hidden) source, which the ⋯ menu shows and saves. With `byRoute` (the host publishes
     pages, `HostPlatform.publishHtmlFrame`) the document waits in `data-nq-doc` and `brancherCadres` points the
     iframe at its route; it is never loaded as `srcdoc` first. */
@@ -192,7 +207,11 @@ export function frameMarkup(source: unknown, theme: FrameTheme, labels: FrameLab
 	const doc = buildSrcdoc(source, theme);
 	if (!doc.ok) return doc.reason === "tooLarge" ? `<div class="nq-html-frame nq-html-frame--refused">${escapeAttr(labels.tooLarge)}</div>` : "";
 	const code = escapeAttr(String(source));
+	/* A head row INSIDE the frame: the title at the top left, the ⋯ button
+	   (put by `poserMenus`) at the top right. */
+	const titre = frameTitle(String(source), name);
 	return `<div class="nq-html-frame" data-nq-frame="1"${name.trim() ? ` data-nq-name="${escapeAttr(name.trim().slice(0, 200))}"` : ""}>`
+		+ `<div class="nq-html-frame-head">${titre ? `<span class="nq-html-frame-title">${escapeAttr(titre)}</span>` : ""}</div>`
 		+ `<iframe class="nq-html-frame-view" sandbox="${FRAME_SANDBOX}" referrerpolicy="no-referrer" allow="" title="${escapeAttr(labels.title)}" ${byRoute ? "data-nq-doc" : "srcdoc"}="${escapeAttr(doc.srcdoc)}" style="height:120px"></iframe>`
 		+ `<pre class="nq-html-frame-source" hidden><code>${code}</code></pre></div>`;
 }

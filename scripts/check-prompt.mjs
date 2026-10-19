@@ -88,6 +88,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	r.check("Learn: interactive pages offer every form, explorable, structured course and annotated diagram among them",
 		["EXPLORABLE", "TWO CASES COMPARED", "STEPS:", "STRUCTURED COURSE", "ANNOTATED DIAGRAM", "SORT OR CLASSIFY", "REVEAL", "PREDICT THEN SEE", "TIMELINE", "METAPHOR", "MIXED"].map(m => learnP.includes(m)), Array(11).fill(true));
 	/* 2026-10-19: a real quote that sums a notion up, as a quote callout; never invented. */
+	r.check("Learn: every interactive page has a <title> that states its goal", learnP.includes("A TITLE, ALWAYS"), true);
 	r.check("Learn: real quotes in a quote callout, never invented; Test: none",
 		[learnP.includes("QUOTES THAT SUM UP"), learnP.includes("> [!quote]"), learnP.includes("never invent one"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("QUOTES THAT SUM UP")], [true, true, true, false]);
 	r.check("Learn: the model chooses each page's form freely, after picturing several, never a default",

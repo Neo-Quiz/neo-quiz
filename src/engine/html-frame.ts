@@ -200,7 +200,7 @@ function placerMenu(btn: HTMLElement): void {
 	menu.style.top = top + "px";
 }
 
-/** The ⋯ button of each frame (just above its top right corner, shown on hover, always on touch):
+/** The ⋯ button of each frame (in its head row, top right, inside the frame since 2026-10-19):
     the actions the host offers, then the code. */
 function poserMenus(racine: ParentNode): void {
 	let platform: HostPlatformLike;
@@ -208,14 +208,20 @@ function poserMenus(racine: ParentNode): void {
 	const copy = platform.copyFrameImage?.bind(platform);
 	const save = platform.saveFrameHtml?.bind(platform);
 	racine.querySelectorAll<HTMLElement>(".nq-html-frame[data-nq-frame]").forEach(cadre => {
-		if (cadre.querySelector(":scope > .nq-html-frame-more")) return;
+		if (cadre.querySelector(".nq-html-frame-head > .nq-html-frame-more")) return;
+		let tete = cadre.querySelector<HTMLElement>(":scope > .nq-html-frame-head");
+		if (!tete) {
+			tete = document.createElement("div");
+			tete.className = "nq-html-frame-head";
+			cadre.insertBefore(tete, cadre.firstChild);
+		}
 		const btn = document.createElement("button");
 		btn.type = "button";
 		btn.className = "nq-html-frame-more";
 		btn.setAttribute("aria-label", t("engine.htmlFrame.more"));
 		btn.setAttribute("aria-haspopup", "menu");
 		currentHost().ui.setIcon(btn, "ellipsis");
-		cadre.insertBefore(btn, cadre.firstChild);
+		tete.append(btn);
 		btn.addEventListener("click", e => {
 			e.preventDefault();
 			e.stopPropagation();
