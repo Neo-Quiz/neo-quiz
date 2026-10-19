@@ -315,6 +315,12 @@ button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
   box-shadow: var(--quiz-fc-rim), 0 4px 0 0 var(--quiz-fc-rate-edge);
 }
 
+/* Once rated, the chosen verdict stays at full strength and only the other
+   one fades: both at 45 % hid which one was given (2026-10-19). */
+.quiz-fc-rate.selected:disabled{
+  opacity: 1;
+}
+
 .quiz-fc-rate:focus-visible{
   outline: 2px solid #fff;
   outline-offset: 3px;

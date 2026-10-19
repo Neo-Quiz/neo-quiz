@@ -28,6 +28,7 @@ release notes.
 - An explanation that names wrong options by their letter now uses the letters shown on screen, which are shuffled; in a multiple choice, which shows no letters, it names the options by their words.
 - A right answer you did not tick in a multiple choice shows an empty dashed box, no longer one that looks ticked.
 - A long line of code in an interactive page wraps instead of pushing the page sideways on a phone.
+- After rating a flashcard, the verdict you gave stays bright and only the other one fades.
 
 ## [1.21.19] - 2026-10-19
 
