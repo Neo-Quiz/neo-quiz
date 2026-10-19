@@ -37,7 +37,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.htmlFrame.showCode": "Voir le code",
 	"engine.htmlFrame.codeTitle": "Code source de la page",
 	"engine.htmlFrame.copyCode": "Copier",
-	"engine.htmlFrame.codeCopied": "Code copié dans le presse-papiers.",
+	"engine.htmlFrame.codeCopied": "Copié",
 	"engine.htmlFrame.codeCopyFailed": "Le code n'a pas pu être copié.",
 	"engine.htmlFrame.tooLarge": "Cette illustration est trop volumineuse pour être affichée.",
 	"engine.htmlFrame.drawing": "Dessin de l'illustration…",

@@ -45,7 +45,7 @@ export const EN_ENGINE = {
 	"engine.htmlFrame.showCode": "View the code",
 	"engine.htmlFrame.codeTitle": "Page source",
 	"engine.htmlFrame.copyCode": "Copy",
-	"engine.htmlFrame.codeCopied": "Code copied to the clipboard.",
+	"engine.htmlFrame.codeCopied": "Copied",
 	"engine.htmlFrame.codeCopyFailed": "The code could not be copied.",
 	"engine.htmlFrame.tooLarge": "This illustration is too large to be shown.",
 	"engine.htmlFrame.drawing": "Drawing the illustration…",

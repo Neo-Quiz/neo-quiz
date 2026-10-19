@@ -2030,6 +2030,7 @@
    « Copié » dure — sinon elle disparaîtrait avec la souris, juste au moment
    où elle a quelque chose à dire. */
 .qbd-install-code:hover .qbd-install-copy,
+.qbd-copy-host:hover .qbd-install-copy,
 .qbd-install-copy:focus-visible,
 .qbd-install-copy[data-copie] { opacity: 1; }
 /* Sans souris (tactile, futur hôte Android), rien ne le révélerait : il reste

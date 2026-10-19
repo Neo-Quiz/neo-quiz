@@ -85,7 +85,8 @@ body.is-mobile .nq-html-frame-more { opacity: 1; }
 .nq-frame-menu .qbd-select-option-label { white-space: nowrap; }
 
 /* "View the code": the source in the centred modal, Tokyo Night (.quiz-md-code),
-   scrolling vertically inside, a Copy button over its top right corner. */
+   scrolling vertically inside, the app's copy button over its top right
+   corner (`copy-button.ts`). */
 .modal.nq-html-code-modal { width: min(900px, 100%); }
 .nq-html-code { position: relative; }
 .nq-html-code-pre.quiz-md-code {
@@ -95,26 +96,6 @@ body.is-mobile .nq-html-frame-more { opacity: 1; }
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
-.nq-html-code-copy {
-	appearance: none;
-	position: absolute;
-	top: 8px;
-	right: 8px;
-	z-index: 1;
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 10px;
-	border: 0;
-	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.08);
-	color: #c0caf5;
-	font: inherit;
-	font-size: 12.5px;
-	cursor: pointer;
-}
-.nq-html-code-copy:hover { background: rgba(255, 255, 255, 0.16); }
-.nq-html-code-copy svg { width: 14px; height: 14px; }
 body.is-mobile .nq-html-code-pre.quiz-md-code { scrollbar-width: none; }
 
 .nq-html-frame--refused,

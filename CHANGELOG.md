@@ -17,6 +17,7 @@ release notes.
 
 - "Report a bug" opens an issue with nothing to fill in: you just describe the problem, and the app and Windows versions are added at the bottom.
 - Interactive pages in a reading sit on their own background, so they stand apart from the text around them.
+- The Copy button of a page's source is the same icon button as every other code block.
 
 ## [1.21.19] - 2026-10-19
 

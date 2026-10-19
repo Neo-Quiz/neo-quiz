@@ -5,6 +5,7 @@ import type { ActionMenuItem } from "../dashboard/ui-select";
 import {
 	FRAME_DEFAULT_THEME, FRAME_MAX_BYTES, acceptFrameUrl, acceptHeight, escapeAttr, frameFileName, frameMarkup, nextFrameHeight,
 } from "./html-frame-core";
+import { addCopyButton } from "../copy-button";
 import { colorerCode } from "./code-highlight";
 import type { FrameTheme } from "./html-frame-core";
 
@@ -161,15 +162,6 @@ function voirCode(cadre: HTMLElement): void {
 		onOpen: h => {
 			const bloc = document.createElement("div");
 			bloc.className = "nq-html-code";
-			const copier = document.createElement("button");
-			copier.type = "button";
-			copier.className = "nq-html-code-copy";
-			host.ui.setIcon(copier, "copy");
-			copier.append(document.createTextNode(t("engine.htmlFrame.copyCode")));
-			copier.addEventListener("click", () => {
-				void Promise.resolve(host.shell.copyText?.(source) ?? false).catch(() => false)
-					.then(ok => host.ui.notice(t(ok ? "engine.htmlFrame.codeCopied" : "engine.htmlFrame.codeCopyFailed")));
-			});
 			const pre = document.createElement("pre");
 			pre.className = "quiz-md-code nq-html-code-pre";
 			const code = document.createElement("code");
@@ -179,7 +171,14 @@ function voirCode(cadre: HTMLElement): void {
 			const colore = colorerCode(source, "html", escapeAttr, Infinity, FRAME_MAX_BYTES);
 			if (colore) code.innerHTML = colore.html; else code.textContent = source;
 			pre.append(code);
-			bloc.append(copier, pre);
+			bloc.append(pre);
+			/* The app's one copy button (`copy-button.ts`): icon alone, a check
+			   once copied; only a failure still speaks, by a notice. */
+			addCopyButton(bloc, async () => {
+				const ok = await Promise.resolve(host.shell.copyText?.(source) ?? false).catch(() => false);
+				if (!ok) host.ui.notice(t("engine.htmlFrame.codeCopyFailed"));
+				return ok;
+			}, { copy: t("engine.htmlFrame.copyCode"), copied: t("engine.htmlFrame.codeCopied") });
 			h.contentEl.append(bloc);
 		},
 	});

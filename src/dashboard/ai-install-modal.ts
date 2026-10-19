@@ -19,6 +19,7 @@
 import { LOG_PREFIX } from "../branding";
 import { getProvider, setBrandLogo } from "./ai-providers";
 import { commandeInstallation } from "../cli-install-cmd";
+import { addCopyButton } from "../copy-button";
 import { ajouter } from "../dom";
 import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
@@ -179,41 +180,14 @@ export function openInstallModal(deps: InstallModalDeps): void {
 			if (deps.renderCodeBlock) deps.renderCodeBlock(bloc, cmd.code, cmd.lang);
 			else colorerCommande(ajouter(ajouter(bloc, "pre"), "code", "language-" + cmd.lang), cmd.code);
 			/* INSIDE the block, top right, revealed on hover: the gesture of
-			   Obsidian and of every code block people know. Under the block it
-			   overlapped the icon and its label overflowed. Here it is
-			   positioned, so its size no longer constrains anything. */
-			const copier = ajouter(bloc, "button", "qbd-btn qbd-install-copy");
-			copier.type = "button";
-			const copierIcone = ajouter(copier, "span", "qbd-btn-icon qbd-btn-icon--sm");
-			host.ui.setIcon(copierIcone, "copy");
-			/* THE ICON ALONE: the word doubled a pictogram everyone knows, in a
-			   corner where room is tight. The label survives OFF SCREEN (a
-			   button without an accessible name is mute for a screen reader)
-			   and it is what says "Copied" after the click. */
-			const copierTexte = ajouter(copier, "span", "qbd-sr-only", t("ai.install.copy"));
-			copier.addEventListener("click", async () => {
-				/* Through the host whenever it can copy: in the app window,
-				   `navigator.clipboard` is refused by the main process and would
-				   fail silently, which is why `copyText` exists. */
-				const ok = deps.copyText
-					? await deps.copyText(cmd.code)
-					: await navigator.clipboard.writeText(cmd.code).then(() => true, () => false);
-				if (!ok) return;
-				/* The confirmation covers BOTH: the icon alone changed while the
-				   word "Copy" stayed, which reads as an invitation to click
-				   again. The button stays visible while it lasts (`data-copie`),
-				   even if the mouse left the block. */
-				copierIcone.replaceChildren();
-				host.ui.setIcon(copierIcone, "check");
-				copierTexte.textContent = t("ai.install.copied");
-				copier.dataset.copie = "1";
-				window.setTimeout(() => {
-					copierIcone.replaceChildren();
-					host.ui.setIcon(copierIcone, "copy");
-					copierTexte.textContent = t("ai.install.copy");
-					delete copier.dataset.copie;
-				}, 1500);
-			});
+			   Obsidian and of every code block people know. Through the host
+			   whenever it can copy: in the app window, `navigator.clipboard` is
+			   refused by the main process and would fail silently, which is why
+			   `copyText` exists. */
+			addCopyButton(bloc, () => deps.copyText
+				? deps.copyText(cmd.code)
+				: navigator.clipboard.writeText(cmd.code).then(() => true, () => false),
+			{ copy: t("ai.install.copy"), copied: t("ai.install.copied") });
 			ajouter(etapes, "li", undefined, t(`ai.install.step3.${deps.provider}`));
 			ajouter(etapes, "li", undefined, t("ai.install.step4"));
 
