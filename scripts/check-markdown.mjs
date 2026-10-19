@@ -383,6 +383,18 @@ await withSrcModule(
 		P("Le prompt <code>$$</code> de bash") + `<ul class="quiz-md-liste"><li>a</li><li>b</li></ul>` + P("fin"));
 	r.check("titre et citation", rendre("## T" + NL + "> **a**" + NL + "> b"),
 		`<h2 class="quiz-md-titre">T</h2><blockquote class="quiz-md-citation"><strong>a</strong><br>b</blockquote>`);
+	/* A quote callout (2026-10-19): the quote centred, the author apart. */
+	const QUOTE = (texte, auteur) => `<div class="quiz-md-quote"><blockquote class="quiz-md-quote-texte">${texte}</blockquote>${auteur ? `<div class="quiz-md-quote-auteur">— ${auteur}</div>` : ""}</div>`;
+	r.check("quote: plain form, author on its own line", rendre("> [!quote]" + NL + "> « Apprendre sans être programmé »" + NL + "> — Arthur Samuel"),
+		QUOTE("« Apprendre sans être programmé »", "Arthur Samuel"));
+	r.check("quote: the Obsidian one-line form loses <center> and the outer italics", rendre("> [!QUOTE]" + NL + "> *<center>« Plus d'exemples »</center>* <br> **— Tom Mitchell**"),
+		QUOTE("« Plus d&#39;exemples »", "Tom Mitchell"));
+	r.check("quote: without an author", rendre("> [!cite]" + NL + "> une phrase"), QUOTE("une phrase", ""));
+	r.check("quote: a lone dash line is the quote, not an author", rendre("> [!quote]" + NL + "> — seule"), QUOTE("— seule", ""));
+	r.check("quote: its text stays escaped", rendre("> [!quote]" + NL + "> <img src=x onerror=alert(1)>" + NL + "> — <b>x</b>"),
+		QUOTE("&lt;img src=x onerror=alert(1)&gt;", "<b>x</b>"));
+	r.check("quote: the canonical render keeps the bare blockquote", rendreTexteQuiz("> [!quote]" + NL + "> a", IMG, false, false),
+		`<blockquote class="quiz-md-citation">[!quote]<br>a</blockquote>`);
 	r.check("une balise dans une liste reste du texte", rendre("- <img src=x onerror=alert(1)>" + NL + "- b"),
 		`<ul class="quiz-md-liste"><li>&lt;img src=x onerror=alert(1)&gt;</li><li>b</li></ul>`);
 	r.check("formule $$ sur plusieurs lignes : un seul paragraphe", rendre("$$" + NL + "a" + NL + NL + "- b" + NL + "$$" + NL + NL + "c"),

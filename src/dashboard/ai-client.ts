@@ -826,6 +826,14 @@ FORMS OF THE INTERACTIVE PAGES: you are FREE. Every form below is available, and
 - MIXED: two forms together only when that truly helps, never more.
 ${SIMULATOR_GUIDE}
 `;
+/** A real quote that sums up a notion, shown as a quote callout (2026-10-19:
+    "a sentence someone said that sums the course up", e.g. on machine
+    learning, more examples and the model learns more, while the perfect
+    program to tell a cat would be near impossible to write). Real and
+    attributed only: an invented or misattributed quote teaches something false. */
+const LEARN_QUOTES = `QUOTES THAT SUM UP: when a REAL, known quote by a named person (a researcher, an author, a pioneer of the field) sums up a notion of the course in one sentence, the reading of that notion ends with it, as the LAST entry of its "etapes" (not counted in the 2 to 4), written exactly: "> [!quote]\\n> « the quote »\\n> — Firstname Lastname (year)". The app shows it centred, in italics, the author under it. Only a quote you are SURE that person really said or wrote, in its known wording (translated into the quiz language when needed); never invent one, never put a paraphrase or a summary of your own in someone's mouth, never a vague attribution ("a researcher said"). When no such quote exists or you are not sure, write none: most readings have none, and a Learn has a few at most, on its key notions.
+
+`;
 const LEARN_FIGURES = `FIGURES OF THE READINGS: a course PDF often holds diagrams, schemas and tables, and its text shows where: on such a page the words read like the labels of a drawing (boxes, arrows, multiplicities such as 0..* or 1, stereotypes such as «include», actor and state names, axis names, a table's cells). When a "read" card explains a notion that one of those pages DRAWS, the card shows that page: add "figure": the PDF's file name EXACTLY as written in its "--- name ---" header, then ONE page from its "[p. N]" marks, for example "figure": "CM2 - UML.pdf, p. 7". The application draws that page above the reading, so the reading's text explains what the figure shows. Give a figure to EVERY reading whose notion is drawn on a page of the documents; none to a reading with no such page, and never a figure for a document that is not a PDF. One figure per reading.
 
 `;
@@ -1140,7 +1148,7 @@ ${categorieBloc}
 
 	${SANS_OUTILS_GENERATION}
 
-${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES + LEARN_HTML : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
+${blocPreparation(preparation, learn)}${learn ? LEARN_SOURCES + LEARN_FIGURES + LEARN_QUOTES + LEARN_HTML : ""}	THE ONLY EXCEPTION: when the user request below EXPLICITLY asks you NOT to make a quiz (for example "don't generate a quiz", "no quiz, just explain"), write no quiz at all: your first line is exactly ${NO_QUIZ_MARKER}, then answer the request in Markdown prose, in the language of the request. Never take this exception on your own: any other request, a question included, gets a quiz.
 
 	${blocLot}${blocParties}${quantite}
 

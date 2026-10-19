@@ -363,6 +363,41 @@ function rendreListe(texte: string, items: ItemListe[], o: OutilsRendu): string 
 	return html;
 }
 
+/* A QUOTE, as Obsidian's quote callout (2026-10-19): `> [!quote]` (or
+   `[!cite]`), the quote centred in italics, then its author in bold under
+   it, "— Author". Read from the plain form ("> « … »" then "> — Author" on
+   its own line) and from the Obsidian form written all on one line:
+   `> *<center>« … »</center>* <br> **— Author**` — the `<center>` tags and
+   the outer `*` are dropped, the layout gives them back. Only for a DISPLAYED
+   render (same switch as the language badge): the canonical render of
+   `html-vers-markdown.ts` re-reads its own output strictly and keeps the
+   bare `<blockquote>`. `null` when the block is not a quote callout. */
+const MOTIF_QUOTE = /^\s*\[!(quote|cite)\][+-]?\s*(.*)$/i;
+const MOTIF_AUTEUR = /^(?:\*\*|__)?\s*[—–-]\s*(.+?)\s*(?:\*\*|__)?$/;
+
+function rendreCitationQuote(lignes: string[], o: OutilsRendu): string | null {
+	const tete = lignes[0]?.match(MOTIF_QUOTE);
+	if (!tete) return null;
+	const titre = tete[2].trim();
+	const morceaux = lignes.slice(1).join("\n")
+		.replace(/<\/?center\s*>/gi, "")
+		.split(/\s*<br\s*\/?>\s*|\n/i)
+		.map(m => m.trim())
+		.filter(Boolean);
+	let auteur = "";
+	const derniere = morceaux.length > 1 ? morceaux[morceaux.length - 1].match(MOTIF_AUTEUR) : null;
+	if (derniere) { auteur = derniere[1].trim(); morceaux.pop(); }
+	let citation = morceaux.join("\n");
+	const italique = citation.match(/^([*_])(?!\1)([\s\S]+)\1$/);
+	if (italique) citation = italique[2].trim();
+	if (!citation) return null;
+	return `<div class="quiz-md-quote">`
+		+ (titre ? `<div class="quiz-md-quote-titre">${o.inline(titre)}</div>` : "")
+		+ `<blockquote class="quiz-md-quote-texte">${o.inline(citation)}</blockquote>`
+		+ (auteur ? `<div class="quiz-md-quote-auteur">— ${o.inline(auteur)}</div>` : "")
+		+ `</div>`;
+}
+
 const STYLE_ALIGNEMENT = (a: Alignement): string => (a ? ` style="text-align: ${a}"` : "");
 
 /**
@@ -379,8 +414,11 @@ export function rendreBlocs(texte: string, o: OutilsRendu): string | null {
 				return `<p class="quiz-md-p">${o.inline(tranche(b.zone))}</p>`;
 			case "titre":
 				return `<h${b.niveau} class="quiz-md-titre">${o.inline(tranche(b.zone))}</h${b.niveau}>`;
-			case "citation":
-				return `<blockquote class="quiz-md-citation">${o.inline(b.lignes.map(l => tranche(l.zone)).join("\n"))}</blockquote>`;
+			case "citation": {
+				const lignes = b.lignes.map(l => tranche(l.zone));
+				const carte = (o.badge ?? o.executable) ? rendreCitationQuote(lignes, o) : null;
+				return carte ?? `<blockquote class="quiz-md-citation">${o.inline(lignes.join("\n"))}</blockquote>`;
+			}
 			case "liste":
 				return rendreListe(texte, b.items, o);
 			case "code": {
