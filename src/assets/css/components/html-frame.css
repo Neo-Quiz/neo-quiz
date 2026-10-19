@@ -48,18 +48,22 @@ body.is-mobile .nq-html-frame-more { opacity: 1; }
 	display: block;
 	width: 100%;
 	min-height: 40px;
-	/* No outline and no fill of its own (2026-10-14): the page sits in the
-	   reading, right under the code it acts on, not in a box. */
+	/* Transparent: the fill is the wrapper's (below). */
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	overflow: hidden;
 }
 
-/* In a chat answer (Explain), the page DOES get a fill (2026-10-19): the
-   panel is glass over the wallpaper, and a diagram drawn on nothing was hard
-   to read. A reading keeps the transparent frame above. */
-.qbd-ai-chat-prose .nq-html-frame-view {
+/* Every page sits on a fill of its own (2026-10-19), in a reading as in a
+   chat answer: drawn straight on the reading, an interactive page could not be
+   told apart from the text around it (it had no fill since 2026-10-14), and
+   over the glass of the Explain panel it was hard to read. The fill is on the
+   wrapper, padded, so the page's content never touches the edge; the iframe's
+   own height stays exactly the height its content reports. */
+.nq-html-frame[data-nq-frame] {
+	box-sizing: border-box;
+	padding: 14px 16px;
 	background: var(--background-secondary);
 	border-radius: 12px;
 	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
