@@ -220,6 +220,7 @@ export const EN_DASHBOARD = {
 	"dashboard.quizzes.shareSaveError": "Could not share the file",
 	"dashboard.quizzes.shareBusy": "A share is already in progress, try again in a moment",
 	"dashboard.quizzes.menuRename": "Rename",
+	"dashboard.quizzes.menuEditQuestions": "Questions",
 	"dashboard.quizzes.menuCopyPath": "Copy path",
 	"dashboard.quizzes.menuOpenFolder": "Open folder",
 	"dashboard.quizzes.menuDelete": "Delete quiz",

@@ -182,6 +182,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	"dashboard.quizzes.shareSaveError": "Impossible de partager le fichier",
 	"dashboard.quizzes.shareBusy": "Un partage est déjà en cours, réessayez dans un instant",
 	"dashboard.quizzes.menuRename": "Renommer",
+	"dashboard.quizzes.menuEditQuestions": "Questions",
 	"dashboard.quizzes.menuCopyPath": "Copier le chemin",
 	"dashboard.quizzes.menuOpenFolder": "Ouvrir le dossier",
 	"dashboard.quizzes.menuDelete": "Supprimer le quiz",

@@ -20,6 +20,7 @@ release notes.
 - The Copy button of a page's source is the same icon button as every other code block.
 - Generated interactive pages are smaller and laid out across the width, and the AI picks the best form for each notion among all of them (one control and its effect, two cases compared, steps, sorting, reveal, predict then see, timeline, diagram...).
 - Quotes written as a quote callout (`> [!quote]`) show centred in italics with their author under them, and generated Learns may end a reading with a real quote that sums it up.
+- A quiz card's menu is shorter: Questions, Subject, Rename and Duplicate now sit under Edit.
 
 ## [1.21.19] - 2026-10-19
 

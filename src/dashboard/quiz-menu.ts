@@ -659,14 +659,44 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 			// texte, jugée insuffisante (demande Ahmed 2026-07-19).
 			onClick: () => { shareQuiz({ quiz }); },
 		});
-		items.push({
+		/* "Edit" GROUPS what changes the quiz itself (2026-10-19: eight
+		   entries in one menu were too many): its questions, subject, exam
+		   mode, name, and a copy of it. A submenu opens on hover and needs
+		   `anchorEl`; without it, the same entries stay flat. */
+		const editItems: ActionMenuItem[] = [];
+		editItems.push({
 			icon: "pencil",
-			label: t("dashboard.detail.edit"),
+			label: t(anchorEl ? "dashboard.quizzes.menuEditQuestions" : "dashboard.detail.edit"),
 			// La page du quiz, en ÉDITION, DANS le dashboard : ouvrir un
 			// onglet à côté ferait deux surfaces pour le même quiz, alors
 			// qu'un clic sur la carte mène déjà à cette page.
 			onClick: () => { ctx.navigate("detail", { quiz, edit: true }); },
 		});
+		// « Subject »: the quiz's own subject, written into the note's frontmatter.
+		if (anchorEl) editItems.push(subjectMenuItem(ctx, quiz, anchorEl, rerender));
+		// « Keep exam mode » (a Test only): checkable, written into the note.
+		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
+		if (keepExam) editItems.push(keepExam);
+		/* Rename and Duplicate act on this quiz, through the contract (`HostFs.rename`,
+		   `readBinary`/`writeBinary`), so every host has them. */
+		editItems.push({
+			// "text-cursor-input", not a pencil: "Edit questions" (pencil)
+			// already opens the question editor, two pencils would be confused.
+			icon: "text-cursor-input",
+			label: t("dashboard.quizzes.menuRename"),
+			onClick: () => { openRenameQuizModal(ctx, quiz, rerender); },
+		});
+		editItems.push({
+			icon: "copy-plus",
+			label: t("dashboard.quizzes.menuDuplicate"),
+			onClick: () => {
+				void runFileGesture(async () => {
+					if (await duplicateQuiz(quiz)) currentHost().ui.notice(t("dashboard.quizzes.duplicated"));
+				}, "dashboard.quizzes.duplicateError", rerender);
+			},
+		});
+		if (anchorEl) items.push({ icon: "pencil", label: t("dashboard.detail.edit"), submenu: editItems });
+		else items.push(...editItems);
 		/* « Déplacer vers » — juste après Edit (demande Ahmed 2026-09-27). Les
 		   dossiers CONNUS : ceux de la page « Mes quiz » (`modulesAffiches`), vides compris,
 		   sur les quiz du catalogue entier (pas seulement ceux affichés/filtrés
@@ -714,29 +744,6 @@ export function buildQuizCardMenu(ctx: DashboardShellCtx, rerender: () => void, 
 				submenu: sousItems,
 			});
 		}
-		// « Subject »: the quiz's own subject, written into the note's frontmatter.
-		if (anchorEl) items.push(subjectMenuItem(ctx, quiz, anchorEl, rerender));
-		// « Keep exam mode » (a Test only): checkable, written into the note.
-		const keepExam = keepExamMenuItem(ctx, quiz, rerender);
-		if (keepExam) items.push(keepExam);
-		/* Rename and Duplicate act on this quiz, through the contract (`HostFs.rename`,
-		   `readBinary`/`writeBinary`), so every host has them. */
-		items.push({
-			// "text-cursor-input", not a pencil: "Edit" (pencil) already opens
-			// the question editor, two pencils would be confused.
-			icon: "text-cursor-input",
-			label: t("dashboard.quizzes.menuRename"),
-			onClick: () => { openRenameQuizModal(ctx, quiz, rerender); },
-		});
-		items.push({
-			icon: "copy-plus",
-			label: t("dashboard.quizzes.menuDuplicate"),
-			onClick: () => {
-				void runFileGesture(async () => {
-					if (await duplicateQuiz(quiz)) currentHost().ui.notice(t("dashboard.quizzes.duplicated"));
-				}, "dashboard.quizzes.duplicateError", rerender);
-			},
-		});
 		/* « Copier le chemin » — le chemin ABSOLU, comme le Ctrl+Maj+C de
 		   l'explorateur (Ahmed, 2026-09-17). Sans `absolutePath`, pas d'entrée :
 		   même règle que Partager et Renommer, une entrée qui ne peut pas tenir
