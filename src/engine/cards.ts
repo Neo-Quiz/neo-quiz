@@ -16,6 +16,7 @@ import { t, type TransKey } from "../i18n";
 import { drawOrder, formatElapsed, learnFigures, stepMembers, stepBeadState, type StepSlide } from "./step-page";
 import { mindMapHtml, mindMapModel } from "./mind-map";
 import { titreSansMode } from "../quiz-format";
+import { relettrerExplication } from "./explain-letters";
 
 /* Lucide `arrow-left` / `arrow-right`, en SVG inline comme ceux de
    passage.ts : le moteur compose ses cartes en chaînes HTML et n'a pas de
@@ -302,7 +303,16 @@ export function createCardRenderers(ctx: EngineCtx): CardHandlers {
 			return `<div class="quiz-explain ${ctx.isCorrect(qi) ? "good" : "bad"}">${ctx.sanitize.replaceObsidianEmbedsInHtml(explainHtml)}</div>`;
 		}
 		if (q.explain) {
-			return `<div class="quiz-explain ${ctx.isCorrect(qi) ? "good" : "bad"}">${ctx.sanitize.renderTextWithEmbeds(q.explain)}</div>`;
+			/* The letters the explanation cites, rewritten to the shuffled
+			   order shown on screen (`explain-letters.ts`). */
+			const ordre = ctx.quizState.shuffleMap[qi];
+			const options = (q as { options?: unknown }).options;
+			const multi = (q as { multiSelect?: unknown }).multiSelect === true;
+			const texte = Array.isArray(ordre) && Array.isArray(options)
+				? relettrerExplication(String(q.explain), ordre as number[], options.length,
+					multi ? options.map(o => stripInlineMarkdown(typeof o === "string" ? o : String((o as { text?: unknown })?.text ?? ""))) : undefined)
+				: q.explain;
+			return `<div class="quiz-explain ${ctx.isCorrect(qi) ? "good" : "bad"}">${ctx.sanitize.renderTextWithEmbeds(texte)}</div>`;
 		}
 		return "";
 	}

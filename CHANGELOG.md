@@ -23,6 +23,10 @@ release notes.
 - A quiz card's menu is shorter: Questions, Subject, Rename and Duplicate now sit under Edit.
 - In a Learn, a question asked before a step's reading now opens the step's page instead of sitting under the reading that answers it.
 
+### Fixed
+
+- An explanation that names wrong options by their letter now uses the letters shown on screen, which are shuffled; in a multiple choice, which shows no letters, it names the options by their words.
+
 ## [1.21.19] - 2026-10-19
 
 ### Fixed

@@ -348,3 +348,22 @@ await withSrcModule(["src/question-edit.ts", "src/explain-prompt.ts"], ({ valida
 		[/ASSISTANT/.test(consigneExplication(false)), /written reason/.test(consigneExplication(false)), /ASSISTANT/.test(consigneExplication(true))], [true, true, false]);
 	r.done();
 });
+
+/* 2026-10-19: an explanation's option letters follow the shuffled order shown on screen. */
+await withSrcModule("src/engine/explain-letters.ts", ({ relettrerExplication }) => {
+	const r = makeReporter("Explanation letters follow the shuffle");
+	const NL = "\n";
+	const ex = ["On remplace x : **10**.", "", "- B oublie de soustraire 2.", "- C ajoute 2.", "- D additionne."].join(NL);
+	// Shown order: written D, C, A, B. Written B is shown D, C shown B, D shown A.
+	r.check("each wrong-option line takes its letter on screen", relettrerExplication(ex, [3, 2, 0, 1], 4),
+		["On remplace x : **10**.", "", "- D oublie de soustraire 2.", "- B ajoute 2.", "- A additionne."].join(NL));
+	r.check("bold and colon forms", relettrerExplication("- **A** : x" + NL + "- B : y", [1, 0], 2), "- **B** : x" + NL + "- A : y");
+	r.check("no shuffle, unchanged", relettrerExplication(ex, [0, 1, 2, 3], 4), ex);
+	r.check("a lone English 'A' line is a word, unchanged", relettrerExplication("Why:" + NL + "- A model learns.", [1, 0, 2], 3), "Why:" + NL + "- A model learns.");
+	r.check("a letter past the options, unchanged", relettrerExplication("- A x" + NL + "- E y", [1, 0, 2], 3), "- A x" + NL + "- E y");
+	r.check("a broken order, unchanged", relettrerExplication(ex, [0, 0, 1, 2], 4), ex);
+	r.check("a multiple choice names the options by their words", relettrerExplication("- A : x" + NL + "- C : y", [0, 1, 2], 3, ["douze", "dix", "une phrase bien plus longue que quarante caractères au total"]),
+		"- « douze » : x" + NL + "- « une phrase bien plus longue que… » : y");
+	r.check("letters inside a sentence are left alone", relettrerExplication("La B est fausse." + NL + "- A x" + NL + "- B y", [1, 0], 2), "La B est fausse." + NL + "- B x" + NL + "- A y");
+	r.done();
+});
