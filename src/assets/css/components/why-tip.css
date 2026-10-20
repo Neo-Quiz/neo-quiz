@@ -28,7 +28,13 @@
   position: relative;
 }
 
-.qb-why:hover,
+@media (hover: hover){
+    .qb-why:hover{
+      outline: none;
+      color: var(--quiz-primary-hover);
+      border-bottom-color: var(--quiz-primary);
+    }
+}
 .qb-why:focus-visible{
   outline: none;
   color: var(--quiz-primary-hover);
@@ -63,7 +69,12 @@
     transform var(--quiz-dur-fast) var(--quiz-ease-smooth);
 }
 
-.qb-why:hover::after,
+@media (hover: hover){
+    .qb-why:hover::after{
+      opacity: 1;
+      transform: translateY(0);
+    }
+}
 .qb-why:focus-visible::after{
   opacity: 1;
   transform: translateY(0);

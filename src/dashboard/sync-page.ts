@@ -1,3 +1,4 @@
+import { dismissOverlay } from "./disclosure-motion";
 /* ══════════════════════════════════════════════════════════
    THE SYNC PAGE (shared by the Windows app and the Android app)
 
@@ -424,7 +425,7 @@ export function monterSync(parent: HTMLElement, deps: SyncPageDeps): () => void 
 		fermerMenu = () => {
 			document.removeEventListener("pointerdown", dehors, true);
 			document.removeEventListener("keydown", echap, true);
-			m.remove();
+			dismissOverlay(m);
 			ancre.setAttribute("aria-expanded", "false");
 			fermerMenu = () => undefined;
 		};

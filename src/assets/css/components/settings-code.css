@@ -36,9 +36,11 @@
 	color: var(--text-muted);
 }
 
-.quiz-blocks-settings-copy-btn:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .quiz-blocks-settings-copy-btn:hover {
+        color: var(--text-normal);
+        background: var(--background-modifier-hover);
+    }
 }
 
 .quiz-blocks-settings-code-pre {

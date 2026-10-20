@@ -1,3 +1,4 @@
+import { dismissOverlay } from "./disclosure-motion";
 import { ajouter } from "../dom";
 import { currentLang, t } from "../i18n";
 import { currentHost } from "../host/current";
@@ -158,7 +159,7 @@ export function openDatePicker(anchor: HTMLElement, value: string, options: Date
 		document.removeEventListener("keydown", onKeyDown, true);
 		window.removeEventListener("scroll", onScroll, true);
 		window.removeEventListener("resize", onResize);
-		pop.remove();
+		dismissOverlay(pop);
 		anchor.setAttribute("aria-expanded", "false");
 		if (open?.anchor === anchor) open = null;
 		if (refocus) anchor.focus();

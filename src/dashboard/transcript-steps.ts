@@ -1,3 +1,4 @@
+import { prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 /**
  * THE AI'S WORK, as a transcript block shows it (2026-10-14): the tools a
  * one-shot CLI call used, summed up by kind and listed step by step, shared
@@ -82,7 +83,7 @@ export interface BlocTravail {
 	maj(tr: Transcript, vivant: boolean): void;
 }
 
-interface Ligne { bouton: HTMLElement; libelle: HTMLElement; chevron: HTMLElement; icone: string; detail: HTMLElement | null }
+interface Ligne { bouton: HTMLElement; libelle: HTMLElement; chevron: HTMLElement; icone: string; detail: HTMLElement | null; content?: HTMLElement }
 
 export function creerBlocTravail(): BlocTravail {
 	const el = document.createElement("div");
@@ -155,14 +156,17 @@ export function creerBlocTravail(): BlocTravail {
 			const ouvert = ouvertes.has(s.cle);
 			if (l.bouton.getAttribute("aria-expanded") !== String(ouvert)) {
 				l.bouton.setAttribute("aria-expanded", String(ouvert));
-				currentHost().ui.setIcon(l.chevron, ouvert ? "chevron-down" : "chevron-right");
+				currentHost().ui.setIcon(l.chevron, "chevron-right");
 			}
-			if (!ouvert && l.detail) { l.detail.remove(); l.detail = null; }
 			if (ouvert && !l.detail) {
 				l.detail = document.createElement("div");
 				l.detail.className = "qbd-ai-transcript-detail";
+				l.content = prepareDisclosure(l.detail, false);
 			}
-			if (l.detail) s.detail(l.detail);
+			if (l.detail && l.content) {
+				s.detail(l.content);
+				setDisclosureOpen(l.detail, ouvert);
+			}
 			if (el.children[rang] !== l.bouton) el.insertBefore(l.bouton, el.children[rang] ?? null);
 			rang++;
 			if (l.detail) {

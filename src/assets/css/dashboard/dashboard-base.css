@@ -123,8 +123,10 @@
 	border-radius: 3px;
 }
 
-.qbd-ai-result-list::-webkit-scrollbar-thumb:hover {
-	background: var(--background-modifier-border-hover);
+@media (hover: hover) {
+    .qbd-ai-result-list::-webkit-scrollbar-thumb:hover {
+        background: var(--background-modifier-border-hover);
+    }
 }
 
 /* ── Responsive tablet ── */

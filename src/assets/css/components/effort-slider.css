@@ -166,9 +166,11 @@
 	height: 14px;
 }
 
-.qbd-effort-fast:hover {
-	background: var(--background-modifier-hover) !important;
-	color: #7d8cff;
+@media (hover: hover) {
+    .qbd-effort-fast:hover {
+        background: var(--background-modifier-hover) !important;
+        color: #7d8cff;
+    }
 }
 
 /* États du bouton Fast (référence annotée) : désactivé = contour gris
@@ -206,8 +208,10 @@
 	flex-shrink: 0;
 }
 
-.qbd-effort-pop-help:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-effort-pop-help:hover {
+        color: var(--text-normal);
+    }
 }
 
 /* ── Échelle « Plus rapide / Plus intelligent » (claude) ──
@@ -635,8 +639,10 @@
 	min-height: 28px;
 }
 
-.qbd-composer-plain:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-composer-plain:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 
 .qbd-effort-trigger.qbd-composer-plain {

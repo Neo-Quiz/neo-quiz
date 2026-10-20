@@ -1,3 +1,4 @@
+import { dismissOverlay } from "./disclosure-motion";
 import { currentHost } from "../host/current";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
@@ -121,7 +122,7 @@ export function createSelect<T extends SelectOption = SelectOption>(parent: HTML
 
 	function closeMenu(): void {
 		if (!menuEl) return;
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		menuEl = null;
 		trigger.setAttribute("aria-expanded", "false");
 		openMenus.delete(closeMenu);
@@ -413,7 +414,7 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 	}
 	function fermerFlyout(): void {
 		annulerFermeture();
-		if (flyout) { flyout.remove(); flyout = null; }
+		if (flyout) { dismissOverlay(flyout); flyout = null; }
 		if (flyoutRow) {
 			flyoutRow.classList.remove("is-open");
 			flyoutRow.setAttribute("aria-expanded", "false");
@@ -472,7 +473,7 @@ export function openActionMenu(anchorEl: HTMLElement, items: ActionMenuItem[], o
 
 	function closeMenu(): void {
 		fermerFlyout();
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
@@ -897,7 +898,7 @@ export function openModelMenu(anchorEl: HTMLElement, opts: OpenModelMenuOptions)
 
 	function closeLevelFlyout(): void {
 		cancelLevelClose();
-		if (levelFlyout) { levelFlyout.remove(); levelFlyout = null; }
+		if (levelFlyout) { dismissOverlay(levelFlyout); levelFlyout = null; }
 		levelFlyoutModel = "";
 		menuEl.querySelectorAll(".qbd-level-row.is-open").forEach(el => el.classList.remove("is-open"));
 	}
@@ -1020,7 +1021,7 @@ export function openModelMenu(anchorEl: HTMLElement, opts: OpenModelMenuOptions)
 
 	function closeEffortFlyout(): void {
 		cancelEffortClose();
-		if (effortFlyout) { effortFlyout.remove(); effortFlyout = null; }
+		if (effortFlyout) { dismissOverlay(effortFlyout); effortFlyout = null; }
 		const row = menuEl.querySelector(".qbd-effort-row");
 		if (row) row.classList.remove("is-open");
 	}
@@ -1092,7 +1093,7 @@ export function openModelMenu(anchorEl: HTMLElement, opts: OpenModelMenuOptions)
 
 	function closeMoreFlyout(): void {
 		cancelMoreClose();
-		if (moreFlyout) { moreFlyout.remove(); moreFlyout = null; }
+		if (moreFlyout) { dismissOverlay(moreFlyout); moreFlyout = null; }
 		const row = menuEl.querySelector(".qbd-more-row");
 		if (row) row.classList.remove("is-open");
 	}
@@ -1129,7 +1130,7 @@ export function openModelMenu(anchorEl: HTMLElement, opts: OpenModelMenuOptions)
 		closeEffortFlyout();
 		closeMoreFlyout();
 		closeLevelFlyout();
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
@@ -1430,7 +1431,7 @@ export function openProviderMenu(anchorEl: HTMLElement, opts: OpenProviderMenuOp
 
 	function closeFlyout(): void {
 		cancelClose();
-		if (flyout) { flyout.remove(); flyout = null; }
+		if (flyout) { dismissOverlay(flyout); flyout = null; }
 		flyoutBrand = "";
 		menuEl.querySelectorAll(".qbd-brand-row.is-open").forEach(el => el.classList.remove("is-open"));
 	}
@@ -1551,7 +1552,7 @@ export function openProviderMenu(anchorEl: HTMLElement, opts: OpenProviderMenuOp
 
 	function closeMenu(): void {
 		closeFlyout();
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
@@ -1954,7 +1955,7 @@ export function openEffortSlider(anchorEl: HTMLElement, opts: OpenEffortSliderOp
 		if (stopDrift) stopDrift();     // stoppe la boucle rAF du drift Fast
 		for (const t of tips) t.remove();
 		tips.clear();
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
@@ -2103,7 +2104,7 @@ export function openNotePicker<F extends PickableFile>(anchorEl: HTMLElement, op
 	menuEl.style.visibility = "";
 
 	function closeMenu(): void {
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		document.removeEventListener("keydown", onKeyDown, true);
@@ -2244,7 +2245,7 @@ export function openMentionMenu(anchorEl: HTMLElement, onClose?: () => void): Me
 	}
 
 	function closeMenu(): void {
-		menuEl.remove();
+		dismissOverlay(menuEl);
 		openMenus.delete(closeMenu);
 		document.removeEventListener("mousedown", onDocDown, true);
 		window.removeEventListener("scroll", onScroll, true);

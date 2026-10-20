@@ -49,10 +49,14 @@
 	transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 .nq-html-frame-more svg { width: 16px; height: 16px; }
-.nq-html-frame:hover .nq-html-frame-more,
+@media (hover: hover) {
+    .nq-html-frame:hover .nq-html-frame-more { opacity: 1; }
+}
 .nq-html-frame-more:focus-visible,
 .nq-html-frame-more:focus { opacity: 1; }
-.nq-html-frame-more:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
+@media (hover: hover) {
+    .nq-html-frame-more:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
+}
 @media (hover: none) { .nq-html-frame-more { opacity: 1; } }
 body.is-mobile .nq-html-frame-more { opacity: 1; }
 /* Out of the picture while "Copy as image" captures the frame. */

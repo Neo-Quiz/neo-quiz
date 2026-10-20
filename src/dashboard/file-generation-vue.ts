@@ -1,3 +1,4 @@
+import { prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 /* ══════════════════════════════════════════════════════════
    LA FILE, EN CONVERSATION (référence claude.ai, 2026-09-26)
 
@@ -526,6 +527,7 @@ export function creerVueFile(opts: {
 		libelle: HTMLElement;
 		chevron: HTMLElement;
 		detail: HTMLElement | null;
+		content?: HTMLElement;
 		ouvert: boolean;
 		chevronNom: string;
 	}
@@ -797,18 +799,22 @@ export function creerVueFile(opts: {
 				delete v.libelle.dataset.debut;
 			}
 			if (v.bouton.getAttribute("aria-expanded") !== String(ouvert)) v.bouton.setAttribute("aria-expanded", String(ouvert));
-			const chevronNom = ouvert ? "chevron-down" : "chevron-right";
+			const chevronNom = "chevron-right";
 			if (v.chevronNom !== chevronNom) { host.ui.setIcon(v.chevron, chevronNom); v.chevronNom = chevronNom; }
 			v.ouvert = ouvert;
-			if (!ouvert && v.detail) { v.detail.remove(); v.detail = null; }
+
 			if (ouvert && !v.detail) {
 				/* The unfolding slides in only when a click opened it. */
 				const anime = ouvertures.delete(k);
 				v.detail = document.createElement("div");
 				v.detail.className = "qbd-ai-transcript-detail" + (anime ? " qbd-ai-transcript-detail--anime" : "");
+				v.content = prepareDisclosure(v.detail, false);
 				v.bouton.after(v.detail);
 			}
-			if (v.detail) s.detail(v.detail);
+			if (v.detail && v.content) {
+				s.detail(v.content);
+				setDisclosureOpen(v.detail, ouvert);
+			}
 			// Keep the DOM order (thinking, tools, writing) by moving only what is out of place.
 			if (bloc.children[rang] !== v.bouton) bloc.insertBefore(v.bouton, bloc.children[rang] ?? null);
 			rang++;

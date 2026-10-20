@@ -1,0 +1,79 @@
+/* Shared mobile feedback; individual scale preserves component transforms. */
+@property --nq-press-opacity {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.is-mobile {
+  --nq-press-down: 0ms;
+  --nq-press-release: 200ms;
+  --nq-press-easing: ease-out;
+  --nq-press-scale: .97;
+  --nq-press-layer: .10;
+  --nq-hover-layer: .08;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.is-mobile [data-nq-press-family] {
+  --nq-press-opacity: 0;
+  transition: scale var(--nq-press-release) var(--nq-press-easing),
+    --nq-press-opacity var(--nq-press-release) var(--nq-press-easing),
+    transform var(--nq-press-release) var(--nq-press-easing),
+    box-shadow var(--nq-press-release) var(--nq-press-easing);
+}
+
+.is-mobile [data-nq-press-family="layer"] {
+  background-image: linear-gradient(rgb(from currentColor r g b / var(--nq-press-opacity)), rgb(from currentColor r g b / var(--nq-press-opacity)));
+}
+
+body.is-mobile [data-nq-press-family][data-nq-pressed="true"]:not(:disabled) {
+  transition-duration: var(--nq-press-down);
+}
+
+.is-mobile [data-nq-press-family="scale"][data-nq-pressed="true"] {
+  scale: var(--nq-press-scale);
+}
+
+.is-mobile [data-nq-press-family="layer"][data-nq-pressed="true"] {
+  --nq-press-opacity: var(--nq-press-layer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-mobile [data-nq-press-family] {
+    background-image: linear-gradient(rgb(from currentColor r g b / var(--nq-press-opacity)), rgb(from currentColor r g b / var(--nq-press-opacity)));
+    transition: --nq-press-opacity var(--nq-press-release) var(--nq-press-easing);
+  }
+  .is-mobile [data-nq-press-family][data-nq-pressed="true"] {
+    --nq-press-opacity: var(--nq-press-layer);
+    scale: 1;
+    translate: none;
+  }
+}
+
+@media (hover: hover) {
+  .is-mobile [data-nq-press-family="layer"]:hover:not([data-nq-pressed]) {
+    --nq-press-opacity: var(--nq-hover-layer);
+  }
+}
+
+
+/* The opaque faces need the veil too; inheriting the animated token keeps release smooth. */
+.is-mobile .quiz-fc-card[data-nq-press-family="layer"] .quiz-fc-face,
+.is-mobile .qbd-cta3d[data-nq-press-family="layer"] .qbd-cta3d-face {
+  background-image: linear-gradient(rgb(from currentColor r g b / var(--nq-press-opacity)), rgb(from currentColor r g b / var(--nq-press-opacity)));
+}
+
+.is-mobile .quiz-fc-card[data-nq-press-family="depth"] .quiz-fc-inner,
+.is-mobile .quiz-fc-card[data-nq-press-family="depth"] .quiz-fc-face,
+.is-mobile .qbd-cta3d[data-nq-press-family="depth"] .qbd-cta3d-face,
+.is-mobile .qbd-quiz-card-play[data-nq-press-family="depth"] svg {
+  transition-duration: var(--nq-press-release);
+  transition-timing-function: var(--nq-press-easing);
+}
+.is-mobile .quiz-fc-card[data-nq-press-family="depth"][data-nq-pressed="true"] .quiz-fc-inner,
+.is-mobile .quiz-fc-card[data-nq-press-family="depth"][data-nq-pressed="true"] .quiz-fc-face,
+.is-mobile .qbd-cta3d[data-nq-press-family="depth"][data-nq-pressed="true"] .qbd-cta3d-face,
+.is-mobile .qbd-quiz-card-play[data-nq-press-family="depth"][data-nq-pressed="true"] svg {
+  transition-duration: var(--nq-press-down);
+}

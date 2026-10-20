@@ -130,10 +130,12 @@
 	.qbd-home-quick .qbd-create-option-icon { transition: none; }
 }
 
-.qbd-root .qbd-resume-hero:hover,
-.qbd-resume-hero:hover {
-	border-color: color-mix(in srgb, var(--accent) 45%, var(--qbd-surface-edge)) !important;
-	background: color-mix(in srgb, var(--accent) 5%, var(--qbd-surface-bg)) !important;
+@media (hover: hover) {
+    .qbd-root .qbd-resume-hero:hover,
+    .qbd-resume-hero:hover {
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--qbd-surface-edge)) !important;
+        background: color-mix(in srgb, var(--accent) 5%, var(--qbd-surface-bg)) !important;
+    }
 }
 
 .qbd-resume-info {
@@ -338,8 +340,10 @@
 	cursor: pointer;
 }
 
-.qbd-root .qbd-homef-task:hover .qbd-homef-task-label {
-	color: #ffffff;
+@media (hover: hover) {
+    .qbd-root .qbd-homef-task:hover .qbd-homef-task-label {
+        color: #ffffff;
+    }
 }
 
 .qbd-homef-task-icon {
@@ -402,7 +406,9 @@
 	cursor: pointer;
 }
 
-.qbd-root .qbd-homef-more:hover { color: var(--text-normal); }
+@media (hover: hover) {
+    .qbd-root .qbd-homef-more:hover { color: var(--text-normal); }
+}
 .qbd-homef-more-chev svg { width: 14px; height: 14px; }
 
 .qbd-root .qbd-homef-name:focus-visible,
@@ -450,7 +456,9 @@
 	cursor: pointer;
 }
 
-.qbd-root .qbd-homes-arrow:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+@media (hover: hover) {
+    .qbd-root .qbd-homes-arrow:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+}
 .qbd-homes-arrow svg { width: 16px; height: 16px; }
 
 .qbd-homes-week {

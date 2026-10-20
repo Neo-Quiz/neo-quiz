@@ -37,14 +37,17 @@
     background var(--quiz-dur-fast) ease,
     color var(--quiz-dur-fast) ease;
 }
-
+@media (hover: hover) {
 .quiz-option:hover{
   z-index: 3;
 }
+}
+
+
 
 /* Pressed: the face sinks onto its edge, which disappears — no more
    sideways slide, which made the row jump under the finger. */
-.quiz-option:active{
+.quiz-option:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: translateY(var(--quiz-option-depth));
   box-shadow: var(--quiz-option-rim), 0 0 0 0 var(--quiz-option-edge);
 }
@@ -118,18 +121,28 @@
   }
 }
 
+
 /* HOVER (2026-09-27): the face lightens one step — an invitation, not yet
    a choice. No blue border: the raised edge already says "press me". No
    more blue glow or 4 px slide either: on hover, the option used to look
    already selected. The circle no longer turns blue on hover either
    (2026-09-28): a blue ring read as a half-made choice. It still does on
    KEYBOARD focus, where it is the only sign of which option has focus. */
-.quiz-option:not(.selected):not(.correct):not(.wrong):hover,
 .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible{
   outline: none;
   background: color-mix(in srgb, var(--text-normal) 4%, var(--background-secondary));
   color: var(--text-normal);
 }
+
+@media (hover: hover) {
+.quiz-option:not(.selected):not(.correct):not(.wrong):hover{
+  outline: none;
+  background: color-mix(in srgb, var(--text-normal) 4%, var(--background-secondary));
+  color: var(--text-normal);
+}
+}
+
+
 
 .quiz-option:not(.selected):not(.correct):not(.wrong):focus-visible::before{
   border-color: var(--quiz-primary);
@@ -292,9 +305,6 @@
   opacity: 0.5;
   cursor: default;
 }
-
-.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover,
-.quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover,
 .quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible,
 .quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):focus-visible{
   outline: none;
@@ -304,9 +314,22 @@
   background: var(--background-secondary);
 }
 
+@media (hover: hover) {
+.quiz-is-locked .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover,
+.quiz-learn-revealed .quiz-option:not(.correct):not(.wrong):not(.missed):not(.selected):hover{
+  outline: none;
+  transform: none;
+  box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
+  border-color: transparent;
+  background: var(--background-secondary);
+}
+}
+
+
+
 /* A locked option is no longer a button: it does not sink when clicked. */
-.quiz-is-locked .quiz-option:active,
-.quiz-learn-revealed .quiz-option:active{
+.quiz-is-locked .quiz-option:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]),
+.quiz-learn-revealed .quiz-option:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: none;
   box-shadow: var(--quiz-option-rim), 0 var(--quiz-option-depth) 0 0 var(--quiz-option-edge);
 }
@@ -316,9 +339,6 @@
 .theme-light .quiz-option{
   --quiz-option-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
-
-.quiz-is-locked .quiz-option.wrong:hover,
-.quiz-learn-revealed .quiz-option.wrong:hover,
 .quiz-is-locked .quiz-option.wrong:focus-visible,
 .quiz-learn-revealed .quiz-option.wrong:focus-visible{
   outline: none;
@@ -328,25 +348,47 @@
     0 0 22px var(--quiz-danger-glow-38);
 }
 
-.quiz-is-locked .quiz-option.missed:hover,
-.quiz-learn-revealed .quiz-option.missed:hover,
+@media (hover: hover) {
+.quiz-is-locked .quiz-option.wrong:hover,
+.quiz-learn-revealed .quiz-option.wrong:hover{
+  outline: none;
+  transform: translate3d(2px,0,0);
+  box-shadow:
+    0 0 0 1.5px var(--quiz-danger-ring-22),
+    0 0 22px var(--quiz-danger-glow-38);
+}
+}
+
 .quiz-is-locked .quiz-option.missed:focus-visible,
 .quiz-learn-revealed .quiz-option.missed:focus-visible{
   transform: none;
 }
 
-.quiz-option.selected:hover,
+@media (hover: hover) {
+.quiz-is-locked .quiz-option.missed:hover,
+.quiz-learn-revealed .quiz-option.missed:hover{
+  transform: none;
+}
+}
+
 .quiz-option.selected:focus-visible{
   outline: none;
   background: var(--quiz-primary-light);
 }
 
+@media (hover: hover) {
+.quiz-option.selected:hover{
+  outline: none;
+  background: var(--quiz-primary-light);
+}
+}
+
+
+
 .quiz-option.selected:focus-visible{
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
-
-.quiz-option.correct:hover,
 .quiz-option.correct:focus-visible{
   outline: none;
   transform: translate3d(2px,0,0);
@@ -354,6 +396,18 @@
     0 0 0 1.5px var(--quiz-success-ring-22),
     0 0 22px var(--quiz-success-glow-38);
 }
+
+@media (hover: hover) {
+.quiz-option.correct:hover{
+  outline: none;
+  transform: translate3d(2px,0,0);
+  box-shadow:
+    0 0 0 1.5px var(--quiz-success-ring-22),
+    0 0 22px var(--quiz-success-glow-38);
+}
+}
+
+
 
 
 /* =========================================================

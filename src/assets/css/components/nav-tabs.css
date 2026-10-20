@@ -56,12 +56,19 @@
     transform 0.08s ease,
     box-shadow 0.08s ease;
 }
-
-.quiz-tab:hover,
 .quiz-tab:focus-visible{
   z-index: 2;
   background: color-mix(in srgb, #fff 9%, var(--tab-face));
 }
+
+@media (hover: hover) {
+.quiz-tab:hover{
+  z-index: 2;
+  background: color-mix(in srgb, #fff 9%, var(--tab-face));
+}
+}
+
+
 
 .quiz-tab:focus-visible{
   outline: 2px solid #fff;
@@ -202,11 +209,17 @@
   --tab-edge: var(--quiz-success-edge);
   --tab-text: #fff;
 }
-
-.quiz-tab.is-result:hover,
 .quiz-tab.is-result:focus-visible{
   background: var(--quiz-success-light);
 }
+
+@media (hover: hover) {
+.quiz-tab.is-result:hover{
+  background: var(--quiz-success-light);
+}
+}
+
+
 
 .quiz-tab.is-result.active{ --tab-border: color-mix(in srgb, #fff 70%, transparent); }
 
@@ -227,11 +240,19 @@
 .quiz-tab.is-result.is-scored .quiz-tab-drapeau svg{
   filter: drop-shadow(0 1px 1px rgb(90 52 0 / 0.75));
 }
-.quiz-tab.is-result.is-scored:hover,
 .quiz-tab.is-result.is-scored:focus-visible{
   background: var(--tab-or);
   filter: brightness(1.1);
 }
+
+@media (hover: hover) {
+.quiz-tab.is-result.is-scored:hover{
+  background: var(--tab-or);
+  filter: brightness(1.1);
+}
+}
+
+
 
 /* THE CHANGE, flag to trophy (cards.ts `resultTab`, 900 ms): the green face
    melts into the gold, the trophy rises in with a small overshoot, and a
@@ -280,7 +301,7 @@
 
 /* The key sinks. `.is-pressing`: the class the engine sets during the
    press animation that precedes navigation (keyboard included). */
-.quiz-tab:active,
+.quiz-tab:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]),
 .quiz-tab.is-pressing{
   transform: translateY(var(--tab-depth));
   box-shadow: 0 0 0 0 var(--tab-edge);

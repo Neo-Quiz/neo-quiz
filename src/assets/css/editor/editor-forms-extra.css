@@ -147,9 +147,11 @@
   padding: 0;
 }
 
-.qb-option-card-delete:hover {
-  opacity: 1;
-  color: var(--quiz-danger);
+@media (hover: hover) {
+    .qb-option-card-delete:hover {
+      opacity: 1;
+      color: var(--quiz-danger);
+    }
 }
 
 /* Array Editor */
@@ -333,8 +335,10 @@
 	transition: all 0.2s ease;
 }
 
-.qb-save-btn:hover:not(:disabled) {
-	filter: brightness(1.1);
+@media (hover: hover) {
+    .qb-save-btn:hover:not(:disabled) {
+        filter: brightness(1.1);
+    }
 }
 
 .qb-save-btn:disabled {

@@ -62,8 +62,10 @@
   color: var(--text-faint);
 }
 
-.quiz-cloze .quiz-cloze-input:hover:not(:disabled){
-  border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+@media (hover: hover){
+    .quiz-cloze .quiz-cloze-input:hover:not(:disabled){
+      border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+    }
 }
 
 .quiz-cloze .quiz-cloze-input:focus{

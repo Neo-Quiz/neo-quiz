@@ -103,21 +103,30 @@
 }
 /* Survol : la face s'éclaircit, comme « Modifier » (#2b2a33 → #36353f) ;
    une perle d'une autre couleur s'éclaircit d'autant. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:hover,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:focus-visible {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:focus-visible{
 	background: color-mix(in srgb, #fff 5%, var(--tab-face));
 }
+
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:hover{
+	background: color-mix(in srgb, #fff 5%, var(--tab-face));
+}
+}
+
 /* La courante, bleue : le texte ombré et le survol de « Commencer le
    quiz » (elle pâlit au lieu de s'éclaircir). */
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active {
 	text-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
 }
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover{
 	background: var(--tab-face);
 	opacity: 0.85;
 }
+}
+
 /* La touche s'enfonce : la face descend sur sa tranche, qui disparaît. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:active,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]),
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-pressing {
 	transform: translateY(var(--tab-depth));
 	box-shadow:
@@ -206,7 +215,7 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	--back-edge: #141319;
 	color: #fff;
 }
-#neo-quiz-root > .qbd-qz .quiz-help-btn:active {
+#neo-quiz-root > .qbd-qz .quiz-help-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) {
 	box-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.09),
 		inset 0 0 0 1px rgba(255, 255, 255, 0.06),
@@ -233,25 +242,40 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	--tab-text: #fff;
 	opacity: 0.45;
 }
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active):hover,
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active):focus-visible,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):hover,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):focus-visible {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):focus-visible{
 	opacity: 1;
 }
+
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.answered:not(.active):hover,
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.checked:not(.active):hover{
+	opacity: 1;
+}
+}
+
 
 /* THE CURRENT BEAD's moving shine (2026-09-27): the same light sweep as
    "Start the quiz" (`.qbd-btn-shine`, dashboard-components.css), as a
    background layer — no pseudo-element, so nothing needs clipping and the
    reading tooltip below keeps its `::after`. Listed with `:hover` because
    the hover rule of the current bead resets the `background` shorthand. */
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active{
 	background-image: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.55) 50%, transparent 60%);
 	background-repeat: no-repeat;
 	background-size: 300% 100%;
 	animation: nq-perle-reflet 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover{
+	background-image: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.55) 50%, transparent 60%);
+	background-repeat: no-repeat;
+	background-size: 300% 100%;
+	animation: nq-perle-reflet 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+}
+
 @keyframes nq-perle-reflet {
 	0%, 8% { background-position: 110% 0; }
 	30%, 100% { background-position: -10% 0; }
@@ -294,13 +318,22 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	transform: translate(-50%, 4px);
 	transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
 }
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:hover::after,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:focus-visible::after {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:focus-visible::after{
 	opacity: 1;
 	visibility: visible;
 	transform: translate(-50%, 0);
 	transition-delay: 0.25s;
 }
+
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-lecture[data-titre]:hover::after{
+	opacity: 1;
+	visibility: visible;
+	transform: translate(-50%, 0);
+	transition-delay: 0.25s;
+}
+}
+
 
 @media (prefers-reduced-motion: reduce) {
 	#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active { animation: none; background-image: none; }
@@ -377,8 +410,25 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored {
 	background: var(--tab-or);
 }
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:hover,
-#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:focus-visible {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:focus-visible{
 	background: var(--tab-or);
 	filter: brightness(1.1);
+}
+
+@media (hover: hover) {
+#neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.is-result.is-scored:hover{
+	background: var(--tab-or);
+	filter: brightness(1.1);
+}
+}
+
+
+/* Keep the app shell's high-specificity bead skin on the shared touch timing. */
+body.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab[data-nq-press-family] {
+  transition: transform var(--nq-press-release) var(--nq-press-easing),
+    box-shadow var(--nq-press-release) var(--nq-press-easing),
+    --nq-press-opacity var(--nq-press-release) var(--nq-press-easing);
+}
+body.is-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab[data-nq-pressed="true"] {
+  transition-duration: var(--nq-press-down);
 }

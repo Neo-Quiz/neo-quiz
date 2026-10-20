@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
+import android.os.Build
 import android.text.TextPaint
 import android.text.TextUtils
 import android.util.TypedValue
@@ -268,7 +269,14 @@ class NavBarView(context: Context) : LinearLayout(context) {
             }
             val mask = InsetDrawable(shape, insetX, insetTop, insetX, insetBottom)
             val ripple = ColorStateList.valueOf(NavBarMotion.withAlpha(colors.texte, RIPPLE_ALPHA))
-            foreground = RippleDrawable(ripple, null, mask)
+            foreground = RippleDrawable(ripple, null, mask).apply {
+                // Android 12's patterned ripple adds a separate white sparkle shader. Its
+                // public effect color controls that layer's alpha independently of the wave.
+                // Keep the bounded, theme-colored wave without the initial bright speckles.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setEffectColor(ColorStateList.valueOf(Color.TRANSPARENT))
+                }
+            }
         }
 
         override fun onDraw(canvas: Canvas) {

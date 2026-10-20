@@ -24,40 +24,46 @@
 	line-height: 1;
 }
 
-.qbd-btn:active { transform: scale(0.97); }
+.qbd-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) { transform: scale(0.97); }
 
 .qbd-root .qbd-btn--primary {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	box-shadow: 0 1px 10px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
 }
-
-.qbd-root .qbd-btn--primary:hover {
+@media (hover: hover) {
+.qbd-root .qbd-btn--primary:hover{
 	background: var(--interactive-accent-hover);
 	box-shadow: 0 2px 16px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
 }
+}
+
 
 .qbd-root .qbd-btn--ghost {
 	background: transparent;
 	color: var(--text-muted);
 	border: 1px solid var(--background-modifier-border);
 }
-
-.qbd-root .qbd-btn--ghost:hover {
+@media (hover: hover) {
+.qbd-root .qbd-btn--ghost:hover{
 	background: var(--background-modifier-hover, rgba(255,255,255,0.04));
 	border-color: var(--background-modifier-border-hover);
 	color: var(--text-normal);
 }
+}
+
 
 .qbd-root .qbd-btn--subtle {
 	background: transparent;
 	color: var(--text-muted);
 }
-
-.qbd-root .qbd-btn--subtle:hover {
+@media (hover: hover) {
+.qbd-root .qbd-btn--subtle:hover{
 	background: var(--background-modifier-hover, rgba(255,255,255,0.04));
 	color: var(--text-normal);
 }
+}
+
 
 .qbd-btn-icon {
 	display: flex;
@@ -158,16 +164,19 @@
 	padding: 0 !important;
 	border: none !important;
 	border-radius: 50%;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 	color: var(--text-muted) !important;
 	cursor: pointer;
 	transition: background-color 120ms, color 120ms;
 }
-.qbd-card-more:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+.qbd-card-more:hover{
+	background-color: var(--background-modifier-hover) !important;
 	color: var(--text-normal) !important;
 }
+}
+
 .qbd-card-more svg {
 	width: 18px;
 	height: 18px;
@@ -184,7 +193,7 @@
 	padding: 0 16px !important;
 	border: none !important;
 	border-radius: 18px;
-	background: var(--text-normal) !important;
+	background-color: var(--text-normal) !important;
 	color: var(--background-secondary) !important;
 	font-size: 13px;
 	font-weight: 600;
@@ -201,13 +210,16 @@
 /* StudySmarter hover (screenshots, 2026-07-18): the white pill turns light
    grey (#FFFFFF → #ECECED, ~7 % towards grey) — theme-aware by mixing the
    inverted background with the page surface. */
-.qbd-btn--create:hover {
-	background: color-mix(in srgb, var(--text-normal) 92%, var(--background-secondary)) !important;
+@media (hover: hover) {
+.qbd-btn--create:hover{
+	background-color: color-mix(in srgb, var(--text-normal) 92%, var(--background-secondary)) !important;
 }
+}
+
 
 /* Click: the face sinks onto its edge (100 ms ease-out, like `.qbd-cta3d`),
    and rises again on release. */
-.qbd-btn--create:active:not(:disabled) {
+.qbd-btn--create:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:disabled) {
 	transform: translateY(4px);
 	box-shadow: 0 0 0 0 var(--qbd-create-edge) !important;
 }
@@ -311,7 +323,7 @@
 	font: inherit;
 	font-size: 14px;
 	color: var(--text-normal);
-	background: var(--background-modifier-form-field) !important;
+	background-color: var(--background-modifier-form-field) !important;
 	border: 1px solid var(--background-modifier-border) !important;
 	border-radius: 10px;
 	box-shadow: none !important;
@@ -398,15 +410,18 @@
 	   sinon la `color` → l'icône devient grise au lieu de l'accent (la carte,
 	   elle, est un <div> et n'a pas ce souci). */
 	color: var(--mod-color, var(--interactive-accent)) !important;
-	background: color-mix(in oklab, var(--mod-color, var(--interactive-accent)) 22%, #181d2b) !important;
+	background-color: color-mix(in oklab, var(--mod-color, var(--interactive-accent)) 22%, #181d2b) !important;
 	border: 1px solid color-mix(in oklab, var(--mod-color, var(--interactive-accent)) 55%, #232939) !important;
 	transition: background 120ms, border-color 120ms;
 }
 .qbd-medit-icon-btn svg { width: 19px; height: 19px; }
-.qbd-medit-icon-btn:hover {
-	background: color-mix(in oklab, var(--mod-color, var(--interactive-accent)) 34%, #181d2b) !important;
+@media (hover: hover) {
+.qbd-medit-icon-btn:hover{
+	background-color: color-mix(in oklab, var(--mod-color, var(--interactive-accent)) 34%, #181d2b) !important;
 	border-color: var(--mod-color, var(--interactive-accent)) !important;
 }
+}
+
 /* Bouton Enregistrer pleine largeur, carte inversée theme-aware (le blanc
    sur sombre de StudySmarter, sans hex en dur). */
 .qbd-medit-save {
@@ -415,7 +430,7 @@
 	height: 40px;
 	border: none !important;
 	border-radius: 20px;
-	background: var(--text-normal) !important;
+	background-color: var(--text-normal) !important;
 	color: var(--background-secondary) !important;
 	font-weight: 600;
 	box-shadow: none !important;
@@ -440,7 +455,7 @@
 	padding: 12px 14px !important;
 	border: none !important;
 	border-radius: 12px;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 	color: inherit;
 	font: inherit;
@@ -452,10 +467,13 @@
 	transition: background-color 0.15s ease;
 }
 .qbd-create-option + .qbd-create-option { margin-top: 2px; }
+@media (hover: hover) {
 .qbd-root .qbd-create-option:hover,
-.qbd-create-option:hover {
-	background: color-mix(in oklab, var(--accent) 11%, transparent) !important;
+.qbd-create-option:hover{
+	background-color: color-mix(in oklab, var(--accent) 11%, transparent) !important;
 }
+}
+
 .qbd-create-option:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
@@ -471,9 +489,12 @@
 	background: color-mix(in oklab, var(--accent) 17%, transparent);
 	transition: background-color 0.15s ease;
 }
-.qbd-create-option:hover .qbd-create-option-icon {
+@media (hover: hover) {
+.qbd-create-option:hover .qbd-create-option-icon{
 	background: color-mix(in oklab, var(--accent) 26%, transparent);
 }
+}
+
 .qbd-create-option-icon svg { width: 21px; height: 21px; }
 .qbd-create-option-text { flex: 1; min-width: 0; }
 .qbd-create-option-title { font-size: 14.5px; font-weight: 650; color: var(--text-normal); overflow-wrap: anywhere; }
@@ -538,15 +559,17 @@
 	transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1), border-color 0.15s ease,
 		box-shadow 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
-
-.qbd-quiz-card.qbd-quiz-card--folder:hover {
+@media (hover: hover) {
+.qbd-quiz-card.qbd-quiz-card--folder:hover{
 	background: var(--card-bg);
 	border-color: var(--border-c);
 	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft);
 	transform: translateY(-3px);
 }
+}
 
-.qbd-quiz-card.qbd-quiz-card--folder:active {
+
+.qbd-quiz-card.qbd-quiz-card--folder:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) {
 	transform: translateY(-1px) scale(0.985);
 	transition-duration: 60ms;
 }
@@ -621,9 +644,12 @@
 	color: var(--accent, var(--interactive-accent));
 	transition: transform 160ms ease;
 }
-.qbd-quiz-card-type:hover .qbd-quiz-card-type-icon {
+@media (hover: hover) {
+.qbd-quiz-card-type:hover .qbd-quiz-card-type-icon{
 	transform: scale(1.3);
 }
+}
+
 .qbd-quiz-card-type-tip {
 	position: absolute;
 	left: -6px;
@@ -652,10 +678,13 @@
 	border: 5px solid transparent;
 	border-top-color: var(--background-modifier-border);
 }
-.qbd-quiz-card-type:hover .qbd-quiz-card-type-tip {
+@media (hover: hover) {
+.qbd-quiz-card-type:hover .qbd-quiz-card-type-tip{
 	opacity: 1;
 	transform: translateY(0);
 }
+}
+
 /* The date sits at the right edge of the card: its bubble opens leftwards. */
 .qbd-quiz-card-date-tip {
 	left: auto;
@@ -666,18 +695,24 @@
 	left: auto;
 	right: 10px;
 }
-.qbd-quiz-card-date:hover .qbd-quiz-card-date-tip {
+@media (hover: hover) {
+.qbd-quiz-card-date:hover .qbd-quiz-card-date-tip{
 	opacity: 1;
 	transform: translateY(0);
 }
+}
+
 /* Elle DISPARAÎT d'un coup et n'apparaît qu'en fondu (2026-09-25) : son
    fondu de sortie laissait, une fraction de seconde après que la souris a
    quitté la pastille, un « N questions » à moitié transparent flotter sur la
    carte — un fantôme sur une capture d'écran. */
+@media (hover: hover) {
 .qbd-quiz-card .qbd-quiz-card-type:not(:hover) .qbd-quiz-card-type-tip,
-.qbd-quiz-card .qbd-quiz-card-date:not(:hover) .qbd-quiz-card-date-tip {
+.qbd-quiz-card .qbd-quiz-card-date:not(:hover) .qbd-quiz-card-date-tip{
 	transition: none;
 }
+}
+
 .qbd-quiz-card--folder .qbd-quiz-card-meta-item .qbd-quiz-card-type-icon svg {
 	width: 14px;
 	height: 14px;
@@ -826,10 +861,12 @@
 	cursor: pointer;
 	transition: background-color 140ms ease;
 }
-
-.qbd-root .qbd-quiz-card-mode-btn:hover {
+@media (hover: hover) {
+.qbd-root .qbd-quiz-card-mode-btn:hover{
 	background: color-mix(in srgb, var(--text-normal) 14%, transparent);
 }
+}
+
 
 .qbd-root .qbd-quiz-card-mode-btn:focus-visible {
 	outline: 2px solid var(--qbd-state-progress);
@@ -865,7 +902,7 @@
 	padding: 0 !important;
 	border: none !important;
 	border-radius: 999px;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 	color: var(--quiz-primary);
 	cursor: pointer;
@@ -893,11 +930,14 @@
 	filter: drop-shadow(0 2px 0 var(--quiz-primary-edge));
 	transition: transform 100ms ease-out, filter 100ms ease-out;
 }
-.qbd-quiz-card-play:hover {
+@media (hover: hover) {
+.qbd-quiz-card-play:hover{
 	color: color-mix(in srgb, var(--quiz-primary) 85%, #fff) !important;
-	background: transparent !important; /* no disc on hover: the triangle alone reacts */
+	background-color: transparent !important; /* no disc on hover: the triangle alone reacts */
 }
-.qbd-quiz-card-play:active svg {
+}
+
+.qbd-quiz-card-play:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) svg {
 	transform: translateY(2px);
 	filter: drop-shadow(0 0 0 var(--quiz-primary-edge));
 }
@@ -908,7 +948,7 @@
 @media (prefers-reduced-motion: reduce) {
 	.qbd-quiz-card-play,
 	.qbd-quiz-card-play svg { transition: none; }
-	.qbd-quiz-card-play:active svg { transform: none; }
+	.qbd-quiz-card-play:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) svg { transform: none; }
 }
 
 /* ── LE BOUTON 3D de Brilliant (« Continue course »), dans le bleu des
@@ -955,13 +995,22 @@
 }
 /* Survol : la face s'éclaircit au lieu de pâlir (une face sombre qui
    devient translucide laisserait voir le fond au travers). */
-.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { opacity: 1; }
-.qbd-root .qbd-cta3d--neutre:hover:not(:disabled) { --qbd-cta3d-face: #36353f; }
+@media (hover: hover) {
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled){ opacity: 1; }
+}
+
+@media (hover: hover) {
+.qbd-root .qbd-cta3d--neutre:hover:not(:disabled){ --qbd-cta3d-face: #36353f; }
+}
+
 .qbd-cta3d--neutre .qbd-cta3d-face .qbd-btn-icon svg { fill: none; }
-:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d:hover:not(:disabled) {
+@media (hover: hover) {
+:is(.qbd-root, .qbd-setup-modal) .qbd-cta3d:hover:not(:disabled){
 	background: none;
 	opacity: 0.85;
 }
+}
+
 .qbd-cta3d-face {
 	position: relative;
 	display: flex;
@@ -983,7 +1032,7 @@
 }
 /* `.is-pressing` : l'enfoncement déclenché au clavier (Entrée), identique au clic. */
 .qbd-cta3d.is-pressing .qbd-cta3d-face,
-.qbd-cta3d:active:not(:disabled) .qbd-cta3d-face {
+.qbd-cta3d:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:disabled) .qbd-cta3d-face {
 	transform: none;
 	box-shadow: none;
 }

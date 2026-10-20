@@ -97,12 +97,14 @@
   transition: opacity 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
-.qbd-visionneuse-fermer:hover{
-  background: rgb(45 45 45 / 0.98);
-  opacity: 1;
+@media (hover: hover){
+    .qbd-visionneuse-fermer:hover{
+      background: rgb(45 45 45 / 0.98);
+      opacity: 1;
+    }
 }
 
-.qbd-visionneuse-fermer:active{
+.qbd-visionneuse-fermer:is(body:not(.is-mobile) :active){
   transform: scale(0.9);
 }
 
@@ -194,13 +196,15 @@
   display: none;
 }
 
-.qbd-visionneuse-fleche:hover{
-  background: rgb(255 255 255 / 0.2);
-  opacity: 1;
+@media (hover: hover){
+    .qbd-visionneuse-fleche:hover{
+      background: rgb(255 255 255 / 0.2);
+      opacity: 1;
+    }
 }
 
-.qbd-visionneuse-fleche:active,
-.qbd-visionneuse-outil:active{
+.qbd-visionneuse-fleche:is(body:not(.is-mobile) :active),
+.qbd-visionneuse-outil:is(body:not(.is-mobile) :active){
   transform: scale(0.9);
 }
 
@@ -232,10 +236,12 @@
   opacity: 0.8;
 }
 
-.qbd-visionneuse-outil:hover,
-.qbd-visionneuse-niveau:hover{
-  background: rgb(255 255 255 / 0.14);
-  opacity: 1;
+@media (hover: hover){
+    .qbd-visionneuse-outil:hover,
+    .qbd-visionneuse-niveau:hover{
+      background: rgb(255 255 255 / 0.14);
+      opacity: 1;
+    }
 }
 
 .qbd-visionneuse-fleche svg{ width: 20px; height: 20px; }

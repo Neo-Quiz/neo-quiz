@@ -86,7 +86,13 @@
               border-color var(--quiz-dur-fast) var(--quiz-ease-smooth);
 }
 
-.quiz-passage-toggle:hover,
+@media (hover: hover){
+    .quiz-passage-toggle:hover{
+      background: var(--background-modifier-hover);
+      border-color: var(--background-modifier-border);
+      color: var(--text-normal);
+    }
+}
 .quiz-passage-toggle:focus-visible{
   background: var(--background-modifier-hover);
   border-color: var(--background-modifier-border);

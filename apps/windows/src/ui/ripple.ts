@@ -1,100 +1,65 @@
-/* ══════════════════════════════════════════════════════════
-   TOUCH RIPPLE (Android app, touch-first devices only)
-
-   A Material-like press feedback without touching the tapped element's DOM
-   or styles: one clip box per press, appended to <body>, fixed over the
-   target's rectangle with the target's corner radius, holding a circle that
-   grows from the touch point (transform + opacity only, compositor-driven).
-   Nothing is inserted inside the target, so `:last-child`, flex gaps and
-   card layouts stay as they were.
-
-   Like Android's own ripple, it waits ~80 ms before showing: a touch that
-   becomes a scroll fires `pointercancel` (or moves past the slop) first and
-   shows nothing, so scrolling a list never flashes the cards under the finger.
-══════════════════════════════════════════════════════════ */
-
+/** Delegated mobile feedback. No overlay, timer, layout writes or DOM observer. */
 const TARGETS = [
-	"button:not(:disabled)",
-	"[role='button']:not([aria-disabled='true'])",
-	"a[href]",
-	"summary",
-	".qbd-nav-item:not(.qbd-nav-item--placeholder)",
-	".qbd-quiz-card",
-	".qbd-module-card",
-	".qbd-qz-card",
-	".qbd-fiche-card.is-editable",
-	".quiz-option",
+	"button", "a[href]", "summary", "input:not([type='hidden'])", "textarea", "select", "math-field",
+	"[role='button']", "[role='tab']", "[role='menuitem']", "[role='option']", "[role='switch']", "[role='checkbox']", "[contenteditable='true']",
+	"label:has(input)", ".qbd-nav-item", ".qbd-quiz-card", ".qbd-module-card", ".qbd-qz-card",
+	".qbd-fiche-card.is-editable", ".quiz-option", ".quiz-fc-card", ".quiz-tab", ".quiz-possibility", ".quiz-slot.filled", ".qb-toggle-wrap", ".qbd-medit-select", ".qb-terme",
+	".qbd-quizzes-node-head", ".qbd-setup-row:has([role='switch'])",
+	".qbd-model-picker-row", ".qbd-select-option", "[data-nq-press]",
 ].join(", ");
-
-const SHOW_DELAY_MS = 80;
+const DISABLED = ":disabled, [disabled], [aria-disabled='true'], [inert], .is-disabled, .qbd-nav-item--placeholder, .qbd-select-option--disabled, .qbd-model-option--disabled";
+const DEPTH = ".quiz-action-btn.success, .quiz-option, .quiz-tab, button.quiz-fc-card, .quiz-fc-rate, .quiz-possibility, .quiz-slot.filled, .qbd-btn--create, .qbd-quiz-card--folder, .qbd-cta3d, .qbd-quiz-card-play, .quiz-help-btn, .qz-explain-btn:not(.qz-explain-btn-icone), .quiz-question-nav .quiz-nav-btn";
+const FLAT = "input, textarea, select, math-field, label, [contenteditable='true'], [role='switch'], [role='checkbox'], [role='menuitem'], [role='option'], .qbd-model-picker-row, .qbd-select-option, .qbd-ai-model-pill, .qz-explain-btn-icone, summary, [role='tab'], [aria-expanded], .qbd-nav-item, .qbd-quizzes-node-head, .qbd-setup-row, .nq-set-ligne-lien, .nq-set-onglet, .nq-choix-option, .nq-menu-ligne, .qbd-create-option, .qbd-ai-composer-add, .qbd-ai-composer-send, .qbd-card-more, .qbd-sel-btn, .qbd-quiz-card-mode-btn, .qbd-medit-select, .qb-toggle-wrap, .quiz-fc-card, .qb-terme";
 const SLOP_PX = 10;
-const GROW_MS = 320;
-const FADE_MS = 260;
-const COLOR = "rgb(255 255 255 / 0.14)";
+
+/** Keep icon actions and rows still; an accessible name alone says nothing about geometry. */
+export function pressFamily(target: HTMLElement, reducedMotion: boolean): "layer" | "depth" | "scale" {
+	if (reducedMotion || target.closest(".modal, .quiz-hint-modal, .quiz-handin-modal, [role='dialog']")) return "layer";
+	if (target.matches(DEPTH)) return "depth";
+	if (target.matches(FLAT) || (target.matches("button, [role='button']") && !target.textContent?.trim())) return "layer";
+	return "scale";
+}
 
 export function installRipple(): void {
-	if (!window.matchMedia("(pointer: coarse)").matches) return;
-	if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-	let timer = 0;
-	let active: { clip: HTMLElement; dot: HTMLElement; grown: Promise<unknown> } | null = null;
-	let pending: { x: number; y: number; target: HTMLElement } | null = null;
-
-	const drop = (fade: boolean): void => {
-		window.clearTimeout(timer);
-		pending = null;
-		const shown = active;
+	let active: { target: HTMLElement; pointerId: number; x: number; y: number } | null = null;
+	const pointers = new Set<number>();
+	const clear = (): void => {
+		if (active) delete active.target.dataset.nqPressed;
 		active = null;
-		if (!shown) return;
-		if (!fade) { shown.clip.remove(); return; }
-		const out = shown.clip.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "linear", fill: "forwards" });
-		// Let the growth finish first so a quick tap still reads as a ripple.
-		void Promise.all([shown.grown, out.finished]).then(() => shown.clip.remove(), () => shown.clip.remove());
 	};
+	const reset = (): void => { clear(); pointers.clear(); };
+	const mobile = (): boolean => document.body.classList.contains("is-mobile");
 
-	const show = (): void => {
-		const p = pending;
-		pending = null;
-		if (!p || !p.target.isConnected) return;
-		const r = p.target.getBoundingClientRect();
-		if (r.width < 8 || r.height < 8) return;
-		const radius = getComputedStyle(p.target).borderRadius;
-		const clip = document.createElement("div");
-		clip.setAttribute("aria-hidden", "true");
-		Object.assign(clip.style, {
-			position: "fixed", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-			borderRadius: radius, overflow: "hidden", pointerEvents: "none", zIndex: "2147483000", contain: "strict",
-		});
-		const reach = Math.hypot(Math.max(p.x - r.left, r.right - p.x), Math.max(p.y - r.top, r.bottom - p.y));
-		const dot = document.createElement("div");
-		Object.assign(dot.style, {
-			position: "absolute", left: `${p.x - r.left - reach}px`, top: `${p.y - r.top - reach}px`,
-			width: `${reach * 2}px`, height: `${reach * 2}px`, borderRadius: "50%", background: COLOR, willChange: "transform",
-		});
-		clip.append(dot);
-		document.body.append(clip);
-		const grown = dot.animate([{ transform: "scale(0.15)" }, { transform: "scale(1)" }], { duration: GROW_MS, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" }).finished;
-		active = { clip, dot, grown };
-	};
-
-	document.addEventListener("pointerdown", (e) => {
-		drop(false);
-		if (e.pointerType !== "touch" || !(e.target instanceof Element)) return;
-		const target = e.target.closest<HTMLElement>(TARGETS);
-		if (!target) return;
-		pending = { x: e.clientX, y: e.clientY, target };
-		timer = window.setTimeout(show, SHOW_DELAY_MS);
+	document.addEventListener("pointerdown", (event) => {
+		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+		pointers.add(event.pointerId);
+		clear();
+		if (!mobile() || pointers.size !== 1 || !event.isPrimary || !(event.target instanceof Element)) return;
+		// Find the closest candidate BEFORE checking disabled state: a disabled child
+		// must never transfer its feedback to an enabled parent card.
+		const target = event.target.closest<HTMLElement>(TARGETS);
+		if (!target || target.closest(DISABLED) || target.matches(".quiz-is-locked .quiz-option, .quiz-learn-revealed .quiz-option, .quiz-possibility.used, .quiz-slot.correct, .quiz-slot.wrong, .quiz-is-locked .quiz-possibility, .quiz-is-locked .quiz-slot, .quiz-learn-revealed .quiz-possibility, .quiz-learn-revealed .quiz-slot")) return;
+		target.dataset.nqPressFamily = pressFamily(target, window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+		target.dataset.nqPressed = "true";
+		active = { target, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
 	}, { passive: true, capture: true });
 
-	document.addEventListener("pointermove", (e) => {
-		if (pending && Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > SLOP_PX) drop(false);
+	document.addEventListener("pointermove", (event) => {
+		if (active && !active.target.isConnected) clear();
+		if (active && event.pointerId === active.pointerId && Math.hypot(event.clientX - active.x, event.clientY - active.y) > SLOP_PX) clear();
 	}, { passive: true, capture: true });
-
-	const release = (): void => {
-		// A tap shorter than the delay still gets its ripple, shown at once.
-		if (pending) { window.clearTimeout(timer); show(); }
-		drop(true);
+	const release = (event: PointerEvent): void => {
+		pointers.delete(event.pointerId);
+		if (active?.pointerId === event.pointerId) clear();
 	};
 	document.addEventListener("pointerup", release, { passive: true, capture: true });
-	document.addEventListener("pointercancel", () => drop(false), { passive: true, capture: true });
+	document.addEventListener("pointercancel", release, { passive: true, capture: true });
+	for (const type of ["scroll", "contextmenu", "dragstart", "lostpointercapture"]) {
+		document.addEventListener(type, clear, { passive: true, capture: true });
+	}
+	window.addEventListener("blur", reset);
+	window.addEventListener("pagehide", reset);
+	window.addEventListener("popstate", reset);
+	window.addEventListener("hashchange", reset);
+	document.addEventListener("visibilitychange", () => { if (document.hidden) reset(); });
 }

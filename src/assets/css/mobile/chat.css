@@ -30,7 +30,7 @@
 	padding: 0;
 	border: none;
 	border-radius: 50%;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
 }
@@ -258,7 +258,7 @@
 	padding: 0;
 	border: none;
 	border-radius: 50%;
-	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	background-color: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
 }
@@ -279,7 +279,7 @@
 	width: 36px;
 	height: 36px;
 	border-radius: 50%;
-	background: var(--interactive-accent) !important;
+	background-color: var(--interactive-accent) !important;
 	color: var(--text-on-accent, #fff);
 }
 .is-mobile .qbd-ai-composer-send svg {
@@ -319,8 +319,8 @@
 .is-mobile .qbd-ai-pc-state[data-tone="error"] {
 	color: var(--text-error);
 }
-.is-mobile .qbd-ai-composer-pc[data-tone="ok"] { background: color-mix(in srgb, var(--interactive-accent) 16%, transparent) !important; }
-.is-mobile .qbd-ai-composer-pc[data-tone="error"] { background: color-mix(in srgb, var(--text-error) 16%, transparent) !important; }
+.is-mobile .qbd-ai-composer-pc[data-tone="ok"] { background-color: color-mix(in srgb, var(--interactive-accent) 16%, transparent) !important; }
+.is-mobile .qbd-ai-composer-pc[data-tone="error"] { background-color: color-mix(in srgb, var(--text-error) 16%, transparent) !important; }
 
 /* ── The PC window ── */
 .is-mobile .qbd-ai-pc-state {
@@ -349,7 +349,7 @@
 	min-height: 48px;
 	padding: 8px 4px;
 	border: none;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
 	text-align: left;
@@ -398,14 +398,12 @@
 	padding: 0 8px;
 	border: none;
 	border-radius: 6px;
-	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	background-color: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
 	font-size: 12px;
 	white-space: nowrap;
 }
-.is-mobile .qbd-ai-model-pill:hover { background: color-mix(in srgb, var(--text-normal) 14%, transparent) !important; }
-.is-mobile .qbd-ai-model-pill:active { background: color-mix(in srgb, var(--text-normal) 18%, transparent) !important; }
 .is-mobile .qbd-ai-model-pill[hidden] { display: none; }
 .is-mobile .qbd-ai-model-pill-logo,
 .is-mobile .qbd-ai-model-pill-chevron {
@@ -537,8 +535,6 @@
 	font-size: 14px;
 	text-align: left;
 }
-.is-mobile .qbd-model-picker-row:hover,
-.is-mobile .qbd-model-picker-row:active { background: color-mix(in srgb, var(--text-normal) 9%, transparent); }
 .is-mobile .qbd-model-picker-row-label {
 	flex: 1 1 auto;
 	min-width: 0;
@@ -564,7 +560,7 @@
 	padding: 0 16px;
 	border: none;
 	border-radius: 22px;
-	background: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
+	background-color: color-mix(in srgb, var(--text-normal) 9%, transparent) !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
 	font-size: 15px;
@@ -592,7 +588,7 @@
 }
 .is-mobile .qbd-ai-lateral.qbd-ai-drawer .qbd-ai-lateral-recherche {
 	border: none !important;
-	background: transparent !important;
+	background-color: transparent !important;
 	box-shadow: none !important;
 }
 

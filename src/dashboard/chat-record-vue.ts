@@ -1,3 +1,4 @@
+import { prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 /* ══════════════════════════════════════════════════════════
    A REQUEST OF THE RECORD, ON SCREEN
 
@@ -138,15 +139,17 @@ function peindreTravail(parent: HTMLElement, q: ChatRequest, runner: DeviceRef, 
 		let lu: Promise<Thread | null> | null = null;
 		let uneFois: ReturnType<typeof recordedOneShot> | null = null;
 		b.addEventListener("click", () => {
-			const ouvrir = !detail;
+			const ouvrir = b.getAttribute("aria-expanded") !== "true";
 			b.setAttribute("aria-expanded", String(ouvrir));
-			host.ui.setIcon(chevron, ouvrir ? "chevron-down" : "chevron-right");
-			if (!ouvrir) { detail?.remove(); detail = null; return; }
+			host.ui.setIcon(chevron, "chevron-right");
+			if (detail) { setDisclosureOpen(detail, ouvrir); return; }
 			const d = document.createElement("div");
 			d.className = "qbd-ai-transcript-detail qbd-ai-transcript-detail--anime";
 			b.after(d);
 			detail = d;
-			const racine = ajouter(d, "div", "qbd-work");
+			const content = prepareDisclosure(d, false);
+			const racine = ajouter(content, "div", "qbd-work");
+			setDisclosureOpen(d, true);
 			/* A one-shot call (Antigravity, Claude Code on an Ollama model...) kept
 			   its raw output: its transcript is rebuilt, a stopped one included
 			   (2026-10-19). Any other run is a live turn, read as a thread. */
@@ -160,14 +163,14 @@ function peindreTravail(parent: HTMLElement, q: ChatRequest, runner: DeviceRef, 
 					const texte = une.transcript.text.trim();
 					if (texte) ajouter(racine, "pre", "qbd-ai-transcript-reflexion", texte.length > 20000 ? texte.slice(0, 20000) + "…" : texte);
 					if (une.cancelled) ajouter(racine, "div", "qbd-ai-statut", t("ai.thread.stopped"));
-					else if (!bloc.el.children.length && !texte) ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable"));
+					else if (!bloc.el.children.length && !texte) ajouter(racine, "div", "qbd-ai-statut", t("ai.work.unavailable"));
 					return;
 				}
 				lu ??= recordedTurn(run).catch(() => null);
 				void lu.then(thread => {
 					if (detail !== d) return;
 					// Gone from the store (deleted, or never kept here): say so, keep the line.
-					if (!thread || !thread.items.length) { ajouter(d, "div", "qbd-ai-statut", t("ai.work.unavailable")); return; }
+					if (!thread || !thread.items.length) { ajouter(racine, "div", "qbd-ai-statut", t("ai.work.unavailable")); return; }
 					// Read-only: a recorded turn has no permission left to answer.
 					renderThread(racine, thread, { loadOutput: id => recordedToolOutput(run.runId, id), answer: () => {}, root: deps.racine?.() ?? undefined, openFile: deps.ouvrirFichier });
 				});

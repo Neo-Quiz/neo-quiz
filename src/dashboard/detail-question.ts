@@ -303,21 +303,32 @@ export function section(parent: HTMLElement, icon: string, label: string, open: 
 	// rien à révéler à l'ouverture.
 	const body = ajouter(wrap, "div", "qbd-qz-section-body");
 	const inner = ajouter(body, "div", "qbd-qz-section-inner");
+	body.inert = !open;
+	let timer = 0;
+	let cleanup: (() => void) | undefined;
 
 	head.addEventListener("click", () => {
+		window.clearTimeout(timer);
+		cleanup?.();
 		const collapsed = wrap.classList.contains("is-collapsed");
+		body.inert = !collapsed;
 		wrap.classList.add("is-animating");
 		wrap.classList.toggle("is-collapsed", !collapsed);
 		head.setAttribute("aria-expanded", String(collapsed));
 		onToggle?.(collapsed);
-		const stop = (): void => wrap.classList.remove("is-animating");
-		body.addEventListener("transitionend", function onEnd(e: TransitionEvent) {
+		const stop = (): void => {
+			window.clearTimeout(timer);
+			cleanup?.();
+			wrap.classList.remove("is-animating");
+		};
+		function onEnd(e: TransitionEvent): void {
 			if (e.target !== body || e.propertyName !== "grid-template-rows") return;
-			body.removeEventListener("transitionend", onEnd);
 			stop();
-		});
+		}
+		cleanup = () => body.removeEventListener("transitionend", onEnd);
+		body.addEventListener("transitionend", onEnd);
 		// Filet : transitionend ne part jamais en reduced-motion.
-		window.setTimeout(stop, 320);
+		timer = window.setTimeout(stop, 340);
 	});
 
 	return inner;

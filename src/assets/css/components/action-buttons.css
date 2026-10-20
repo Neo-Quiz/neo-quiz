@@ -33,8 +33,6 @@
     color var(--quiz-dur-fast) ease,
     opacity 120ms ease;
 }
-
-.quiz-action-btn:hover,
 .quiz-action-btn:focus-visible{
   outline: none;
   transform: translate3d(0,-2px,0);
@@ -44,7 +42,20 @@
     0 0 20px color-mix(in srgb, var(--quiz-primary) 14%, transparent);
 }
 
-.quiz-action-btn:active:not(:disabled){
+@media (hover: hover) {
+.quiz-action-btn:hover{
+  outline: none;
+  transform: translate3d(0,-2px,0);
+  border-color: color-mix(in srgb, var(--quiz-primary) 34%, var(--background-modifier-border));
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--quiz-primary) 18%, transparent),
+    0 0 20px color-mix(in srgb, var(--quiz-primary) 14%, transparent);
+}
+}
+
+
+
+.quiz-action-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:disabled){
   transform: translate3d(0,-1px,0) scale(0.992);
   transition-duration: 90ms;
 }
@@ -79,8 +90,6 @@
   box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
   transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease, opacity 120ms ease;
 }
-
-.quiz-action-btn.success:hover,
 .quiz-action-btn.success:focus-visible{
   background: var(--quiz-press-face-hover);
   border-color: transparent;
@@ -88,12 +97,23 @@
   box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
 }
 
+@media (hover: hover) {
+.quiz-action-btn.success:hover{
+  background: var(--quiz-press-face-hover);
+  border-color: transparent;
+  transform: none;
+  box-shadow: 0 var(--quiz-press-depth) 0 0 var(--quiz-press-edge);
+}
+}
+
+
+
 .quiz-action-btn.success:focus-visible{
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
 
-.quiz-action-btn.success:active:not(:disabled){
+.quiz-action-btn.success:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:disabled){
   transform: translateY(var(--quiz-press-depth));
   box-shadow: 0 0 0 0 var(--quiz-press-edge);
 }
@@ -122,13 +142,21 @@
   color: var(--text-error, #e5484d);
   border-color: color-mix(in srgb, var(--text-error, #e5484d) 34%, var(--background-modifier-border));
 }
-
-.quiz-action-btn.quiz-results-file-btn.is-delete:hover,
 .quiz-action-btn.quiz-results-file-btn.is-delete:focus-visible{
   border-color: color-mix(in srgb, var(--text-error, #e5484d) 64%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--text-error, #e5484d) 8%, var(--background-primary));
   box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-error, #e5484d) 18%, transparent);
 }
+
+@media (hover: hover) {
+.quiz-action-btn.quiz-results-file-btn.is-delete:hover{
+  border-color: color-mix(in srgb, var(--text-error, #e5484d) 64%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--text-error, #e5484d) 8%, var(--background-primary));
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-error, #e5484d) 18%, transparent);
+}
+}
+
+
 
 .quiz-action-btn.quiz-results-file-btn.is-deleted:disabled,
 .quiz-action-btn.quiz-results-file-btn.is-busy:disabled{
@@ -180,10 +208,13 @@
   height: 20px;
   stroke-width: 2.5;
 }
-
+@media (hover: hover) {
 .quiz-question-nav .quiz-nav-btn:hover:not(:disabled){
   background: var(--quiz-nav-face-hover);
 }
+}
+
+
 
 .quiz-question-nav .quiz-nav-btn:focus-visible{
   outline: 2px solid #fff;
@@ -191,7 +222,7 @@
 }
 
 /* La touche s'enfonce : la tranche disparaît, le bouton descend d'autant. */
-.quiz-question-nav .quiz-nav-btn:active:not(:disabled){
+.quiz-question-nav .quiz-nav-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:disabled){
   transform: translateY(var(--quiz-nav-depth));
   box-shadow: 0 0 0 0 var(--quiz-nav-edge);
 }

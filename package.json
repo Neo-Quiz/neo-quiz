@@ -128,6 +128,7 @@
     "check:phone-layout": "node scripts/check-phone-layout.mjs",
     "check:selection": "node scripts/check-selection.mjs",
     "check:model-picker": "node scripts/check-model-picker.mjs",
+    "check:mobile-press": "node scripts/check-mobile-press.mjs",
     "check:html-text": "node scripts/check-html-text.mjs",
     "check:pdf-sources": "node scripts/check-pdf-sources.mjs",
     "check:overscroll": "node scripts/check-overscroll.mjs",

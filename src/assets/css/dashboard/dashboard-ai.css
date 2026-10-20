@@ -380,8 +380,10 @@
 	cursor: pointer;
 }
 
-.qbd-model-manager-remove:hover {
-	color: var(--text-error);
+@media (hover: hover) {
+    .qbd-model-manager-remove:hover {
+        color: var(--text-error);
+    }
 }
 
 .qbd-model-manager-remove svg {
@@ -423,9 +425,11 @@
 	cursor: pointer;
 }
 
-.qbd-model-manager-chip:hover {
-	background-color: var(--background-modifier-hover) !important;
-	border-color: var(--interactive-accent);
+@media (hover: hover) {
+    .qbd-model-manager-chip:hover {
+        background-color: var(--background-modifier-hover) !important;
+        border-color: var(--interactive-accent);
+    }
 }
 
 .qbd-model-manager-chip-icon {
@@ -479,9 +483,11 @@
 	cursor: pointer;
 }
 
-.qbd-model-manager-manual-btn:hover {
-	background-color: var(--background-modifier-hover) !important;
-	border-color: var(--interactive-accent);
+@media (hover: hover) {
+    .qbd-model-manager-manual-btn:hover {
+        background-color: var(--background-modifier-hover) !important;
+        border-color: var(--interactive-accent);
+    }
 }
 
 /* Trigger : logo (le nom et le dot de statut vivent dans le menu et le
@@ -584,7 +590,13 @@
 	white-space: nowrap;
 	transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.1s ease, filter 0.1s ease;
 }
-.qbd-select-option .qbd-provider-install:hover,
+@media (hover: hover) {
+    .qbd-select-option .qbd-provider-install:hover {
+        background: var(--interactive-accent);
+        border-color: var(--interactive-accent);
+        color: var(--text-on-accent);
+    }
+}
 .qbd-select-option .qbd-provider-install:focus-visible {
 	background: var(--interactive-accent);
 	border-color: var(--interactive-accent);
@@ -593,7 +605,7 @@
 .qbd-select-option .qbd-provider-install:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* L'appui : le bouton s'enfonce et fonce d'un cran, puis le menu se ferme
    (délai dans `appendStatut`). */
-.qbd-select-option .qbd-provider-install:active,
+.qbd-select-option .qbd-provider-install:is(body:not(.is-mobile) :active),
 .qbd-select-option .qbd-provider-install.is-pressed {
 	transform: scale(0.93);
 	background: var(--interactive-accent);
@@ -605,7 +617,9 @@
 /* La ligne d'un fournisseur absent n'est pas une option qu'on choisit : ni
    main au survol, ni fond qui s'allume. */
 .qbd-select-option.qbd-select-option--inerte { cursor: default; }
-.qbd-select-option.qbd-select-option--inerte:hover { background: transparent; }
+@media (hover: hover) {
+    .qbd-select-option.qbd-select-option--inerte:hover { background: transparent; }
+}
 .qbd-provider-install-icon svg { width: 12px; height: 12px; }
 
 /* Options du fournisseur (2 lignes) : plus d'air, façon Notion Calendar */
@@ -769,14 +783,16 @@
    noire douce, micro-lift) avec un simple liseré accent adouci —
    la v1 tout-accent faisait « trop de bleu » (retour Ahmed), le gris
    --background-modifier-hover d'origine était terne. */
-.qbd-ai-hint-action:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
-	background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary)) !important;
-	transform: translateY(-1px);
-	box-shadow: 0 3px 8px -4px rgba(0, 0, 0, 0.4) !important;
+@media (hover: hover) {
+    .qbd-ai-hint-action:hover {
+        border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+        background: color-mix(in srgb, var(--text-normal) 6%, var(--background-primary)) !important;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px -4px rgba(0, 0, 0, 0.4) !important;
+    }
 }
 
-.qbd-ai-hint-action:active {
+.qbd-ai-hint-action:is(body:not(.is-mobile) :active) {
 	transform: translateY(0);
 	background: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary)) !important;
 	box-shadow: none !important;
@@ -824,7 +840,12 @@
    menu opened from the composer made it lose. Two tints (35 % on hover,
    55 % on focus) and a hover rule more specific than the focus one made
    the contour change with the mouse (2026-09-19). */
-.qbd-ai-composer:hover:not(.qbd-ai-composer--dragover),
+@media (hover: hover) {
+    .qbd-ai-composer:hover:not(.qbd-ai-composer--dragover) {
+        border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+    }
+}
 .qbd-ai-composer--actif:not(.qbd-ai-composer--dragover) {
 	border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
 	box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
@@ -837,7 +858,13 @@
 	box-shadow: 0 14px 40px -18px rgb(0 0 0 / 0.5);
 }
 
-.qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer:hover:not(.qbd-ai-composer--dragover),
+@media (hover: hover) {
+    .qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer:hover:not(.qbd-ai-composer--dragover) {
+        box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent),
+		0 10px 44px -10px color-mix(in srgb, var(--interactive-accent) 32%, transparent);
+    }
+}
 .qbd-ai-stage:has(> .qbd-ai-title-row) .qbd-ai-composer--actif:not(.qbd-ai-composer--dragover) {
 	box-shadow:
 		0 0 0 1px color-mix(in srgb, var(--interactive-accent) 8%, transparent),
@@ -860,9 +887,14 @@
 /* Obsidian assombrit les textarea au survol (textarea:hover →
    --background-modifier-form-field-hover, spécificité 0,1,1 > 0,1,0) :
    le champ du composer reste invisible dans sa carte, à tous les états. */
-.qbd-ai-composer-input:hover,
+@media (hover: hover) {
+    .qbd-ai-composer-input:hover {
+        background: transparent !important;
+        border: none;
+    }
+}
 .qbd-ai-composer-input:focus,
-.qbd-ai-composer-input:active {
+.qbd-ai-composer-input:is(body:not(.is-mobile) :active) {
 	background: transparent !important;
 	border: none;
 }
@@ -943,9 +975,11 @@
 	transition: color 0.14s ease, background 0.14s ease;
 }
 
-.qbd-ai-composer-add:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-composer-add:hover {
+        color: var(--text-normal);
+        background: var(--background-modifier-hover) !important;
+    }
 }
 
 .qbd-ai-composer-add svg {
@@ -1046,9 +1080,11 @@
 	font-size: 13.5px;
 }
 
-.qbd-ai-composer-tools .qbd-select:hover {
-	background: var(--background-modifier-hover) !important;
-	border-color: transparent;
+@media (hover: hover) {
+    .qbd-ai-composer-tools .qbd-select:hover {
+        background: var(--background-modifier-hover) !important;
+        border-color: transparent;
+    }
 }
 
 .qbd-ai-composer-tools .qbd-select[aria-expanded="true"] {
@@ -1088,11 +1124,13 @@
 	display: none;
 }
 
-.qbd-ai-composer-send:hover {
-	background: var(--interactive-accent-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-composer-send:hover {
+        background: var(--interactive-accent-hover) !important;
+    }
 }
 
-.qbd-ai-composer-send:active {
+.qbd-ai-composer-send:is(body:not(.is-mobile) :active) {
 	transform: scale(0.93);
 }
 
@@ -1101,8 +1139,10 @@
 	cursor: not-allowed;
 }
 
-.qbd-ai-composer-send--disabled:hover {
-	background: var(--interactive-accent) !important;
+@media (hover: hover) {
+    .qbd-ai-composer-send--disabled:hover {
+        background: var(--interactive-accent) !important;
+    }
 }
 
 .qbd-ai-composer-send-icon {
@@ -1454,13 +1494,19 @@
 	transition: opacity 0.15s ease, color 0.15s ease;
 }
 
-.qbd-ai-video-tile:hover .qbd-ai-video-tile-remove,
+@media (hover: hover) {
+    .qbd-ai-video-tile:hover .qbd-ai-video-tile-remove {
+        opacity: 1;
+    }
+}
 .qbd-ai-video-tile-remove:focus-visible {
 	opacity: 1;
 }
 
-.qbd-ai-video-tile-remove:hover {
-	color: var(--color-red, #f87171);
+@media (hover: hover) {
+    .qbd-ai-video-tile-remove:hover {
+        color: var(--color-red, #f87171);
+    }
 }
 
 .qbd-ai-video-tile-remove svg {
@@ -1495,13 +1541,19 @@
 		color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.qbd-ai-note-chip:hover > .qbd-ai-note-chip-remove,
+@media (hover: hover) {
+    .qbd-ai-note-chip:hover > .qbd-ai-note-chip-remove {
+        opacity: 1;
+    }
+}
 .qbd-ai-note-chip:focus-within > .qbd-ai-note-chip-remove {
 	opacity: 1;
 }
 
-.qbd-ai-note-chip-remove:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-note-chip-remove:hover {
+        color: var(--text-normal);
+    }
 }
 
 .qbd-ai-note-chip-remove svg {
@@ -1537,8 +1589,10 @@
 	right: -9px;
 }
 
-.qbd-ai-note-chip--prete.qbd-ai-note-chip--toggle:hover {
-	border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+@media (hover: hover) {
+    .qbd-ai-note-chip--prete.qbd-ai-note-chip--toggle:hover {
+        border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+    }
 }
 
 /* Sans image, le contenu garde ses 12 px de marge moins le liseré, et
@@ -1800,7 +1854,9 @@
 .mdp-task.is-done { color: var(--text-muted); text-decoration: line-through; }
 
 .mdp-link { color: var(--interactive-accent); text-decoration: none; }
-.mdp-link:hover { text-decoration: underline; }
+@media (hover: hover) {
+    .mdp-link:hover { text-decoration: underline; }
+}
 /* Un wikilink n'est plus un lien (il n'ouvre rien depuis cette page) : le
    texte reste dans le ton du paragraphe, pas dans l'accent d'un vrai lien. */
 .mdp-wikilink { color: inherit; }
@@ -1969,7 +2025,9 @@
 	   sur lesquels le curseur ne changeait pas. */
 	cursor: pointer;
 }
-.qbd-install-manual-row .qbd-quizzes-node-head:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+@media (hover: hover) {
+    .qbd-install-manual-row .qbd-quizzes-node-head:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
 .qbd-install-manual-row .qbd-quizzes-node-head { padding: 9px 6px; margin-left: -6px; }
 .qbd-install-manual-row .qbd-quizzes-node-chevron { flex: 0 0 auto; width: 16px; height: 16px; display: inline-flex; }
 .qbd-install-manual-row .qbd-quizzes-node-chevron svg { width: 16px; height: 16px; }
@@ -2029,8 +2087,10 @@
 /* Révélé au survol du bloc, au focus clavier, et tant que la confirmation
    « Copié » dure — sinon elle disparaîtrait avec la souris, juste au moment
    où elle a quelque chose à dire. */
-.qbd-install-code:hover .qbd-install-copy,
-.qbd-copy-host:hover .qbd-install-copy,
+@media (hover: hover) {
+    .qbd-install-code:hover .qbd-install-copy,
+    .qbd-copy-host:hover .qbd-install-copy { opacity: 1; }
+}
 .qbd-install-copy:focus-visible,
 .qbd-install-copy[data-copie] { opacity: 1; }
 /* Sans souris (tactile, futur hôte Android), rien ne le révélerait : il reste
@@ -2041,7 +2101,9 @@
 /* Room for the button at the end of the first lines: on a touch screen it is
    always shown and covered the end of the code (2026-10-19). */
 .qbd-copy-host > pre { padding-right: 44px; }
-.qbd-install-copy:hover { color: var(--text-normal); border-color: var(--interactive-accent); }
+@media (hover: hover) {
+    .qbd-install-copy:hover { color: var(--text-normal); border-color: var(--interactive-accent); }
+}
 .qbd-install-copy[data-copie] { color: var(--color-green, #4ade80); border-color: var(--color-green, #4ade80); }
 .qbd-install-copy .qbd-btn-icon { margin: 0; }
 .qbd-install-copy svg { width: 14px; height: 14px; }
@@ -2073,8 +2135,10 @@
 	font-weight: 600;
 	color: var(--text-muted);
 }
-.qbd-root .qbd-install-manual-row .qbd-quizzes-node-head:hover,
-.qbd-install-manual-row .qbd-quizzes-node-head:hover { color: var(--text-normal); background: transparent; }
+@media (hover: hover) {
+    .qbd-root .qbd-install-manual-row .qbd-quizzes-node-head:hover,
+    .qbd-install-manual-row .qbd-quizzes-node-head:hover { color: var(--text-normal); background: transparent; }
+}
 /* LE NOMBRE D'ÉTAPES, montré et non plus masqué (Ahmed, 2026-09-20) : replié,
    « Install manually » ne disait pas ce qu'il coûte ; le chiffre le dit avant
    qu'on ouvre. Même chip que les sections de « Mes quiz ». */
@@ -2086,7 +2150,9 @@
 .qbd-root .qbd-install-modal .qbd-quizzes-node-body,
 .qbd-install-modal .qbd-quizzes-node-body { padding: 0; }
 .qbd-install-learn { display: inline-flex; align-self: flex-start; margin-top: 14px; font-size: 13.5px; color: var(--interactive-accent); text-decoration: none; }
-.qbd-install-learn:hover { text-decoration: underline; }
+@media (hover: hover) {
+    .qbd-install-learn:hover { text-decoration: underline; }
+}
 
 /* ══════════════════════════════════════════════════════════
    LA MODALE D'INSTALLATION DE YT-DLP (vidéos YouTube, spec § 4)
@@ -2113,7 +2179,9 @@
 	font-size: 13.5px; line-height: 1.5;
 }
 .qbd-video-install-lien { color: var(--interactive-accent); text-decoration: none; }
-.qbd-video-install-lien:hover { text-decoration: underline; }
+@media (hover: hover) {
+    .qbd-video-install-lien:hover { text-decoration: underline; }
+}
 .qbd-video-install-lignes,
 .qbd-video-install-fixe { color: var(--text-muted); }
 .qbd-video-install-lignes:empty { display: none; }
@@ -2169,10 +2237,12 @@
 	font-size: 13px; font-weight: 600; cursor: pointer;
 	transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.qbd-video-install-annuler:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-	border-color: var(--background-modifier-border-hover);
+@media (hover: hover) {
+    .qbd-video-install-annuler:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+        border-color: var(--background-modifier-border-hover);
+    }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -2232,9 +2302,11 @@
 
 .qbd-ai-video-tile[data-etat="prete"] { cursor: pointer; }
 
-.qbd-ai-video-tile[data-etat="prete"]:hover {
-	border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
-	background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary));
+@media (hover: hover) {
+    .qbd-ai-video-tile[data-etat="prete"]:hover {
+        border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border));
+        background: color-mix(in srgb, var(--text-normal) 5%, var(--background-primary));
+    }
 }
 
 /* La bande de miniature : 16:9 approximatif d'une vignette YouTube, la
@@ -2350,7 +2422,9 @@
 	cursor: pointer;
 }
 
-.qbd-ai-video-tile-pilule:hover { opacity: 0.9; }
+@media (hover: hover) {
+    .qbd-ai-video-tile-pilule:hover { opacity: 0.9; }
+}
 .qbd-ai-video-tile-pilule svg { width: 13px; height: 13px; }
 
 /* « Réessayer » : secondaire — l'échec n'est pas une action proposée, c'est
@@ -2370,9 +2444,11 @@
 	transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.qbd-ai-video-tile-reessayer:hover {
-	border-color: var(--interactive-accent);
-	color: var(--interactive-accent);
+@media (hover: hover) {
+    .qbd-ai-video-tile-reessayer:hover {
+        border-color: var(--interactive-accent);
+        color: var(--interactive-accent);
+    }
 }
 
 /* La notice des autres liens (spec § 5.4) : une ligne discrète sous le
@@ -2520,19 +2596,34 @@
    sont réglés sur la LUMINANCE de son liseré (0,037), pas sur sa teinte —
    les deux produits n'ont pas le même bleu, et copier la teinte aurait fait
    entrer une couleur étrangère au thème pour un trait d'un pixel. */
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack-page,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack-page {
+        rotate: -1deg;
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack-page {
 	rotate: -1deg;
 	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
 }
 
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
+        transform: translateX(10px) rotate(3deg);
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
 	transform: translateX(10px) rotate(3deg);
 	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
 }
 
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
+        transform: translateX(5px) rotate(2deg);
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
 	transform: translateX(5px) rotate(2deg);
 	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
@@ -2580,13 +2671,22 @@
 	transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-caption-pages,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-caption-pages {
+        opacity: 0;
+        scale: 0.75;
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-caption-pages {
 	opacity: 0;
 	scale: 0.75;
 }
 
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-open,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-open {
+        opacity: 1;
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-open {
 	opacity: 1;
 }
@@ -2598,8 +2698,14 @@
    NÉGATIF sur l'élément et ses états, et non seulement omis : le bouton hérite
    d'une feuille de style d'agent utilisateur et de règles de lien plus larges.
    */
-.qbd-ai-preview-open,
-.qbd-ai-preview-open:hover,
+.qbd-ai-preview-open {
+	text-decoration: none;
+}
+@media (hover: hover) {
+    .qbd-ai-preview-open:hover {
+        text-decoration: none;
+    }
+}
 .qbd-ai-preview-open:focus,
 .qbd-ai-preview-open:focus-visible {
 	text-decoration: none;
@@ -2611,7 +2717,11 @@
 	transition: scale 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.qbd-ai-preview-pdf:hover .qbd-ai-preview-open-icon,
+@media (hover: hover) {
+    .qbd-ai-preview-pdf:hover .qbd-ai-preview-open-icon {
+        scale: 1;
+    }
+}
 .qbd-ai-preview-pdf:focus-within .qbd-ai-preview-open-icon {
 	scale: 1;
 }
@@ -2635,28 +2745,50 @@
 		transition: none;
 	}
 
-	.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack-page,
+	@media (hover: hover) {
+        .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack-page {
+            rotate: none;
+        }
+	}
 	.qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack-page {
 		rotate: none;
 	}
 
-	.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before,
+	@media (hover: hover) {
+        .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
+            transform: translateX(8px);
+        }
+	}
 	.qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
 		transform: translateX(8px);
 	}
 
-	.qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after,
+	@media (hover: hover) {
+        .qbd-ai-preview-pdf:hover .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
+            transform: translateX(4px);
+        }
+	}
 	.qbd-ai-preview-pdf:focus-within .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
 		transform: translateX(4px);
 	}
 
-	.qbd-ai-preview-open-icon,
-	.qbd-ai-preview-pdf:hover .qbd-ai-preview-open-icon,
+	.qbd-ai-preview-open-icon {
+		scale: 1;
+	}
+	@media (hover: hover) {
+        .qbd-ai-preview-pdf:hover .qbd-ai-preview-open-icon {
+            scale: 1;
+        }
+	}
 	.qbd-ai-preview-pdf:focus-within .qbd-ai-preview-open-icon {
 		scale: 1;
 	}
 
-	.qbd-ai-preview-pdf:hover .qbd-ai-preview-caption-pages,
+	@media (hover: hover) {
+        .qbd-ai-preview-pdf:hover .qbd-ai-preview-caption-pages {
+            scale: 1;
+        }
+	}
 	.qbd-ai-preview-pdf:focus-within .qbd-ai-preview-caption-pages {
 		scale: 1;
 	}
@@ -2707,13 +2839,15 @@
 	box-shadow: 0 2px 16px color-mix(in srgb, var(--interactive-accent) 35%, transparent);
 }
 
-.qbd-ai-generate-btn--active:hover {
-	background: var(--interactive-accent-hover);
-	box-shadow: 0 4px 20px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
-	transform: translateY(-1px);
+@media (hover: hover) {
+    .qbd-ai-generate-btn--active:hover {
+        background: var(--interactive-accent-hover);
+        box-shadow: 0 4px 20px color-mix(in srgb, var(--interactive-accent) 45%, transparent);
+        transform: translateY(-1px);
+    }
 }
 
-.qbd-ai-generate-btn--active:active {
+.qbd-ai-generate-btn--active:is(body:not(.is-mobile) :active) {
 	transform: translateY(0) scale(0.98);
 }
 
@@ -2873,7 +3007,7 @@
 	padding: 4px 0 0;
 	cursor: grab;
 }
-.qbd-ai-web-pile:active { cursor: grabbing; }
+.qbd-ai-web-pile:is(body:not(.is-mobile) :active) { cursor: grabbing; }
 
 /* TOUS LES FICHIERS RÉAGISSENT au survol de l'un d'eux (retour Ahmed
    2026-09-19 : « Drag all » sous une seule pile laissait croire qu'un seul
@@ -2885,26 +3019,40 @@
    (Ahmed, 2026-09-19 — « Glisser tout » sous chaque pile avait été essayé
    et retiré). */
 .qbd-ai-web-pile .qbd-ai-preview-open { white-space: nowrap; }
-.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack-page {
-	rotate: -1deg;
-	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+@media (hover: hover) {
+    .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack-page {
+        rotate: -1deg;
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
 }
-.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
-	transform: translateX(10px) rotate(3deg);
-	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+@media (hover: hover) {
+    .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before {
+        transform: translateX(10px) rotate(3deg);
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
 }
-.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
-	transform: translateX(5px) rotate(2deg);
-	border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+@media (hover: hover) {
+    .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after {
+        transform: translateX(5px) rotate(2deg);
+        border-color: color-mix(in oklab, var(--interactive-accent) 50%, #000);
+    }
 }
-.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-web-pile:not(:hover) .qbd-ai-web-pile-nom {
-	color: var(--interactive-accent);
+@media (hover: hover) {
+    .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-web-pile:not(:hover) .qbd-ai-web-pile-nom {
+        color: var(--interactive-accent);
+    }
 }
 .qbd-ai-web-pile-nom { transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), scale 0.15s cubic-bezier(0.4, 0, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack-page { rotate: none; }
-	.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before { transform: translateX(8px); }
-	.qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after { transform: translateX(4px); }
+	@media (hover: hover) {
+        .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack-page { rotate: none; }
+	}
+	@media (hover: hover) {
+        .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::before { transform: translateX(8px); }
+	}
+	@media (hover: hover) {
+        .qbd-ai-web-files:has(.qbd-ai-web-pile:hover) .qbd-ai-preview-stack.is-ready .qbd-ai-preview-sheet::after { transform: translateX(4px); }
+	}
 	.qbd-ai-web-pile-nom { transition: none; }
 }
 .qbd-ai-web-pile .qbd-ai-preview-stack {
@@ -2968,12 +3116,17 @@
 .qbd-web-wait-modal .modal-close-button.qbd-web-wait-close {
 	transition: background-color 0.1s ease, color 0.1s ease;
 }
-.qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:hover,
+@media (hover: hover) {
+    .qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:hover {
+        background: #c42b1c;
+        color: #fff;
+    }
+}
 .qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:focus-visible {
 	background: #c42b1c;
 	color: #fff;
 }
-.qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:active {
+.qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:is(body:not(.is-mobile) :active) {
 	background: rgba(196, 43, 28, 0.9);
 	color: rgba(255, 255, 255, 0.7);
 }
@@ -3009,9 +3162,11 @@
 	opacity: 0;
 	transition: opacity 0.08s linear;
 }
-.qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:hover::after {
-	opacity: 1;
-	transition-delay: 0.4s;
+@media (hover: hover) {
+    .qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:hover::after {
+        opacity: 1;
+        transition-delay: 0.4s;
+    }
 }
 .qbd-web-wait-modal .modal-close-button.qbd-web-wait-close:focus-visible::after {
 	opacity: 1;
@@ -3036,16 +3191,18 @@
 	font-family: var(--font-interface, inherit);
 	transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.08s ease;
 }
-.qbd-web-wait-modal .qbd-btn:active { transform: scale(0.97); }
+.qbd-web-wait-modal .qbd-btn:is(body:not(.is-mobile) :active) { transform: scale(0.97); }
 .qbd-web-wait-modal .qbd-btn--ghost {
 	background: transparent;
 	color: var(--text-muted);
 	border-color: var(--background-modifier-border);
 }
-.qbd-web-wait-modal .qbd-btn--ghost:hover {
-	background: var(--background-modifier-hover);
-	border-color: var(--background-modifier-border-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-web-wait-modal .qbd-btn--ghost:hover {
+        background: var(--background-modifier-hover);
+        border-color: var(--background-modifier-border-hover);
+        color: var(--text-normal);
+    }
 }
 .qbd-web-wait-modal .qbd-btn--primary {
 	background: var(--interactive-accent);
@@ -3053,9 +3210,11 @@
 	font-weight: 600;
 	box-shadow: 0 1px 10px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
 }
-.qbd-web-wait-modal .qbd-btn--primary:hover {
-	background: var(--interactive-accent-hover);
-	box-shadow: 0 2px 16px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+@media (hover: hover) {
+    .qbd-web-wait-modal .qbd-btn--primary:hover {
+        background: var(--interactive-accent-hover);
+        box-shadow: 0 2px 16px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+    }
 }
 .qbd-web-wait-modal .qbd-btn-icon svg { width: 14px; height: 14px; }
 
@@ -3259,8 +3418,10 @@
 	transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.qbd-web-warn-dismiss:hover input {
-	border-color: var(--text-muted);
+@media (hover: hover) {
+    .qbd-web-warn-dismiss:hover input {
+        border-color: var(--text-muted);
+    }
 }
 
 .qbd-web-warn-dismiss input:checked {
@@ -3413,9 +3574,11 @@
 	transition: border-color 0.15s ease;
 }
 
-.qbd-ai-result-item:hover {
-	border-color: var(--background-modifier-border-hover);
-	background: var(--background-modifier-hover, rgba(255,255,255,0.02));
+@media (hover: hover) {
+    .qbd-ai-result-item:hover {
+        border-color: var(--background-modifier-border-hover);
+        background: var(--background-modifier-hover, rgba(255,255,255,0.02));
+    }
 }
 
 @keyframes qbd-cin {
@@ -3647,9 +3810,11 @@
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
-.qbd-ai-usage-badge:hover {
-  color: var(--text-normal);
-  border-color: color-mix(in srgb, var(--text-normal) 26%, transparent);
+@media (hover: hover) {
+    .qbd-ai-usage-badge:hover {
+      color: var(--text-normal);
+      border-color: color-mix(in srgb, var(--text-normal) 26%, transparent);
+    }
 }
 
 /* Fournisseur muet sur ses compteurs : mention informative, pas un bouton. */
@@ -3948,9 +4113,11 @@
   transition: color 0.14s ease, background 0.14s ease;
 }
 
-.qbd-usage-refresh:hover:not(:disabled) {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-usage-refresh:hover:not(:disabled) {
+      color: var(--text-normal);
+      background: var(--background-modifier-hover) !important;
+    }
 }
 
 .qbd-usage-refresh svg {
@@ -4008,8 +4175,10 @@
 	cursor: pointer;
 }
 
-.qbd-ai-relay-btn:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-ai-relay-btn:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-ai-relay-btn--principal {
@@ -4097,7 +4266,7 @@
 }
 
 /* Press: sinks fast, and the hover wash brightens a little. */
-.qbd-ai-usage-line:active,
+.qbd-ai-usage-line:is(body:not(.is-mobile) :active),
 .qbd-ai-usage-line.is-pressed {
 	transform: scale(0.97);
 	transition: background-color 120ms ease, transform 90ms ease-out;
@@ -4132,14 +4301,18 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-ai-usage-line,
-	.qbd-ai-usage-line:active,
+	.qbd-ai-usage-line:is(body:not(.is-mobile) :active),
 	.qbd-ai-usage-line.is-pressed { transition: background-color 120ms ease; transform: none; }
 	.qbd-ai-usage-updated { transition: none; }
 	.qbd-usage-pop-refresh.is-reading svg,
 	.qbd-usage-pop-bar .qbd-ai-usage-fill.is-filling { animation: none; }
 }
 
-.qbd-ai-usage-line:hover,
+@media (hover: hover) {
+    .qbd-ai-usage-line:hover {
+        background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+    }
+}
 .qbd-ai-usage-line[aria-expanded="true"] {
 	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
 }
@@ -4264,9 +4437,11 @@
 	cursor: pointer;
 }
 
-.qbd-usage-pop-refresh:hover:not(:disabled) {
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-usage-pop-refresh:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-usage-pop-refresh:disabled {
@@ -4362,8 +4537,10 @@
 	border-radius: 6px;
 	transition: background-color 120ms ease, transform 120ms ease;
 }
-.qbd-usage-pop-group-toggle:not(:disabled):hover { background: var(--background-modifier-hover); }
-.qbd-usage-pop-group-toggle:not(:disabled):active { transform: scale(0.98); }
+@media (hover: hover) {
+    .qbd-usage-pop-group-toggle:not(:disabled):hover { background: var(--background-modifier-hover); }
+}
+.qbd-usage-pop-group-toggle:not(:disabled):is(body:not(.is-mobile) :active) { transform: scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-usage-pop-group,
@@ -4372,7 +4549,7 @@
 	.qbd-usage-pop-group-inner,
 	.qbd-usage-pop-group-chevron { transition: none; }
 	.qbd-usage-pop-group-body.is-folded .qbd-usage-pop-group-inner { transform: none; }
-	.qbd-usage-pop-group-toggle:not(:disabled):active { transform: none; }
+	.qbd-usage-pop-group-toggle:not(:disabled):is(body:not(.is-mobile) :active) { transform: none; }
 }
 
 /* The group title heads the block under the composer, on its own line. */
@@ -4497,7 +4674,9 @@
 .qbd-usage-reset-btn.is-primary,
 .qbd-usage-reset-row:not(.is-confirming) .qbd-usage-reset-btn { color: var(--interactive-accent); }
 
-.qbd-usage-reset-btn:hover:not(:disabled) { background: var(--background-modifier-hover) !important; }
+@media (hover: hover) {
+    .qbd-usage-reset-btn:hover:not(:disabled) { background: var(--background-modifier-hover) !important; }
+}
 .qbd-usage-reset-btn:disabled { opacity: 0.5; cursor: default; }
 
 .qbd-usage-reset-message {

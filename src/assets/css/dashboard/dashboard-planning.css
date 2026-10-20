@@ -64,7 +64,9 @@
 	cursor: pointer;
 	transition: background 0.15s ease, color 0.15s ease;
 }
-.qbd-root .qbd-planning-exam-add:hover { background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal); }
+@media (hover: hover) {
+    .qbd-root .qbd-planning-exam-add:hover { background: color-mix(in srgb, var(--text-normal) 8%, transparent); color: var(--text-normal); }
+}
 .qbd-root .qbd-planning-exam-add:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .qbd-planning-exam-add svg { width: 15px; height: 15px; }
 
@@ -81,11 +83,15 @@
 	padding: 10px;
 	border-radius: 10px;
 }
-.qbd-planning-exam-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+@media (hover: hover) {
+    .qbd-planning-exam-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+}
 /* A past exam is DONE: the row recedes, back to full on hover or focus
    (same idea as an answered question bead). */
 .qbd-planning-exam-row.is-past { opacity: 0.45; transition: opacity 0.15s ease; }
-.qbd-planning-exam-row.is-past:hover,
+@media (hover: hover) {
+    .qbd-planning-exam-row.is-past:hover { opacity: 1; }
+}
 .qbd-planning-exam-row.is-past:focus-within { opacity: 1; }
 /* Edit / Delete at the end of an exam row: ghost round icon buttons, like
    `.qbd-card-more`. !important beats the `.theme-dark button` chrome (0,1,1),
@@ -111,12 +117,16 @@
 	cursor: pointer;
 	transition: background-color 120ms, color 120ms;
 }
-.qbd-planning-exam-action:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
+@media (hover: hover) {
+    .qbd-planning-exam-action:hover {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal) !important;
+    }
 }
-.qbd-planning-exam-action--danger:hover {
-	color: var(--color-red, #f87171) !important;
+@media (hover: hover) {
+    .qbd-planning-exam-action--danger:hover {
+        color: var(--color-red, #f87171) !important;
+    }
 }
 .qbd-planning-exam-action:focus-visible {
 	outline: 2px solid var(--interactive-accent);
@@ -226,8 +236,10 @@
 	opacity: 0.6;
 	cursor: not-allowed;
 }
-.qbd-ai-composer--dossier .qbd-ai-composer-send:disabled:hover {
-	background: var(--qbd-glass-edge) !important;
+@media (hover: hover) {
+    .qbd-ai-composer--dossier .qbd-ai-composer-send:disabled:hover {
+        background: var(--qbd-glass-edge) !important;
+    }
 }
 
 /* ── Colonne de droite : tuiles verre, comme les tuiles de « Progression » ── */
@@ -412,7 +424,9 @@
 	cursor: pointer;
 	transition: color 200ms ease;
 }
-.qbd-planning-unit-btn:hover:not(.is-active) { color: var(--text-normal); }
+@media (hover: hover) {
+    .qbd-planning-unit-btn:hover:not(.is-active) { color: var(--text-normal); }
+}
 .qbd-planning-unit-btn.is-active {
 	color: var(--text-normal);
 	font-weight: 600;
@@ -438,8 +452,10 @@
 	background: var(--quiz-primary) !important;
 	color: #fff !important;
 }
-.qbd-medit-save.qbd-medit-save--primary:hover:not(:disabled) {
-	background: var(--quiz-primary-hover) !important;
+@media (hover: hover) {
+    .qbd-medit-save.qbd-medit-save--primary:hover:not(:disabled) {
+        background: var(--quiz-primary-hover) !important;
+    }
 }
 .qbd-medit-save.qbd-medit-save--primary:disabled {
 	opacity: 0.5;
@@ -488,9 +504,11 @@
 	transition: background-color 120ms, color 120ms;
 }
 .qbd-datepicker-nav svg { width: 16px; height: 16px; }
-.qbd-datepicker-nav:hover:not(:disabled) {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
+@media (hover: hover) {
+    .qbd-datepicker-nav:hover:not(:disabled) {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal) !important;
+    }
 }
 .qbd-datepicker-nav:disabled { opacity: 0.35; cursor: default; }
 .qbd-datepicker-grid {
@@ -520,8 +538,10 @@
 	cursor: pointer;
 	transition: background-color 120ms;
 }
-.qbd-datepicker-day:hover:not([aria-disabled="true"]):not([aria-selected="true"]) {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-datepicker-day:hover:not([aria-disabled="true"]):not([aria-selected="true"]) {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-datepicker-day--other { color: var(--text-faint) !important; }
 .qbd-datepicker-day--today { border-color: var(--text-muted) !important; }

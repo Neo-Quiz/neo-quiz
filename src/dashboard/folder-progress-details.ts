@@ -1,3 +1,4 @@
+import { prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import { currentHost } from "../host/current";
@@ -136,12 +137,14 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 	bloc.classList.toggle("is-open", ouverte);
 
 	const corps = ajouter(bloc, "div", "qbd-folder-attempts");
-	corps.hidden = !ouverte;
+
 	const tentatives = [...reelles.map(tt => ({ tentative: tt, enAttente: false })), ...attentes.map(tt => ({ tentative: tt, enAttente: true }))]
 		.sort((a, b) => b.tentative.date - a.tentative.date);
 	for (const { tentative, enAttente: attente } of tentatives) {
 		renderLigneTentative(corps, ctx, q, tentative, attente, enAttente, redessiner);
 	}
+
+	prepareDisclosure(corps, ouverte);
 
 	bouton.addEventListener("click", () => {
 		const maintenant = !ouvertes.has(cle);
@@ -149,7 +152,7 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 		else ouvertes.delete(cle);
 		bouton.setAttribute("aria-expanded", String(maintenant));
 		bloc.classList.toggle("is-open", maintenant);
-		corps.hidden = !maintenant;
+		setDisclosureOpen(corps, maintenant);
 	});
 }
 

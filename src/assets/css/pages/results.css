@@ -150,11 +150,13 @@
     box-shadow 100ms ease-out;
 }
 
-.quiz-submit-perle:hover{
-  background: var(--perle-face-hover);
+@media (hover: hover){
+    .quiz-submit-perle:hover{
+      background: var(--perle-face-hover);
+    }
 }
 
-.quiz-submit-perle:active{
+.quiz-submit-perle:is(body:not(.is-mobile) :active){
   transform: translateY(var(--perle-depth));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.09),
@@ -223,11 +225,13 @@
   flex-shrink: 0;
 }
 
-.quiz-submit-back:hover{
-  background: var(--back-face-hover);
+@media (hover: hover){
+    .quiz-submit-back:hover{
+      background: var(--back-face-hover);
+    }
 }
 
-.quiz-submit-back:active{
+.quiz-submit-back:is(body:not(.is-mobile) :active){
   transform: translateY(var(--back-depth));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.09),

@@ -72,8 +72,14 @@
 }
 
 /* The menu rows' hover, the same token (`.nq-menu-ligne:hover`). */
-.nq-zoom-bubble-step:hover:not(:disabled),
-.nq-zoom-bubble-reset:hover:not(:disabled),
+@media (hover: hover) {
+    .nq-zoom-bubble-step:hover:not(:disabled),
+    .nq-zoom-bubble-reset:hover:not(:disabled) {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+        outline: none;
+    }
+}
 .nq-zoom-bubble-step:focus-visible,
 .nq-zoom-bubble-reset:focus-visible {
 	background: var(--background-modifier-hover);
@@ -132,8 +138,10 @@
 	cursor: pointer;
 	transition: background-color 120ms ease-out, transform 120ms ease-out;
 }
-.nq-maj-toast-bouton:hover { background: var(--background-modifier-hover); }
-.nq-maj-toast-bouton:active { transform: scale(.98); }
+@media (hover: hover) {
+    .nq-maj-toast-bouton:hover { background: var(--background-modifier-hover); }
+}
+.nq-maj-toast-bouton:is(body:not(.is-mobile) :active) { transform: scale(.98); }
 .nq-maj-toast-bouton:disabled { opacity: .6; cursor: default; }
 .nq-maj-toast-fermer {
 	position: absolute;
@@ -150,7 +158,9 @@
 	color: var(--text-muted);
 	cursor: pointer;
 }
-.nq-maj-toast-fermer:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+@media (hover: hover) {
+    .nq-maj-toast-fermer:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+}
 .nq-maj-toast-fermer svg { width: 14px; height: 14px; }
 .nq-maj-toast-bouton:focus-visible, .nq-maj-toast-fermer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {

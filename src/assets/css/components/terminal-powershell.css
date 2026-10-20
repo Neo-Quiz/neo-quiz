@@ -35,9 +35,22 @@
   transition: none !important;
 }
 
-.quiz-command-shell.quiz-terminal-variant-powershell:hover,
-.quiz-command-shell.quiz-terminal-variant-powershell:focus-within,
-.quiz-command-shell[data-terminal-variant="powershell"]:hover,
+@media (hover: hover){
+    .quiz-command-shell.quiz-terminal-variant-powershell:hover{
+      border-color: #1f4c88;
+      box-shadow: none !important;
+    }
+}
+.quiz-command-shell.quiz-terminal-variant-powershell:focus-within{
+  border-color: #1f4c88;
+  box-shadow: none !important;
+}
+@media (hover: hover){
+    .quiz-command-shell[data-terminal-variant="powershell"]:hover{
+      border-color: #1f4c88;
+      box-shadow: none !important;
+    }
+}
 .quiz-command-shell[data-terminal-variant="powershell"]:focus-within{
   border-color: #1f4c88;
   box-shadow: none !important;
@@ -186,9 +199,22 @@
   box-shadow: none !important;
 }
 
-.theme-light .quiz-command-shell.quiz-terminal-variant-powershell:hover,
-.theme-light .quiz-command-shell.quiz-terminal-variant-powershell:focus-within,
-.theme-light .quiz-command-shell[data-terminal-variant="powershell"]:hover,
+@media (hover: hover){
+    .theme-light .quiz-command-shell.quiz-terminal-variant-powershell:hover{
+      border-color: #1f4c88 !important;
+      box-shadow: none !important;
+    }
+}
+.theme-light .quiz-command-shell.quiz-terminal-variant-powershell:focus-within{
+  border-color: #1f4c88 !important;
+  box-shadow: none !important;
+}
+@media (hover: hover){
+    .theme-light .quiz-command-shell[data-terminal-variant="powershell"]:hover{
+      border-color: #1f4c88 !important;
+      box-shadow: none !important;
+    }
+}
 .theme-light .quiz-command-shell[data-terminal-variant="powershell"]:focus-within{
   border-color: #1f4c88 !important;
   box-shadow: none !important;

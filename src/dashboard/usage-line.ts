@@ -1,3 +1,4 @@
+import { dismissOverlay } from "./disclosure-motion";
 import { ajouter } from "../dom";
 import { currentLang, t } from "../i18n";
 import { currentHost } from "../host/current";
@@ -441,7 +442,7 @@ export function mountUsageLine(parent: HTMLElement, tool: UsageTool, read: (tool
 	function closePop(): void {
 		if (!pop) return;
 		clearAccountMessage();
-		pop.remove();
+		dismissOverlay(pop);
 		pop = null;
 		stopSec();
 		el.setAttribute("aria-expanded", "false");

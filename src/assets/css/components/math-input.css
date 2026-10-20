@@ -204,7 +204,7 @@ body:has(.MLK__backdrop.is-dragging) {
 	touch-action: none;
 }
 
-.qbd-kb-handle:active {
+.qbd-kb-handle:is(body:not(.is-mobile) :active) {
 	cursor: grabbing;
 }
 
@@ -239,9 +239,11 @@ body:has(.MLK__backdrop.is-dragging) {
 	pointer-events: auto;
 }
 
-.qbd-kb-handle-close:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-kb-handle-close:hover {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal);
+    }
 }
 
 .qbd-kb-handle-close svg {

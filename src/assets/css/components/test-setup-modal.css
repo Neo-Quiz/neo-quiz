@@ -224,10 +224,14 @@
 }
 .qbd-setup-step-ico { display: inline-flex; }
 .qbd-setup-step-ico svg { width: 16px; height: 16px; }
-.qbd-setup-step:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
-.qbd-setup-step:active { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
+@media (hover: hover) {
+    .qbd-setup-step:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
+}
+.qbd-setup-step:is(body:not(.is-mobile) :active) { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
 .qbd-setup-step[aria-disabled="true"] { opacity: 0.35; cursor: default; }
-.qbd-setup-step[aria-disabled="true"]:hover { background: none; color: var(--text-muted); }
+@media (hover: hover) {
+    .qbd-setup-step[aria-disabled="true"]:hover { background: none; color: var(--text-muted); }
+}
 .qbd-setup-step:focus-visible {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 1px;
@@ -244,7 +248,9 @@
 	cursor: text;
 	transition: border-color 120ms, background-color 120ms;
 }
-.qbd-setup-value:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+@media (hover: hover) {
+    .qbd-setup-value:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+}
 .qbd-setup-value:focus-within {
 	border-color: var(--quiz-primary);
 	background: var(--background-modifier-form-field);

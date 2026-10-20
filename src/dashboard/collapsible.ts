@@ -56,7 +56,8 @@ export function wireCollapseToggle(
 		nodeEl.classList.add("is-animating");
 		const nowCollapsed = nodeEl.classList.toggle("is-collapsed");
 		head.setAttribute("aria-expanded", String(!nowCollapsed));
-		const body = nodeEl.querySelector(".qbd-quizzes-node-body");
+		const body = nodeEl.querySelector<HTMLElement>(".qbd-quizzes-node-body");
+		if (body) body.inert = nowCollapsed;
 		const stopAnim = () => {
 			window.clearTimeout(animTimer);
 			offEnd?.();
@@ -121,5 +122,6 @@ export function renderCollapsibleSection(
 	if (opts?.headRow && row !== nodeEl) opts.headRow(row);
 	wireCollapseToggle(deps, nodeEl, head, chev, key, opts?.defaultOpen ?? true);
 	const body = ajouter(nodeEl, "div", "qbd-quizzes-node-body");
+	body.inert = nodeEl.classList.contains("is-collapsed");
 	return ajouter(body, "div", "qbd-quizzes-node-clip");
 }

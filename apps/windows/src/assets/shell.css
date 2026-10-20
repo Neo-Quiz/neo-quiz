@@ -311,8 +311,10 @@ body::after {
 	font-size: 12.5px;
 }
 
-.nq-reglages-lien:hover {
-	text-decoration: underline;
+@media (hover: hover) {
+    .nq-reglages-lien:hover {
+        text-decoration: underline;
+    }
 }
 
 .nq-reglages-liste {
@@ -360,9 +362,11 @@ body::after {
 	transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.nq-fond-rangee:hover {
-	border-color: var(--text-accent);
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .nq-fond-rangee:hover {
+        border-color: var(--text-accent);
+        background: var(--background-modifier-hover);
+    }
 }
 
 .nq-reglages-icone {
@@ -448,9 +452,11 @@ body::after {
 	cursor: pointer;
 }
 
-.nq-reglages-changer:hover:not(:disabled) {
-	border-color: var(--text-accent);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .nq-reglages-changer:hover:not(:disabled) {
+        border-color: var(--text-accent);
+        color: var(--text-normal);
+    }
 }
 
 .nq-reglages-changer:disabled {
@@ -460,17 +466,26 @@ body::after {
 
 /* "Install" (Updates row, phone): the button turns BLUE once a version is on
    offer, the one action left to do there (2026-10-09). */
-.nq-reglages-changer.is-installer,
-.nq-reglages-changer.is-installer:hover:not(:disabled) {
+.nq-reglages-changer.is-installer {
 	border-color: var(--interactive-accent);
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	font-weight: 600;
 }
+@media (hover: hover) {
+    .nq-reglages-changer.is-installer:hover:not(:disabled) {
+        border-color: var(--interactive-accent);
+        background: var(--interactive-accent);
+        color: var(--text-on-accent);
+        font-weight: 600;
+    }
+}
 
-.nq-reglages-retirer:hover {
-	background: var(--background-modifier-border);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .nq-reglages-retirer:hover {
+        background: var(--background-modifier-border);
+        color: var(--text-normal);
+    }
 }
 
 .nq-reglages-retirer svg {
@@ -532,9 +547,11 @@ body::after {
 	transition: background-color 120ms ease-out, color 120ms ease-out;
 }
 
-.nq-set-onglet:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .nq-set-onglet:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 /* The current category: lit, and marked by a short accent bar on its left
@@ -775,8 +792,10 @@ label.nq-set-ligne {
 	padding: 8px 16px;
 }
 
-.nq-set .nq-fond-rangee:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .nq-set .nq-fond-rangee:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 /* ── Le fond d'écran (Réglages) ──
@@ -936,7 +955,12 @@ label.nq-set-ligne {
 	height: 16px;
 }
 
-.nq-comptes-action:hover:not(:disabled),
+@media (hover: hover) {
+    .nq-comptes-action:hover:not(:disabled) {
+        background: var(--background-modifier-hover);
+        outline: none;
+    }
+}
 .nq-comptes-action:focus-visible:not(:disabled) {
 	background: var(--background-modifier-hover);
 	outline: none;
@@ -966,7 +990,13 @@ label.nq-set-ligne {
 	height: 16px;
 }
 
-.nq-comptes-usage:hover,
+@media (hover: hover) {
+    .nq-comptes-usage:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+        outline: none;
+    }
+}
 .nq-comptes-usage:focus-visible {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
@@ -1143,8 +1173,10 @@ label.nq-set-ligne {
 	cursor: pointer;
 }
 
-.nq-fond-option:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .nq-fond-option:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .nq-fond-option[aria-selected="true"] {
@@ -1302,7 +1334,10 @@ label.nq-set-ligne {
    under the cross would look like Windows' red button, and that is not
    the reference. (The menu's chevron, which had one, is gone since
    2026-09-29: the rail's logo opens the menu.) */
-.nq-barre-controle:hover, .nq-barre-controle:focus-visible { color: #fff; }
+@media (hover: hover) {
+    .nq-barre-controle:hover { color: #fff; }
+}
+.nq-barre-controle:focus-visible { color: #fff; }
 .nq-barre-controle:focus-visible { outline: 1px solid color-mix(in srgb, var(--text-normal) 50%, transparent); outline-offset: -1px; }
 .nq-barre-controle svg { transition: opacity 100ms ease; filter: var(--nq-ombre-lisible-filtre); }
 /* The rail in the APP (2026-09-29): StudySmarter's effects (dashboard-nav.css)
@@ -1612,9 +1647,12 @@ label.nq-set-ligne {
 	-webkit-mask: url("./logo-rail.svg") center / contain no-repeat;
 	mask: url("./logo-rail.svg") center / contain no-repeat;
 }
-.nq-rail-logo:hover, .nq-rail-logo:focus-visible { opacity: 1; transform: scale(1.04); }
+@media (hover: hover) {
+    .nq-rail-logo:hover { opacity: 1; transform: scale(1.04); }
+}
+.nq-rail-logo:focus-visible { opacity: 1; transform: scale(1.04); }
 .nq-rail-logo[data-open] { opacity: 1; }
-.nq-rail-logo:active { transform: scale(0.96); }
+.nq-rail-logo:is(body:not(.is-mobile) :active) { transform: scale(0.96); }
 .nq-rail-logo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* THE UPDATE DOT (2026-10-10). Everything about updates happens in the menu
    this logo opens; the logo only says the menu has news: a dot while a
@@ -1638,7 +1676,10 @@ label.nq-set-ligne {
 .nq-rail-logo.is-maj-prete .nq-rail-logo-point { background: var(--interactive-accent); }
 @media (prefers-reduced-motion: reduce) {
 	.nq-rail-logo, .nq-rail-logo-point { transition: none; }
-	.nq-rail-logo:hover, .nq-rail-logo:active { transform: none; }
+	@media (hover: hover) {
+        .nq-rail-logo:hover { transform: none; }
+	}
+	.nq-rail-logo:is(body:not(.is-mobile) :active) { transform: none; }
 }
 
 /* ── LE MENU D'APPLICATION ── */
@@ -1723,7 +1764,10 @@ label.nq-set-ligne {
 .nq-menu-cli[hidden] { display: none; }
 .nq-menu-cli { padding: 0 6px 4px 6px; }
 .nq-menu-cli-ligne { display: flex; align-items: center; gap: 8px; width: 100%; height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
-.nq-menu-cli-ligne:hover:not(:disabled), .nq-menu-cli-ligne:focus-visible { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
+@media (hover: hover) {
+    .nq-menu-cli-ligne:hover:not(:disabled) { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
+}
+.nq-menu-cli-ligne:focus-visible { background: var(--background-modifier-hover); color: var(--text-normal); outline: none; }
 .nq-menu-cli-ligne:disabled { cursor: default; }
 .nq-menu-cli-ligne[data-phase="echec"] { color: var(--text-error); }
 .nq-menu-cli-logo { display: inline-flex; flex: none; width: 14px; height: 14px; }
@@ -1790,11 +1834,13 @@ label.nq-set-ligne {
 	border-radius: 999px;
 }
 
-*::-webkit-scrollbar-thumb:hover,
-.qbd-content::-webkit-scrollbar-thumb:hover,
-.qbd-ai-result-list::-webkit-scrollbar-thumb:hover {
-	background: var(--background-modifier-border-hover);
-	background-clip: padding-box;
+@media (hover: hover) {
+    *::-webkit-scrollbar-thumb:hover,
+    .qbd-content::-webkit-scrollbar-thumb:hover,
+    .qbd-ai-result-list::-webkit-scrollbar-thumb:hover {
+        background: var(--background-modifier-border-hover);
+        background-clip: padding-box;
+    }
 }
 
 /* L'angle entre une barre verticale et une horizontale : peint en gris par le
@@ -1881,8 +1927,10 @@ label.nq-set-ligne {
 	cursor: pointer;
 }
 
-.nq-langage-lien:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .nq-langage-lien:hover {
+        color: var(--text-normal);
+    }
 }
 
 .nq-langage-lien-debut {
@@ -1964,14 +2012,18 @@ label.nq-set-ligne {
 .nq-moodle-champ { flex: 1; justify-content: flex-end; }
 .nq-moodle-champ[hidden], .nq-moodle-lien[hidden] { display: none; }
 .nq-moodle-lien { border: 0; background: none; padding: 0; color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
-.nq-moodle-lien:hover { color: var(--text-normal); }
+@media (hover: hover) {
+    .nq-moodle-lien:hover { color: var(--text-normal); }
+}
 
 .nq-moodle-ecoles { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .nq-moodle-filtre { width: 100%; text-align: left; }
 .nq-moodle-ecoles-liste { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
 .nq-moodle-ecoles-liste > * + * { border-top: 1px solid var(--background-modifier-border); }
 .nq-moodle-ecole { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border: 0; background: none; color: var(--text-normal); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.nq-moodle-ecole:hover { background: var(--background-modifier-hover); }
+@media (hover: hover) {
+    .nq-moodle-ecole:hover { background: var(--background-modifier-hover); }
+}
 .nq-moodle-ecole.is-actif { box-shadow: inset 3px 0 0 var(--interactive-accent); font-weight: 600; }
 .nq-moodle-ecole-nom { flex: 1; min-width: 0; }
 .nq-moodle-ecole-autre { color: var(--text-muted); }

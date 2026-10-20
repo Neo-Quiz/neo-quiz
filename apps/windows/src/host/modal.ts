@@ -135,6 +135,7 @@ function ouvrir(spec: HostModalSpec): HostModalHandle {
 	function fermer(): void {
 		if (ferme) return;
 		ferme = true;
+		panneau.inert = true;
 		quitterPile();
 		/* `prefers-reduced-motion` : détachement immédiat, sans animation —
 		   sinon on attendrait 240 ms un `animationend` que le CSS partagé

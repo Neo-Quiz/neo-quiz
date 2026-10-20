@@ -10,7 +10,13 @@
   box-shadow: none !important;
 }
 
-.theme-light .quiz-action-btn:hover,
+@media (hover: hover){
+    .theme-light .quiz-action-btn:hover{
+      box-shadow:
+    0 0 0 1.5px var(--quiz-primary-ring-16),
+    0 0 16px var(--quiz-primary-ring-12) !important;
+    }
+}
 .theme-light .quiz-action-btn:focus-visible{
   box-shadow:
     0 0 0 1.5px var(--quiz-primary-ring-16),
