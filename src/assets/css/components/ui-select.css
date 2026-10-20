@@ -37,6 +37,12 @@
 	min-height: 32px;
 	height: auto;
 	padding: 5px 10px;
+}
+
+/* The display above beats the UA rule for `hidden`: a trigger hidden by code
+   (the Explain effort button for Antigravity) stayed on screen. */
+.qbd-select[hidden] {
+	display: none;
 	font-family: var(--font-interface, inherit);
 	font-size: 12.5px;
 	font-weight: 500;

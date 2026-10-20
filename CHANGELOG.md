@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Explain panel shows the Antigravity model in its composer, without a stray effort button, and the usage line under it keeps to that model from the first opening.
+
 ## [1.21.21] - 2026-10-20
 
 ### Changed

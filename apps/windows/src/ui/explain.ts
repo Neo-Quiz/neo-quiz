@@ -977,6 +977,15 @@ export function monterBoutonExpliquer(hote: HTMLElement, deps: {
 				etat.peindrePieces = () => { if (!composer.isConnected) return; etat.jointes.peindre(piecesZone); majEnvoi(); };
 				etat.peindrePieces();
 				void detecterDefaut().then(() => { if (fournisseurBtn.isConnected) peindreOutils(); });
+				/* Antigravity's model list is otherwise only loaded by the Generate page:
+				   opened first, the panel showed an empty model chip and the usage line
+				   every model group. Same seed (last launch's list), then `agy models`. */
+				const gardee = deps.settings.get().aiAntigravityModels;
+				if (gardee && gardee.length) aiProviders.seedAntigravityModels(gardee);
+				if (courant === "antigravity-cli") {
+					peindreOutils();
+					void aiProviders.refreshAntigravityModels().then(() => { if (modeleBtn.isConnected && courant === "antigravity-cli") peindreOutils(); });
+				}
 				fournisseurBtn.addEventListener("click", () => {
 					const masques = deps.settings.get().aiCanauxPayantsMasques;
 					const brands = (): ProviderBrandOption[] => aiProviders.MARQUES
