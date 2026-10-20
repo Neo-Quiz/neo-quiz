@@ -36,14 +36,14 @@ export interface DetailsProgression {
    compte comme « en cours » : pas encore acquis.
 ══════════════════════════════════════════════════════════ */
 
-/** La moyenne d'avancement du dossier (anneau de Progression ET de Planning) :
-    « maîtrisé » compte pour 100, sinon le pourcentage de progression — mêmes
-    deux tuiles à s'accorder, jamais deux formules qui divergent. */
-export function moyenneDossier(inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>): number {
+/** Mean folder progress for Progress, Planning and Home: mastered quizzes
+    count as 100, otherwise use completion. Unfinished work lives in the
+    session snapshot until the attempt ends, just as on the quiz cards. */
+export function moyenneDossier(inModule: QuizIndexEntry[], stats: Record<string, QuizStatRecord>, sessionOf?: DashboardShellCtx["sessionOf"]): number {
 	if (inModule.length === 0) return 0;
 	let somme = 0;
 	for (const quiz of inModule) {
-		const { state, pct } = computeQuizState(quiz, stats[quiz.path]);
+		const { state, pct } = computeQuizState(quiz, stats[quiz.path], sessionOf?.(quiz.path) ?? null);
 		somme += state === "mastered" ? 100 : pct;
 	}
 	return Math.round(somme / inModule.length);
@@ -53,12 +53,12 @@ export function renderFolderProgress(parent: HTMLElement, inModule: QuizIndexEnt
 	const total = inModule.length;
 	let masteredN = 0, enCoursN = 0, freshN = 0;
 	for (const quiz of inModule) {
-		const { state } = computeQuizState(quiz, stats[quiz.path]);
+		const { state } = computeQuizState(quiz, stats[quiz.path], details.ctx.sessionOf?.(quiz.path) ?? null);
 		if (state === "mastered") masteredN++;
 		else if (state === "fresh") freshN++;
 		else enCoursN++;
 	}
-	const moyenne = moyenneDossier(inModule, stats);
+	const moyenne = moyenneDossier(inModule, stats, details.ctx.sessionOf);
 
 	const vue = ajouter(parent, "div", "qbd-folder-progress");
 

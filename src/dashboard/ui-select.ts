@@ -17,9 +17,11 @@ type CloseFn = () => void;
 
 const openMenus = new Map<CloseFn, HTMLElement | null>();
 
-/* Ferme tous les menus ouverts (appelé à chaque re-render). */
-export function closeAllSelects(): void {
-	for (const close of Array.from(openMenus.keys())) close();
+/** Closes all floating menus; reports whether any consumed the dismissal. */
+export function closeAllSelects(): boolean {
+	const menus = Array.from(openMenus.keys());
+	for (const close of menus) close();
+	return menus.length > 0;
 }
 
 /** Toggle : si un menu/popover portalé est DÉJÀ ouvert pour cette ancre (le

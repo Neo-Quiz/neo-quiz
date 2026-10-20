@@ -102,11 +102,10 @@ function renderLigneCours(parent: HTMLElement, ctx: DashboardShellCtx, quiz: Qui
 	return ligne;
 }
 
-/** Un mode d'un cours : barre + pourcentage, et si des tentatives existent
-    (réelles ou en attente d'annulation), la pastille « Meilleur » et le
-    chevron qui déplie leur liste. */
+/** A course mode: progress bar and percentage, then its best score and
+    expandable history when attempts exist (including pending deletions). */
 function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizIndexEntry, rec: QuizStatRecord | undefined, ouvertes: Set<string>, enAttente: EnAttenteAnnulation, redessiner: () => void): void {
-	const { state, pct } = computeQuizState(q, rec);
+	const { state, pct } = computeQuizState(q, rec, ctx.sessionOf?.(q.path) ?? null);
 	const valeur = state === "mastered" ? 100 : pct;
 	const bloc = ajouter(parent, "div", "qbd-folder-course-mode-bloc");
 	const ligne = ajouter(bloc, "div", "qbd-folder-course-mode");

@@ -19,6 +19,7 @@ const { window, document } = parseHTML("<html><body></body></html>");
 globalThis.window = window;
 globalThis.document = document;
 globalThis.HTMLElement = window.HTMLElement;
+globalThis.CustomEvent = window.CustomEvent;
 window.innerWidth = 400;
 window.innerHeight = 800;
 // Reduced motion: the panel leaves the DOM at once instead of after its 150 ms fade.
@@ -28,7 +29,8 @@ window.requestAnimationFrame = (f) => { cadres.push(f); return cadres.length; };
 window.cancelAnimationFrame = () => {};
 const viderCadres = () => { while (cadres.length) cadres.shift()(0); };
 
-await withSrcModule(["src/dashboard/ui-select.ts", "src/host/current.ts"], async (S, H) => {
+await withSrcModule(["src/dashboard/ui-select.ts", "src/host/current.ts",
+	"apps/windows/src/ui/retour-android.ts", "apps/windows/src/ui/historique-nav.ts"], async (S, H, B, N) => {
 	const r = makeReporter("Model picker (phone)");
 	H.installHost({ ui: { setIcon(el, name) { el.dataset.icon = name; } } });
 
@@ -130,6 +132,57 @@ await withSrcModule(["src/dashboard/ui-select.ts", "src/host/current.ts"], async
 	window.dispatchEvent(new window.Event("resize"));
 	viderCadres();
 	r.check("nothing reopens after a close", !!panneau(), false);
+
+	// Android Back must consume the floating layer before its modal, page or activity.
+	const select = S.createSelect(document.body, {
+		value: "name", options: [{ value: "name", label: "Name" }],
+	});
+	const menus = [
+		["select", () => select.el.click(), ".qbd-select-menu"],
+		["action menu", () => S.openActionMenu(pill, [{ icon: "pencil", label: "Rename" }]), ".qbd-action-menu"],
+		["model picker", ouvrir, ".qbd-model-picker"],
+	];
+	for (const [name, open, selector] of menus) {
+		for (const layer of ["history", "modal", "root"]) {
+			const history = N.creerHistorique((a, b) => a === b);
+			let page = "folder";
+			let requests = 0;
+			if (layer !== "root") history.enregistrer("home");
+			const onBack = (event) => {
+				requests++;
+				if (!history.peutReculer() || !B.prendreRetour(event)) return;
+				page = history.reculer(page);
+			};
+			document.addEventListener(B.EVENEMENT_RETOUR, onBack);
+			const modal = document.createElement("div");
+			modal.className = "modal-container";
+			const close = document.createElement("button");
+			close.className = "modal-close-button";
+			close.addEventListener("click", () => modal.remove());
+			modal.append(close);
+			if (layer === "modal") document.body.append(modal);
+
+			open();
+			r.check(`${name} above ${layer}: the menu is open`, !!document.querySelector(selector), true);
+			r.check(`${name} above ${layer}: Back is consumed`, B.retourAndroid(), true);
+			r.check(`${name} above ${layer}: only the menu closes`,
+				[!!document.querySelector(selector), modal.isConnected, page, requests],
+				[false, layer === "modal", "folder", 0]);
+			if (layer === "modal") {
+				r.check(`${name}: the next Back closes the underlying modal`,
+					[B.retourAndroid(), modal.isConnected, page, requests], [true, false, "folder", 0]);
+			}
+			if (layer !== "root") {
+				r.check(`${name} above ${layer}: the next Back navigates once`,
+					[B.retourAndroid(), page, requests], [true, "home", 1]);
+			}
+			r.check(`${name} above ${layer}: empty history lets the activity finish`, B.retourAndroid(), false);
+			S.closeAllSelects();
+			modal.remove();
+			document.removeEventListener(B.EVENEMENT_RETOUR, onBack);
+		}
+	}
+	select.el.remove();
 
 	r.done();
 });
