@@ -15,6 +15,7 @@ release notes.
 
 ### Fixed
 
+- Classify newly created empty folders by their real modification date in Recent folders.
 - Fix folder progress, course rows, planning and home bars ignoring unfinished quiz sessions.
 - Android Back closes an open action menu or picker before leaving the folder, closing the window beneath it or exiting the app.
 
