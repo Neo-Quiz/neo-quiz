@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.21] - 2026-10-20
+
 ### Changed
 
 - A Learn never asks a question before its lesson: a generated Learn has none, and in an older one such a question comes after the reading again.
