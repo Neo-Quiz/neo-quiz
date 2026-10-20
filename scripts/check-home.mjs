@@ -193,3 +193,59 @@ await withSrcModule(["src/dashboard/home.ts", "src/host/current.ts"], async (Hom
 	Host.uninstallHost();
 	r.done();
 });
+
+// Session-only progress must agree across folder views before any attempt ends.
+await withSrcModule([
+	"src/dashboard/folder-progress.ts", "src/dashboard/folder-planning.ts",
+	"src/dashboard/home-folders.ts", "src/host/current.ts",
+], (Progress, Planning, HomeFolders, Host) => {
+	const r = makeReporter("Folder progress — live sessions across views");
+	Host.installHost({ ui: { setIcon: () => {} } });
+	const quiz = { path: "Course/Live.md", title: "Live Learn", mode: "learn", questions: 10 };
+	const group = { name: "Course", folder: "Course", quizzes: [quiz] };
+	let live = { question: 3, answered: 2, total: 10, ecrite: 1 };
+	const ctx = {
+		sessionOf: () => live, statsStore: { getAll: () => ({}) },
+		navigate: () => {}, openQuiz: () => {},
+	};
+	const details = { ctx, group, map: {}, quizzes: [quiz], rerender: () => {}, folder: "Course" };
+	const render = (stats = {}) => {
+		const root = document.createElement("main");
+		const progress = Progress.renderFolderProgress(root, [quiz], stats, details);
+		const planning = Planning.renderFolderPlanning(root, [quiz], [quiz], stats, details);
+		HomeFolders.renderHomeFolder(root, ctx, { group, name: "Course", tasks: [], nextExam: null }, stats, 0);
+		return { root, progress, planning };
+	};
+	const snapshot = (stats) => {
+		const { root, progress, planning } = render(stats);
+		return {
+			progress: progress.querySelector(".qbd-ring").getAttribute("aria-label"),
+			planning: planning.querySelector(".qbd-ring").getAttribute("aria-label"),
+			course: progress.querySelector(".qbd-folder-course-pct").textContent,
+			home: root.querySelector(".qbd-homef-bar-fill").style.width,
+			counts: ["done", "progress", "fresh"].map(tone => progress.querySelector(".qbd-folder-progress-tile--" + tone + " b").textContent),
+		};
+	};
+	r.check("a session without stats appears in every folder aggregate", snapshot(),
+		{ progress: "20%", planning: "20%", course: "20%", home: "20%", counts: ["0", "1", "0"] });
+	live = { ...live, answered: 7 };
+	r.check("a later render reads the current session snapshot", snapshot().progress, "70%");
+	live = { ...live, answered: 10 };
+	r.check("an open fully answered session is not mastered", snapshot(),
+		{ progress: "99%", planning: "99%", course: "99%", home: "99%", counts: ["0", "1", "0"] });
+	live = { ...live, answered: 2 };
+	const completed = { [quiz.path]: { questionsDone: 10, totalQuestions: 10, bestScore: 90, attempts: 1, lastPlayed: 1, tentatives: [{ date: 1, pct: 90 }] } };
+	r.check("completed mastery takes precedence over a live retry", snapshot(completed),
+		{ progress: "100%", planning: "100%", course: "100%", home: "100%", counts: ["1", "0", "0"] });
+	completed[quiz.path].bestScore = 40;
+	completed[quiz.path].tentatives[0].pct = 40;
+	r.check("a completed low score remains under review", snapshot(completed),
+		{ progress: "100%", planning: "100%", course: "100%", home: "100%", counts: ["0", "1", "0"] });
+	r.check("folder averages include a fresh sibling with session progress",
+		Progress.moyenneDossier([quiz, { ...quiz, path: "Course/Fresh.md" }], {}, path => path === quiz.path ? live : null), 10);
+	live = null;
+	r.check("without a live session or stats the quiz is fresh", snapshot(),
+		{ progress: "0%", planning: "0%", course: "0%", home: "0%", counts: ["0", "0", "1"] });
+	Host.uninstallHost();
+	r.done();
+});

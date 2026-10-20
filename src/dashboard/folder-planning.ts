@@ -390,9 +390,9 @@ export function renderFolderPlanning(
 		renderComposerDossier(emplacement, ctx, details.folder);
 	}
 
-	// ── Colonne droite : anneau, étape suivante, modes ──
+	// Right column: progress ring and next step.
 	const dues = duesDuDossier(ctx, inModule);
-	const moyenne = moyenneDossier(inModule, stats);
+	const moyenne = moyenneDossier(inModule, stats, ctx.sessionOf);
 	const masteredN = inModule.filter(q => computeQuizState(q, stats[q.path]).state === "mastered").length;
 	const anneauTuile = ajouter(droite, "div", "qbd-planning-ring-tile");
 	renderProgressRing(anneauTuile, moyenne, masteredN === inModule.length && inModule.length > 0 ? "done" : moyenne > 0 ? "progress" : "fresh", 88, 7);
