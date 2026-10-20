@@ -2038,6 +2038,9 @@
 @media (hover: none) {
 	.qbd-install-copy { opacity: 1; }
 }
+/* Room for the button at the end of the first lines: on a touch screen it is
+   always shown and covered the end of the code (2026-10-19). */
+.qbd-copy-host > pre { padding-right: 44px; }
 .qbd-install-copy:hover { color: var(--text-normal); border-color: var(--interactive-accent); }
 .qbd-install-copy[data-copie] { color: var(--color-green, #4ade80); border-color: var(--color-green, #4ade80); }
 .qbd-install-copy .qbd-btn-icon { margin: 0; }
