@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.20] - 2026-10-20
+
 ### Changed
 
 - "Report a bug" opens an issue with nothing to fill in: you just describe the problem, and the app and Windows versions are added at the bottom.
