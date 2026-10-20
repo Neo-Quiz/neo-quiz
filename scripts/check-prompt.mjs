@@ -45,7 +45,8 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	], [true, false]);
 	r.check("le code d'une phrase va entre backticks, dans les deux modes (sinon __init__ s'affiche en gras)",
 		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes("goes between backticks in EVERY text field")), [true, true]);
-	r.check("Learn : chaque pré-question a un indice", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("It also has \"hint\": a clue that lets someone who has NOT read"), true);
+	// 2026-10-20: no pre-question any more (never a question before the lesson), so no pre-question hint either.
+	r.check("Learn: no pre-question hint left", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("It also has \"hint\": a clue that lets someone who has NOT read"), false);
 	r.check("mode absent = Practice", composerPrompts("x", {}).systemPrompt.includes("MODE: PRACTICE"), true);
 	const plan = [{ slice: 1, titre: "Types" }, { slice: 2, titre: "Listes" }];
 	r.check("Practice : le plan des tranches part dans la demande",
@@ -56,10 +57,12 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes('"flashcard": true')), [true, false]);
 	/* Spec 2026-10-07-learn-scroll §5: a generated Learn is tap-only. */
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
-	r.check("Learn: per step one etapes reading with a worked example (code and what it prints), 2 MCQ questions (first may be pre), at most 1 flashcard",
+	r.check("Learn: per step one etapes reading with a worked example (code and what it prints), 2 MCQ questions, never one before the reading, at most 1 flashcard",
 		['"lecture" is "etapes"', '"etapes" lists 2 to 4 SHORT paragraphs', "fully WORKED EXAMPLE", "WHAT IT PRINTS (or its result) written right under the line that prints it", '"retenir"',
-			"2 MCQ questions per slice in all, the optional \"pre\" one counted", "ONE OR SEVERAL correct answers", "3 to 5 options", "The first question of the slice is easy", "at most ONE FLASHCARD per slice",
-			"ONLY when the slice brings a genuinely NEW idea"].filter(p => !learnP.includes(p)), []);
+			"2 MCQ questions per slice, each with \"role\": \"recall\"", "ONE OR SEVERAL correct answers", "3 to 5 options", "The first question of the slice is easy", "at most ONE FLASHCARD per slice",
+			"NO QUESTION BEFORE THE READING"].filter(p => !learnP.includes(p)), []);
+	/* 2026-10-20: never a question before the lesson (owner's rule): no "pre" role is ever asked for. */
+	r.check("Learn: no question before the reading", [learnP.includes('"role": "pre", asked BEFORE'), learnP.includes("ONLY when the slice brings a genuinely NEW idea")], [false, false]);
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
 	/* 2026-10-14: a recommended maximum, no longer a wall: a reading may go past it when its notion needs it. */
 	r.check("Learn: a reading aims under 1800 characters, a recommended maximum it may exceed, written in the prompt",
@@ -145,7 +148,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 			[p.includes("The learner can open it BEFORE any attempt"), /after a (first )?wrong attempt/i.test(p)], [true, false]);
 	}
 	r.check("Learn: every single-choice question has a hint",
-		learnP.includes("EVERY MCQ question of the path has \"hint\", pre and recall alike"), true);
+		learnP.includes("EVERY MCQ question of the path has \"hint\";"), true);
 	/* 2026-10-14: a notion explained through notions not yet taught (an f-string
 	   as `+` with `str()`) left the learner lost; the example comes first, then
 	   the contrast, never a numbered row of definitions. */

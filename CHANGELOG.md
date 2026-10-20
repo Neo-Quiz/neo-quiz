@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- A Learn never asks a question before its lesson: a generated Learn has none, and in an older one such a question comes after the reading again.
+
 ## [1.21.20] - 2026-10-20
 
 ### Changed
@@ -23,6 +27,7 @@ release notes.
 - Generated interactive pages are smaller and laid out across the width, and the AI picks the best form for each notion among all of them (one control and its effect, two cases compared, steps, sorting, reveal, predict then see, timeline, diagram...).
 - Quotes written as a quote callout (`> [!quote]`) show centred in italics with their author under them, and generated Learns may end a reading with a real quote that sums it up.
 - A quiz card's menu is shorter: Questions, Subject, Rename and Duplicate now sit under Edit.
+- In a Learn, a question asked before a step's reading now opens the step's page instead of sitting under the reading that answers it.
 
 ### Fixed
 
