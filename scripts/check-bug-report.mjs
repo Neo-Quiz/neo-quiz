@@ -132,7 +132,7 @@ await withSrcModule(["src/bug-report-form.ts"], (F) => {
 await withSrcModule(["apps/windows/src/ui/menu-app-arbre.ts"], (M) => {
 	const r = makeReporter("Bug report menu");
 	r.check("menu: chooseBugReportRoute", [M.chooseBugReportRoute(false), M.chooseBugReportRoute(true)], ["url", "form"]);
-	r.check("menu: urlSignalement output is pinned", M.urlSignalement("1.2.3", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140", "15.0.0"), "https://github.com/Neo-Quiz/neo-quiz/issues/new?body=**App%20version%3A**%201.2.3%0A**System%3A**%20Windows%2011%0A%0A%23%23%20What%20happened%0A%0A%0A%23%23%20Steps%20to%20reproduce%0A%0A1.%20%0A%0A%23%23%20Expected%0A%0A");
+	r.check("menu: urlSignalement output is pinned", M.urlSignalement("1.2.3", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140", "15.0.0"), "https://github.com/Neo-Quiz/neo-quiz/issues/new?body=%3C!--%20Describe%20the%20problem%20in%20your%20own%20words%2C%20in%20any%20language.%20--%3E%0A%0A%0A%0A---%0ANeo%20Quiz%201.2.3%20%C2%B7%20Windows%2011%0A");
 	r.done();
 });
 
