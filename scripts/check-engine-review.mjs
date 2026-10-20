@@ -25,7 +25,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
 await withSrcModule(
 	["src/engine/state.ts", "src/quiz-ids.ts", "src/engine/text-only.ts", "src/engine/learn.ts", "src/engine/learn-loop.ts", "src/engine/lesson.ts", "src/engine/step-page.ts"],
-	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }, { createLessonHandlers, buildLessonModel }, { buildStepSlides, isTapType, stepBeadState, stepMembers }) => {
+	async ({ createStateHandlers }, { idsForRawItems }, { createTextOnlyHandlers }, { createLearnHandlers }, { emptyLearnState }, { createLessonHandlers, buildLessonModel }, { buildStepSlides, isTapType, stepBeadState }) => {
 	/**
 	 * Construit un ctx minimal, avec le câblage croisé réel des méthodes
 	 * aplaties (même pattern qu'engine.ts).
@@ -966,15 +966,6 @@ await withSrcModule(
 				{ step: 2, reads: [3], questions: [2, 4] },
 				{ step: 3, reads: [], questions: [5] },
 			]);
-
-		/* 2026-10-19: a "pre" question is asked BEFORE the reading, so it
-		   opens its page; the others follow the reading. */
-		const avecPre = [{ ...qcm("p", 1), role: "pre" }, read("r", 1), qcm("q", 1)];
-		const pagePre = buildStepSlides(avecPre, buildLessonModel(avecPre, "lesson"))[0];
-		r.check("a pre question opens its page, before the reading", stepMembers(pagePre), [0, 1, 2]);
-		const preApres = [read("r", 1), qcm("q", 1), { ...qcm("p", 1), role: "pre" }];
-		r.check("a pre question written after its reading still comes first", stepMembers(buildStepSlides(preApres, buildLessonModel(preApres, "lesson"))[0]), [2, 0, 1]);
-		r.check("without a pre question, the reading comes first", stepMembers(pages[1]), [3, 2, 4]);
 
 		const noSlice = [qcm("x"), qcm("y"), qcm("z")];
 		r.check("a Learn without any slice keeps one page per question",

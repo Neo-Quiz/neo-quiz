@@ -15,9 +15,6 @@ export interface StepSlide {
 	step: number;
 	reads: number[];
 	questions: number[];
-	/** The step's "pre" questions, a subset of `questions`: asked BEFORE the
-	    reading (2026-10-19), so they come first on the page. */
-	pres?: number[];
 }
 
 /**
@@ -30,28 +27,20 @@ export function buildStepSlides(questions: readonly QuizQuestion[], lesson: Less
 	if (!lesson.isLesson) {
 		return questions.map((_, qi) => ({ step: qi + 1, reads: [], questions: [qi] }));
 	}
-	const split = (indexes: number[], step: number): StepSlide => {
-		const pres = indexes.filter(qi => lesson.roleOf(qi) === "pre");
-		return {
-			step,
-			reads: indexes.filter(qi => lesson.roleOf(qi) === "read"),
-			questions: indexes.filter(qi => lesson.roleOf(qi) !== "read"),
-			...(pres.length ? { pres } : {}),
-		};
-	};
+	const split = (indexes: number[], step: number): StepSlide => ({
+		step,
+		reads: indexes.filter(qi => lesson.roleOf(qi) === "read"),
+		questions: indexes.filter(qi => lesson.roleOf(qi) !== "read"),
+	});
 	const pages = lesson.slices.map(s => split(s.questionIndexes, s.index));
 	const loose = questions.map((_, qi) => qi).filter(qi => lesson.sliceOf(qi) === null);
 	if (loose.length > 0) pages.push(split(loose, lesson.slices.length + 1));
 	return pages;
 }
 
-/** The cards of a page in the order they are shown: its "pre" questions
-    first (a pre question is asked BEFORE the notion is taught: shown under
-    the reading, its answer sat right above it, 2026-10-19), then the
-    readings, then the other questions. */
+/** The cards of a page in the order they are shown: readings first. */
 export function stepMembers(step: StepSlide): number[] {
-	const pres = step.pres ?? [];
-	return [...pres, ...step.reads, ...step.questions.filter(qi => !pres.includes(qi))];
+	return [...step.reads, ...step.questions];
 }
 
 /**
