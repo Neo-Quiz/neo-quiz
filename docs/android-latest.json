@@ -1,8 +1,8 @@
 {
-  "versionCode": 37,
-  "versionName": "0.2.35",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.35/NeoQuiz-0.2.35.apk",
-  "sha256": "5788a39b9a651239357d548066eaf662e3d91d39e3634c275dd79bcf18038c34",
-  "size": 56209797,
-  "notes": "Phone display fixes (code blocks, formulas, cards, settings rows), flat hand-in window, and the French interface now says « tu » everywhere."
+  "versionCode": 38,
+  "versionName": "0.2.36",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.36/NeoQuiz-0.2.36.apk",
+  "sha256": "62eb4931d43c9984389bf23f250589add6e05da4d530ead94f4c023150afb048",
+  "size": 56210341,
+  "notes": "Review your answers before a generation starts."
 }
