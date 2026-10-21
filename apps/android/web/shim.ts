@@ -351,6 +351,7 @@ const pont: Pont = {
 			}
 		},
 		desinstaller: async () => ({ ok: false, code: "inconnu" }),
+		supprimerTout: async () => ({ ok: false, code: "io" }),
 	},
 
 	langages: {

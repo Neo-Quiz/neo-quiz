@@ -1178,6 +1178,8 @@ export interface Pont {
 		etat(): Promise<EtatPython>;
 		installer(paquets: string[], surProgression: (recus: number, total: number) => void): Promise<{ ok: true } | { ok: false; code: "reseau" | "empreinte" | "echec" }>;
 		desinstaller(paquet: string): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
+		/** Uninstalls every library, then the interpreter. */
+		supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
 	};
 
 	langages: {
@@ -1390,6 +1392,7 @@ export const CANAUX = {
 	pythonInstaller: "neo:python/installer",
 	pythonDesinstaller: "neo:python/desinstaller",
 	pythonProgression: "neo:python/progression",
+	pythonSupprimerTout: "neo:python/supprimer-tout",
 	langagesEtat: "neo:langages/etat",
 	langagesInstaller: "neo:langages/installer",
 	langagesSupprimer: "neo:langages/supprimer",

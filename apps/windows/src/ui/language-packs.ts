@@ -17,11 +17,12 @@
 import { pont } from "../host/pont";
 import { PAGES_PACKS } from "../../electron/pont";
 import { langageActif, reglerLangageActif } from "../host/code";
+import { estMobile } from "../host/platform";
 import { currentHost } from "../../../../src/host/current";
 import { t } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 
-type Pack = "python" | "c";
+type Pack = "c";
 
 /** Bytes as whole megabytes, the unit a 120 MB pack is read in. */
 function megaOctets(octets: number): number {
@@ -30,9 +31,9 @@ function megaOctets(octets: number): number {
 
 function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean): void {
 	const row = ajouter(section, "div", "nq-reglages-dossier nq-langage");
-	currentHost().ui.setIcon(ajouter(row, "span", "nq-reglages-icone"), pack === "python" ? "file-code-2" : "file-code");
+	currentHost().ui.setIcon(ajouter(row, "span", "nq-reglages-icone"), "file-code");
 	const text = ajouter(row, "div", "nq-reglages-texte");
-	ajouter(text, "span", "nq-reglages-nom", t(pack === "python" ? "settings.languages.python" : "settings.languages.c"));
+	ajouter(text, "span", "nq-reglages-nom", t("settings.languages.c"));
 	const state = ajouter(text, "span", "nq-reglages-chemin");
 	const source = ajouter(text, "span", "nq-reglages-chemin nq-langage-source");
 	ajouter(source, "span", "nq-langage-source-nom", t("settings.languages.source"));
@@ -119,8 +120,126 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 	void draw();
 }
 
+/** Megabytes for the Python lists: one decimal under 10 MB, whole above. */
+function megaOctetsPrecis(octets: number): string {
+	const mo = octets / 1_000_000;
+	return mo < 10 ? (Math.round(mo * 10) / 10).toFixed(1) : String(Math.round(mo));
+}
+
+/* The NATIVE Python (`pont().python`): the managed interpreter, then one
+   plain line per installed library. Libraries download by themselves the
+   first time a block imports them; here they can only be removed, a library
+   that other installed ones need being refused (button off, the line says by
+   whom). On the phone Python runs on the PC, so the row is a single line. */
+function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void {
+	const row = ajouter(section, "div", "nq-reglages-dossier nq-langage nq-python");
+	currentHost().ui.setIcon(ajouter(row, "span", "nq-reglages-icone"), "file-code-2");
+	const text = ajouter(row, "div", "nq-reglages-texte");
+	ajouter(text, "span", "nq-reglages-nom", t("settings.languages.python"));
+	const state = ajouter(text, "span", "nq-reglages-chemin");
+	if (estMobile()) {
+		state.textContent = t("settings.python.onPc");
+		return;
+	}
+
+	const run = ajouter(row, "label", "nq-langage-interrupteur");
+	const toggle = ajouter(run, "input", "nq-set-interrupteur");
+	toggle.type = "checkbox";
+	toggle.setAttribute("role", "switch");
+	toggle.setAttribute("aria-label", t("settings.languages.run"));
+	toggle.checked = langageActif("python");
+	toggle.addEventListener("change", () => {
+		void reglerLangageActif("python", toggle.checked).catch(() => { toggle.checked = langageActif("python"); });
+	});
+
+	const slot = ajouter(row, "div", "nq-langage-action");
+	const remove = ajouter(slot, "button", "qbd-sync-action qbd-sync-action-danger");
+	remove.type = "button";
+	remove.hidden = true;
+	remove.setAttribute("aria-label", t("settings.languages.delete"));
+	currentHost().ui.setIcon(remove, "trash-2");
+	const download = ajouter(slot, "button", "qbd-sync-action nq-langage-telecharger");
+	download.type = "button";
+	download.hidden = true;
+	download.setAttribute("aria-label", t("settings.languages.download"));
+	const downloadIcon = ajouter(download, "span", "nq-langage-telecharger-icone");
+	currentHost().ui.setIcon(downloadIcon, "download");
+	const percentLabel = ajouter(download, "span", "nq-langage-pourcent");
+	percentLabel.hidden = true;
+
+	const libs = ajouter(section, "div", "nq-python-libs");
+
+	function refuse(code: string): void {
+		currentHost().ui.notice(t(code === "occupe" ? "settings.python.busy" : "settings.python.failed"));
+	}
+
+	remove.addEventListener("click", () => {
+		remove.disabled = true;
+		void pont().python.supprimerTout().then(res => { if (!res.ok && !isDestroyed()) refuse(res.code); }, () => { if (!isDestroyed()) refuse("io"); }).then(draw);
+	});
+	download.addEventListener("click", () => {
+		download.disabled = true;
+		downloadIcon.hidden = true;
+		percentLabel.hidden = false;
+		percentLabel.textContent = "0%";
+		void pont().python.installer([], (received, total) => {
+			if (isDestroyed()) return;
+			const percent = Math.floor((received * 100) / Math.max(1, total));
+			state.textContent = t("settings.languages.downloading", { percent });
+			percentLabel.textContent = percent + "%";
+		}).then(result => {
+			if (isDestroyed()) return;
+			if (!result.ok) currentHost().ui.notice(t(result.code === "empreinte" ? "settings.languages.refused" : "settings.languages.offline"));
+			return draw();
+		}, () => { if (!isDestroyed()) { currentHost().ui.notice(t("settings.languages.offline")); void draw(); } });
+	});
+
+	async function draw(): Promise<void> {
+		const st = await pont().python.etat().catch(() => ({ interprete: false, version: null, paquets: [], octetsTotal: 0 }));
+		if (isDestroyed()) return;
+		remove.hidden = !st.interprete;
+		remove.disabled = false;
+		download.hidden = st.interprete;
+		download.disabled = false;
+		downloadIcon.hidden = false;
+		percentLabel.hidden = true;
+		state.textContent = st.interprete
+			? t("settings.languages.installed", { version: st.version ?? "", size: megaOctetsPrecis(st.octetsTotal) })
+			: t("settings.languages.notInstalled");
+		libs.replaceChildren();
+		libs.hidden = !st.interprete;
+		if (!st.interprete) return;
+		if (!st.paquets.length) {
+			ajouter(libs, "div", "nq-python-lib-vide", t("settings.python.none"));
+			return;
+		}
+		const somme = st.paquets.reduce((n, p) => n + p.octets, 0);
+		ajouter(libs, "div", "nq-python-libs-titre", t("settings.python.libraries", { size: megaOctetsPrecis(somme) }));
+		for (const p of st.paquets) {
+			const ligne = ajouter(libs, "div", "nq-python-lib");
+			const nom = ajouter(ligne, "div", "nq-python-lib-texte");
+			ajouter(nom, "span", "nq-python-lib-nom", p.nom + " " + p.version);
+			const taille = t("settings.python.size", { size: megaOctetsPrecis(p.octets) });
+			ajouter(nom, "span", "nq-python-lib-detail", p.requisPar.length ? taille + " · " + t("settings.python.requiredBy", { names: p.requisPar.join(", ") }) : taille);
+			const bouton = ajouter(ligne, "button", "qbd-sync-action qbd-sync-action-danger nq-python-lib-bouton", t("settings.python.uninstall"));
+			bouton.type = "button";
+			bouton.disabled = p.requisPar.length > 0;
+			bouton.setAttribute("aria-label", t("settings.python.uninstall") + " " + p.nom);
+			bouton.addEventListener("click", () => {
+				bouton.disabled = true;
+				void pont().python.desinstaller(p.nom).then(res => {
+					if (!res.ok && "code" in res && !isDestroyed()) refuse(res.code);
+				}, () => { if (!isDestroyed()) refuse("io"); }).then(draw);
+			});
+		}
+	}
+
+	void draw();
+}
+
 export function mountLanguagePackSettings(section: HTMLElement): () => void {
 	let destroyed = false;
-	for (const pack of ["python", "c"] as const) mountRow(section, pack, () => destroyed);
+	mountPythonRow(section, () => destroyed);
+	mountRow(section, "c", () => destroyed);
 	return () => { destroyed = true; };
 }

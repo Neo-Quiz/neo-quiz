@@ -260,6 +260,11 @@ jobs:
       - name: Share lock
         run: npm run check:share-lock
 
+      # Settings > Python: libraries listed with sizes, dependencies cannot be
+      # uninstalled, the phone gets one line.
+      - name: Python settings
+        run: npm run check:python-settings
+
       # Sharing end to end: the real exporter into the real importer, byte for
       # byte; golden archives from other tools import; hostile ones write nothing.
       - name: Share round trip and archives

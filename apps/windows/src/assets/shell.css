@@ -2053,3 +2053,57 @@ label.nq-set-ligne {
 .nq-annees-erreur { margin: 10px 0 0; font-size: 13px; color: var(--color-red, #f87171); }
 .nq-annees-statut { margin: 12px 0 0; font-size: 13px; color: var(--text-normal); }
 .nq-annees-statut[hidden], .nq-reglages-section[hidden] { display: none; }
+
+/* The native Python's libraries: plain rows under the language row, no tile. */
+.nq-python-libs {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 0 0 8px;
+	padding: 0 0 0 44px;
+	min-width: 0;
+}
+
+.nq-python-libs[hidden] {
+	display: none;
+}
+
+.nq-python-libs-titre,
+.nq-python-lib-vide,
+.nq-python-lib-detail {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.nq-python-lib {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 4px 0;
+}
+
+.nq-python-lib-texte {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.nq-python-lib-nom {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nq-python-lib-bouton {
+	flex: none;
+	width: auto;
+	padding: 0 10px;
+	font-size: 12px;
+}
+
+.nq-python-lib-bouton:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}

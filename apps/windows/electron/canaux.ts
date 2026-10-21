@@ -2201,6 +2201,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ ok: false, code: "echec" });
 		return deps.python.installer(paquets, (recus, total) => deps.envoyer(CANAUX.pythonProgression, { recus, total }));
 	});
+	ipcMain.handle(CANAUX.pythonSupprimerTout, (e) => (depuisFenetrePrincipale(e) ? deps.python.supprimerTout() : Promise.resolve({ ok: false, code: "io" })));
 	ipcMain.handle(CANAUX.pythonDesinstaller, (e, paquet: unknown) => (depuisFenetrePrincipale(e) ? deps.python.desinstaller(paquet) : Promise.resolve({ ok: false, code: "inconnu" })));
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {

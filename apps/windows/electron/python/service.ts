@@ -29,6 +29,8 @@ export interface ServicePython {
 	/** Every name must be a key of `PAQUETS`, else refused (`echec`) before anything moves. */
 	installer(paquets: unknown, progression: (recus: number, total: number) => void): Promise<ResultatInstallation>;
 	desinstaller(paquet: unknown): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
+	/** Removes every library then the interpreter ("Delete" in Settings). */
+	supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
 	run(job: { code: string; timeoutMs: number; signal?: AbortSignal }): Promise<CodeRun>;
 }
 
@@ -79,6 +81,10 @@ export function creerServicePython(installation: InstallationPython, dossierTemp
 				if (estErreurPython(err) && err.code === "empreinte") return { ok: false, code: "empreinte" };
 				return { ok: false, code: "echec" };
 			}
+		},
+
+		supprimerTout() {
+			return installation.supprimerTout();
 		},
 
 		async desinstaller(paquet) {

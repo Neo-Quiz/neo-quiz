@@ -113,6 +113,7 @@
     "check:live-session": "node scripts/check-live-session.mjs",
     "check:codex-home": "node scripts/check-codex-home.mjs",
     "check:share-lock": "node scripts/check-share-lock.mjs",
+    "check:python-settings": "node scripts/check-python-settings.mjs",
     "check:share-roundtrip": "node scripts/check-share-roundtrip.mjs",
     "check:moodle": "node scripts/check-moodle.mjs",
     "check:bug-report": "node scripts/check-bug-report.mjs",

@@ -414,6 +414,7 @@ const pont: Pont = {
 			}
 		},
 		desinstaller: paquet => ipcRenderer.invoke(CANAUX.pythonDesinstaller, paquet),
+		supprimerTout: () => ipcRenderer.invoke(CANAUX.pythonSupprimerTout),
 	},
 
 	langages: {
