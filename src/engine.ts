@@ -825,13 +825,19 @@ async function renderInteractiveQuiz(context: RenderQuizContext): Promise<void> 
 			primeAllSlideHeights({ retries: 3, syncCurrent: true });
 			ctx.viewport.scheduleViewportHeightSync({ index: quizState.current, animate: false, refresh: true });
 		});
-		if (document.fonts?.ready) {
+		if (document.fonts) {
 			const epoch = currentAsyncEpoch();
-			document.fonts.ready.then(() => {
+			/* Read in the next frame (2026-10-21): the `ready` getter flushes
+			   style and layout, 100 ms when read while the quiz is being built;
+			   in a frame callback that layout is the one the frame does anyway. */
+			requestAnimationFrame(() => {
 				if (!isQuizInstanceAlive(epoch)) return;
-				resyncLayout();
-				primeAllSlideHeights({ retries: 3, syncCurrent: true });
-			}).catch(() => {});
+				document.fonts.ready.then(() => {
+					if (!isQuizInstanceAlive(epoch)) return;
+					resyncLayout();
+					primeAllSlideHeights({ retries: 3, syncCurrent: true });
+				}).catch(() => {});
+			});
 		}
 	}
 	ctx.bindTrackFirstLoadFix = bindTrackFirstLoadFix;

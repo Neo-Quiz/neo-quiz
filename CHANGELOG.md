@@ -17,6 +17,7 @@ release notes.
 
 - Formulas can be selected along with the text around them, highlighted as one block, and copying them gives their LaTeX (`$…$`).
 - Generated code blocks carry their own imports, so running one no longer fails on a name defined elsewhere.
+- Opening or resuming a long quiz is faster (about a third less waiting).
 
 ## [1.21.25] - 2026-10-21
 

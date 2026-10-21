@@ -596,16 +596,39 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 		textarea.style.height = `${textarea.scrollHeight}px`;
 	}
 
+	/* The first sizing of every field, batched (2026-10-21): sized one by one as
+	   each card was bound, every field wrote `height: auto` then read its
+	   `scrollHeight`, a full layout of the whole quiz each time. Twelve
+	   flashcard fields made 400 ms of a 1.35 s launch. Batched: every write,
+	   ONE layout for all the reads, every write again; same formula as
+	   `syncTextAreaHeight`. Runs as a microtask, after the binding loop and
+	   before the first paint. */
+	let premieresHauteurs: Array<{ textarea: HTMLTextAreaElement; ensuite: () => void }> = [];
+	function dimensionnerAuPremierRendu(textarea: HTMLTextAreaElement, ensuite: () => void): void {
+		if (premieresHauteurs.length === 0) queueMicrotask(() => {
+			const lot = premieresHauteurs;
+			premieresHauteurs = [];
+			for (const { textarea: t } of lot) t.style.height = "auto";
+			const hauteurs = lot.map(({ textarea: t }) => t.scrollHeight);
+			lot.forEach(({ textarea: t }, i) => { t.style.height = `${hauteurs[i]}px`; });
+			for (const { ensuite: f } of lot) f();
+		});
+		premieresHauteurs.push({ textarea, ensuite });
+	}
+
 	function bindTextOnlyQuestion(trackItem: HTMLElement, qi: number): void {
 		const textarea = trackItem.querySelector<HTMLTextAreaElement>(".quiz-textonly-textarea[data-textonly-answer]");
 		if (textarea) {
-			const syncLayout = () => {
-				syncTextAreaHeight(textarea);
+			const apresHauteur = () => {
 				const slideIdx = ctx.getSlideIndexForQuestion(qi);
 				if (slideIdx >= 0) ctx.viewport.__quizSlideHeightCache?.delete(slideIdx);
 				if (slideIdx === ctx.quizState.current) {
 					ctx.viewport.scheduleViewportHeightSync({ index: slideIdx, animate: false, refresh: true });
 				}
+			};
+			const syncLayout = () => {
+				syncTextAreaHeight(textarea);
+				apresHauteur();
 			};
 
 			const persistAnswer = () => {
@@ -638,7 +661,7 @@ export function createTextOnlyHandlers(ctx: EngineCtx): TextOnlyHandlers {
 					trackItem.querySelector<HTMLButtonElement>(".quiz-flashcard-flip-btn")?.click();
 				});
 			}
-			syncLayout();
+			dimensionnerAuPremierRendu(textarea, apresHauteur);
 		}
 
 		const turned = trackItem.querySelector<HTMLElement>(".quiz-fc.is-flipped .quiz-fc-card");
