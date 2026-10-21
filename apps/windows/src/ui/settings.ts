@@ -95,9 +95,11 @@ function card(parent: HTMLElement): HTMLElement {
 }
 
 /** A setting row: name and help on the left, the control on the right. The
-    returned element receives the control. */
-function row(parent: HTMLElement, name: string, help?: string, tag: "div" | "label" = "div"): HTMLElement {
+    returned element receives the control. `icon` leads the row, as the phone's
+    link rows do. */
+function row(parent: HTMLElement, name: string, help?: string, tag: "div" | "label" = "div", icon?: string): HTMLElement {
 	const r = ajouter(parent, tag, "nq-set-ligne");
+	if (icon) currentHost().ui.setIcon(ajouter(r, "span", "nq-set-ligne-icone"), icon);
 	const text = ajouter(r, "div", "nq-set-ligne-texte");
 	ajouter(text, "span", "nq-reglages-nom", name);
 	if (help) ajouter(text, "span", "nq-set-ligne-aide", help);
@@ -386,7 +388,7 @@ export function renderSettings(
 	/* PHONE: the in-app updater (version, manual check). The desktop's menu has its own. */
 	let demonterMajAndroid: () => void = () => {};
 	if (mobile) {
-		const controle = row(general, t("app.update.android.row"), " ");
+		const controle = row(general, t("app.update.android.row"), " ", "div", "circle-arrow-down");
 		const aide = controle.parentElement!.querySelector<HTMLElement>(".nq-set-ligne-aide")!;
 		demonterMajAndroid = monterLigneMajAndroid(controle, aide);
 		/* The in-app bug report, only once the relay is configured; the form's fallback (and the

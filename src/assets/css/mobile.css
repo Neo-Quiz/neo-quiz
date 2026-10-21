@@ -1204,12 +1204,6 @@ html.nq-mobile ::-webkit-scrollbar {
    choice shows its value and a chevron and opens a list; notes sit under
    their group; the wallpaper and language-pack rows are tiles too. */
 .is-mobile .nq-set-ligne-valeur {
-	flex: none;
-	max-width: 45%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: 15px;
 	color: var(--text-muted);
 }
 
@@ -1317,33 +1311,23 @@ html.nq-mobile ::-webkit-scrollbar {
 }
 
 /* The wallpaper row: "Wallpaper", the picture's name on the right, a chevron. */
+/* Label with the picture's name UNDER it, as every phone settings row. */
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-texte {
 	flex: 1;
 	min-width: 0;
 	display: flex;
-	flex-direction: row;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
 	text-align: left;
-	flex-direction: row;
-	text-align: left;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-}
-
-.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
-	flex: 1;
-}
-
-.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
-	flex: 1;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
-	max-width: 50%;
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 15px;
+	font-size: 14px;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-fond-apercu {

@@ -77,3 +77,8 @@ body.is-mobile [data-nq-press-family][data-nq-pressed="true"]:not(:disabled) {
 .is-mobile .qbd-quiz-card-play[data-nq-press-family="depth"][data-nq-pressed="true"] svg {
   transition-duration: var(--nq-press-down);
 }
+
+/* A section header's veil follows its rounded hit area, not a square band. */
+.is-mobile .qbd-quizzes-node-head {
+  border-radius: 12px;
+}

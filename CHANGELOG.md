@@ -16,11 +16,13 @@ release notes.
 ### Changed
 
 - On the phone, every button, card, row, tab, menu item and answer reacts the instant it is touched and settles back smoothly; folding sections and menus open and close with motion, and the bottom bar ripple no longer sparkles.
+- Phone settings rows share one look: an icon, the label with its value under it, and a chevron; the wallpaper sliders get their own rows.
 
 ### Fixed
 
 - Classify newly created empty folders by their real modification date in Recent folders.
 - Fix folder progress, course rows, planning and home bars ignoring unfinished quiz sessions.
+- The bin of a document row shows on touch screens instead of staying invisible yet tappable.
 - Android Back closes an open action menu or picker before leaving the folder, closing the window beneath it or exiting the app.
 
 ## [1.21.22] - 2026-10-20

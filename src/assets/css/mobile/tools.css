@@ -249,36 +249,87 @@
    onto a second line instead of ending in an ellipsis. A path with no space
    breaks where it must. */
 .is-mobile .nq-set-ligne-valeur {
-	max-width: 55%;
-	overflow: visible;
-	text-overflow: clip;
-	white-space: normal;
 	overflow-wrap: anywhere;
-	text-align: right;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
-	max-width: 50%;
-	overflow: visible;
-	text-overflow: clip;
 	white-space: normal;
 	overflow-wrap: anywhere;
-	text-align: right;
 }
 
-/* The value wrapping above pushed a row's chevron onto a line of its own
-   (« Langue »): the row stays on one line, the chevron keeps its place at the
-   right, the label and the value share the rest. */
+/* A phone settings row reads like Android's own (2026-10-21): icon, the label
+   with its current value UNDER it, chevron. A long value (« Automatique (suivre
+   le système) ») used to wrap on two right-aligned lines beside the label. */
 .is-mobile .nq-set-ligne-lien {
-	flex-wrap: nowrap;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-areas: "icon label chevron" "icon value chevron";
+	column-gap: 16px;
+	row-gap: 2px;
+	align-items: center;
 }
 
-.is-mobile .nq-set-ligne-lien > .nq-set-onglet-chevron {
-	flex: none;
+.is-mobile .nq-set-ligne-lien > .nq-set-ligne-icone { grid-area: icon; }
+.is-mobile .nq-set-ligne-lien > .nq-set-onglet-chevron { grid-area: chevron; }
+
+.is-mobile .nq-set-ligne-lien > .nq-set-ligne-libelle {
+	grid-area: label;
+	align-self: end;
 }
 
 .is-mobile .nq-set-ligne-lien > .nq-set-ligne-valeur {
-	flex: 0 1 auto;
+	grid-area: value;
+	align-self: start;
+	text-align: left;
+	font-size: 14px;
+	color: var(--text-muted);
+}
+
+/* No value: the label takes both lines, centred like the icon. */
+.is-mobile .nq-set-ligne-lien:not(:has(> .nq-set-ligne-valeur:not(:empty))) > .nq-set-ligne-libelle {
+	grid-row: 1 / span 2;
+	align-self: center;
+}
+
+/* Every row's name has the same weight on a phone (« Mises à jour » was bold
+   beside « Langue »). */
+.is-mobile .nq-set .nq-reglages-nom {
+	font-weight: 400;
+}
+
+.is-mobile .nq-set-ligne > .nq-set-ligne-icone {
+	flex: none;
+	align-self: center;
+}
+
+/* The wallpaper's sliders as phone setting rows: icon, label and value on the
+   first line, the track across the second. */
+.is-mobile .nq-set-carte > .nq-fond-curseur {
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-areas: "icon label value" "icon track track";
+	column-gap: 16px;
+	row-gap: 4px;
+	min-height: 72px;
+	padding: 12px 18px;
+	font-size: 16px;
+}
+
+.is-mobile .nq-fond-curseur > .nq-set-ligne-icone { grid-area: icon; }
+.is-mobile .nq-fond-curseur-libelle { grid-area: label; }
+.is-mobile .nq-fond-curseur-entree { grid-area: track; }
+
+.is-mobile .nq-fond-curseur-valeur {
+	grid-area: value;
+	font-size: 14px;
+}
+
+/* The wallpaper row: icon, label, then the current picture and its name. */
+.is-mobile .nq-set .nq-fond-rangee {
+	gap: 16px;
+}
+
+.is-mobile .nq-set .nq-fond-rangee .nq-fond-apercu {
+	order: 0;
 }
 
 /* "Scroll to the latest message": 44 px tap target, no hover face (the
