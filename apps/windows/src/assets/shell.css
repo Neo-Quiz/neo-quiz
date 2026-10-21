@@ -58,6 +58,13 @@
 	user-select: none;
 }
 
+/* A bare browser gives form controls its own font (Arial): the results'
+   « Recommencer » and « Supprimer ces résultats » showed in it (2026-10-21).
+   Zero specificity: any class that names a font still wins. */
+:where(button, input, select, textarea) {
+	font-family: inherit;
+}
+
 /* THE INTERFACE IS NOT A DOCUMENT. A native app does not let its labels,
    chips and hints be highlighted in blue; only the content the user reads or
    copies is selectable. The root is `none`, and each content zone below sets

@@ -20,6 +20,7 @@ release notes.
 - On the phone, a folder's three progress counts sit side by side, and a long quiz title wraps to two lines before it is cut, on the quiz page and on Home.
 - On a tablet or a narrow window, folders show two per row instead of one, and a long folder name wraps to two lines.
 - The Set up your test window starts with a flat button, like every other window.
+- Test results put « Restart » before « Delete these results », and every button uses the app font instead of Arial.
 
 ### Fixed
 
