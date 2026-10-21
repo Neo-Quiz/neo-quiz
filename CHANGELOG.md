@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.25] - 2026-10-21
+
 ### Changed
 
 - The questions asked before a generation end with a review of your answers: nothing starts until you submit them, and a click on an answer changes it.
