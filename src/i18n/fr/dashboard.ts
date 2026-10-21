@@ -94,7 +94,7 @@ export const FR_DASHBOARD: Record<keyof typeof EN_DASHBOARD, string> = {
 	/* ── Les trois sections d'un dossier (folder-sections.ts) ── */
 	"dashboard.folder.documents": "Documents",
 	"dashboard.folder.documentsEmptyTitle": "Aucun document pour l'instant",
-	"dashboard.folder.documentsEmptyHint": "Ajoutez un fichier (PDF, image) et créez des quiz à partir de celui-ci.",
+	"dashboard.folder.documentsEmptyHint": "Ajoutez un fichier (PDF, image) pour en tirer des quiz.",
 	"dashboard.folder.addFiles": "Upload des fichiers",
 	"dashboard.folder.addGenerate": "Générer un quiz avec l'IA",
 	"dashboard.folder.newQuizAiDesc": "À partir des documents et des notes de ce dossier, déjà joints",
