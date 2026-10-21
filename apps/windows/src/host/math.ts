@@ -63,6 +63,23 @@ function etendueSelectionnee(range: Range, formule: HTMLElement): { gauche: numb
 	return droite > gauche ? { gauche, droite, haut, bas } : null;
 }
 
+/** The line box an inline formula sits on: from the content top of its block
+    and its `line-height`, or, when that is `normal`, centred on the span. */
+function ligneDe(m: HTMLElement, boite: DOMRect): { haut: number; hauteur: number } {
+	let bloc = m.parentElement;
+	while (bloc && /^(inline|contents)/.test(getComputedStyle(bloc).display)) bloc = bloc.parentElement;
+	const style = bloc ? getComputedStyle(bloc) : null;
+	const lh = style ? parseFloat(style.lineHeight) : NaN;
+	if (!bloc || !style || !Number.isFinite(lh) || lh <= 0) {
+		const propre = parseFloat(getComputedStyle(m).lineHeight);
+		const demi = Number.isFinite(propre) ? Math.max(0, (propre - boite.height) / 2) : 0;
+		return { haut: boite.top - demi, hauteur: boite.height + 2 * demi };
+	}
+	const haut = bloc.getBoundingClientRect().top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+	const k = Math.max(0, Math.round((boite.top - (lh - boite.height) / 2 - haut) / lh));
+	return { haut: haut + k * lh, hauteur: lh };
+}
+
 function copierFormulesEnLatex(): void {
 	if (copieInstallee) return;
 	copieInstallee = true;
@@ -117,10 +134,19 @@ function copierFormulesEnLatex(): void {
 					const boite = m.getBoundingClientRect();
 					bande.style.left = `${e.gauche - boite.left}px`;
 					bande.style.width = `${e.droite - e.gauche}px`;
-					// A display formula spans the glyphs' height; an inline one the line (CSS).
+					// A display formula spans the selected glyphs' height.
 					if (m.classList.contains("math-block")) {
 						bande.style.top = `${e.haut - boite.top}px`;
 						bande.style.height = `${e.bas - e.haut}px`;
+					} else {
+						/* An inline formula: its line, where the native highlight of
+						   text is painted. The lines of the text's block stack every
+						   `line-height` from its content top; centring the band on the
+						   span's content area instead landed 0.8 px higher than the
+						   text's highlight, a visible step once snapped. */
+						const l = ligneDe(m, boite);
+						bande.style.top = `${l.haut - boite.top}px`;
+						bande.style.height = `${l.hauteur}px`;
 					}
 					bande.hidden = false;
 					vues.push(m);

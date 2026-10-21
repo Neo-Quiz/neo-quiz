@@ -588,9 +588,8 @@ code.quiz-code-tokens .token.number{ color: #ff9e64; }
 /* Inside a formula the native highlight (glyph by glyph, uneven, with holes)
    is transparent; `.math-selection` is ONE band from the first selected glyph
    to the last (placed by the `selectionchange` listener of
-   apps/windows/src/host/math.ts), under the glyphs. An inline formula's band
-   covers the whole line, as the native highlight of text does: the span's
-   content area is about 1.33em in the interface font, the line `1lh`. */
+   apps/windows/src/host/math.ts, which also sets its height), under the
+   glyphs. */
 .math{
   position: relative;
   z-index: 0;
@@ -604,8 +603,4 @@ code.quiz-code-tokens .token.number{ color: #ff9e64; }
   z-index: -1;
   background: var(--nq-selection, Highlight);
   pointer-events: none;
-}
-.math-inline > .math-selection{
-  top: calc(-1 * max(0px, (1lh - 1.3334em) / 2));
-  bottom: calc(-1 * max(0px, (1lh - 1.3334em) / 2));
 }
