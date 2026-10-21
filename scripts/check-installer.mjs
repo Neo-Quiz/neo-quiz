@@ -839,9 +839,9 @@ await withSrcModule(["apps/windows/installer/diagnosis.ts", "src/i18n.ts", "apps
 	const fr = diagnosisTexts({ cause: "blocked", vpn: nordlynx.name, again: false, exitCode: null });
 	const frEncore = diagnosisTexts({ cause: "blocked", vpn: "NordLynx", again: true, exitCode: null });
 	r.check("le message NOMME le VPN, et l'action dit de le désactiver puis Réessayer",
-		[fr.body, fr.steps], ["Votre VPN (NordLynx) semble bloquer le téléchargement depuis GitHub.",
-			["Désactivez NordLynx le temps de l'installation.", "Puis cliquez sur Réessayer."]]);
-	r.check("un nouvel essai encore bloqué le dit tout de suite", frEncore.title, "Toujours bloqué : votre VPN (NordLynx) est encore actif");
+		[fr.body, fr.steps], ["Ton VPN (NordLynx) semble bloquer le téléchargement depuis GitHub.",
+			["Désactive NordLynx le temps de l'installation.", "Puis clique sur Réessayer."]]);
+	r.check("un nouvel essai encore bloqué le dit tout de suite", frEncore.title, "Toujours bloqué : ton VPN (NordLynx) est encore actif");
 	r.check("inspection TLS avec VPN : le VPN est nommé aussi",
 		diagnosisTexts({ cause: "tlsInspection", vpn: "Cloudflare WARP", again: false, exitCode: null }).body.includes("Cloudflare WARP"), true);
 	const causes = ["offline", "blocked", "tlsInspection", "integrity", "publishing", "server", "diskFull", "antivirus", "windowsRefused", "appOpen", "launch", "unknown"];
