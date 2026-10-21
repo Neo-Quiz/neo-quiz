@@ -29,7 +29,7 @@ release notes.
 - A fill-in blank written inside inline code shows as a blank instead of two boxes and its number.
 - The bin of a document row shows on touch screens instead of staying invisible yet tappable.
 - On a narrow phone, a quiz card's counts wrap between items instead of breaking inside each one.
-- Four editor and usage labels left in English in the French interface are translated.
+- Four editor and usage labels left in English in the French interface are translated, and the French interface now says « tu » everywhere instead of mixing it with « vous ».
 - Android Back closes an open action menu or picker before leaving the folder, closing the window beneath it or exiting the app.
 - On the phone, a code block in a reading stays inside its card instead of running past its left edge.
 - On a touch screen, the hint under a reading's flip cards says to tap a card instead of clicking or pressing Enter.

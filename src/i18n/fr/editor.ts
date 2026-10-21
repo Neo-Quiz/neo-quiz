@@ -28,17 +28,17 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.flashcard.help": "L'énoncé ci-dessus est le recto. Écris ici la réponse attendue : une phrase, une formule ou une ligne de code.",
 	"editor.flashcard.back": "Réponse",
 	"editor.flashcard.backPlaceholder": "<class 'list'>",
-	"editor.cloze.help": "Écrivez le texte entier et encadrez chaque trou de doubles accolades. Séparez les variantes acceptées par une barre verticale : {{Paris}}, {{l'euro|euro}}.",
+	"editor.cloze.help": "Écris le texte entier et encadre chaque trou de doubles accolades. Sépare les variantes acceptées par une barre verticale : {{Paris}}, {{l'euro|euro}}.",
 	"editor.cloze.templateLabel": "Texte à trous",
 	"editor.cloze.templatePlaceholder": "La capitale de la France est {{Paris}}.",
 	"editor.cloze.defaultTemplate": "La capitale de la France est {{Paris}}.",
 	"editor.cloze.blankCount": "{n} trous détectés",
-	"editor.cloze.noBlank": "Aucun trou pour l'instant — encadrez un mot de doubles accolades, comme {{ceci}}",
+	"editor.cloze.noBlank": "Aucun trou pour l'instant — encadre un mot de doubles accolades, comme {{ceci}}",
 
 	/* ── Réponse numérique ── */
 	"editor.type.numeric.label": "Numérique",
 	"editor.type.numeric.desc": "Une valeur, avec une marge",
-	"editor.numeric.help": "La réponse est comparée comme un NOMBRE : 3.14, 3,14 et 3,140 passent toutes. Ajoutez une marge quand la valeur attendue est une mesure ou un résultat arrondi.",
+	"editor.numeric.help": "La réponse est comparée comme un NOMBRE : 3.14, 3,14 et 3,140 passent toutes. Ajoute une marge quand la valeur attendue est une mesure ou un résultat arrondi.",
 	"editor.numeric.answers": "Valeur attendue",
 	"editor.numeric.answerPlaceholder": "9,81",
 	"editor.numeric.unit": "Unité (facultatif)",
@@ -48,9 +48,9 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Support de compréhension ── */
 	"editor.passage.section": "Document",
-	"editor.passage.help": "Un texte à lire avant de répondre. Donnez la même clé de partage à plusieurs questions : elles afficheront toutes ce même document.",
+	"editor.passage.help": "Un texte à lire avant de répondre. Donne la même clé de partage à plusieurs questions : elles afficheront toutes ce même document.",
 	"editor.passage.textLabel": "Texte",
-	"editor.passage.textPlaceholder": "Collez ou écrivez le texte, l'étude de cas, le scénario ou l'extrait de code…",
+	"editor.passage.textPlaceholder": "Colle ou écris le texte, l'étude de cas, le scénario ou l'extrait de code…",
 	"editor.passage.titleLabel": "Titre",
 	"editor.passage.titlePlaceholder": "Texte : L'effet de serre",
 	"editor.passage.idLabel": "Clé de partage",
@@ -78,7 +78,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Formulaire : sections communes ── */
 	"editor.form.promptSection": "Énoncé",
-	"editor.form.promptPlaceholder": "Votre question...",
+	"editor.form.promptPlaceholder": "Ta question...",
 	"editor.hint.label": "Indice",
 	"editor.hint.placeholder": "Un indice pour aider...",
 	"editor.hint.levelsHelp": "Une question difficile peut avoir plusieurs niveaux, du plus léger au plus révélateur.",
@@ -140,16 +140,16 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.text.acceptedAnswers": "Réponses acceptées",
 	"editor.text.answerPlaceholder": "Réponse",
 	"editor.text.caseSensitive": "Sensible à la casse",
-	"editor.text.defaultPlaceholder": "Votre réponse...",
+	"editor.text.defaultPlaceholder": "Ta réponse...",
 
 	/* ── Panneau Aperçu ── */
 	"editor.preview.resourceFallback": "Ressource",
-	"editor.preview.multiHint": "Sélectionnez une ou plusieurs réponses",
-	"editor.preview.orderingHint": "Classez les éléments dans le bon ordre",
-	"editor.preview.matchingHint": "Associez chaque situation à un support",
+	"editor.preview.multiHint": "Sélectionne une ou plusieurs réponses",
+	"editor.preview.orderingHint": "Classe les éléments dans le bon ordre",
+	"editor.preview.matchingHint": "Associe chaque situation à un support",
 
 	/* ── Édition dans le rendu corrigé (dashboard/edition-rendu.ts) ── */
-	"editor.render.clickToEdit": "Cliquez pour modifier",
+	"editor.render.clickToEdit": "Clique pour modifier",
 	"editor.render.htmlInMore": "Modifié en HTML dans Plus",
 	"editor.render.untitled": "Question sans titre",
 	"editor.render.addPrompt": "Ajouter l'énoncé",
@@ -200,7 +200,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Modale « Ajouter une question » ── */
 	"editor.typeModal.title": "Ajouter une question",
-	"editor.typeModal.subtitle": "Choisissez le type de question",
+	"editor.typeModal.subtitle": "Choisis le type de question",
 
 	/* ── Modale « Vocabulaire » (dashboard/glossaire-modal.ts, lot D) ── */
 	"editor.glossary.button": "Vocabulaire",
@@ -211,7 +211,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.glossary.add": "Ajouter un terme",
 	"editor.glossary.remove": "Supprimer ce terme",
 	"editor.glossary.close": "Fermer",
-	"editor.glossary.empty": "Aucun terme pour l'instant. Ajoutez ceux qu'une lecture, une explication ou un indice doit relier à leur définition.",
+	"editor.glossary.empty": "Aucun terme pour l'instant. Ajoute ceux qu'une lecture, une explication ou un indice doit relier à leur définition.",
 	"editor.glossary.countOne": "{count} terme",
 	"editor.glossary.countOther": "{count} termes",
 
