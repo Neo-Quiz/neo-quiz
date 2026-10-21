@@ -37,12 +37,6 @@
 	min-height: 32px;
 	height: auto;
 	padding: 5px 10px;
-}
-
-/* The display above beats the UA rule for `hidden`: a trigger hidden by code
-   (the Explain effort button for Antigravity) stayed on screen. */
-.qbd-select[hidden] {
-	display: none;
 	font-family: var(--font-interface, inherit);
 	font-size: 12.5px;
 	font-weight: 500;
@@ -58,6 +52,12 @@
 	transform-origin: center;
 	transition: border-color 0.14s ease, background-color 0.14s ease,
 		transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The display above beats the UA rule for `hidden`: a trigger hidden by code
+   (the Explain effort button for Antigravity) stayed on screen. */
+.qbd-select[hidden] {
+	display: none;
 }
 
 /* Survol StudySmarter (annotation Ahmed 2026-07-18, pipette) : le FOND ne
