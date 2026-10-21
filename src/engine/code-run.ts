@@ -109,7 +109,10 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		btn.addEventListener("click", e => {
 			e.preventDefault();
 			void (async () => {
-				try { await ctx.host.shell.copyText?.(source); } catch { /* best effort */ }
+				let copie = false;
+				try { copie = (await ctx.host.shell.copyText?.(source)) === true; } catch { /* best effort */ }
+				// Said on the block: nothing else tells the learner the code is waiting to be pasted.
+				if (copie) info.textContent = t("engine.code.copiedPaste");
 				await ctx.host.shell.openUrl(URL_EN_LIGNE);
 			})();
 		});

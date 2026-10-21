@@ -261,6 +261,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.code.notInstalled": "Ce langage n'est pas encore installé.",
 	"engine.code.needsMore": "Ce programme a besoin de plus que le bac à sable.",
 	"engine.code.runOnline": "Exécuter en ligne",
+	"engine.code.copiedPaste": "Code copié : colle-le dans la première cellule du notebook, puis exécute-le.",
 	"engine.code.installing": "Téléchargement du compilateur C/C++… {percent} %",
 	"engine.code.installOffline": "Le compilateur C/C++ n'a pas pu être téléchargé (pas de connexion).",
 	"engine.code.installRefused": "Le compilateur téléchargé n'a pas passé la vérification d'intégrité : il n'a pas été installé.",

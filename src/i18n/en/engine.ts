@@ -280,6 +280,7 @@ export const EN_ENGINE = {
 	"engine.code.notInstalled": "This language is not installed yet.",
 	"engine.code.needsMore": "This program needs more than the sandbox.",
 	"engine.code.runOnline": "Run online",
+	"engine.code.copiedPaste": "Code copied: paste it into the notebook's first cell, then run it.",
 	"engine.code.installing": "Downloading the C/C++ compiler… {percent} %",
 	"engine.code.installOffline": "The C/C++ compiler could not be downloaded (no connection).",
 	"engine.code.installRefused": "The downloaded compiler failed its integrity check and was not installed.",
