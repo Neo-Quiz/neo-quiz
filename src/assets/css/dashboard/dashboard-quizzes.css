@@ -1514,7 +1514,11 @@
 .qbd-root .qbd-folder-attempt-undo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 
 @media (max-width: 620px) {
-	.qbd-folder-progress { grid-template-columns: minmax(0, 1fr); }
+	/* The three counts stay side by side: one full-width tile per number left
+	   a phone scrolling past three near-empty blocks. */
+	.qbd-folder-progress { gap: 10px; }
+	.qbd-folder-progress-tile { padding: 14px 12px; }
+	.qbd-folder-progress-tile--wide { padding: 18px 20px; }
 	.qbd-folder-course { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
