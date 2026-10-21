@@ -35,6 +35,7 @@ release notes.
 - On a touch screen, the hint under a reading's flip cards says to tap a card instead of clicking or pressing Enter.
 - On the phone, folder cards and question cards size to their content instead of leaving an empty band, and Home quick actions show two lines of description.
 - A question mark, colon or closing quote never wraps alone onto its own line.
+- On the phone, a formula with limits or a fraction is no longer clipped or nudged up and down by a finger, and the last line of a question card no longer fades out.
 
 ## [1.21.23] - 2026-10-21
 

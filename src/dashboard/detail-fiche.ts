@@ -354,9 +354,13 @@ function renderBody(root: HTMLElement, attirer: () => void, deps: FicheDeps): ()
     for the whole grid. */
 export function suivreDebord(zone: HTMLElement): void {
 	const maj = (): void => {
-		const bas = zone.scrollTop + zone.clientHeight < zone.scrollHeight - 2;
+		/* Only an area that scrolls fades: a question card shows its whole
+		   text (overflow visible), and a formula rising a few pixels past its
+		   last line faded that line out. */
+		const defile = /auto|scroll/.test(getComputedStyle(zone).overflowY);
+		const bas = defile && zone.scrollTop + zone.clientHeight < zone.scrollHeight - 2;
 		zone.classList.toggle("a-suivre", bas);
-		zone.classList.toggle("a-precede", zone.scrollTop > 2);
+		zone.classList.toggle("a-precede", defile && zone.scrollTop > 2);
 	};
 	zone.addEventListener("scroll", maj, { passive: true });
 	if (typeof ResizeObserver !== "undefined") {

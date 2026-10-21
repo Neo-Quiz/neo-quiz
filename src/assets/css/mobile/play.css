@@ -27,10 +27,17 @@ html.nq-phone .math-block {
 	overflow-x: auto;
 }
 
+/* A side scroll makes the box clip vertically too, and MathJax glyphs (a sum
+   with its limits, a fraction) rise or sink a few pixels past it: the 6 px of
+   padding hold them, the negative margin keeps the line where it was, and the
+   formula never scrolls up and down under a finger. */
 html.nq-phone .math-inline {
 	display: inline-block;
 	max-width: 100%;
 	overflow-x: auto;
+	overflow-y: hidden;
+	padding-block: 6px;
+	margin-block: -6px;
 	vertical-align: middle;
 }
 
