@@ -217,10 +217,20 @@ export function codeClozeHtml(marked: string): string | null {
 const FENCE_RE = /^([ \t]*)(`{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*$/gm;
 const SLOT_IDENT_RE = /__NQ_SLOT_(\d+)__/g;
 
-/** The marked template, its blank tokens inside fenced code blocks turned into
-    identifiers the highlighter does not split (`restoreCodeSlots` undoes it). */
+/* An inline code span is coloured too (`quiz-code-tokens`): in
+   `` `commande {{2>>}} log.txt` `` the highlighter made the blank's number a
+   `token number` and left its two private-use characters on screen as boxes
+   (2026-10-21). Inside a code span `__…__` is literal, never bold. */
+const INLINE_CODE_RE = /`[^`\n]+`/g;
+
+/** The marked template, its blank tokens inside fenced code blocks and inline
+    code spans turned into identifiers the highlighter does not split
+    (`restoreCodeSlots` undoes it). */
 export function protectCodeSlots(marked: string): string {
-	return marked.replace(FENCE_RE, bloc => bloc.replace(SLOT_RE, (_m, n: string) => `__NQ_SLOT_${n}__`));
+	const ident = (_m: string, n: string): string => `__NQ_SLOT_${n}__`;
+	return marked
+		.replace(FENCE_RE, bloc => bloc.replace(SLOT_RE, ident))
+		.replace(INLINE_CODE_RE, span => span.replace(SLOT_RE, ident));
 }
 
 /** The rendered HTML, the identifiers of `protectCodeSlots` back to tokens. */
