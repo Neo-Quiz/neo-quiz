@@ -92,6 +92,24 @@ try {
 			const res = await run;
 			r.check("run then sees the installed library (no not-installed)", res.status === "not-installed", false);
 		}
+		{
+			// a stalled install: the run answers timeout within ITS deadline
+			const f = fausse();
+			const s = creerServicePython(f.installation, temp);
+			void s.installer(["numpy"], () => {}); // never released
+			const t0 = Date.now();
+			const res = await s.run({ code: "print(1)\n", timeoutMs: 300 });
+			r.check("stalled install: run times out in its deadline", [res.status, Date.now() - t0 < 3000], ["timeout", true]);
+			// abort while queued behind the stalled install: unavailable at once
+			const ac = new AbortController();
+			const t1 = Date.now();
+			const p = s.run({ code: "print(1)\n", timeoutMs: 60000, signal: ac.signal });
+			setTimeout(() => ac.abort(), 100);
+			const res2 = await p;
+			r.check("abort while queued: unavailable at once", [res2.status, Date.now() - t1 < 3000], ["unavailable", true]);
+			void s.installer(["numpy"], () => {});
+			r.check("identical install shared (one download)", f.appels.length, 1);
+		}
 		if (!pythonDuDeveloppeur()) {
 			console.log("SKIPPED 4 real-run case(s): no CPython 3.12");
 		} else {

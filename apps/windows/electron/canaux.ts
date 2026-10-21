@@ -2139,7 +2139,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		   several seconds); C and C++ stay at 10 s. */
 		const plafond = o.language === "python" ? 60000 : 10000;
 		const delai = Math.min(plafond, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
-		if (o.language === "python") return trackRun(() => deps.python.run({ code: o.code as string, timeoutMs: delai }));
+		if (o.language === "python") {
+			/* Closing the window frees a queued run and kills a running one. */
+			const controleur = new AbortController();
+			const surFermeture = (): void => controleur.abort();
+			e.sender.once("destroyed", surFermeture);
+			return trackRun(() => deps.python.run({ code: o.code as string, timeoutMs: delai, signal: controleur.signal })).finally(() => { e.sender.removeListener("destroyed", surFermeture); });
+		}
 		return trackRun(() => deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai }));
 	});
 	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never) && language !== "python") deps.code.warm(language as CodeLanguage); });
@@ -2190,12 +2196,12 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	/* NATIVE PYTHON. `paquets` names are checked against the pinned catalogue
 	   in the service (a name that is not a key of `PAQUETS` is refused before
 	   anything moves); progress is pushed like the language packs'. */
-	ipcMain.handle(CANAUX.pythonEtat, (e) => (depuisFenetrePrincipale(e) ? deps.python.etat() : { interprete: false, version: null, paquets: [], octetsTotal: 0 }));
+	ipcMain.handle(CANAUX.pythonEtat, (e) => (depuisFenetrePrincipale(e) ? deps.python.etat() : Promise.resolve({ interprete: false, version: null, paquets: [], octetsTotal: 0 })));
 	ipcMain.handle(CANAUX.pythonInstaller, (e, paquets: unknown) => {
 		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ ok: false, code: "echec" });
 		return deps.python.installer(paquets, (recus, total) => deps.envoyer(CANAUX.pythonProgression, { recus, total }));
 	});
-	ipcMain.handle(CANAUX.pythonDesinstaller, (e, paquet: unknown) => (depuisFenetrePrincipale(e) ? deps.python.desinstaller(paquet) : { ok: false, code: "inconnu" }));
+	ipcMain.handle(CANAUX.pythonDesinstaller, (e, paquet: unknown) => (depuisFenetrePrincipale(e) ? deps.python.desinstaller(paquet) : Promise.resolve({ ok: false, code: "inconnu" })));
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {
