@@ -1086,7 +1086,14 @@
 	font-size: 14px;
 	line-height: 21px;
 	display: flex;
+	flex-wrap: wrap;
 	align-items: baseline;
+}
+/* Each count stays whole and the row wraps BETWEEN them: on a 360 px phone
+   « 54 questions · 10 lectures · ≈ 40 min » broke inside every item, three
+   columns of two words beside the ring (2026-10-21). */
+.qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-count > * {
+	white-space: nowrap;
 }
 /* Creation date: on the bottom row, right of the type pills and left of the
    "⋯" (which keeps `margin-left: auto`), small and muted; the row's
