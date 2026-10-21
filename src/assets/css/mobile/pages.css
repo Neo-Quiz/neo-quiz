@@ -379,3 +379,27 @@ html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
 	line-clamp: 2;
 	white-space: normal;
 }
+
+/* The subject and sort pickers share one row on a 360 px phone: four pixels
+   too wide, « Récent » went down to a line of its own. The subject picker
+   gives way, its label ending in an ellipsis if it must. */
+.is-mobile .qbd-quizzes-group-selects {
+	flex-wrap: nowrap;
+	gap: 6px;
+}
+
+.is-mobile .qbd-quizzes-subject-select {
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.is-mobile .qbd-quizzes-group-selects .qbd-select:not(.qbd-quizzes-subject-select) {
+	flex: none;
+}
+
+.is-mobile .qbd-quizzes-subject-select .qbd-select-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
