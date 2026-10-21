@@ -110,6 +110,14 @@
 	--text-on-accent: rgb(30, 30, 46);
 	--text-success: rgb(0,151,26);
 	--text-warning: rgb(250, 179, 135);
+	/* The selection, explicit (the blue Chromium painted by default): a
+	   selected formula paints the same colour as one block (quiz-card.css),
+	   which the system `Highlight` colour did not match, focused or not. */
+	--nq-selection: rgb(5, 57, 165);
+}
+
+::selection {
+	background: var(--nq-selection);
 }
 
 /* Android app: the platform's own UI font (Roboto, or Google Sans on HyperOS)

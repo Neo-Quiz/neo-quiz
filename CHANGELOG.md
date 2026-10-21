@@ -15,7 +15,8 @@ release notes.
 
 ### Fixed
 
-- Formulas can be selected along with the text around them, and copying them gives their LaTeX (`$…$`).
+- Formulas can be selected along with the text around them, highlighted as one block, and copying them gives their LaTeX (`$…$`).
+- Generated code blocks carry their own imports, so running one no longer fails on a name defined elsewhere.
 
 ## [1.21.25] - 2026-10-21
 

@@ -123,11 +123,11 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	r.check("Learn with an explicit type list: exactly those types, with their fields",
 		[expl.includes("ONLY these question types"), expl.includes("free-text questions"), expl.includes('"ordering": true)'), expl.includes("- ordering / slots"), expl.includes("MCQ questions and flashcards")], [true, true, true, true, false]);
 	/* The Test prompt is pinned byte for byte (SHA-256 of system + user prompt,
-	   four option sets): re-pinned on 2026-10-14 for the required question title, then for the Python idiom taught by example first. */
+	   four option sets): re-pinned on 2026-10-14 for the required question title, then for the Python idiom taught by example first, then on 2026-10-21 for runnable code blocks that carry their own imports. */
 	const sha = (o) => { const p = composerPrompts("x", { mode: "practice", ...o }); return createHash("sha256").update(p.systemPrompt + " " + p.userPrompt).digest("hex"); };
 	r.check("Test prompt: pinned byte for byte",
 		[{}, { count: 12 }, { type: ["Choix unique", "Choix multiple"] }, { categorie: "python" }].map(sha),
-		["5e0c175a59790c4bab2e0e0086bf2e21dead384ae895c6598da78816c53f6dc6", "8587d6e0cb5078f6cc5cf124fe073ce76d7a2d4d36a2d66050bc2fa9bdebdd04", "93faa5b023fc559f443d4938a0811fc96ba4a6093fa69d78fff2d3320b633ad5", "5687d03bb7325a362640be8dff35df176f8d4b305a05ef164cb2c09d14839e1d"]);
+		["5f24dfa59d5e85cb8a52cc1f656c1cedc99bdbf69c99efa1af5ec54a80362e98", "046cafd940f283a1620df1bf2ef808b69ed9a42fc400fae9d479abe15178b5d7", "ebc2a5d963985089df141850f341047ec43df1a2de9bf238d522386d4f8d0543", "657287e350c9a467f6148e1d53e4a11bf403ecdecafd67df50ad58175fadb5af"]);
 	r.check("Learn and Test: every question has a title naming its notion, never a question",
 		[learnP, composerPrompts("x", { mode: "practice" }).systemPrompt].map(p => /title: REQUIRED on every question: the notion it tests/.test(p) && p.includes("never a question")), [true, true]);
 	r.check("Learn: every reading has a hook whose form varies", /"accroche"[\s\S]*analogie[\s\S]*histoire[\s\S]*image[\s\S]*mnemo/.test(learnP) && /never the same form twice in a row/i.test(learnP), true);

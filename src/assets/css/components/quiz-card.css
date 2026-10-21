@@ -585,3 +585,11 @@ code.quiz-code-tokens .token.number{ color: #ff9e64; }
   -webkit-user-select: text;
   user-select: text;
 }
+/* One solid highlight on a selected formula, not glyph by glyph with holes at
+   its spacing (set by the `selectionchange` listener of the same file). */
+.math.is-selected{
+  background: var(--nq-selection, Highlight);
+}
+.math.is-selected ::selection{
+  background: transparent;
+}

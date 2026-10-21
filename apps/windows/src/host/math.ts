@@ -59,6 +59,28 @@ function copierFormulesEnLatex(): void {
 		e.clipboardData.setData("text/plain", morceaux.join("\n"));
 		e.preventDefault();
 	});
+	/* The native highlight paints glyph by glyph, with holes at MathLive's
+	   spacing (around `=`, `+`): a formula touched by the selection gets one
+	   solid highlight instead (`.is-selected`, quiz-card.css), its glyphs'
+	   own highlight made transparent. */
+	let marquees: HTMLElement[] = [];
+	document.addEventListener("selectionchange", () => {
+		const sel = document.getSelection();
+		const touchees: HTMLElement[] = [];
+		if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+			for (let i = 0; i < sel.rangeCount; i++) {
+				const range = sel.getRangeAt(i);
+				const racine = range.commonAncestorContainer;
+				const dans = racine instanceof Element ? racine : racine.parentElement;
+				const propre = dans?.closest<HTMLElement>(".math[data-latex]");
+				if (propre) touchees.push(propre);
+				dans?.querySelectorAll<HTMLElement>(".math[data-latex]").forEach(m => { if (range.intersectsNode(m)) touchees.push(m); });
+			}
+		}
+		for (const m of marquees) if (!touchees.includes(m)) m.classList.remove("is-selected");
+		for (const m of touchees) m.classList.add("is-selected");
+		marquees = touchees;
+	});
 }
 
 /** Le réglage des fontes n'est posé qu'UNE fois par session. */
