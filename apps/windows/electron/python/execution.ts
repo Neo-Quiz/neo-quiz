@@ -29,6 +29,8 @@
    - AFTER EVERY RUN, whatever its outcome, what the interpreter left
      running is swept (`balayer`): a block may `Popen` a long child and
      return normally. One limit is written at the sweep: a double fork.
+     The sweep and the run folder's removal run AFTER the result is
+     returned, in the background (`attendreNettoyages` waits for them).
 
    It does not import `../process.ts` (the CLI launcher, heavy imports): a
    spawn and a tree kill are all it needs.
@@ -190,24 +192,46 @@ function balayer(pid: number, debutMs: number, finMs: number): Promise<void> {
 	});
 }
 
+/* THE CLEANUP runs AFTER the result (the sweep is a PowerShell start, about
+   450 ms, and a run's result must not wait for it): the sweep, then the
+   removal of the run folder (an orphan would hold it as its working
+   directory), in the background, errors swallowed. The timeout, cap and
+   abort paths still kill the tree at once. */
+const nettoyages = new Set<Promise<void>>();
+function suivre(nettoyage: Promise<void>): void {
+	const suivi = nettoyage.catch(() => undefined).finally(() => { nettoyages.delete(suivi); });
+	nettoyages.add(suivi);
+}
+/** Resolves once every cleanup started so far (and any they start) is done:
+    the check's seam, to assert that no child and no run folder is left. */
+export async function attendreNettoyages(): Promise<void> {
+	while (nettoyages.size > 0) await Promise.all([...nettoyages]);
+}
+
 export async function executerPython(job: JobPython, contexte: ContextePython): Promise<CodeRun> {
 	const refus = verifierImports(job.code, contexte.installes);
 	if (refus) return refus;
 	if (job.signal?.aborted) return { status: "unavailable", stdout: "" };
 
 	const dossier = await mkdtemp(join(contexte.dossierTemp, "neo-python-run-"));
+	let balayage: Promise<void> = Promise.resolve();
 	try {
 		await writeFile(join(dossier, "main.py"), job.code, "utf8");
 		/* An abort during the two awaits above fired no listener yet. */
 		if (job.signal?.aborted) return { status: "unavailable", stdout: "" };
-		return await lancer(job, contexte, dossier);
+		const issue = await lancer(job, contexte, dossier);
+		balayage = issue.balayage;
+		return issue.resultat;
 	} finally {
-		await rm(dossier, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined);
+		suivre(balayage.catch(() => undefined).then(() => rm(dossier, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })));
 	}
 }
 
-function lancer(job: JobPython, contexte: ContextePython, dossier: string): Promise<CodeRun> {
-	return new Promise<CodeRun>((resolve) => {
+/** The result, and the sweep that follows it (see the cleanup). */
+interface IssuePython { resultat: CodeRun; balayage: Promise<void> }
+
+function lancer(job: JobPython, contexte: ContextePython, dossier: string): Promise<IssuePython> {
+	return new Promise<IssuePython>((resolve) => {
 		const env: NodeJS.ProcessEnv = {
 			SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
 			TEMP: dossier,
@@ -229,7 +253,7 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 				detached: process.platform !== "win32",
 			});
 		} catch (e) {
-			resolve({ status: "unavailable", stdout: "", error: e instanceof Error ? e.message : String(e) });
+			resolve({ resultat: { status: "unavailable", stdout: "", error: e instanceof Error ? e.message : String(e) }, balayage: Promise.resolve() });
 			return;
 		}
 
@@ -299,8 +323,9 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 			else if (fin) resultat = { status: fin, stdout };
 			else if (code === 0) resultat = { status: "ok", stdout };
 			else resultat = { status: "error", stdout, error: stderr };
-			/* Whatever the outcome, nothing the block started outlives it. */
-			void (echecLancement ? Promise.resolve() : balayerUneFois()).then(() => resolve(resultat));
+			/* Whatever the outcome, nothing the block started outlives it;
+			   the caller does not wait for that to answer. */
+			resolve({ resultat, balayage: echecLancement ? Promise.resolve() : balayerUneFois() });
 		};
 
 		enfant.on("error", (e) => terminer(e));

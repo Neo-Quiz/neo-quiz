@@ -100,7 +100,7 @@ const SURVIVANT_MUET = 'import subprocess, sys\np = subprocess.Popen([sys.execut
 const SURVIVANT_PIPES = 'import subprocess, sys\np = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])\nprint(p.pid, flush=True)\n';
 
 await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async (ex, cat) => {
-	const { executerPython, verifierImports, PLAFOND_SORTIE } = ex;
+	const { executerPython, verifierImports, PLAFOND_SORTIE, attendreNettoyages } = ex;
 	const absent = join(temp, "no-such-python.exe");
 	const tout = new Set(Object.keys(cat.PAQUETS));
 
@@ -123,6 +123,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 		verifierImports("import torch\nimport numpyy\n", new Set())?.status, "unsupported");
 	r.check("a missing interpreter: unavailable, folder removed",
 		(await executerPython({ code: "print(1)\n", timeoutMs: 1000 }, { executable: absent, installes: tout, dossierTemp: temp })).status, "unavailable");
+	await attendreNettoyages();
 	r.check("nothing left in the temp folder (pure cases)", vide(), true);
 	const { sansSequenceCoupee } = ex;
 	const coupe = (s, n) => sansSequenceCoupee(Buffer.from(s, "utf8").subarray(0, n)).toString("utf8");
@@ -133,7 +134,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 
 	/* ── The real interpreter ── */
 	const exe = pythonDuDeveloppeur();
-	const REELS = 24;
+	const REELS = 25;
 	let sautes = 0;
 	if (!exe) {
 		sautes = REELS;
@@ -143,6 +144,14 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 		const run = (code, timeoutMs = 20000, extra = {}) => executerPython({ code, timeoutMs }, ctx(extra));
 
 		r.check("print: ok, LF line ends", await run('print("ok")\n'), { status: "ok", stdout: "ok\n" });
+		/* The sweep (a PowerShell start, about 450 ms) runs AFTER the result:
+		   time-to-result stays that of Python itself. */
+		const tOk = Date.now();
+		await run('print("ok")\n');
+		const msOk = Date.now() - tOk;
+		console.log('print("ok") time-to-result: ' + msOk + " ms");
+		r.check("the result does not wait for the sweep (< 250 ms)", msOk < 250, true);
+		await attendreNettoyages();
 
 		const err = await run('raise ValueError("x")\n');
 		r.check("raise: error carrying the traceback", [err.status, /ValueError: x/.test(err.error ?? "")], ["error", true]);
@@ -197,13 +206,15 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 		/* A child that outlives a block which returned normally. */
 		const orphelin = await run(SURVIVANT_MUET);
 		const pidOrphelin = Number.parseInt(orphelin.stdout, 10);
-		r.check("Popen then exit 0: ok, the child is gone", [orphelin.status, pidOrphelin > 0 && !(await vivantApres(pidOrphelin))], ["ok", true]);
+		await attendreNettoyages();
+		r.check("Popen then exit 0: ok, the child is gone once the cleanup is done", [orphelin.status, pidOrphelin > 0 && !(await vivantApres(pidOrphelin, 500))], ["ok", true]);
 		if (pidOrphelin > 0) tuer(pidOrphelin);
 
 		/* Same child holding the pipes, and a timeout due while the sweep
 		   runs: the exit already decided the outcome. */
 		const tenace = await run(SURVIVANT_PIPES, 400);
 		const pidTenace = Number.parseInt(tenace.stdout, 10);
+		await attendreNettoyages();
 		r.check("child holding the pipes, timeout during the sweep: still ok, child gone", [tenace.status, pidTenace > 0 && !(await vivantApres(pidTenace))], ["ok", true]);
 		if (pidTenace > 0) tuer(pidTenace);
 
@@ -211,6 +222,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 		r.check("cap inside a character: the cut character is dropped, not shown as U+FFFD",
 			[accents.status, accents.stdout.length, accents.stdout.includes("�")], ["too-long", 131072, false]);
 
+		await attendreNettoyages();
 		r.check("nothing left in the temp folder (real runs)", vide(), true);
 
 		/* ── Discriminance: each mutant must break its case ── */
@@ -220,6 +232,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 			const res = await mod.executerPython({ code: "while True: pass\n", timeoutMs: 1000 }, ctx({ surDemarrage: x => { p = x; } }));
 			r.check("mutant without the kill leaves python.exe running", [res.status, p > 0 && vivant(p)], ["timeout", true]);
 			if (p > 0) tuer(p);
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 		{
@@ -228,8 +241,10 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 			const { mod, dir } = await mutant([['"/T", "/F"', '"/F"'], ["balayage = balayer(enfant.pid, debut, Date.now())", "balayage = Promise.resolve()"]]);
 			const res = await mod.executerPython({ code: 'import subprocess, sys\np = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])\nprint(p.pid, flush=True)\nwhile True: pass\n', timeoutMs: 3000 }, ctx());
 			const gp = Number.parseInt(res.stdout, 10);
+			await mod.attendreNettoyages();
 			r.check("mutant without /T nor the sweep leaves the grandchild running", gp > 0 && vivant(gp), true);
 			if (gp > 0) tuer(gp);
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 		{
@@ -239,20 +254,24 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 			   (measured: fired after 7.5 s and 1.5 GB). */
 			const res = await mod.executerPython({ code: BORNE, timeoutMs: 20000 }, ctx());
 			r.check("mutant without the cap returns all 400 KB", [res.status, res.stdout.length], ["ok", 400400]);
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 		{
 			const { mod, dir } = await mutant("const env: NodeJS.ProcessEnv = {", "const env: NodeJS.ProcessEnv = { ...process.env,");
 			const res = await mod.executerPython({ code: "import os\nprint(os.environ.get('NQ_SECRET_TOKEN'))\n", timeoutMs: 20000 }, ctx());
 			r.check("mutant with the app's environment leaks the secret", res.stdout, "leak\n");
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 		{
 			const { mod, dir } = await mutant("balayage = balayer(enfant.pid, debut, Date.now())", "balayage = Promise.resolve()");
 			const res = await mod.executerPython({ code: SURVIVANT_MUET, timeoutMs: 20000 }, ctx());
 			const p = Number.parseInt(res.stdout, 10);
+			await mod.attendreNettoyages();
 			r.check("mutant without the sweep leaves the child running", p > 0 && vivant(p), true);
 			if (p > 0) tuer(p);
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 		{
@@ -261,6 +280,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 			const p = Number.parseInt(res.stdout, 10);
 			r.check("mutant whose late timer rewrites the outcome answers timeout", res.status, "timeout");
 			if (p > 0) tuer(p);
+			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
 	}
