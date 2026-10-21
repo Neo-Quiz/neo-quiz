@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.23] - 2026-10-21
+
 ### Fixed
 
 - Dropdowns get back their field look (background, border, font, rounded corners), lost in 1.21.22.
