@@ -127,6 +127,7 @@ await withSrcModule("apps/windows/electron/reseau.ts", async ({ HOTES_AUTORISES,
 				"pypi.org",
 				"registry.npmjs.org",
 				"release-assets.githubusercontent.com",
+				"www.python.org",
 			]);
 
 		await cas(r, "un hôte hors liste rend null ET un console.warn, sans toucher le réseau", async () => {

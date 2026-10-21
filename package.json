@@ -95,6 +95,7 @@
     "check:python-catalogue": "node scripts/check-python-catalogue.mjs",
     "check:code-packages": "node scripts/check-code-packages.mjs",
     "check:python-zip": "node scripts/check-python-zip.mjs",
+    "check:python-install": "node scripts/check-python-install.mjs",
     "build:language-pack": "node scripts/build-language-pack.mjs",
     "build:language-pack:python": "node scripts/build-language-pack.mjs python",
     "check:electron-comptes": "node scripts/check-electron-comptes.mjs",

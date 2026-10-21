@@ -11,14 +11,16 @@ export const PAQUETS: Record<string, { version: string; url: string; sha256: str
 export const IMPORTS: Record<string, string> = IMPORTS_DATA;
 export const STDLIB: ReadonlySet<string> = new Set(STDLIB_DATA);
 
-/** The package and its transitive dependencies, dependencies first. */
-export function fermeture(paquet: string): string[] {
+/** The package and its transitive dependencies, dependencies first.
+    `paquets` is the installer check's seam (a fake catalogue); a name that
+    is not an OWN key (`constructor`, `__proto__`) is unknown. */
+export function fermeture(paquet: string, paquets: Record<string, { dependances: readonly string[] }> = PAQUETS): string[] {
 	const sortie: string[] = [];
 	const vus = new Set<string>();
 	const visiter = (nom: string) => {
 		if (vus.has(nom)) return;
 		vus.add(nom);
-		const p = PAQUETS[nom];
+		const p = Object.prototype.hasOwnProperty.call(paquets, nom) ? paquets[nom] : undefined;
 		if (!p) throw new Error("Unknown package: " + nom);
 		for (const d of [...p.dependances].sort()) visiter(d);
 		sortie.push(nom);

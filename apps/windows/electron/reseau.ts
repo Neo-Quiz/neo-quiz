@@ -83,6 +83,9 @@ export const HOTES_AUTORISES = new Set([
 	"cdn.jsdelivr.net",
 	"pypi.org",
 	"files.pythonhosted.org",
+	/* The pinned CPython embeddable zip (`python/installation.ts`,
+	   2026-10-22), downloaded by the main process only, hash pinned. */
+	"www.python.org",
 	/* The school's own Moodle (`moodle/garde.ts` SITE_DEFAUT, 2026-10-07):
 	   allowed by code, so it needs no field and no dialog. Another site goes
 	   through the guarded `moodle` setting. */

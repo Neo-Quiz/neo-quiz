@@ -179,6 +179,13 @@ jobs:
       - name: Python zip reader
         run: npm run check:python-zip
 
+      # The Python installer: bytes off their pin, a redirect to http: or off
+      # the host list, a wheel that fails mid-unpack (no .part left), deps
+      # installed first, one download for parallel installs, the _pth naming
+      # exactly the installed folders, and no uninstall of a needed library.
+      - name: Python installer
+        run: npm run check:python-install
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar
