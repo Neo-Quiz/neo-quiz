@@ -373,5 +373,14 @@ function normaliserResultat(res: unknown): CodeRun {
 	const statuts = ["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed", "unsupported"] as const;
 	const status = statuts.includes(o.status as typeof statuts[number]) ? o.status as CodeRun["status"] : "error";
 	const stdout = typeof o.stdout === "string" ? o.stdout.slice(0, 20000) : "";
-	return typeof o.error === "string" ? { status, stdout, error: o.error.slice(0, 20000) } : { status, stdout };
+	const resultat: CodeRun = typeof o.error === "string" ? { status, stdout, error: o.error.slice(0, 20000) } : { status, stdout };
+	/* Package and module names: at most 64, each at most 100 characters. */
+	const noms = (v: unknown): string[] | undefined => Array.isArray(v)
+		? v.filter((n): n is string => typeof n === "string" && n.length > 0 && n.length <= 100).slice(0, 64)
+		: undefined;
+	const missing = noms(o.missing);
+	const unsupported = noms(o.unsupported);
+	if (missing) resultat.missing = missing;
+	if (unsupported) resultat.unsupported = unsupported;
+	return resultat;
 }

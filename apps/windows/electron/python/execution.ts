@@ -26,6 +26,9 @@
      the run answers `timeout`.
    - 256 KiB of stdout + stderr together → the tree is killed and the run
      answers `too-long` with the first 256 KiB.
+   - AFTER EVERY RUN, whatever its outcome, what the interpreter left
+     running is swept (`balayer`): a block may `Popen` a long child and
+     return normally. One limit is written at the sweep: a double fork.
 
    It does not import `../process.ts` (the CLI launcher, heavy imports): a
    spawn and a tree kill are all it needs.
@@ -89,13 +92,13 @@ export function verifierImports(code: string, installes: ReadonlySet<string>): C
 function sansCr(): (morceau: Buffer) => Buffer {
 	let crEnAttente = false;
 	return (morceau) => {
+		if (!crEnAttente && !morceau.includes(0x0d)) return morceau;
 		const octets: number[] = [];
-		let i = 0;
 		if (crEnAttente) {
 			crEnAttente = false;
 			if (morceau[0] !== 0x0a) octets.push(0x0d);
 		}
-		for (; i < morceau.length; i++) {
+		for (let i = 0; i < morceau.length; i++) {
 			const o = morceau[i];
 			if (o === 0x0d) {
 				if (i === morceau.length - 1) { crEnAttente = true; continue; }
@@ -107,21 +110,84 @@ function sansCr(): (morceau: Buffer) => Buffer {
 	};
 }
 
-/** Kills `enfant` and every process it started. */
-function tuerArbre(enfant: ChildProcess): void {
+/** `octets` without a UTF-8 sequence cut short at its end (the cap may
+    fall inside a character; decoding it would show a U+FFFD). */
+export function sansSequenceCoupee(octets: Buffer): Buffer {
+	const n = octets.length;
+	for (let recul = 1; recul <= Math.min(3, n); recul++) {
+		const o = octets[n - recul];
+		if ((o & 0xc0) === 0x80) continue; /* continuation byte: look further back */
+		const longueur = o >= 0xf0 ? 4 : o >= 0xe0 ? 3 : o >= 0xc0 ? 2 : 1;
+		return longueur > recul ? octets.subarray(0, n - recul) : octets;
+	}
+	return octets;
+}
+
+const taskkill = () => join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe");
+
+/** Kills `enfant` and every process it started, while it is alive (`/T`
+    walks the tree from a LIVE root). Resolves once the kill was tried. */
+function tuerArbre(enfant: ChildProcess): Promise<void> {
 	const pid = enfant.pid;
-	if (pid === undefined) return;
+	if (pid === undefined) return Promise.resolve();
 	if (process.platform === "win32") {
-		const taskkill = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe");
-		execFile(taskkill, ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, () => {
-			/* taskkill failed (the process already exited, or it could not be
-			   reached): the direct kill below still covers the interpreter. */
-			try { enfant.kill("SIGKILL"); } catch { /* already gone */ }
+		return new Promise((resolve) => {
+			execFile(taskkill(), ["/pid", String(pid), "/T", "/F"], { windowsHide: true, timeout: 10000 }, () => {
+				/* Whatever taskkill answered (it may not have reached the
+				   process), the direct kill still covers the interpreter. */
+				try { enfant.kill("SIGKILL"); } catch { /* already gone */ }
+				resolve();
+			});
 		});
-		return;
 	}
 	/* Elsewhere the interpreter leads its own process group (`detached`). */
 	try { process.kill(-pid, "SIGKILL"); } catch { try { enfant.kill("SIGKILL"); } catch { /* already gone */ } }
+	return Promise.resolve();
+}
+
+/* THE SWEEP, after the interpreter exited, on EVERY outcome: a block that
+   `Popen`s a long child and returns would otherwise leave it running (and
+   holding the run folder as its working directory). `taskkill /T` cannot
+   help any more: it walks the tree from a live root. Windows does not
+   re-parent an orphan, though: its `ParentProcessId` still names our dead
+   interpreter. The script lists the processes once, takes those whose
+   parent is our pid AND that were created between our spawn and its exit
+   (a pid reused by an unrelated process after our exit would only have
+   later children), then their descendants (each created after its
+   parent), and stops them all. Its values come from the environment,
+   never from its text: the script is constant.
+   LIMIT (no Job Object without native code): a grandchild whose parent
+   ALREADY exited before the sweep (a double fork) has a parent pid that no
+   live process carries, and escapes the chain. */
+const SCRIPT_BALAYAGE = [
+	"$ErrorActionPreference = 'SilentlyContinue'",
+	"$racine = [uint32]$env:NQ_RACINE; $debut = [int64]$env:NQ_DEBUT; $fin = [int64]$env:NQ_FIN",
+	"$tous = @(Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate)",
+	"$vus = @{}; $file = New-Object System.Collections.Queue",
+	"foreach ($p in $tous) { $c = $p.CreationDate.ToFileTimeUtc(); if ($p.ParentProcessId -eq $racine -and $c -ge $debut -and $c -le $fin) { $vus[$p.ProcessId] = $c; $file.Enqueue($p) } }",
+	"while ($file.Count -gt 0) { $q = $file.Dequeue(); foreach ($p in $tous) { if ($p.ParentProcessId -eq $q.ProcessId -and -not $vus.ContainsKey($p.ProcessId)) { $c = $p.CreationDate.ToFileTimeUtc(); if ($c -ge $vus[$q.ProcessId]) { $vus[$p.ProcessId] = $c; $file.Enqueue($p) } } } }",
+	"foreach ($id in @($vus.Keys)) { Stop-Process -Id $id -Force }",
+].join("\n");
+
+/** Milliseconds since 1970 as a Windows FILETIME (100 ns since 1601). */
+const enFiletime = (ms: number) => String((BigInt(Math.floor(ms)) + 11644473600000n) * 10000n);
+
+/** Stops what the dead interpreter `pid` left running (see the sweep). */
+function balayer(pid: number, debutMs: number, finMs: number): Promise<void> {
+	if (process.platform !== "win32") {
+		/* The process group outlives its leader while a member lives. */
+		try { process.kill(-pid, "SIGKILL"); } catch { /* none left */ }
+		return Promise.resolve();
+	}
+	const powershell = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+	return new Promise((resolve) => {
+		execFile(powershell, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", SCRIPT_BALAYAGE], {
+			windowsHide: true,
+			timeout: 10000,
+			/* Clock granularity: a second of slack before the spawn. */
+			env: { ...process.env, NQ_RACINE: String(pid), NQ_DEBUT: enFiletime(debutMs - 1000), NQ_FIN: enFiletime(finMs) },
+		}, () => resolve());
+	});
 }
 
 export async function executerPython(job: JobPython, contexte: ContextePython): Promise<CodeRun> {
@@ -132,6 +198,8 @@ export async function executerPython(job: JobPython, contexte: ContextePython): 
 	const dossier = await mkdtemp(join(contexte.dossierTemp, "neo-python-run-"));
 	try {
 		await writeFile(join(dossier, "main.py"), job.code, "utf8");
+		/* An abort during the two awaits above fired no listener yet. */
+		if (job.signal?.aborted) return { status: "unavailable", stdout: "" };
 		return await lancer(job, contexte, dossier);
 	} finally {
 		await rm(dossier, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined);
@@ -149,6 +217,7 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 			MPLCONFIGDIR: dossier,
 			PATH: dirname(contexte.executable),
 		};
+		const debut = Date.now();
 		let enfant: ChildProcess;
 		try {
 			enfant = spawn(contexte.executable, ["-X", "utf8", "-B", "main.py"], {
@@ -168,17 +237,25 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 		const erreur: Buffer[] = [];
 		let restant = PLAFOND_SORTIE;
 		let fin: "timeout" | "too-long" | "aborted" | null = null;
+		let sorti = false;
 		let code: number | null = null;
 		let termine = false;
+		let balayage: Promise<void> | null = null;
 		let minuterieFermeture: ReturnType<typeof setTimeout> | undefined;
 		let minuterieArret: ReturnType<typeof setTimeout> | undefined;
 
+		const balayerUneFois = () => {
+			if (!balayage && enfant.pid !== undefined) balayage = balayer(enfant.pid, debut, Date.now());
+			return balayage ?? Promise.resolve();
+		};
 		const arreter = (raison: "timeout" | "too-long" | "aborted") => {
-			if (fin || termine) return;
+			/* Once the interpreter exited, its outcome is known: a late timer
+			   must not rewrite a clean run. */
+			if (fin || termine || sorti) return;
 			fin = raison;
-			tuerArbre(enfant);
-			/* A kill that never lands still ends the run. */
-			minuterieArret = setTimeout(() => terminer(), ATTENTE_ARRET_MS);
+			void tuerArbre(enfant);
+			/* A kill that never lands: one more try, then the run ends. */
+			minuterieArret = setTimeout(() => { void tuerArbre(enfant).then(() => terminer()); }, ATTENTE_ARRET_MS);
 		};
 		const recevoir = (cible: Buffer[]) => {
 			const crlf = sansCr();
@@ -201,6 +278,8 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 		const minuterie = setTimeout(() => arreter("timeout"), job.timeoutMs);
 		const surAbandon = () => arreter("aborted");
 		job.signal?.addEventListener("abort", surAbandon, { once: true });
+		/* An abort between the caller's check and the listener above. */
+		if (job.signal?.aborted) arreter("aborted");
 
 		const terminer = (echecLancement?: Error) => {
 			if (termine) return;
@@ -211,18 +290,26 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 			job.signal?.removeEventListener("abort", surAbandon);
 			enfant.stdout?.destroy();
 			enfant.stderr?.destroy();
-			const stdout = Buffer.concat(sortie).toString("utf8");
-			const stderr = Buffer.concat(erreur).toString("utf8");
-			if (echecLancement) resolve({ status: "unavailable", stdout: "", error: echecLancement.message });
-			else if (fin === "aborted") resolve({ status: "unavailable", stdout: "" });
-			else if (fin) resolve({ status: fin, stdout });
-			else if (code === 0) resolve({ status: "ok", stdout });
-			else resolve({ status: "error", stdout, error: stderr });
+			const texte = (morceaux: Buffer[]) => sansSequenceCoupee(Buffer.concat(morceaux)).toString("utf8");
+			const stdout = texte(sortie);
+			const stderr = texte(erreur);
+			let resultat: CodeRun;
+			if (echecLancement) resultat = { status: "unavailable", stdout: "", error: echecLancement.message };
+			else if (fin === "aborted") resultat = { status: "unavailable", stdout: "" };
+			else if (fin) resultat = { status: fin, stdout };
+			else if (code === 0) resultat = { status: "ok", stdout };
+			else resultat = { status: "error", stdout, error: stderr };
+			/* Whatever the outcome, nothing the block started outlives it. */
+			void (echecLancement ? Promise.resolve() : balayerUneFois()).then(() => resolve(resultat));
 		};
 
 		enfant.on("error", (e) => terminer(e));
 		enfant.on("exit", (c) => {
+			sorti = true;
 			code = c;
+			/* Sweep at once: an orphan holding the pipes is what would keep
+			   `close` from coming. */
+			void balayerUneFois();
 			/* The streams close once every holder of the pipe is gone; one
 			   kept open outside the tree must not hold the run forever. */
 			minuterieFermeture = setTimeout(() => terminer(), ATTENTE_FERMETURE_MS);
