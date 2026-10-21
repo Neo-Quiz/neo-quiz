@@ -370,7 +370,7 @@ export function creerBacASable(racine: string, langages: string, preload: string
    contract's fields are kept, typed. */
 function normaliserResultat(res: unknown): CodeRun {
 	const o = (res ?? {}) as Record<string, unknown>;
-	const statuts = ["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed"] as const;
+	const statuts = ["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed", "unsupported"] as const;
 	const status = statuts.includes(o.status as typeof statuts[number]) ? o.status as CodeRun["status"] : "error";
 	const stdout = typeof o.stdout === "string" ? o.stdout.slice(0, 20000) : "";
 	return typeof o.error === "string" ? { status, stdout, error: o.error.slice(0, 20000) } : { status, stdout };

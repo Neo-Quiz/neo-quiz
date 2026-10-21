@@ -186,6 +186,16 @@ jobs:
       - name: Python installer
         run: npm run check:python-install
 
+      # Running one Python block: imports judged before Python starts, the
+      # process tree killed on timeout and past 256 KiB of output, an
+      # environment built from nothing. The real runs need Windows and
+      # CPython 3.12: on this Linux runner all 18 are SKIPPED, and the step
+      # fails if that count changes (never silently green).
+      - name: Python block runner
+        run: npm run check:python-run
+        env:
+          NQ_PYTHON_RUN_EXPECT_SKIPPED: "18"
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar

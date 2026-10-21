@@ -1010,11 +1010,16 @@ export interface CodeJob {
 	timeoutMs: number;
 }
 /** What the sandbox returns, never more than these fields. `compile-error`:
-    the compiler refused the program; `error` carries its message. */
+    the compiler refused the program; `error` carries its message.
+    `unsupported`: the program imports a module that no installable package
+    provides (named in `unsupported`); `not-installed` may name, in
+    `missing`, the root packages to install before it can run. */
 export interface CodeRun {
-	status: "ok" | "error" | "compile-error" | "timeout" | "too-long" | "unavailable" | "not-installed";
+	status: "ok" | "error" | "compile-error" | "timeout" | "too-long" | "unavailable" | "not-installed" | "unsupported";
 	stdout: string;
 	error?: string;
+	missing?: string[];
+	unsupported?: string[];
 }
 /** THE CODE SANDBOX — an OPTIONAL member, the app only
     (apps/windows/electron/code-sandbox.ts). The plugin runs nothing. */
