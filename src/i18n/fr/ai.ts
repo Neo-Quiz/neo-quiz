@@ -50,7 +50,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	   du tableau de bord. Ne restent que les clés du badge et de l'infobulle
 	   de la page « Générer » (`dashboard/usage-format.ts`), consommées par
 	   l'APPLICATION. */
-	"ai.usage.badge": "{tokens} tokens",
+	"ai.usage.badge": "{tokens} jetons",
 	"ai.usage.sessionCurrent": "Session actuelle",
 	"ai.usage.allModels": "Tous les modèles",
 	"ai.usage.usedPercent": "{n} % utilisés",

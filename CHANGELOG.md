@@ -28,6 +28,7 @@ release notes.
 - Fix folder progress, course rows, planning and home bars ignoring unfinished quiz sessions.
 - A fill-in blank written inside inline code shows as a blank instead of two boxes and its number.
 - The bin of a document row shows on touch screens instead of staying invisible yet tappable.
+- Four editor and usage labels left in English in the French interface are translated.
 - Android Back closes an open action menu or picker before leaving the folder, closing the window beneath it or exiting the app.
 
 ## [1.21.23] - 2026-10-21

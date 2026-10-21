@@ -106,7 +106,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.form.resourceSection": "Ressource",
 	"editor.form.resourceSectionWithFile": "Ressource — {file}",
 	"editor.form.resourceDefaultLabel": "Activité PT",
-	"editor.form.resourceLabel": "Label",
+	"editor.form.resourceLabel": "Libellé",
 	"editor.form.resourceLabelPlaceholder": "Activité PT",
 	"editor.form.resourceFileName": "Nom du fichier à ouvrir",
 	"editor.form.resourceFilePlaceholder": "fichier.pka",
@@ -121,7 +121,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 	"editor.ordering.possibilities": "Possibilités",
 	"editor.ordering.itemPlaceholder": "Élément",
 	"editor.ordering.slotLabels": "Labels des slots",
-	"editor.ordering.slotPlaceholder": "Slot",
+	"editor.ordering.slotPlaceholder": "Emplacement",
 	"editor.ordering.correctOrder": "Ordre correct (index → slot)",
 	"editor.ordering.slotDefault": "Étape {n}",
 
@@ -135,7 +135,7 @@ export const FR_EDITOR: Record<keyof typeof EN_EDITOR, string> = {
 
 	/* ── Texte libre & terminaux ── */
 	"editor.text.commandPrefix": "Préfix du prompt",
-	"editor.text.placeholderLabel": "Placeholder",
+	"editor.text.placeholderLabel": "Texte indicatif",
 	"editor.text.placeholderHint": "Texte indicatif...",
 	"editor.text.acceptedAnswers": "Réponses acceptées",
 	"editor.text.answerPlaceholder": "Réponse",
