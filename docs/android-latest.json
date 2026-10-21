@@ -1,8 +1,8 @@
 {
-  "versionCode": 38,
-  "versionName": "0.2.36",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.36/NeoQuiz-0.2.36.apk",
-  "sha256": "62eb4931d43c9984389bf23f250589add6e05da4d530ead94f4c023150afb048",
-  "size": 56210341,
-  "notes": "Review your answers before a generation starts."
+  "versionCode": 39,
+  "versionName": "0.2.37",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.37/NeoQuiz-0.2.37.apk",
+  "sha256": "5a1d402dea1e2176cbf9efe465fad60ea45f0b83ba6b7cf751d4e52bebaac61b",
+  "size": 56211933,
+  "notes": "Selectable formulas, faster quiz opening, self-contained code blocks."
 }
