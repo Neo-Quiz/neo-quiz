@@ -35,6 +35,7 @@ export const EN_ENGINE = {
 	"engine.lecture.keyPoints": "Key points",
 	"engine.lecture.source": "Source: {source}",
 	"engine.lecture.flipHint": "Click a card, or press Enter, to flip it.",
+	"engine.lecture.flipHintTouch": "Tap a card to flip it.",
 	"engine.lecture.flipAria": "{front}: flip the card",
 	"engine.lecture.flippedAria": "{front}: {back}",
 	"engine.lecture.hook.analogie": "Analogy",

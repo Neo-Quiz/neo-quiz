@@ -1098,7 +1098,16 @@ html.nq-phone:has(#neo-quiz-root > .qbd-qz) body {
    key badge on its rating buttons. */
 @media (pointer: coarse) {
 	.quiz-fc-tip,
-	.quiz-fc-rate .quiz-flashcard-kbd {
+	.quiz-fc-rate .quiz-flashcard-kbd,
+	.quiz-lecture-indice-clic {
+		display: none;
+	}
+}
+
+/* A reading's flip hint names the tap on a touch screen, the click and the
+   Enter key elsewhere (lecture-rendu.ts renders both). */
+@media not (pointer: coarse) {
+	.quiz-lecture-indice-tap {
 		display: none;
 	}
 }

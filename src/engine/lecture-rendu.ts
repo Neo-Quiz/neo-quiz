@@ -102,7 +102,7 @@ function retenirHtml(r: Retenir, p: PortesLecture): string {
 		const fermee = p.attribut(t("engine.lecture.flipAria", { front: c.recto }));
 		const ouverte = p.attribut(t("engine.lecture.flippedAria", { front: c.recto, back: c.verso }));
 		return `<button type="button" class="quiz-lecture-carte" aria-pressed="false" aria-label="${fermee}" data-aria-ferme="${fermee}" data-aria-ouvert="${ouverte}"><span class="quiz-lecture-carte-in" aria-hidden="true"><span class="quiz-lecture-face is-recto"><span>${p.inline(c.recto)}</span></span><span class="quiz-lecture-face is-verso"><span>${p.inline(c.verso)}</span></span></span></button>`;
-	}).join("")}</div><div class="quiz-lecture-indice">${p.inline(t("engine.lecture.flipHint"))}</div></div>`;
+	}).join("")}</div><div class="quiz-lecture-indice"><span class="quiz-lecture-indice-clic">${p.inline(t("engine.lecture.flipHint"))}</span><span class="quiz-lecture-indice-tap">${p.inline(t("engine.lecture.flipHintTouch"))}</span></div></div>`;
 }
 
 /**
