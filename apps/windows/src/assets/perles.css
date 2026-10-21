@@ -208,6 +208,10 @@ body > .quiz-handin-overlay .quiz-submit-perle {
 	--perle-depth: 4px;
 	color: #fff;
 }
+/* …but flat in the hand-in window: no 3D in a window (hand-in.css). */
+body > .quiz-handin-overlay .quiz-submit-perle {
+	--perle-depth: 0px;
+}
 /* And its "Back", with the same face. */
 #neo-quiz-root > .qbd-qz .quiz-submit-back {
 	--back-face: #2b2a33;

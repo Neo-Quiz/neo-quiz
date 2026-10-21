@@ -15,9 +15,8 @@
   justify-content: center;
   padding: clamp(10px, 2vw, 18px);
   box-sizing: border-box;
-  background: color-mix(in srgb, #000 32%, transparent);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* The backdrop of every other window: a 30 % black smoke, no blur. */
+  background: rgba(0, 0, 0, 0.3);
   animation: quiz-handin-fade var(--quiz-dur-mid, 180ms) ease;
 }
 
@@ -48,6 +47,16 @@
 
 .quiz-handin-modal .quiz-submit-perles{
   margin-bottom: 8px;
+}
+
+/* No 3D in a window: the beads and « Hand in » keep their colours but lose
+   the edge they sit on and the drop when pressed. */
+.quiz-handin-modal .quiz-submit-perle{
+  --perle-depth: 0px;
+}
+
+.quiz-handin-modal .quiz-action-btn.success{
+  --quiz-press-depth: 0px;
 }
 
 @keyframes quiz-handin-fade{
