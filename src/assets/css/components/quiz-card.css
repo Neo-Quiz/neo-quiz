@@ -585,19 +585,27 @@ code.quiz-code-tokens .token.number{ color: #ff9e64; }
   -webkit-user-select: text;
   user-select: text;
 }
-/* One solid highlight on a selected formula, not glyph by glyph with holes at
-   its spacing (set by the `selectionchange` listener of the same file). */
-.math.is-selected{
-  background: var(--nq-selection, Highlight);
+/* Inside a formula the native highlight (glyph by glyph, uneven, with holes)
+   is transparent; `.math-selection` is ONE band from the first selected glyph
+   to the last (placed by the `selectionchange` listener of
+   apps/windows/src/host/math.ts), under the glyphs. An inline formula's band
+   covers the whole line, as the native highlight of text does: the span's
+   content area is about 1.33em in the interface font, the line `1lh`. */
+.math{
+  position: relative;
+  z-index: 0;
 }
-/* The native highlight of text fills the whole line; an inline span's
-   background only its content area (about 1.33em in the interface font).
-   Painting-only padding makes up the difference, so two selected lines
-   meet without a dark seam under a formula. */
-.math-inline.is-selected{
-  padding-block: max(0px, calc((1lh - 1.3334em) / 2));
-}
-.math.is-selected::selection,
-.math.is-selected ::selection{
+.math::selection,
+.math ::selection{
   background: transparent;
+}
+.math-selection{
+  position: absolute;
+  z-index: -1;
+  background: var(--nq-selection, Highlight);
+  pointer-events: none;
+}
+.math-inline > .math-selection{
+  top: calc(-1 * max(0px, (1lh - 1.3334em) / 2));
+  bottom: calc(-1 * max(0px, (1lh - 1.3334em) / 2));
 }

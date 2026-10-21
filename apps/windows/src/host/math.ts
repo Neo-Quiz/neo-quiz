@@ -26,10 +26,43 @@ provideMathlive(mathlive);
 /* Rendered formulas are selectable (2026-10-21; MathLive's static CSS sets
    `user-select: none` on `.ML__latex`, overridden in quiz-card.css). Their
    glyph spans make poor text (a fraction copies as its numerator and
-   denominator side by side), so a copy whose selection touches a formula puts
-   that formula's LaTeX source in the clipboard, between `$` (or `$$`), as the
-   quiz wrote it. Installed once, on the first formula rendered. */
+   denominator side by side), so a copy that holds a WHOLE formula puts its
+   LaTeX source in the clipboard, between `$` (or `$$`), as the quiz wrote
+   it; a formula only partly selected copies the selected glyphs. Installed
+   once, on the first formula rendered. */
 let copieInstallee = false;
+
+/** The formulas a range touches, in document order. */
+function formulesTouchees(range: Range): HTMLElement[] {
+	const racine = range.commonAncestorContainer;
+	const dans = racine instanceof Element ? racine : racine.parentElement;
+	if (!dans) return [];
+	const propre = dans.closest<HTMLElement>(".math[data-latex]");
+	if (propre) return [propre];
+	return [...dans.querySelectorAll<HTMLElement>(".math[data-latex]")].filter(m => range.intersectsNode(m));
+}
+
+/** The horizontal extent of what a range selects inside a formula: the union
+    of its selected glyphs, or null when none is. */
+function etendueSelectionnee(range: Range, formule: HTMLElement): { gauche: number; droite: number; haut: number; bas: number } | null {
+	let gauche = Infinity, droite = -Infinity, haut = Infinity, bas = -Infinity;
+	const parcours = document.createTreeWalker(formule, NodeFilter.SHOW_TEXT);
+	const morceau = document.createRange();
+	for (let n = parcours.nextNode() as Text | null; n; n = parcours.nextNode() as Text | null) {
+		if (!n.data.trim() || !range.intersectsNode(n)) continue;
+		const debut = n === range.startContainer ? range.startOffset : 0;
+		const fin = n === range.endContainer ? range.endOffset : n.length;
+		if (fin <= debut) continue;
+		morceau.setStart(n, debut);
+		morceau.setEnd(n, fin);
+		const r = morceau.getBoundingClientRect();
+		if (!r.width) continue;
+		gauche = Math.min(gauche, r.left); droite = Math.max(droite, r.right);
+		haut = Math.min(haut, r.top); bas = Math.max(bas, r.bottom);
+	}
+	return droite > gauche ? { gauche, droite, haut, bas } : null;
+}
+
 function copierFormulesEnLatex(): void {
 	if (copieInstallee) return;
 	copieInstallee = true;
@@ -39,17 +72,16 @@ function copierFormulesEnLatex(): void {
 		const morceaux: string[] = [];
 		let formule = false;
 		for (let i = 0; i < sel.rangeCount; i++) {
-			const range = sel.getRangeAt(i).cloneRange();
-			// A selection that starts or ends inside a formula takes the whole formula.
-			const debut = (range.startContainer.parentElement ?? null)?.closest<HTMLElement>(".math[data-latex]");
-			const fin = (range.endContainer.parentElement ?? null)?.closest<HTMLElement>(".math[data-latex]");
-			if (debut) range.setStartBefore(debut);
-			if (fin) range.setEndAfter(fin);
+			const range = sel.getRangeAt(i);
+			const originales = formulesTouchees(range);
 			const copie = document.createElement("div");
 			copie.append(range.cloneContents());
-			const maths = copie.querySelectorAll<HTMLElement>(".math[data-latex]");
-			if (maths.length) formule = true;
-			maths.forEach(m => {
+			copie.querySelectorAll(".math-selection").forEach(o => o.remove());
+			// The clone holds the touched formulas in the same order, whole or cut.
+			copie.querySelectorAll<HTMLElement>(".math[data-latex]").forEach((m, k) => {
+				const origine = originales[k];
+				if (!origine || !sel.containsNode(origine, false)) return;
+				formule = true;
 				const bloc = m.classList.contains("math-block");
 				m.replaceWith(bloc ? `$$${m.dataset.latex}$$` : `$${m.dataset.latex}$`);
 			});
@@ -59,27 +91,47 @@ function copierFormulesEnLatex(): void {
 		e.clipboardData.setData("text/plain", morceaux.join("\n"));
 		e.preventDefault();
 	});
-	/* The native highlight paints glyph by glyph, with holes at MathLive's
-	   spacing (around `=`, `+`): a formula touched by the selection gets one
-	   solid highlight instead (`.is-selected`, quiz-card.css), its glyphs'
-	   own highlight made transparent. */
-	let marquees: HTMLElement[] = [];
+	/* The native highlight paints glyph by glyph, each glyph at its own height
+	   and with holes at MathLive's spacing (around `=`, `+`). Inside a formula
+	   it is made transparent (quiz-card.css) and ONE band is drawn instead,
+	   from the first selected glyph to the last, at the height of the line
+	   (`.math-selection`): the selection stays free, glyph by glyph, like the
+	   text around it. */
+	let surlignees: HTMLElement[] = [];
 	document.addEventListener("selectionchange", () => {
 		const sel = document.getSelection();
-		const touchees: HTMLElement[] = [];
+		const vues: HTMLElement[] = [];
 		if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
 			for (let i = 0; i < sel.rangeCount; i++) {
 				const range = sel.getRangeAt(i);
-				const racine = range.commonAncestorContainer;
-				const dans = racine instanceof Element ? racine : racine.parentElement;
-				const propre = dans?.closest<HTMLElement>(".math[data-latex]");
-				if (propre) touchees.push(propre);
-				dans?.querySelectorAll<HTMLElement>(".math[data-latex]").forEach(m => { if (range.intersectsNode(m)) touchees.push(m); });
+				for (const m of formulesTouchees(range)) {
+					const e = etendueSelectionnee(range, m);
+					if (!e) continue;
+					let bande = m.querySelector<HTMLElement>(":scope > .math-selection");
+					if (!bande) {
+						bande = document.createElement("span");
+						bande.className = "math-selection";
+						bande.setAttribute("aria-hidden", "true");
+						m.append(bande);
+					}
+					const boite = m.getBoundingClientRect();
+					bande.style.left = `${e.gauche - boite.left}px`;
+					bande.style.width = `${e.droite - e.gauche}px`;
+					// A display formula spans the glyphs' height; an inline one the line (CSS).
+					if (m.classList.contains("math-block")) {
+						bande.style.top = `${e.haut - boite.top}px`;
+						bande.style.height = `${e.bas - e.haut}px`;
+					}
+					bande.hidden = false;
+					vues.push(m);
+				}
 			}
 		}
-		for (const m of marquees) if (!touchees.includes(m)) m.classList.remove("is-selected");
-		for (const m of touchees) m.classList.add("is-selected");
-		marquees = touchees;
+		for (const m of surlignees) if (!vues.includes(m)) {
+			const bande = m.querySelector<HTMLElement>(":scope > .math-selection");
+			if (bande) bande.hidden = true;
+		}
+		surlignees = vues;
 	});
 }
 
