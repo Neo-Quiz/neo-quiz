@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.24] - 2026-10-21
+
 ### Changed
 
 - On the phone, every button, card, row, tab, menu item and answer reacts the instant it is touched and settles back smoothly; folding sections and menus open and close with motion, and the bottom bar ripple no longer sparkles.
