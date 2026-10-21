@@ -12,7 +12,10 @@
    Keyboard: ↑/↓ move the highlight, Enter picks, 1–9 pick directly, Esc
    skips the question (an empty answer: the generation goes on without that
    precision). Focus goes to the first option when the card appears. When
-   every question is answered or skipped, `repondre` starts the generation.
+   every question is answered or skipped, a review step lists the answers and
+   asks to submit them, like Claude Code's "Review your answers": answering
+   on autopilot no longer starts a generation unseen (2026-10-21). An answer
+   clicked there reopens its question. Submitting calls `repondre`.
    Read back from the record (or once answered) the card is read-only.
 ══════════════════════════════════════════════════════════ */
 
@@ -24,7 +27,7 @@ import type { ClarifyQuestion } from "./generation-kind";
 
 /** The progress of a card still waiting, by request id: the thread repaints
     as the queue moves, and a repaint must not send the user back to step 1. */
-const progres = new Map<string, { index: number; reponses: string[][]; envoye: boolean; autre?: string }>();
+const progres = new Map<string, { index: number; reponses: string[][]; envoye: boolean; autre?: string; retour?: boolean }>();
 
 export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repondre?: (answers: string[][]) => void, cle?: string): void {
 	const host = currentHost();
@@ -33,7 +36,7 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 	carte.setAttribute("role", "group");
 	carte.setAttribute("aria-label", questions.map(q => q.question).join(" "));
 
-	const resume = (zone: HTMLElement, q: ClarifyQuestion, reponse: string[]): void => {
+	const resume = (zone: HTMLElement, q: ClarifyQuestion, reponse: string[]): HTMLElement => {
 		const ligne = ajouter(zone, "div", "qbd-ai-kind-resume");
 		if (q.header) ajouter(ligne, "span", "qbd-ai-kind-chip", q.header);
 		ajouter(ligne, "span", "qbd-ai-kind-resume-q", q.question);
@@ -41,6 +44,7 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 		const defaut = q.options[q.default]?.label ?? q.options[0].label;
 		const r = ajouter(ligne, "span", "qbd-ai-kind-resume-r", reponse.length ? reponse.join(", ") : t("ai.clarify.skippedDefault", { answer: defaut }));
 		r.classList.toggle("is-skipped", reponse.length === 0);
+		return ligne;
 	};
 
 	const dejaRepondu = !!clarify.answers || !repondre || !cle;
@@ -56,23 +60,86 @@ export function peindreQuestions(parent: HTMLElement, clarify: ChatClarify, repo
 
 	const peindre = (): void => {
 		carte.replaceChildren();
-		for (let i = 0; i < Math.min(etat.index, questions.length); i++) resume(carte, questions[i], etat.reponses[i] ?? []);
-		if (etat.index >= questions.length) {
-			carte.classList.add("is-answered");
-			if (!etat.envoye) {
+		const relecture = etat.index >= questions.length && !etat.envoye;
+		for (let i = 0; i < Math.min(etat.index, questions.length); i++) {
+			const ligne = resume(carte, questions[i], etat.reponses[i] ?? []);
+			if (relecture) rendreModifiable(ligne, () => { etat.index = i; etat.retour = true; peindre(); });
+		}
+		if (etat.envoye) { carte.classList.add("is-answered"); return; }
+		if (relecture) {
+			peindreRelecture(carte, () => {
 				etat.envoye = true;
+				peindre();
 				repondre(questions.map((_, i) => etat.reponses[i] ?? []));
-			}
+			}, () => { etat.index = 0; etat.retour = false; peindre(); });
 			return;
 		}
 		peindreEtape(carte, questions[etat.index], etat.index, questions.length, etat, (reponse) => {
 			etat.autre = undefined;
 			etat.reponses[etat.index] = reponse;
-			etat.index++;
+			// An answer changed from the review goes straight back to it.
+			etat.index = etat.retour ? questions.length : etat.index + 1;
+			etat.retour = false;
 			peindre();
 		});
 	};
 	peindre();
+}
+
+/** A summary line of the review: a click (or Enter) reopens its question. */
+function rendreModifiable(ligne: HTMLElement, ouvrir: () => void): void {
+	ligne.classList.add("is-editable");
+	ligne.tabIndex = 0;
+	ligne.setAttribute("role", "button");
+	ligne.setAttribute("aria-label", t("ai.clarify.change", { question: ligne.querySelector(".qbd-ai-kind-resume-q")?.textContent ?? "" }));
+	ligne.addEventListener("click", ouvrir);
+	ligne.addEventListener("keydown", (e) => {
+		if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); ouvrir(); }
+	});
+}
+
+/** The last step, as in Claude Code: "Ready to submit your answers?" with
+    Submit (highlighted) and Change, which starts again from the first question. */
+function peindreRelecture(carte: HTMLElement, envoyer: () => void, modifier: () => void): void {
+	ajouter(carte, "div", "qbd-ai-kind-question qbd-ai-kind-pret", t("ai.clarify.ready"));
+	const liste = ajouter(carte, "div", "qbd-ai-kind-options");
+	liste.setAttribute("role", "listbox");
+	let fait = false;
+	let actif = 0;
+	const actions: Array<[string, () => void]> = [[t("ai.clarify.submit"), envoyer], [t("ai.clarify.restart"), modifier]];
+	const agir = (i: number): void => {
+		if (fait) return;
+		fait = true;
+		actions[i][1]();
+	};
+	const marquer = (): void => lignes.forEach((l, i) => l.classList.toggle("is-active", i === actif));
+	const lignes = actions.map(([libelle], i) => {
+		const b = ajouter(liste, "button", "qbd-ai-kind-option");
+		b.type = "button";
+		ajouter(b, "span", "qbd-ai-kind-num", String(i + 1));
+		ajouter(ajouter(b, "span", "qbd-ai-kind-corps"), "span", "qbd-ai-kind-label", libelle);
+		b.addEventListener("click", () => agir(i));
+		b.addEventListener("focus", () => { actif = i; marquer(); });
+		return b;
+	});
+	ajouter(carte, "div", "qbd-ai-kind-aide", t("ai.clarify.reviewHint"));
+	carte.tabIndex = -1;
+	carte.addEventListener("keydown", (e) => {
+		if (fait || !liste.isConnected) return;
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			actif = (actif + 1) % lignes.length;
+			lignes[actif].focus({ preventScroll: true });
+			marquer();
+		} else if (e.key === "1" || e.key === "2") {
+			e.preventDefault();
+			agir(Number(e.key) - 1);
+		}
+	});
+	marquer();
+	const focus = (): void => { if (carte.isConnected && !fait && !carte.contains(document.activeElement)) lignes[actif].focus({ preventScroll: true }); };
+	requestAnimationFrame(focus);
+	window.setTimeout(focus, 150);
 }
 
 /** One step: the question and its rows, with the keyboard. `fini` receives the
