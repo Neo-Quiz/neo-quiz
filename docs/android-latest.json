@@ -1,8 +1,8 @@
 {
-  "versionCode": 36,
-  "versionName": "0.2.34",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.34/NeoQuiz-0.2.34.apk",
-  "sha256": "baaff10f1619cdade73fc2240f300b9335cc64a5138f64036350df4255122fb0",
-  "size": 56199953,
-  "notes": "Sync relaunches itself after a crash, AI quiz generation repairs its own mistakes, subject editable per quiz and folder, chat aligned with claude.ai, new gallery covers, bug report entry."
+  "versionCode": 37,
+  "versionName": "0.2.35",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.35/NeoQuiz-0.2.35.apk",
+  "sha256": "5788a39b9a651239357d548066eaf662e3d91d39e3634c275dd79bcf18038c34",
+  "size": 56209797,
+  "notes": "Phone display fixes (code blocks, formulas, cards, settings rows), flat hand-in window, and the French interface now says « tu » everywhere."
 }
