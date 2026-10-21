@@ -17,6 +17,9 @@ export function pressFamily(target: HTMLElement, reducedMotion: boolean): "layer
 	if (reducedMotion || target.closest(".modal, .quiz-hint-modal, .quiz-handin-modal, [role='dialog']")) return "layer";
 	if (target.matches(DEPTH)) return "depth";
 	if (target.matches(FLAT) || (target.matches("button, [role='button']") && !target.textContent?.trim())) return "layer";
+	// A list row spans the page: scaling it shifts its text against the rows around it.
+	const box = target.getBoundingClientRect?.();
+	if (box && box.width > window.innerWidth * 0.6 && box.height < 80) return "layer";
 	return "scale";
 }
 
