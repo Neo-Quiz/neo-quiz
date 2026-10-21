@@ -27,7 +27,7 @@
  *     npm run check:python-install
  */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -150,7 +150,9 @@ function transportFaux() {
 	const remplacements = new Map();
 	const t = async (url) => {
 		appels.push(url);
+		t.surAppel(url);
 		const autre = remplacements.get(url);
+		if (autre && autre.sansFlux) return { status: 200, entete: () => null, texte: async () => "never read" };
 		if (autre && autre.redirige) return reponse(302, null, { location: autre.redirige });
 		if (autre && autre.status) return reponse(autre.status, Buffer.alloc(0));
 		if (autre && autre.flux) return { status: 200, entete: () => null, texte: async () => "", octets: autre.flux };
@@ -158,6 +160,7 @@ function transportFaux() {
 		return corps ? reponse(200, corps) : reponse(404, Buffer.alloc(0));
 	};
 	t.appels = appels;
+	t.surAppel = () => {};
 	t.remplacer = (url, v) => remplacements.set(url, v);
 	t.retablir = () => remplacements.clear();
 	return t;
@@ -167,6 +170,18 @@ function transportFaux() {
 async function codeDe(promesse) {
 	try { await promesse; return "no error"; } catch (e) { return e && e.code ? e.code : "not an install error: " + String(e && e.message); }
 }
+
+/** A disk that obeys `pannes`: each { op, quand, code } makes the matching
+    rename or write throw an errno error, as Windows would. */
+const pannes = [];
+const panne = (op, ...args) => {
+	const p = pannes.find((x) => x.op === op && x.quand(...args));
+	if (p) { const e = new Error(p.code + " (injected)"); e.code = p.code; throw e; }
+};
+const DISQUE_FAUX = {
+	renommer(de, vers) { panne("renommer", de, vers); renameSync(de, vers); },
+	ecrire(chemin, texte) { panne("ecrire", chemin); writeFileSync(chemin, texte, "utf8"); },
+};
 
 const lirePth = (racine) => readFileSync(join(racine, "interpreteur", "python312._pth"), "utf8").split(/\r?\n/).filter((l) => l !== "");
 const lib = (racine, dossier) => resolve(racine, "libs", dossier);
@@ -350,6 +365,90 @@ try {
 		const retrait = instF.desinstaller("numpy");
 		await installation;
 		r.check("an uninstall asked during an install of a dependent waits, then is refused", await retrait, { ok: false, requisPar: ["pandas"] });
+
+		/* ── 14. A response with no body stream is refused, never read whole ── */
+		const racineH = join(tmp, "h", "python");
+		const tH = transportFaux();
+		const instH = creerInstallationPython(racineH, tH, CATALOGUE, DISQUE_FAUX);
+		const avantH = snapshot(tmp);
+		tH.remplacer(CATALOGUE.interprete.url, { sansFlux: true });
+		r.check("a response without a body stream is refused: reseau", await codeDe(instH.installer([], () => {})), "reseau");
+		r.check("...and nothing is written", snapshot(tmp), avantH);
+		tH.retablir();
+		await instH.installer(["pandas"], () => {});
+
+		/* ── 15. A task that finds its work done rewrites the _pth ── */
+		const pthComplet = lirePth(racineH);
+		writeFileSync(join(racineH, "interpreteur", "python312._pth"), "python312.zip\n.\n");
+		tH.appels.length = 0;
+		await instH.installer(["numpy"], () => {});
+		r.check("an install with nothing to download heals a _pth that missed a folder", [tH.appels, lirePth(racineH)], [[], pthComplet]);
+
+		/* ── 16. Uninstall: a _pth that cannot be written, a folder in use ── */
+		const avantU = snapshot(tmp);
+		pannes.push({ op: "ecrire", quand: (c) => c.endsWith("._pth.tmp"), code: "ENOSPC" });
+		r.check("an uninstall whose _pth write fails is refused: io", await codeDe(instH.desinstaller("pandas")), "io");
+		r.check("...the folder is put back and the _pth unchanged", snapshot(tmp), avantU);
+		pannes.length = 0;
+		for (const code of ["EBUSY", "EPERM"]) {
+			pannes.push({ op: "renommer", quand: (de) => de.endsWith("pandas-3.0.6"), code });
+			r.check("an uninstall of a folder in use (" + code + ") is refused: occupe", await codeDe(instH.desinstaller("pandas")), "occupe");
+			r.check("...and nothing changes (" + code + ")", snapshot(tmp), avantU);
+			pannes.length = 0;
+		}
+
+		/* ── 17. A disk error during an install is io, not reseau ── */
+		pannes.push({ op: "renommer", quand: (de) => de.endsWith("leaf-1.0.part"), code: "ENOSPC" });
+		r.check("a rename refused by the disk during an install: io", await codeDe(instH.installer(["leaf"], () => {})), "io");
+		r.check("...and its .part is removed", snapshot(tmp), avantU);
+		pannes.length = 0;
+
+		/* ── 18. A dependency gone when its dependent's turn comes: absent ── */
+		const racineI = join(tmp, "i", "python");
+		const tI = transportFaux();
+		const instI = creerInstallationPython(racineI, tI, CATALOGUE);
+		tI.surAppel = (url) => { if (url === CATALOGUE.paquets.tzdata.url) rmSync(join(racineI, "libs", "numpy-2.5.4"), { recursive: true, force: true }); };
+		r.check("a dependency removed before its dependent's turn: absent", await codeDe(instI.installer(["pandas"], () => {})), "absent");
+		r.check("...the dependent is never downloaded", tI.appels.includes(CATALOGUE.paquets.pandas.url), false);
+
+		/* ── 19. A new interpreter that cannot take its place: .old is kept ── */
+		const racineJ = join(tmp, "j", "python");
+		await creerInstallationPython(racineJ, transportFaux(), CATALOGUE).installer([], () => {});
+		const urlJ = PY + "python-3.12.12-embed-amd64.zip";
+		const zipJ = forgeZip([{ name: "python.exe", bytes: "MZ next python" }]);
+		const tJ = transportFaux();
+		tJ.remplacer(urlJ, zipJ);
+		const dossierJ = resolve(racineJ, "interpreteur");
+		pannes.push({ op: "renommer", quand: (de, vers) => vers === dossierJ, code: "EPERM" });
+		r.check("a new interpreter that cannot be renamed into place, nor the old one back: io",
+			await codeDe(creerInstallationPython(racineJ, tJ, { ...CATALOGUE, interprete: pin(urlJ, zipJ, "3.12.10") }, DISQUE_FAUX).installer([], () => {})), "io");
+		pannes.length = 0;
+		r.check("...the old interpreter is kept at .old, never deleted", [existsSync(dossierJ), existsSync(join(racineJ, "interpreteur.old", "python.exe")) ? readFileSync(join(racineJ, "interpreteur.old", "python.exe"), "utf8") : "no .old"], [false, "MZ fake python"]);
+		const tJ2 = transportFaux();
+		await creerInstallationPython(racineJ, tJ2, CATALOGUE).installer([], () => {});
+		r.check("...and the next install puts it back without a download", [tJ2.appels, readFileSync(join(dossierJ, "python.exe"), "utf8"), existsSync(join(racineJ, "interpreteur.old"))], [[], "MZ fake python", false]);
+
+		/* ── 20. supprimerTout: dependents first, stops at a folder in use ── */
+		pannes.push({ op: "renommer", quand: (de) => de.endsWith("numpy-2.5.4"), code: "EBUSY" });
+		r.check("remove everything with numpy in use: occupe", await instH.supprimerTout(), { ok: false, code: "occupe" });
+		r.check("...its dependents went first, numpy and the interpreter stay, the _pth names numpy",
+			[readdirSync(join(racineH, "libs")), existsSync(join(racineH, "interpreteur", "python.exe")), lirePth(racineH)],
+			[["numpy-2.5.4"], true, ["python312.zip", ".", lib(racineH, "numpy-2.5.4")]]);
+		pannes.length = 0;
+		pannes.push({ op: "renommer", quand: (de) => de === resolve(racineH, "interpreteur"), code: "EBUSY" });
+		r.check("remove everything with the interpreter in use: occupe", await instH.supprimerTout(), { ok: false, code: "occupe" });
+		r.check("...the libraries are gone, the interpreter stays", [readdirSync(join(racineH, "libs")), existsSync(join(racineH, "interpreteur", "python.exe"))], [[], true]);
+		pannes.length = 0;
+		await instH.installer(["numpy"], () => {});
+		pannes.push({ op: "ecrire", quand: (c) => c.endsWith("._pth.tmp"), code: "ENOSPC" });
+		r.check("remove everything with a _pth that cannot be written: io", await instH.supprimerTout(), { ok: false, code: "io" });
+		r.check("...numpy is put back", existsSync(join(racineH, "libs", "numpy-2.5.4", "numpy", "__init__.py")), true);
+		pannes.length = 0;
+		r.check("remove everything: ok", await instH.supprimerTout(), { ok: true });
+		r.check("...nothing is left under the root", readdirSync(racineH), []);
+		r.check("...etat reads nothing installed", await instH.etat(), { interprete: false, version: null, paquets: [], octetsTotal: 0 });
+		await instH.installer(["leaf"], () => {});
+		r.check("...and a new install after it works", readdirSync(join(racineH, "libs")), ["leaf-1.0"]);
 	});
 } finally {
 	rmSync(tmp, { recursive: true, force: true });

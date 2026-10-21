@@ -11,10 +11,11 @@
 
    THE PINS DECIDE, the network does not: every file is fetched through
    `demander` (https only, every redirect hop re-judged against the host
-   list), held IN MEMORY while it is hashed, refused past its pinned size,
-   and refused when its SHA-256 differs from the pin, before a single byte
-   is unpacked. One file is held at a time: every download goes through ONE
-   queue, so a torch wheel (124 MB) never shares memory with another.
+   list), streamed into a buffer of exactly its pinned size, refused past
+   that size, and refused when its SHA-256 differs from the pin, before a
+   single byte is unpacked. One file is held at a time: every download goes
+   through ONE queue, so a torch wheel (124 MB) never shares memory with
+   another.
 
    EVERY UNPACK goes to `<final>.part` (zip-lecture.ts's `extraireZip`, which
    distrusts every name), then becomes `<final>` by one rename; a failure at
@@ -29,10 +30,14 @@
 
    THE `_pth` FILE is the interpreter's whole `sys.path`: `python312.zip`,
    `.`, then one absolute line per installed library folder, and no
-   `import site` (no user site-packages, no `.pth` hooks of a package). An
-   uninstall renames the folder aside BEFORE the `_pth` stops naming it, so
-   a folder still in use by a running `python.exe` (a loaded `.pyd` is
-   locked on Windows) makes the uninstall fail with nothing changed.
+   `import site` (no user site-packages, no `.pth` hooks of a package). It
+   is rewritten from the disk after every change, and also whenever a task
+   finds its work already done (which heals a crash between a rename and
+   the `_pth` write). An uninstall renames the folder aside to `.suppr`
+   BEFORE the `_pth` stops naming it, and puts it back if the `_pth` write
+   fails: a folder still in use by a running `python.exe` (a loaded `.pyd`
+   is locked on Windows) cannot be renamed, so the uninstall fails with
+   nothing changed.
 
    ORDER. Installs and uninstalls run in one queue, each queued at the
    moment it is asked, and each re-reads the disk when its turn comes. Two
@@ -47,11 +52,53 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
-import { demander, erreurInstallation, estErreurInstallation, transportDefaut } from "../telechargement";
-import type { TransportInstallation } from "../telechargement";
+import { demander, transportDefaut } from "../telechargement";
+import type { CodeInstallation, TransportInstallation } from "../telechargement";
 import { INTERPRETE, PAQUETS, fermeture } from "./catalogue";
 import { ErreurZip, extraireZip } from "./zip-lecture";
 import type { BornesZip } from "./zip-lecture";
+
+/** The codes of a Python install error, each a different message for the
+    user:
+    - `reseau`: unreachable, a redirect to `http:` or off the host list, an
+      HTTP error, a response without a body stream;
+    - `empreinte`: bytes that do not match their pin, or an archive refused;
+    - `io`: the disk refused (ENOSPC, EBUSY, EPERM, EACCES…);
+    - `absent`: the interpreter or a dependency is missing when a library's
+      turn comes (its own install failed first, or its folder was removed);
+    - `occupe`: a folder to remove is in use (a running `python.exe` holds
+      one of its files); nothing was changed. */
+export type CodePython = CodeInstallation | "io" | "absent" | "occupe";
+
+export interface ErreurPython extends Error {
+	code: CodePython;
+	detail?: string;
+}
+
+/** Same shape as `telechargement.ts`'s `erreurInstallation`, so a `reseau`
+    or `empreinte` from here reads like one from the other installers. */
+export function erreurPython(code: CodePython, detail?: string): ErreurPython {
+	const e = new Error("python install: " + code + (detail ? " — " + detail : "")) as ErreurPython;
+	e.name = code;
+	e.code = code;
+	if (detail) e.detail = detail;
+	return e;
+}
+
+const CODES_PYTHON: ReadonlySet<string> = new Set(["reseau", "empreinte", "io", "absent", "occupe"]);
+export function estErreurPython(e: unknown): e is ErreurPython {
+	const o = e as { code?: unknown } | null;
+	return !!o && typeof o.code === "string" && CODES_PYTHON.has(o.code);
+}
+
+/** Node's errno codes that mean the DISK refused, not the network. */
+const CODES_DISQUE: ReadonlySet<string> = new Set(["ENOSPC", "EDQUOT", "EBUSY", "EPERM", "EACCES", "EROFS", "EIO", "EMFILE", "ENFILE", "ENOENT", "EEXIST", "ENOTEMPTY", "ENOTDIR", "EISDIR", "EXDEV"]);
+/** The ones a rename of a folder in use answers on Windows. */
+const CODES_OCCUPE: ReadonlySet<string> = new Set(["EBUSY", "EPERM", "EACCES"]);
+const codeSysteme = (e: unknown): string => {
+	const c = (e as { code?: unknown } | null)?.code;
+	return typeof c === "string" ? c : "";
+};
 
 /** A pinned file: where it is, and the only bytes accepted from there. */
 export interface FichierEpingle { version: string; url: string; sha256: string; taille: number }
@@ -62,6 +109,14 @@ export interface CataloguePython {
 	interprete: FichierEpingle;
 	paquets: Record<string, FichierEpingle & { dependances: readonly string[] }>;
 }
+
+/** The two disk writes the check makes fail (a folder in use, a full
+    disk). The app passes nothing. */
+export interface DisquePython {
+	renommer(de: string, vers: string): void;
+	ecrire(chemin: string, texte: string): void;
+}
+const DISQUE_REEL: DisquePython = { renommer: renameSync, ecrire: (chemin, texte) => writeFileSync(chemin, texte, "utf8") };
 
 export interface EtatPython {
 	interprete: boolean;
@@ -77,10 +132,18 @@ export interface InstallationPython {
 	etat(): Promise<EtatPython>;
 	/** Installs the interpreter if absent, then the closure of `cibles`
 	    (root package names; `[]` = the interpreter only) minus what is
-	    installed. Rejects `ErreurInstallation` (`reseau` | `empreinte`); an
-	    unknown name throws a plain `Error` before anything is downloaded. */
+	    installed. Rejects `ErreurPython` (`reseau`, `empreinte`, `io`,
+	    `absent`); an unknown name throws a plain `Error` before anything is
+	    downloaded. */
 	installer(cibles: string[], progression: (recus: number, total: number) => void): Promise<void>;
+	/** `{ ok: false, requisPar }` when an installed library needs it.
+	    Rejects `ErreurPython` `occupe` (its folder is in use) or `io`, with
+	    the folder still installed and the `_pth` unchanged. */
 	desinstaller(paquet: string): Promise<{ ok: true } | { ok: false; requisPar: string[] }>;
+	/** Every library (dependents first), then the interpreter. Stops at the
+	    first folder that cannot be removed: what is left is still a
+	    consistent install. */
+	supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
 	/** `executable` is `python.exe`; `dossier` the interpreter folder. */
 	chemins(): { executable: string; dossier: string };
 }
@@ -105,13 +168,18 @@ function estDossier(chemin: string): boolean {
 	try { return lstatSync(chemin).isDirectory(); } catch { return false; }
 }
 
-/** Bytes under `dir`, links not followed. */
+/** Bytes under `dir`, links not followed. A folder or file that vanishes
+    while it is counted (an uninstall, an antivirus) counts as 0. */
 function tailleDossier(dir: string): number {
+	let noms: string[];
+	try { noms = readdirSync(dir); } catch { return 0; }
 	let total = 0;
-	for (const nom of readdirSync(dir)) {
+	for (const nom of noms) {
 		const p = join(dir, nom);
-		const s = lstatSync(p);
-		total += s.isDirectory() ? tailleDossier(p) : s.size;
+		try {
+			const s = lstatSync(p);
+			total += s.isDirectory() ? tailleDossier(p) : s.size;
+		} catch { /* vanished */ }
 	}
 	return total;
 }
@@ -130,7 +198,7 @@ function fusionner(src: string, dest: string): void {
 		const vers = join(dest, nom);
 		if (!existsSync(vers)) renameSync(de, vers);
 		else if (estDossier(de) && estDossier(vers)) fusionner(de, vers);
-		else throw erreurInstallation("empreinte", "a wheel's data folder collides with its own files: " + nom);
+		else throw erreurPython("empreinte", "a wheel's data folder collides with its own files: " + nom);
 	}
 }
 
@@ -147,13 +215,14 @@ function aplatirData(dossier: string): void {
 }
 
 /**
- * The installer over `racine` (`userData/python`). `transport` and
- * `catalogue` are the check's seams; the app passes neither.
+ * The installer over `racine` (`userData/python`). `transport`, `catalogue`
+ * and `disque` are the check's seams; the app passes none of them.
  */
 export function creerInstallationPython(
 	racine: string,
 	transport: TransportInstallation = transportDefaut,
 	catalogue: CataloguePython = { interprete: INTERPRETE, paquets: PAQUETS },
+	disque: DisquePython = DISQUE_REEL,
 ): InstallationPython {
 	const base = resolve(racine);
 	const dossierInterprete = join(base, "interpreteur");
@@ -186,12 +255,12 @@ export function creerInstallationPython(
 		if (!interpreteOk()) return;
 		const lignes = [nomZipStdlib, ".", ...installes().map(dossierPaquet)];
 		const cible = join(dossierInterprete, nomPth);
-		writeFileSync(cible + ".tmp", lignes.join("\n") + "\n", "utf8");
-		renameSync(cible + ".tmp", cible);
+		disque.ecrire(cible + ".tmp", lignes.join("\n") + "\n");
+		disque.renommer(cible + ".tmp", cible);
 	}
 
 	/** Anything in `libs/` that is not a current pin's folder: `.part` and
-	    aside folders of an aborted task, versions of an older catalogue.
+	    `.suppr` folders of an aborted task, versions of an older catalogue.
 	    Only ever called from inside the queue, so no task's `.part` is live. */
 	function nettoyerLibs(): void {
 		if (!estDossier(dossierLibs)) return;
@@ -199,57 +268,68 @@ export function creerInstallationPython(
 		for (const nom of readdirSync(dossierLibs)) if (!attendus.has(nom)) retirer(join(dossierLibs, nom));
 	}
 
-	/** The pinned file's bytes, or `reseau` / `empreinte`. */
+	/** The pinned file's bytes, or `reseau` / `empreinte`. The buffer is
+	    allocated once at the pinned size; nothing past it is ever kept. */
 	async function telecharger(pin: FichierEpingle, surRecus: (recus: number) => void): Promise<Uint8Array> {
 		const reponse = await demander(pin.url, "GET", transport);
-		if (reponse.status !== 200) throw erreurInstallation("reseau", "status " + reponse.status + " for " + pin.url);
+		if (reponse.status !== 200) throw erreurPython("reseau", "status " + reponse.status + " for " + pin.url);
+		/* No body stream: refused rather than read whole by `texte()`, which
+		   would buffer an unbounded body before any size check. */
+		if (!reponse.octets) throw erreurPython("reseau", "the response has no body stream: " + pin.url);
+		const tampon = Buffer.allocUnsafe(pin.taille);
 		const hache = createHash("sha256");
-		const morceaux: Uint8Array[] = [];
 		let recus = 0;
-		const recevoir = (morceau: Uint8Array): void => {
+		for await (const morceau of reponse.octets()) {
+			if (recus + morceau.length > pin.taille) throw erreurPython("empreinte", "larger than its pin: " + pin.url);
+			tampon.set(morceau, recus);
 			recus += morceau.length;
-			if (recus > pin.taille) throw erreurInstallation("empreinte", "larger than its pin: " + pin.url);
 			hache.update(morceau);
-			morceaux.push(morceau);
 			surRecus(recus);
-		};
-		if (reponse.octets) {
-			for await (const morceau of reponse.octets()) recevoir(morceau);
-		} else {
-			recevoir(Buffer.from(await reponse.texte(), "latin1"));
 		}
-		if (hache.digest("hex") !== pin.sha256) throw erreurInstallation("empreinte", "SHA-256 does not match its pin: " + pin.url);
+		if (hache.digest("hex") !== pin.sha256) throw erreurPython("empreinte", "SHA-256 does not match its pin: " + pin.url);
 		/* The very buffer that was hashed is the one unpacked: never re-read. */
-		return Buffer.concat(morceaux);
+		return tampon.subarray(0, recus);
 	}
 
 	async function deballer(octets: Uint8Array, dest: string, bornes: BornesZip): Promise<void> {
 		try {
 			await extraireZip(octets, dest, bornes);
 		} catch (e) {
-			if (e instanceof ErreurZip) throw erreurInstallation("empreinte", "archive refused (" + e.code + "): " + e.message);
+			if (e instanceof ErreurZip) throw erreurPython("empreinte", "archive refused (" + e.code + "): " + e.message);
 			throw e;
 		}
 	}
 
 	async function installerInterprete(surRecus: (recus: number) => void): Promise<void> {
-		if (interpreteOk()) return;
 		const partiel = dossierInterprete + ".part";
 		const ancien = dossierInterprete + ".old";
+		/* A previous install that failed between its two renames, and could
+		   not put the old interpreter back, left it at `.old`: back first. */
+		if (!existsSync(dossierInterprete) && estDossier(ancien)) disque.renommer(ancien, dossierInterprete);
+		if (interpreteOk()) {
+			mkdirSync(dossierLibs, { recursive: true });
+			ecrirePth();
+			return;
+		}
+		let garderAncien = false;
 		try {
 			retirer(partiel);
 			retirer(ancien);
 			const octets = await telecharger(catalogue.interprete, surRecus);
 			await deballer(octets, partiel, BORNES_INTERPRETE);
-			if (!existsSync(join(partiel, "python.exe"))) throw erreurInstallation("empreinte", "the interpreter archive has no python.exe");
+			if (!existsSync(join(partiel, "python.exe"))) throw erreurPython("empreinte", "the interpreter archive has no python.exe");
 			writeFileSync(join(partiel, MARQUEUR), JSON.stringify({ version: catalogue.interprete.version, sha256: catalogue.interprete.sha256 }));
 			/* An older interpreter is renamed aside, never deleted in place: a
 			   delete that fails halfway would leave a broken one in place. */
-			if (existsSync(dossierInterprete)) renameSync(dossierInterprete, ancien);
+			if (existsSync(dossierInterprete)) disque.renommer(dossierInterprete, ancien);
 			try {
-				renameSync(partiel, dossierInterprete);
+				disque.renommer(partiel, dossierInterprete);
 			} catch (e) {
-				if (existsSync(ancien) && !existsSync(dossierInterprete)) renameSync(ancien, dossierInterprete);
+				if (existsSync(ancien) && !existsSync(dossierInterprete)) {
+					/* If even that fails, `.old` is the only interpreter left:
+					   it is kept, and the next install puts it back. */
+					try { disque.renommer(ancien, dossierInterprete); } catch (e2) { garderAncien = true; console.warn(LOG_PREFIX, "previous python interpreter not put back:", e2); }
+				}
 				throw e;
 			}
 			/* An installed interpreter always has its libs/ folder. */
@@ -257,16 +337,16 @@ export function creerInstallationPython(
 			ecrirePth();
 		} finally {
 			retirer(partiel);
-			retirer(ancien);
+			if (!garderAncien) retirer(ancien);
 		}
 	}
 
 	async function installerPaquet(nom: string, surRecus: (recus: number) => void): Promise<void> {
 		nettoyerLibs();
-		if (installe(nom)) return;
-		if (!interpreteOk()) throw erreurInstallation("reseau", "the interpreter is not installed");
+		if (installe(nom)) { ecrirePth(); return; }
+		if (!interpreteOk()) throw erreurPython("absent", "the interpreter is not installed");
 		for (const d of catalogue.paquets[nom].dependances) {
-			if (!installe(d)) throw erreurInstallation("reseau", "dependency " + d + " of " + nom + " is not installed");
+			if (!installe(d)) throw erreurPython("absent", "dependency " + d + " of " + nom + " is not installed");
 		}
 		const final = dossierPaquet(nom);
 		const partiel = final + ".part";
@@ -275,11 +355,42 @@ export function creerInstallationPython(
 			const octets = await telecharger(catalogue.paquets[nom], surRecus);
 			await deballer(octets, partiel, BORNES_ROUE);
 			aplatirData(partiel);
-			renameSync(partiel, final);
+			disque.renommer(partiel, final);
 			ecrirePth();
 		} finally {
 			retirer(partiel);
 		}
+	}
+
+	/** Moves an installed folder aside to `<dossier>.suppr`. A folder in use
+	    gives `occupe`, any other refusal `io`; a move the system half did is
+	    put back. */
+	function mettreDeCote(dossier: string): string {
+		const aCote = dossier + ".suppr";
+		retirer(aCote);
+		try {
+			disque.renommer(dossier, aCote);
+		} catch (e) {
+			if (!estDossier(dossier) && estDossier(aCote)) {
+				try { disque.renommer(aCote, dossier); } catch (e2) { console.warn(LOG_PREFIX, "python folder not put back:", dossier, e2); }
+			}
+			throw erreurPython(CODES_OCCUPE.has(codeSysteme(e)) ? "occupe" : "io", "cannot move " + dossier + " aside (" + codeSysteme(e) + ")");
+		}
+		return aCote;
+	}
+
+	/** Removes one library: aside, `_pth` rewritten without it, deleted. A
+	    `_pth` that cannot be written puts the folder back. */
+	function retirerPaquet(nom: string): void {
+		const final = dossierPaquet(nom);
+		const aCote = mettreDeCote(final);
+		try {
+			ecrirePth();
+		} catch (e) {
+			try { disque.renommer(aCote, final); } catch (e2) { console.warn(LOG_PREFIX, "python library not put back:", final, e2); }
+			throw e;
+		}
+		retirer(aCote);
 	}
 
 	/* ── The queue and the map of in-flight installs ── */
@@ -290,15 +401,16 @@ export function creerInstallationPython(
 		return suite;
 	}
 
-	/** Reduces anything that is not an install error to `reseau`; the raw
-	    message (local paths, a signed URL) goes to the log only. */
-	async function garder(tache: () => Promise<void>): Promise<void> {
+	/** An `ErreurPython` passes as is; a disk errno becomes `io`, anything
+	    else `reseau`. The raw message (local paths, a signed URL) goes to the
+	    log only. */
+	async function garder<T>(tache: () => Promise<T>): Promise<T> {
 		try {
-			await tache();
+			return await tache();
 		} catch (e) {
-			if (estErreurInstallation(e)) throw e;
+			if (estErreurPython(e)) throw e;
 			console.warn(LOG_PREFIX, "python install failed:", e);
-			throw erreurInstallation("reseau", "unexpected error during the install");
+			throw CODES_DISQUE.has(codeSysteme(e)) ? erreurPython("io", "disk error " + codeSysteme(e)) : erreurPython("reseau", "unexpected error during the install");
 		}
 	}
 
@@ -328,12 +440,11 @@ export function creerInstallationPython(
 				octets: tailleDossier(dossierPaquet(nom)),
 				requisPar: requisPar(nom),
 			}));
-			const octetsInterprete = estDossier(dossierInterprete) ? tailleDossier(dossierInterprete) : 0;
 			return {
 				interprete,
 				version: interprete ? catalogue.interprete.version : null,
 				paquets,
-				octetsTotal: octetsInterprete + paquets.reduce((s, p) => s + p.octets, 0),
+				octetsTotal: tailleDossier(dossierInterprete) + paquets.reduce((s, p) => s + p.octets, 0),
 			};
 		},
 
@@ -366,20 +477,32 @@ export function creerInstallationPython(
 
 		desinstaller(paquet) {
 			if (!connu(paquet)) return Promise.reject(new Error("Unknown package: " + paquet));
-			return enFile(async () => {
+			return enFile(() => garder(async () => {
 				nettoyerLibs();
-				const final = dossierPaquet(paquet);
-				if (!estDossier(final)) { ecrirePth(); return { ok: true as const }; }
+				if (!installe(paquet)) { ecrirePth(); return { ok: true as const }; }
 				const dependants = requisPar(paquet);
 				if (dependants.length) return { ok: false as const, requisPar: dependants };
-				const aCote = final + ".suppr";
-				retirer(aCote);
-				/* A folder in use (a `.pyd` loaded by a running python.exe)
-				   cannot be renamed: the uninstall throws with nothing changed. */
-				renameSync(final, aCote);
-				ecrirePth();
-				retirer(aCote);
+				retirerPaquet(paquet);
 				return { ok: true as const };
+			}));
+		},
+
+		supprimerTout() {
+			return enFile(async () => {
+				try {
+					nettoyerLibs();
+					/* Dependents first: stopped half-way, what is left still
+					   has every dependency it needs. */
+					const ordre: string[] = [];
+					for (const n of installes()) for (const d of fermetureDe(n)) if (!ordre.includes(d)) ordre.push(d);
+					for (const nom of ordre.reverse()) if (installe(nom)) retirerPaquet(nom);
+					if (existsSync(dossierInterprete)) retirer(mettreDeCote(dossierInterprete));
+					for (const reste of [dossierLibs, dossierInterprete + ".part", dossierInterprete + ".old"]) retirer(reste);
+					return { ok: true as const };
+				} catch (e) {
+					console.warn(LOG_PREFIX, "python removal stopped:", e);
+					return { ok: false as const, code: estErreurPython(e) && e.code === "occupe" ? ("occupe" as const) : ("io" as const) };
+				}
 			});
 		},
 
