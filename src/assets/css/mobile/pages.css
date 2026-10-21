@@ -369,3 +369,13 @@ html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
 	white-space: normal;
 	text-align: left;
 }
+
+/* A folder card's name on a phone: two lines before the ellipsis (one column,
+   so no row of cards to keep level). */
+.is-mobile .qbd-module-card__title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+}
