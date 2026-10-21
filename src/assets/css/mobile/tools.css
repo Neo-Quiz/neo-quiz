@@ -151,6 +151,12 @@
 .is-mobile .qbd-ai-provider-nudge {
 	min-height: 40px;
 }
+
+/* The bubble steps aside while a menu or a window is open over the composer:
+   it peeked from behind the "+" menu and stayed lit next to the device list. */
+body.is-mobile:has(> .qbd-select-menu, > .modal-container) .qbd-ai-provider-nudge {
+	visibility: hidden;
+}
 .is-mobile .qbd-ai-plus-menu .qbd-select-option,
 .is-mobile .qbd-ai-kind-option {
 	min-height: 44px;
