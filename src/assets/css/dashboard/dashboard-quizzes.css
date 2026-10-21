@@ -655,7 +655,7 @@
 	max-width: 1082px;
 	grid-template-columns: repeat(
 		auto-fill,
-		minmax(max(300px, calc((100% - 2 * 16px) / 3)), 1fr)
+		minmax(max(260px, calc((100% - 2 * 16px) / 3)), 1fr)
 	);
 	gap: 16px;
 }
