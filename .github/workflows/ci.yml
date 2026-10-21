@@ -196,6 +196,12 @@ jobs:
         env:
           NQ_PYTHON_RUN_EXPECT_SKIPPED: "25"
 
+      # The service canaux.ts calls for a Python block: package-name checks,
+      # error mapping, the run held behind an install. Its real run is skipped
+      # on this Linux runner (no CPython 3.12).
+      - name: Python service
+        run: npm run check:python-service
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar

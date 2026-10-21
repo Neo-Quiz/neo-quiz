@@ -15,7 +15,7 @@ import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 const { document } = parseHTML("<html><body></body></html>");
 globalThis.document = document;
 
-await withSrcModule(["src/engine/code-run.ts", "src/code-exercise/besoin-en-ligne.ts"], async ({ createCodeRunHandlers }, { besoinEnLigne, URL_EN_LIGNE }) => {
+await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }) => {
 	const r = makeReporter("Bouton « Exécuter » — sortie jamais interprétée (M4)");
 
 	const CHARGE = '<img src=x onerror=alert(1)>';
@@ -68,53 +68,89 @@ await withSrcModule(["src/engine/code-run.ts", "src/code-exercise/besoin-en-lign
 		r.check("table language not offered by the host: executable class removed", bloc.classList.contains("quiz-code-block-executable"), false);
 	}
 
-	// "Run online": classification on the REAL strings of the Pyodide sandbox
-	// (task 3 and 4 reports), then the button's wiring.
-	const OUI = [
-		"ModuleNotFoundError: No module named 'torch'",
-		"ModuleNotFoundError: No module named 'numpy'\nThe module 'numpy' is included in the Pyodide distribution, but it is not installed.",
-		"ImportError: dynamic module does not define module export function (PyInit_base)",
-		"RuntimeError: TLS not supported in this environment",
-		"ValueError: Can't find a pure Python 3 wheel for 'pygame'.",
-		"ValueError: Can't fetch metadata for 'x'. Please make sure you have entered a correct package name",
-		"pyodide.ffi.JsException: TypeError: Failed to fetch",
-	];
-	const NON = [
-		"NameError: name 'x' is not defined",
-		"SyntaxError: invalid syntax",
-		"AssertionError: 3 != 4",
-		"ZeroDivisionError: division by zero",
-		"ImportError: cannot import name 'foo' from 'math'",
-		"FileNotFoundError: [Errno 44] No such file or directory: 'a.txt'",
-		"",
-	];
-	for (const e of OUI) r.check(`online needed: ${e.slice(0, 50)}`, besoinEnLigne(e), true);
-	for (const e of NON) r.check(`ordinary error: ${e.slice(0, 50)}`, besoinEnLigne(e), false);
-
+	// NATIVE PYTHON: missing libraries are downloaded, then the block runs ONCE more.
+	const clic = async (container) => {
+		container.querySelector(".quiz-code-run-btn").dispatchEvent(new document.defaultView.Event("click"));
+		for (let i = 0; i < 6; i++) await new Promise(res => setTimeout(res, 0));
+	};
 	{
-		const calls = [];
+		const installs = [];
+		const jobs = [];
+		let appels = 0;
 		const container = fabriquerBloc();
 		const host = {
-			code: { languages: () => ["python"], run: async () => ({ status: "error", stdout: "", error: "ModuleNotFoundError: No module named 'torch'" }), warm: () => {} },
+			code: {
+				languages: () => ["python"],
+				run: async job => {
+					jobs.push(job);
+					return ++appels === 1 ? { status: "not-installed", stdout: "", missing: ["torch"] } : { status: "ok", stdout: "tensor(1)" };
+				},
+				warm: () => {},
+				installer: async (langue, progression, paquets) => { installs.push([langue, paquets]); progression(40); return "ok"; },
+			},
 			ui: { setIcon: () => {} },
-			shell: { copyText: async t => { calls.push(["copy", t]); return true; }, openUrl: async u => { calls.push(["open", u]); return true; } },
 		};
 		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
-		container.querySelector(".quiz-code-run-btn").dispatchEvent(new document.defaultView.Event("click"));
-		await new Promise(res => setTimeout(res, 0));
-		await new Promise(res => setTimeout(res, 0));
-		const online = container.querySelector(".quiz-code-online-btn");
-		r.check("online button shown for a blocked import", !!online, true);
-		online.dispatchEvent(new document.defaultView.Event("click"));
-		await new Promise(res => setTimeout(res, 0));
-		await new Promise(res => setTimeout(res, 0));
-		r.check("click copies the code then opens Colab", JSON.stringify(calls), JSON.stringify([["copy", 'print("x")'], ["open", URL_EN_LIGNE]]));
-		// an ordinary error offers nothing
-		host.code.run = async () => ({ status: "error", stdout: "", error: "NameError: name 'x' is not defined" });
-		container.querySelector(".quiz-code-run-btn").dispatchEvent(new document.defaultView.Event("click"));
-		await new Promise(res => setTimeout(res, 0));
-		await new Promise(res => setTimeout(res, 0));
-		r.check("no online button for a NameError (and the old one is gone)", container.querySelector(".quiz-code-online-btn"), null);
+		await clic(container);
+		r.check("missing torch: installer called once with [torch]", JSON.stringify(installs), JSON.stringify([["python", ["torch"]]]));
+		r.check("missing torch: ran a second time, not more", appels, 2);
+		r.check("python is given 60 s", jobs[0].timeoutMs, 60000);
+		r.check("missing torch: the output is the second run's", container.querySelector(".quiz-code-output").textContent, "tensor(1)");
+	}
+	{
+		// the interpreter alone missing: missing [] -> installer(python, [])
+		const installs = [];
+		let appels = 0;
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => (++appels === 1 ? { status: "not-installed", stdout: "", missing: [] } : { status: "ok", stdout: "1" }), warm: () => {}, installer: async (l, p, paquets) => { installs.push(paquets); return "ok"; } }, ui: { setIcon: () => {} } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("interpreter missing: installer([])", JSON.stringify(installs), "[[]]");
+	}
+	{
+		// never a loop: still not-installed after the install -> exactly two runs
+		let appels = 0;
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => { appels++; return { status: "not-installed", stdout: "", missing: ["torch"] }; }, warm: () => {}, installer: async () => "ok" }, ui: { setIcon: () => {} } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("no loop on a persistent not-installed", appels, 2);
+	}
+	for (const [res, cle] of [["offline", "offline"], ["refused", "refused"], ["failed", "failed"]]) {
+		let appels = 0;
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => { appels++; return { status: "not-installed", stdout: "", missing: ["torch"] }; }, warm: () => {}, installer: async () => res }, ui: { setIcon: () => {} } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("install " + cle + ": no second run", appels, 1);
+		r.check("install " + cle + ": a message, no element", container.querySelector(".quiz-code-output").children.length, 0);
+	}
+	{
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => ({ status: "unsupported", stdout: "", unsupported: ["pygame", '<img src=x onerror=alert(1)>'] }), warm: () => {} }, ui: { setIcon: () => {} } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		const sortie = container.querySelector(".quiz-code-output");
+		r.check("unsupported: names the library", sortie.textContent.includes("pygame"), true);
+		r.check("unsupported: shown as an error", sortie.classList.contains("quiz-code-output-error"), true);
+		r.check("unsupported: no element under the output", sortie.children.length, 0);
+	}
+	// No "Run online" button for any Python status.
+	for (const status of ["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed", "unsupported"]) {
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => ({ status, stdout: "", error: "ModuleNotFoundError: No module named 'torch'", missing: [], unsupported: ["x"] }), warm: () => {} }, ui: { setIcon: () => {} }, shell: { copyText: async () => true, openUrl: async () => true } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("no online button: " + status, container.querySelector(".quiz-code-online-btn, .quiz-code-online"), null);
+	}
+	// C keeps the 10 s deadline.
+	{
+		const jobs = [];
+		const container = fabriquerBloc("c");
+		const host = { code: { languages: () => ["c"], run: async job => { jobs.push(job); return { status: "ok", stdout: "" }; }, warm: () => {} }, ui: { setIcon: () => {} } };
+		createCodeRunHandlers({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("C keeps 10 s", jobs[0]?.timeoutMs, 10000);
 	}
 
 	r.done();

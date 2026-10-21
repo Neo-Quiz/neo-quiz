@@ -1,7 +1,6 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
-import { besoinEnLigne, URL_EN_LIGNE } from "../code-exercise/besoin-en-ligne";
 import type { CodeRun } from "../host/types";
 import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../code-languages";
 
@@ -31,9 +30,11 @@ import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../c
    entities included, exactly as `colorerCode`/`echapper` wrote it).
 ══════════════════════════════════════════════════════════ */
 
-/** Le délai le plus long qu'un clic manuel mérite d'attendre : le contrat
-    (`canaux.ts`) borne `timeoutMs` à 10 s au maximum, on prend ce plafond. */
+/** The longest a manual click deserves to wait. The host contract
+    (`canaux.ts`) bounds `timeoutMs` to 10 s for C/C++ and 60 s for Python
+    (native interpreter: importing a heavy library alone takes seconds). */
 const TIMEOUT_MS = 10_000;
+const TIMEOUT_PYTHON_MS = 60_000;
 
 export interface CodeRunHandlers {
 	/** Unmasks (and wires up) every « Run » button under `rootEl` if the host
@@ -84,40 +85,14 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				return { texte: t("engine.code.timeout"), erreur: false, panne: true };
 			case "too-long":
 				return { texte: t("engine.code.tooLong"), erreur: false, panne: true };
+			case "unsupported":
+				return { texte: t("engine.code.unsupportedLibrary", { names: (resultat.unsupported ?? []).join(", ") }), erreur: true, panne: false };
 			case "not-installed":
 				return { texte: t("engine.code.notInstalled"), erreur: false, panne: true };
 			case "unavailable":
 			default:
 				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
-	}
-
-	/** « Run online »: copies the block's code, then opens Colab in the system
-	    browser. Built with DOM calls and `t()` only, no HTML string. */
-	function boutonEnLigne(source: string): HTMLElement {
-		const ligne = document.createElement("div");
-		ligne.className = "quiz-code-online";
-		const info = document.createElement("span");
-		info.textContent = t("engine.code.needsMore");
-		const btn = document.createElement("button");
-		btn.type = "button";
-		btn.className = "quiz-code-online-btn";
-		const icone = document.createElement("span");
-		icone.className = "quiz-code-online-icon";
-		ctx.host.ui.setIcon(icone, "external-link");
-		btn.append(icone, document.createTextNode(t("engine.code.runOnline")));
-		btn.addEventListener("click", e => {
-			e.preventDefault();
-			void (async () => {
-				let copie = false;
-				try { copie = (await ctx.host.shell.copyText?.(source)) === true; } catch { /* best effort */ }
-				// Said on the block: nothing else tells the learner the code is waiting to be pasted.
-				if (copie) info.textContent = t("engine.code.copiedPaste");
-				await ctx.host.shell.openUrl(URL_EN_LIGNE);
-			})();
-		});
-		ligne.append(info, btn);
-		return ligne;
 	}
 
 	async function executer(btn: HTMLButtonElement, source: string, language: CodeLanguage): Promise<void> {
@@ -131,22 +106,27 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		btn.classList.add("quiz-code-run-running");
 		sortie.hidden = false;
 		sortie.classList.remove("quiz-code-output-error", "quiz-code-output-panne");
-		sortie.querySelector(".quiz-code-online")?.remove();
 		sortie.textContent = t("engine.code.running");
 
 		try {
-			const job = { language, code: source, stdin: "", timeoutMs: TIMEOUT_MS };
+			const job = { language, code: source, stdin: "", timeoutMs: language === "python" ? TIMEOUT_PYTHON_MS : TIMEOUT_MS };
 			let resultat = await code.run(job);
 			/* THE LANGUAGE IS DOWNLOADED ON FIRST USE (task 10): C and C++
 			   answer `not-installed` until their pack is there. With a host
 			   that can install it, the progress replaces "Running…", then
 			   the program runs ONCE more — never in a loop. */
 			if (resultat.status === "not-installed" && code.installer) {
+				/* Python names the libraries it lacks (`missing`; `[]` = only the
+				   interpreter): they are downloaded with their own progress line. */
+				const manquants = resultat.missing ?? [];
+				const message = (percent: number): string => language === "python"
+					? t("engine.code.installingLibraries", { names: manquants.length > 0 ? manquants.join(", ") : "Python", percent })
+					: t("engine.code.installing", { percent });
 				sortie.classList.add("quiz-code-output-panne");
-				sortie.textContent = t("engine.code.installing", { percent: 0 });
-				const installe = await code.installer(language, percent => { sortie.textContent = t("engine.code.installing", { percent }); });
+				sortie.textContent = message(0);
+				const installe = await code.installer(language, percent => { sortie.textContent = message(percent); }, language === "python" ? manquants : undefined);
 				if (installe !== "ok") {
-					sortie.textContent = t(installe === "refused" ? "engine.code.installRefused" : "engine.code.installOffline");
+					sortie.textContent = t(installe === "refused" ? "engine.code.installRefused" : installe === "failed" ? "engine.code.installFailed" : "engine.code.installOffline");
 					return;
 				}
 				sortie.classList.remove("quiz-code-output-panne");
@@ -157,9 +137,6 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			sortie.textContent = texte;
 			sortie.classList.toggle("quiz-code-output-error", erreur);
 			sortie.classList.toggle("quiz-code-output-panne", panne);
-				if (language === "python" && resultat.status === "error" && besoinEnLigne(resultat.error ?? "")) {
-					sortie.appendChild(boutonEnLigne(source));
-				}
 		} catch {
 			sortie.textContent = t("engine.code.unavailable");
 			sortie.classList.add("quiz-code-output-panne");

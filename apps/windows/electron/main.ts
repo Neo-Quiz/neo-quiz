@@ -28,6 +28,8 @@ import { BrowserWindow, Menu, app, dialog, net, powerMonitor, protocol, safeStor
 import * as fs from "node:fs/promises";
 // Le SEUL usage synchrone du disque dans ce fichier — voir `poserLocaleChromium`.
 import { readFileSync } from "node:fs";
+import { creerInstallationPython } from "./python/installation";
+import { creerServicePython } from "./python/service";
 import { randomBytes } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -1033,6 +1035,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			perimetre,
 			reglagesOuErreur,
 			code,
+			python: creerServicePython(creerInstallationPython(path.join(app.getPath("userData"), "python")), app.getPath("temp")),
 			dossierLangages,
 			/* LU À CHAQUE APPEL, jamais capturé : l'utilisateur peut changer ce
 			   dossier en cours de session, et les canaux doivent servir le

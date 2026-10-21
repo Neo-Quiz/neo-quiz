@@ -334,6 +334,24 @@ const pont: Pont = {
 		warm: (language) => appeler("code.warm", [language]),
 	},
 
+	/* Android keeps its own Python (the Pyodide pack, `langages`): the native
+	   Python channels exist for the PC only. `installer` forwards to the pack so
+	   the shared host code (`host/code.ts`) keeps working here; the rest is empty. */
+	python: {
+		etat: async () => ({ interprete: false, version: null, paquets: [], octetsTotal: 0 }),
+		async installer(_paquets, surProgression) {
+			const off = abonner<{ recus: number; total: number }>("langages.progression", (d) => surProgression(d.recus, d.total));
+			try {
+				const res = await appeler<{ ok: boolean; code?: string }>("langages.installer", ["python"]);
+				if (res.ok) return { ok: true };
+				return { ok: false, code: res.code === "empreinte" ? "empreinte" : res.code === "reseau" ? "reseau" : "echec" };
+			} finally {
+				off();
+			}
+		},
+		desinstaller: async () => ({ ok: false, code: "inconnu" }),
+	},
+
 	langages: {
 		etat: (nom) => appeler("langages.etat", [nom]),
 		async installer(nom, surProgression) {

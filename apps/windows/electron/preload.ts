@@ -402,6 +402,20 @@ const pont: Pont = {
 
 	/* THE LANGUAGE PACKS (task 9): same subscribe-before, unsubscribe-in-
 	   `finally` discipline as `video.installer`. */
+	python: {
+		etat: () => ipcRenderer.invoke(CANAUX.pythonEtat),
+		async installer(paquets, surProgression) {
+			const ecouteur = (_e: unknown, p: { recus: number; total: number }): void => surProgression(p.recus, p.total);
+			ipcRenderer.on(CANAUX.pythonProgression, ecouteur);
+			try {
+				return await ipcRenderer.invoke(CANAUX.pythonInstaller, paquets);
+			} finally {
+				ipcRenderer.off(CANAUX.pythonProgression, ecouteur);
+			}
+		},
+		desinstaller: paquet => ipcRenderer.invoke(CANAUX.pythonDesinstaller, paquet),
+	},
+
 	langages: {
 		etat: nom => ipcRenderer.invoke(CANAUX.langagesEtat, nom),
 		async installer(nom, surProgression) {

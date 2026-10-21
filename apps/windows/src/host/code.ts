@@ -49,10 +49,24 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 			? pont().code.run(job).catch((): CodeRun => ({ status: "unavailable", stdout: "" }))
 			: Promise.resolve<CodeRun>({ status: "unavailable", stdout: "" }),
 		warm: language => { if (!langageActif(language)) return; void pont().code.warm(language).catch(() => undefined); },
-		installer: async (language, onProgress) => {
-				const pack = language === "python" ? "python" : "c";
+		/* Python: `paquets` names the root libraries to download (`[]` = the
+		   interpreter alone). Mapping of the installer's codes: reseau -> "offline",
+		   empreinte -> "refused", anything else (disk, bad name) -> "failed".
+		   C/C++: the one compiler pack, as before. */
+		installer: async (language, onProgress, paquets) => {
+			const pourcent = (recus: number, total: number): void => onProgress(Math.floor((recus * 100) / Math.max(1, total)));
+			if (language === "python") {
+				try {
+					const res = await pont().python.installer(paquets ?? [], pourcent);
+					if (res.ok) return "ok";
+					return res.code === "reseau" ? "offline" : res.code === "empreinte" ? "refused" : "failed";
+				} catch {
+					return "failed";
+				}
+			}
+			const pack = "c";
 			try {
-				const res = await pont().langages.installer(pack, (received, total) => onProgress(Math.floor((received * 100) / Math.max(1, total))));
+				const res = await pont().langages.installer(pack, pourcent);
 				if (res.ok) return "ok";
 				return res.code === "empreinte" ? "refused" : "offline";
 			} catch {

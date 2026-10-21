@@ -535,34 +535,6 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
 }
 
 
-/* "Run online" offer under a Python error that the sandbox's isolation caused. */
-.quiz-code-online{
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  font-family: var(--font-interface, inherit);
-  color: var(--text-muted);
-  white-space: normal;
-}
-.quiz-code-online-btn{
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-normal);
-  font: inherit;
-  cursor: pointer;
-}
-@media (hover: hover){
-    .quiz-code-online-btn:hover{ background: var(--background-modifier-hover); }
-}
-.quiz-code-online-icon svg{ width: 14px; height: 14px; }
-
 /* Backtick code coloured by the generic tokenizer (engine/code-generique.ts,
    2026-10-14): the pill of plain inline code is kept, only the tokens take
    the colours of the app's code. */

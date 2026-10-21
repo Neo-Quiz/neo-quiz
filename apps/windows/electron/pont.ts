@@ -55,6 +55,7 @@ import type { EtatSync, LigneJournal } from "../../../src/dashboard/sync-etat";
 export type { EtatSync } from "../../../src/dashboard/sync-etat";
 export type { EtatMiseAJour, PhaseMiseAJour } from "./mise-a-jour-etat";
 import type { EtatMiseAJour } from "./mise-a-jour-etat";
+import type { EtatPython } from "./python/installation";
 /* Le type des NOMS d'outils que le principal accepte de lancer/installer.
    `import type` seulement : ce module reste sans Node (`check:host`,
    assertion 6), et `Outil` n'est qu'une union de littéraux. */
@@ -1166,6 +1167,19 @@ export interface Pont {
 		tailleRuns(): Promise<number>;
 	};
 
+	/**
+	 * NATIVE PYTHON (`python/service.ts`): the pinned interpreter and libraries.
+	 * The window names packages; each must be a key of the pinned catalogue
+	 * (checked in the main process). Progress is PUSHED (`pythonProgression`).
+	 * Installer result codes: `reseau` offline, `empreinte` hash refused,
+	 * `echec` anything else (disk, bad name).
+	 */
+	python: {
+		etat(): Promise<EtatPython>;
+		installer(paquets: string[], surProgression: (recus: number, total: number) => void): Promise<{ ok: true } | { ok: false; code: "reseau" | "empreinte" | "echec" }>;
+		desinstaller(paquet: string): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
+	};
+
 	langages: {
 		etat(nom: "c" | "python"): Promise<{ installe: boolean; version: string | null; octets: number }>;
 		installer(nom: "c" | "python", surProgression: (recus: number, total: number) => void): Promise<EnveloppeVideo<null, CodeInstallation>>;
@@ -1372,6 +1386,10 @@ export const CANAUX = {
 	videoAnnuler: "neo:video/annuler",
 	codeRun: "neo:code/run",
 	codeWarm: "neo:code/warm",
+	pythonEtat: "neo:python/etat",
+	pythonInstaller: "neo:python/installer",
+	pythonDesinstaller: "neo:python/desinstaller",
+	pythonProgression: "neo:python/progression",
 	langagesEtat: "neo:langages/etat",
 	langagesInstaller: "neo:langages/installer",
 	langagesSupprimer: "neo:langages/supprimer",

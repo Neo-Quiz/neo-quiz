@@ -1035,7 +1035,7 @@ export interface HostCode {
 	    percents. `offline`: it could not be downloaded; `refused`: it was,
 	    but failed its integrity check and was not installed. OPTIONAL: a
 	    host whose languages are all built in has nothing to download. */
-	installer?(language: CodeLanguage, onProgress: (percent: number) => void): Promise<"ok" | "offline" | "refused">;
+	installer?(language: CodeLanguage, onProgress: (percent: number) => void, paquets?: string[]): Promise<"ok" | "offline" | "refused" | "failed">;
 }
 
 /**

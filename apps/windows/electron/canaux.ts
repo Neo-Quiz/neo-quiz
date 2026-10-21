@@ -128,6 +128,7 @@ import type { BacASable } from "./code-sandbox";
    is pinned in `langages.ts`; the renderer only names the language. */
 import { etatLangage, installerLangage, PACKS, supprimerLangage } from "./langages";
 import type { NomPack } from "./langages";
+import type { ServicePython } from "./python/service";
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
@@ -182,6 +183,9 @@ export interface DependancesCanaux {
 	    `main.ts` — this file only relays calls to it. Only Python reaches it
 	    today; `c`/`cpp` answer `not-installed` until task 8. */
 	code: BacASable;
+	/** The native Python (`./python/service.ts`): runs Python blocks and manages
+	    the interpreter and libraries. Python never reaches `code` (the sandbox). */
+	python: ServicePython;
 	/** The embedded Syncthing, `null` where there is none (Linux): the `sync`
 	    channels are then not registered at all. */
 	sync: GestionSync | null;
@@ -2131,10 +2135,14 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		if (!LANGUES_CODE.includes(o.language as never) || !texte(o.code) || !texte(o.stdin ?? "") || (o.after !== undefined && !texte(o.after))) {
 			return Promise.resolve({ status: "unavailable", stdout: "", error: "job refused" });
 		}
-		const delai = Math.min(10000, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
+		/* Python runs get up to 60 s (an import of a heavy library alone can take
+		   several seconds); C and C++ stay at 10 s. */
+		const plafond = o.language === "python" ? 60000 : 10000;
+		const delai = Math.min(plafond, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
+		if (o.language === "python") return trackRun(() => deps.python.run({ code: o.code as string, timeoutMs: delai }));
 		return trackRun(() => deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai }));
 	});
-	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never)) deps.code.warm(language as CodeLanguage); });
+	ipcMain.handle(CANAUX.codeWarm, (e, language: unknown) => { if (depuisFenetrePrincipale(e) && LANGUES_CODE.includes(language as never) && language !== "python") deps.code.warm(language as CodeLanguage); });
 
 	/* THE LANGUAGE PACKS (task 9). The renderer passes ONE argument, the
 	   pack's name (`"c"`, which serves C and C++, or `"python"`): anything
@@ -2145,7 +2153,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   `.part` files, and a delete waits for that pack's install rather than
 	   removing a directory being renamed into place. Progress is PUSHED
 	   (`langagesProgression`), like yt-dlp's. */
-	const PACKS_CONNUS = ["c", "python"] as const;
+	const PACKS_CONNUS = ["c"] as const;
 	const packConnu = (nom: unknown): nom is NomPack => PACKS_CONNUS.includes(nom as never);
 	const installationsPack = new Map<NomPack, Promise<EnveloppeVideo<null, CodeInstallation>>>();
 	ipcMain.handle(CANAUX.langagesEtat, async (e, nom: unknown) => {
@@ -2178,6 +2186,16 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		await installationsPack.get(nom);
 		await supprimerLangage(deps.dossierLangages, nom);
 	});
+
+	/* NATIVE PYTHON. `paquets` names are checked against the pinned catalogue
+	   in the service (a name that is not a key of `PAQUETS` is refused before
+	   anything moves); progress is pushed like the language packs'. */
+	ipcMain.handle(CANAUX.pythonEtat, (e) => (depuisFenetrePrincipale(e) ? deps.python.etat() : { interprete: false, version: null, paquets: [], octetsTotal: 0 }));
+	ipcMain.handle(CANAUX.pythonInstaller, (e, paquets: unknown) => {
+		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ ok: false, code: "echec" });
+		return deps.python.installer(paquets, (recus, total) => deps.envoyer(CANAUX.pythonProgression, { recus, total }));
+	});
+	ipcMain.handle(CANAUX.pythonDesinstaller, (e, paquet: unknown) => (depuisFenetrePrincipale(e) ? deps.python.desinstaller(paquet) : { ok: false, code: "inconnu" }));
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {
