@@ -205,9 +205,11 @@
 	transition: background 120ms, color 120ms;
 }
 .qbd-icon-cell svg { width: 18px; height: 18px; }
-.qbd-icon-cell:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
+@media (hover: hover) {
+    .qbd-icon-cell:hover {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal) !important;
+    }
 }
 .qbd-icon-cell.is-active {
 	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
@@ -231,7 +233,9 @@
 .qbd-subject-row-icon svg { width: 16px; height: 16px; }
 .qbd-subject-row-icon img { width: 18px; height: 18px; object-fit: contain; }
 .qbd-subject-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qbd-subject-row:hover { background: var(--background-modifier-hover) !important; }
+@media (hover: hover) {
+    .qbd-subject-row:hover { background: var(--background-modifier-hover) !important; }
+}
 .qbd-subject-row.is-active {
 	background: color-mix(in srgb, var(--interactive-accent) 20%, transparent) !important;
 	color: var(--interactive-accent) !important;

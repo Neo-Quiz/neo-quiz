@@ -5,20 +5,23 @@
    it can go back; only when it answers no does the activity finish.
 
    Layers, topmost first:
-   1. an open modal (Settings, a "Set up your test" window, a menu of the
+   1. a floating select, action menu or picker (`ui-select.ts`);
+   2. an open modal (Settings, a "Set up your test" window, a menu of the
       shell are all `.modal-container`s): its close button, the one the user
       would tap;
-   2. the editor's question sheet (`detail-list-sheet.ts`), then the quiz
+   3. the editor's question sheet (`detail-list-sheet.ts`), then the quiz
       engine's hint window, then the folder page's card selection (its
       "Cancel" button, `selection-view.ts`: Back leaves the selection mode
       before it leaves the page);
-   3. a screen: every screen that can go back listens to `EVENEMENT_RETOUR`
+   4. a screen: every screen that can go back listens to `EVENEMENT_RETOUR`
       on the document and marks the event handled. The played quiz closes
       (as its cross does); the dashboard shell steps back in its history, the
       same one the mouse's back button walks (`historique-nav.ts`). The shell
       kept inert behind a played quiz stays out of it.
    Nothing handled: the key leaves the app.
 ══════════════════════════════════════════════════════════ */
+
+import { closeAllSelects } from "../../../../src/dashboard/ui-select";
 
 export const EVENEMENT_RETOUR = "nq-retour";
 
@@ -36,6 +39,7 @@ export function prendreRetour(e: Event): boolean {
 
 /** Goes one step back; returns whether anything did. */
 export function retourAndroid(): boolean {
+	if (closeAllSelects()) return true;
 	const modales = document.querySelectorAll<HTMLElement>(".modal-container:not(.qbd-closing) .modal-close-button");
 	const derniere = modales[modales.length - 1];
 	/* Inside Settings, the Sync page goes back to the settings page first

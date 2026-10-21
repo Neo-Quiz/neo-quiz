@@ -89,14 +89,15 @@ export interface RecentModuleGroup {
 	modules: ModuleGroup[];
 }
 
-/** Récence d'un module = la plus récente activité de SES quiz (un module
-    vide date de 0 → « plus d'un mois »). Un groupe vide est omis. */
+/** Folder activity is its filesystem modification date or its newest quiz
+    activity, whichever is later. An unknown date keeps the quiz fallback. */
 export function buildRecentModuleGroups(
 	modules: ModuleGroup[],
 	stats: Record<string, QuizStatRecord>,
+	folderModified?: ReadonlyMap<string, number | null>,
 ): RecentModuleGroup[] {
 	const now = Date.now();
-	const activity = (m: ModuleGroup) => m.quizzes.reduce((mx, q) => Math.max(mx, lastActivity(q, stats)), 0);
+	const activity = (m: ModuleGroup) => m.quizzes.reduce((mx, q) => Math.max(mx, lastActivity(q, stats)), m.path ? folderModified?.get(m.path) ?? 0 : 0);
 	const buckets: Record<RecentGroupKey, ModuleGroup[]> = {
 		"recent:7d": [], "recent:30d": [], "recent:older": []
 	};

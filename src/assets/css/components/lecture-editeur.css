@@ -67,7 +67,12 @@
   cursor: pointer;
 }
 
-.qbd-lecture-style-btn:hover,
+@media (hover: hover){
+    .qbd-lecture-style-btn:hover{
+      background: var(--background-modifier-hover);
+      color: var(--text-normal);
+    }
+}
 .qbd-lecture-style-btn:focus-visible{
   background: var(--background-modifier-hover);
   color: var(--text-normal);

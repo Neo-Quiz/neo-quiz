@@ -21,7 +21,12 @@
   border-radius: 2px;
 }
 
-.qb-terme:hover,
+@media (hover: hover){
+    .qb-terme:hover{
+      color: var(--quiz-primary);
+      border-bottom-color: var(--quiz-primary);
+    }
+}
 .qb-terme:focus-visible{
   color: var(--quiz-primary);
   border-bottom-color: var(--quiz-primary);

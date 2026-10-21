@@ -224,10 +224,14 @@
 }
 .qbd-setup-step-ico { display: inline-flex; }
 .qbd-setup-step-ico svg { width: 16px; height: 16px; }
-.qbd-setup-step:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
-.qbd-setup-step:active { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
+@media (hover: hover) {
+    .qbd-setup-step:hover { background: color-mix(in srgb, var(--text-normal) 10%, transparent); color: var(--text-normal); }
+}
+.qbd-setup-step:is(body:not(.is-mobile) :active) { background: color-mix(in srgb, var(--text-normal) 16%, transparent); }
 .qbd-setup-step[aria-disabled="true"] { opacity: 0.35; cursor: default; }
-.qbd-setup-step[aria-disabled="true"]:hover { background: none; color: var(--text-muted); }
+@media (hover: hover) {
+    .qbd-setup-step[aria-disabled="true"]:hover { background: none; color: var(--text-muted); }
+}
 .qbd-setup-step:focus-visible {
 	outline: 2px solid var(--quiz-primary);
 	outline-offset: 1px;
@@ -244,7 +248,9 @@
 	cursor: text;
 	transition: border-color 120ms, background-color 120ms;
 }
-.qbd-setup-value:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+@media (hover: hover) {
+    .qbd-setup-value:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+}
 .qbd-setup-value:focus-within {
 	border-color: var(--quiz-primary);
 	background: var(--background-modifier-form-field);
@@ -270,15 +276,39 @@
 	color: var(--text-muted);
 }
 
-/* ── The footer: the app's 3D button, at the right. Its rules live in
-   dashboard-components.css; only the spacing is set here. ── */
+/* ── The footer: a FLAT primary button at the right. A 3D button belongs on
+   a page, never in a window (2026-10-05); this one was 3D until 2026-10-21. ── */
 .qbd-setup-foot {
 	display: flex;
 	justify-content: flex-end;
 	margin-top: 18px;
 }
-.qbd-setup-modal .qbd-setup-foot .qbd-cta3d-face { padding: 12px 26px; }
-.qbd-setup-foot .qbd-btn-icon svg { width: 15px; height: 15px; }
+.qbd-setup-start {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 12px 26px;
+	border: 0;
+	border-radius: 12px;
+	/* The colours of the app's primary buttons (the 3D face's), flat. */
+	background: var(--quiz-primary);
+	color: #fff;
+	font: inherit;
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 150ms ease-out;
+}
+@media (hover: hover) {
+	.qbd-setup-start:hover { background: color-mix(in srgb, var(--quiz-primary) 88%, #fff); }
+}
+.qbd-setup-start:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+.qbd-setup-foot .qbd-btn-icon { display: inline-flex; }
+.qbd-setup-foot .qbd-btn-icon svg { width: 15px; height: 15px; fill: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-setup-switch,

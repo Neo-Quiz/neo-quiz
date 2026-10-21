@@ -47,11 +47,13 @@
   --help-icon: var(--quiz-hint);
 }
 
-.quiz-help-btn:hover{
-  background: var(--help-face-hover);
+@media (hover: hover){
+    .quiz-help-btn:hover{
+      background: var(--help-face-hover);
+    }
 }
 
-.quiz-help-btn:active{
+.quiz-help-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: translateY(var(--help-depth));
   box-shadow: 0 0 0 0 var(--help-edge);
 }
@@ -242,7 +244,18 @@
     color var(--quiz-dur-fast) ease;
 }
 
-.quiz-hint-modal-close:hover,
+@media (hover: hover){
+    .quiz-hint-modal-close:hover{
+      outline: none;
+      transform: translate3d(0,-1px,0);
+      color: var(--text-normal);
+      border-color: color-mix(in srgb, var(--quiz-primary) 38%, var(--background-modifier-border));
+      background: color-mix(in srgb, var(--quiz-primary) 10%, var(--background-secondary));
+      box-shadow:
+    0 0 0 1.5px var(--quiz-primary-ring-12),
+    0 0 10px color-mix(in srgb, var(--quiz-primary) 8%, transparent);
+    }
+}
 .quiz-hint-modal-close:focus-visible{
   outline: none;
   transform: translate3d(0,-1px,0);

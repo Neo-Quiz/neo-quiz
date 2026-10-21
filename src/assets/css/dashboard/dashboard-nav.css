@@ -87,7 +87,7 @@
 	background: color-mix(in srgb, var(--qbd-nav-card) 70%, transparent) !important;
 	opacity: 1;
 }
-.qbd-nav-item:active:not(:disabled) { transform: scale(0.98); }
+.qbd-nav-item:is(body:not(.is-mobile) :active):not(:disabled) { transform: scale(0.98); }
 
 .qbd-nav-item.qbd-nav-item--active {
 	opacity: 1;
@@ -99,11 +99,17 @@
 /* An entry the host cannot open yet: visible but inert — a disabled
    <button> already gets no click, this block only cancels the hover so it
    does not suggest a possible action. */
-.qbd-nav-item--disabled,
-.qbd-nav-item--disabled:hover {
+.qbd-nav-item--disabled {
 	color: var(--text-faint) !important;
 	background: transparent !important;
 	cursor: not-allowed;
+}
+@media (hover: hover) {
+    .qbd-nav-item--disabled:hover {
+        color: var(--text-faint) !important;
+        background: transparent !important;
+        cursor: not-allowed;
+    }
 }
 
 .qbd-nav-icon {
@@ -181,7 +187,7 @@
 	.qbd-nav-icon .qbd-nav-cut {
 		transition: none;
 	}
-	.qbd-nav-item:active:not(:disabled) { transform: none; }
+	.qbd-nav-item:is(body:not(.is-mobile) :active):not(:disabled) { transform: none; }
 }
 
 .qbd-nav-item[hidden] { display: none; }

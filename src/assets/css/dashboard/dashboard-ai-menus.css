@@ -41,8 +41,10 @@
 	color: var(--text-normal);
 }
 
-.qbd-menu-claude .qbd-select-option:hover {
-	background: color-mix(in srgb, var(--text-normal) 7.5%, transparent) !important;
+@media (hover: hover) {
+    .qbd-menu-claude .qbd-select-option:hover {
+        background: color-mix(in srgb, var(--text-normal) 7.5%, transparent) !important;
+    }
 }
 
 .qbd-menu-claude .qbd-model-menu-sep {
@@ -50,10 +52,15 @@
 	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
-.qbd-menu-claude .qbd-action-menu-icon,
-.qbd-menu-claude .qbd-select-option:hover .qbd-action-menu-icon {
+.qbd-menu-claude .qbd-action-menu-icon {
 	width: 16px;
 	color: var(--text-normal);
+}
+@media (hover: hover) {
+    .qbd-menu-claude .qbd-select-option:hover .qbd-action-menu-icon {
+        width: 16px;
+        color: var(--text-normal);
+    }
 }
 
 .qbd-menu-claude .qbd-action-menu-icon svg {

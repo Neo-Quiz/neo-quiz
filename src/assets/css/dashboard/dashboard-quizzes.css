@@ -204,9 +204,11 @@
 	line-height: 1.3;
 }
 
-.qbd-root .qbd-filter-pill:hover {
-	border-color: var(--background-modifier-border-hover);
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-root .qbd-filter-pill:hover {
+        border-color: var(--background-modifier-border-hover);
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-root .qbd-filter-pill--active {
@@ -423,22 +425,24 @@
    s'éclaircit d'un cran, avec l'ombre douce de StudySmarter, au lieu de
    l'élévation d'avant. Le halo lui-même n'est donc jamais éteint : il
    grandit, il ne bouge pas. */
-.qbd-module-card:hover {
-	border-color: var(--border-c);
-	--qbd-halo: 20%;
-	--qbd-voile: var(--qbd-carte-voile-survol);
-	box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft),
+@media (hover: hover) {
+    .qbd-module-card:hover {
+        border-color: var(--border-c);
+        --qbd-halo: 20%;
+        --qbd-voile: var(--qbd-carte-voile-survol);
+        box-shadow: var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow), 0 0 0 1px var(--border-soft),
 		var(--qbd-carte-ombre-survol);
+    }
 }
 /* Press : un léger enfoncement, comme StudySmarter, sans levée à retomber ;
    le voile retombe d'un cran pendant qu'on appuie. */
-.qbd-module-card:active {
+.qbd-module-card:is(body:not(.is-mobile) :active) {
 	--qbd-voile: var(--qbd-carte-voile-clic);
 	transform: scale(var(--qbd-carte-echelle-clic));
 	transition: var(--qbd-carte-transition-clic);
 }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-module-card:active { transform: none; }
+	.qbd-module-card:is(body:not(.is-mobile) :active) { transform: none; }
 }
 
 /* LA CARTE NE S'ENFONCE PAS SOUS UN CLIC QUI NE LUI EST PAS ADRESSÉ (Ahmed,
@@ -456,7 +460,7 @@
    levée à annuler, donc plus de transform à rétablir ici — il suffit qu'elle
    n'hérite pas du `scale(0.99)` de son propre `:active`, qu'un clic sur
    l'icône déclenche aussi par bouillonnement de l'état). */
-.qbd-module-card:has(.qbd-module-card__icon--editable:active) {
+.qbd-module-card:has(.qbd-module-card__icon--editable:is(body:not(.is-mobile) :active)) {
 	transform: none;
 	transition-duration: 0.12s;
 }
@@ -506,8 +510,10 @@
 	cursor: pointer;
 	transition: transform 0.12s ease;
 }
-.qbd-module-card__icon--editable:hover { transform: scale(1.2); }
-.qbd-module-card__icon--editable:active { transform: scale(1.05); }
+@media (hover: hover) {
+    .qbd-module-card__icon--editable:hover { transform: scale(1.2); }
+}
+.qbd-module-card__icon--editable:is(body:not(.is-mobile) :active) { transform: scale(1.05); }
 .qbd-module-card__titles {
 	display: flex;
 	flex-direction: column;
@@ -632,9 +638,11 @@
 	cursor: pointer;
 }
 .qbd-module-card__menu svg { width: 16px; height: 16px; }
-.qbd-module-card__menu:hover {
-	background: rgba(255, 255, 255, .08) !important;
-	color: #dfe4ef !important;
+@media (hover: hover) {
+    .qbd-module-card__menu:hover {
+        background: rgba(255, 255, 255, .08) !important;
+        color: #dfe4ef !important;
+    }
 }
 
 /* Grille de cartes de module. Largeur de rangée plafonnée à 1082 px
@@ -647,7 +655,7 @@
 	max-width: 1082px;
 	grid-template-columns: repeat(
 		auto-fill,
-		minmax(max(300px, calc((100% - 2 * 16px) / 3)), 1fr)
+		minmax(max(260px, calc((100% - 2 * 16px) / 3)), 1fr)
 	);
 	gap: 16px;
 }
@@ -794,9 +802,11 @@
 	color: var(--text-muted);
 }
 
-.qbd-root .qbd-quizzes-header-back:hover {
-	color: var(--text-normal);
-	background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+@media (hover: hover) {
+    .qbd-root .qbd-quizzes-header-back:hover {
+        color: var(--text-normal);
+        background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+    }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -816,6 +826,19 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* A folder's name wraps to two lines before it is cut, at every width: a
+   tablet showed « XTI306 - Introduction à l'in… » (2026-10-21). */
+.qbd-quizzes-folder-hero .qbd-quizzes-title-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	min-width: 0;
+	line-height: 1.15;
 }
 
 /* Trait 7a sous le titre, à l'accent du dossier : les 61 px correspondent
@@ -1018,28 +1041,30 @@
 	transition: background-color 0.22s ease, border-color 0.22s ease, --qbd-voile 0.22s ease,
 		--qbd-halo 0.22s ease, transform 100ms ease-out, box-shadow 100ms ease-out;
 }
-.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:hover {
-	transform: none;
-	--qbd-halo: 20%;
-	--qbd-voile: var(--qbd-carte-voile-survol);
-	--qbd-card3d-edge: color-mix(in oklab, var(--accent) 72%, #07080d);
-	background:
+@media (hover: hover) {
+    .qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:hover {
+        transform: none;
+        --qbd-halo: 20%;
+        --qbd-voile: var(--qbd-carte-voile-survol);
+        --qbd-card3d-edge: color-mix(in oklab, var(--accent) 72%, #07080d);
+        background:
 		radial-gradient(360px 150px at 0% 0%, color-mix(in oklab, var(--accent) var(--qbd-halo), transparent) 0%, transparent 68%),
 		color-mix(in srgb, var(--text-normal) var(--qbd-voile), var(--card-bg));
-	border-color: var(--border-c);
-	box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow);
+        border-color: var(--border-c);
+        box-shadow: 0 4px 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen), 0 14px 30px -12px var(--glow);
+    }
 }
 /* Pressed: the card sinks onto its edge, and rises again on release. A
    press on a control inside it (a mode pill, "⋯") does not sink the card:
    the same rule as the folder cards, below. */
-.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:not(:has(button:active)) {
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:has(button:is(body:not(.is-mobile) :active))) {
 	--qbd-voile: var(--qbd-carte-voile-clic);
 	transform: translateY(4px);
 	box-shadow: 0 0 0 0 var(--qbd-card3d-edge), var(--qbd-glass-sheen);
 }
 /* …nor its older press (`.qbd-quiz-card--folder:active`,
    dashboard-components.css), which would still apply through the pill. */
-.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:has(button:active) {
+.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):has(button:is(body:not(.is-mobile) :active)) {
 	transform: none;
 }
 .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-text {
@@ -1111,8 +1136,10 @@
 	color: color-mix(in srgb, var(--interactive-accent) 45%, var(--text-normal));
 	font-weight: 600;
 }
-.qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn:hover {
-	background: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+@media (hover: hover) {
+    .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode-btn:hover {
+        background: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+    }
 }
 .qbd-root .qbd-quizzes-drill-grid .qbd-quiz-card--folder .qbd-quiz-card-mode--learn .qbd-quiz-card-mode-btn {
 	border-radius: 999px;
@@ -1135,7 +1162,7 @@
 	height: 20px;
 }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:active:not(:has(button:active)) { transform: none; }
+	.qbd-quizzes-drill-grid .qbd-quiz-card.qbd-quiz-card--folder:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]):not(:has(button:is(body:not(.is-mobile) :active))) { transform: none; }
 }
 
 /* ── Sélecteur Contenu | Progression, entre le titre et « Nouveau quiz ». ── */
@@ -1182,7 +1209,11 @@
 	transition: color 0.15s ease;
 }
 
-.qbd-root .qbd-folder-view-tab:hover,
+@media (hover: hover) {
+    .qbd-root .qbd-folder-view-tab:hover {
+        color: var(--text-normal);
+    }
+}
 .qbd-root .qbd-folder-view-tab[aria-selected="true"] {
 	color: var(--text-normal);
 }
@@ -1248,8 +1279,10 @@
 	border-radius: 60px;
 }
 
-.qbd-root .qbd-next-step-main:hover {
-	background: rgba(255, 255, 255, 0.1);
+@media (hover: hover) {
+    .qbd-root .qbd-next-step-main:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
 }
 
 .qbd-root .qbd-next-step-main:focus-visible {
@@ -1378,7 +1411,9 @@
 	white-space: nowrap;
 	cursor: pointer;
 }
-.qbd-root .qbd-folder-course-title:hover { text-decoration: underline; }
+@media (hover: hover) {
+    .qbd-root .qbd-folder-course-title:hover { text-decoration: underline; }
+}
 .qbd-root .qbd-folder-course-title:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .qbd-folder-course-modes { display: flex; flex-direction: column; gap: 6px; }
 .qbd-folder-course-mode {
@@ -1419,7 +1454,9 @@
 	cursor: pointer;
 	flex-shrink: 0;
 }
-.qbd-folder-course-mode-toggle:hover { color: var(--text-normal); }
+@media (hover: hover) {
+    .qbd-folder-course-mode-toggle:hover { color: var(--text-normal); }
+}
 .qbd-folder-course-mode-toggle:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .qbd-folder-course-mode-chevron { display: flex; transition: transform 0.15s ease; }
 .qbd-folder-course-mode-bloc.is-open .qbd-folder-course-mode-chevron { transform: rotate(90deg); }
@@ -1435,7 +1472,10 @@
 	font-size: 11.5px;
 	color: var(--text-muted);
 }
-.qbd-folder-attempt-row:hover, .qbd-folder-attempt-row:focus-within { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+@media (hover: hover) {
+    .qbd-folder-attempt-row:hover { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
+}
+.qbd-folder-attempt-row:focus-within { background: color-mix(in srgb, var(--text-normal) 6%, transparent); }
 .qbd-folder-attempt-date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qbd-folder-attempt-info { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .qbd-folder-attempt-old { color: var(--text-faint); }
@@ -1461,10 +1501,14 @@
 	flex-shrink: 0;
 	opacity: 0;
 }
-.qbd-folder-attempt-row:hover .qbd-folder-attempt-delete,
+@media (hover: hover) {
+    .qbd-folder-attempt-row:hover .qbd-folder-attempt-delete { opacity: 1; }
+}
 .qbd-folder-attempt-row:focus-within .qbd-folder-attempt-delete,
 .qbd-root .qbd-folder-attempt-delete:focus-visible { opacity: 1; }
-.qbd-root .qbd-folder-attempt-delete:hover { color: var(--color-red); }
+@media (hover: hover) {
+    .qbd-root .qbd-folder-attempt-delete:hover { color: var(--color-red); }
+}
 .qbd-root .qbd-folder-attempt-delete:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .qbd-folder-attempt-row--deleted { justify-content: flex-start; }
 .qbd-folder-attempt-deleted-label { color: var(--text-faint); }
@@ -1483,7 +1527,11 @@
 .qbd-root .qbd-folder-attempt-undo:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 
 @media (max-width: 620px) {
-	.qbd-folder-progress { grid-template-columns: minmax(0, 1fr); }
+	/* The three counts stay side by side: one full-width tile per number left
+	   a phone scrolling past three near-empty blocks. */
+	.qbd-folder-progress { gap: 10px; }
+	.qbd-folder-progress-tile { padding: 14px 12px; }
+	.qbd-folder-progress-tile--wide { padding: 18px 20px; }
 	.qbd-folder-course { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
@@ -1560,9 +1608,11 @@
 	}
 }
 
-.qbd-root .qbd-quizzes-crumb-back:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-root .qbd-quizzes-crumb-back:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1591,9 +1641,11 @@
 	color: var(--text-muted) !important;
 }
 
-.theme-light .qbd-module-card__menu:hover {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal) !important;
+@media (hover: hover) {
+    .theme-light .qbd-module-card__menu:hover {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal) !important;
+    }
 }
 
 
@@ -1632,7 +1684,12 @@
 	cursor: pointer;
 	transition: color 0.15s ease, background-color 0.15s ease;
 }
-.qbd-root .qbd-folder-more-btn:hover,
+@media (hover: hover) {
+    .qbd-root .qbd-folder-more-btn:hover {
+        color: var(--text-normal);
+        background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    }
+}
 .qbd-root .qbd-folder-more-btn[aria-expanded="true"] {
 	color: var(--text-normal);
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
@@ -1685,9 +1742,11 @@
 	cursor: pointer;
 	transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
-.qbd-root .qbd-drop-zone:hover {
-	border-color: color-mix(in srgb, var(--drop-accent) 55%, transparent);
-	background: color-mix(in srgb, var(--drop-accent) 6%, transparent);
+@media (hover: hover) {
+    .qbd-root .qbd-drop-zone:hover {
+        border-color: color-mix(in srgb, var(--drop-accent) 55%, transparent);
+        background: color-mix(in srgb, var(--drop-accent) 6%, transparent);
+    }
 }
 .qbd-root .qbd-drop-zone:focus-visible {
 	outline: 2px solid var(--interactive-accent);
@@ -1765,7 +1824,7 @@
 	transition: transform 140ms ease, filter 140ms ease;
 }
 
-.qbd-quizzes-fab:active {
+.qbd-quizzes-fab:is(body:not(.is-mobile) :active) {
 	transform: scale(0.96);
 }
 
@@ -1812,9 +1871,11 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	color: #ffffff !important;
 }
 
-.qbd-btn--create.qbd-btn--import:hover,
-.qbd-quizzes-group .qbd-btn--create.qbd-btn--import:hover {
-	background: rgba(255, 255, 255, 0.17) !important;
+@media (hover: hover) {
+    .qbd-btn--create.qbd-btn--import:hover,
+    .qbd-quizzes-group .qbd-btn--create.qbd-btn--import:hover {
+        background: rgba(255, 255, 255, 0.17) !important;
+    }
 }
 
 .qbd-quizzes-group .qbd-quizzes-import {
@@ -1956,9 +2017,11 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	-webkit-tap-highlight-color: transparent;
 }
 
-.qbd-sel-btn:hover {
-	color: var(--text-normal);
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+@media (hover: hover) {
+    .qbd-sel-btn:hover {
+        color: var(--text-normal);
+        background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    }
 }
 
 .qbd-sel-btn-icon {
@@ -1975,8 +2038,10 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	color: #fff;
 }
 
-.qbd-sel-btn.qbd-sel-share:hover {
-	background: color-mix(in oklab, var(--accent) 88%, #fff);
+@media (hover: hover) {
+    .qbd-sel-btn.qbd-sel-share:hover {
+        background: color-mix(in oklab, var(--accent) 88%, #fff);
+    }
 }
 
 .qbd-sel-btn:disabled {
@@ -2019,8 +2084,10 @@ body:has(.modal-container) > .qbd-quizzes-fab {
 	cursor: pointer;
 }
 
-.qbd-share-pick-all:hover {
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+@media (hover: hover) {
+    .qbd-share-pick-all:hover {
+        background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+    }
 }
 
 .qbd-share-pick-note {

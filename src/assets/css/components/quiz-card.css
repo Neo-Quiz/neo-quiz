@@ -442,10 +442,12 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
 /* Au survol, l'ACCENT de l'app (le bleu de « Commencer le quiz »), pas une
    teinte du thème de code : c'est un bouton de Neo Quiz posé sur le code. */
 .quiz-code-run-btn{ transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease; }
-.quiz-code-run-btn:hover{
-  opacity: 1;
-  color: var(--quiz-primary, var(--interactive-accent));
-  background: color-mix(in srgb, var(--quiz-primary, var(--interactive-accent)) 16%, transparent);
+@media (hover: hover){
+    .quiz-code-run-btn:hover{
+      opacity: 1;
+      color: var(--quiz-primary, var(--interactive-accent));
+      background: color-mix(in srgb, var(--quiz-primary, var(--interactive-accent)) 16%, transparent);
+    }
 }
 .quiz-code-run-btn:focus-visible{ opacity: 1; outline: 2px solid var(--quiz-primary, var(--interactive-accent)); outline-offset: 1px; }
 .quiz-code-run-btn:disabled{ cursor: default; opacity: 0.5; }
@@ -556,7 +558,9 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
   font: inherit;
   cursor: pointer;
 }
-.quiz-code-online-btn:hover{ background: var(--background-modifier-hover); }
+@media (hover: hover){
+    .quiz-code-online-btn:hover{ background: var(--background-modifier-hover); }
+}
 .quiz-code-online-icon svg{ width: 14px; height: 14px; }
 
 /* Backtick code coloured by the generic tokenizer (engine/code-generique.ts,

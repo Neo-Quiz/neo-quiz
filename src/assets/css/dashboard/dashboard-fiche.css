@@ -173,8 +173,10 @@
 	cursor: default;
 	transition: transform 160ms ease;
 }
-.qbd-fiche-chip:hover {
-	transform: scale(1.08);
+@media (hover: hover) {
+    .qbd-fiche-chip:hover {
+        transform: scale(1.08);
+    }
 }
 .qbd-fiche-mode-icon { display: inline-flex; }
 
@@ -212,9 +214,11 @@
 	cursor: pointer;
 	transition: background-color 140ms ease, color 140ms ease;
 }
-.qbd-root .qbd-fiche-mode-seg:hover:not(.is-active) {
-	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-root .qbd-fiche-mode-seg:hover:not(.is-active) {
+        background: color-mix(in srgb, var(--text-normal) 8%, transparent);
+        color: var(--text-normal);
+    }
 }
 /* The active segment's background is the SLIDING BLOCK (`seg-indic.ts`),
    laid under the segments: the segment itself stays transparent and only
@@ -241,12 +245,16 @@
 	pointer-events: none;
 }
 .qbd-fiche-mode-seg .qbd-fiche-mode-icon svg { width: 14px; height: 14px; }
-.qbd-fiche-chip .qbd-quiz-card-type:hover .qbd-quiz-card-type-icon {
-	transform: none;
+@media (hover: hover) {
+    .qbd-fiche-chip .qbd-quiz-card-type:hover .qbd-quiz-card-type-icon {
+        transform: none;
+    }
 }
-.qbd-fiche-chip:hover .qbd-quiz-card-type-tip {
-	opacity: 1;
-	transform: translateY(0);
+@media (hover: hover) {
+    .qbd-fiche-chip:hover .qbd-quiz-card-type-tip {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* D'où vient le quiz : le logo et le modèle, puis la date dessous, plus
@@ -498,10 +506,14 @@
 	border-radius: 999px;
 	background-clip: padding-box;
 }
-.qbd-fiche-card:hover .qbd-fiche-card-corps::-webkit-scrollbar-thumb,
-.qbd-folder-list--defile:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text-normal) 32%, transparent); }
-.qbd-fiche-card-corps::-webkit-scrollbar-thumb:hover,
-.qbd-folder-list--defile::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent); }
+@media (hover: hover) {
+    .qbd-fiche-card:hover .qbd-fiche-card-corps::-webkit-scrollbar-thumb,
+    .qbd-folder-list--defile:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text-normal) 32%, transparent); }
+}
+@media (hover: hover) {
+    .qbd-fiche-card-corps::-webkit-scrollbar-thumb:hover,
+    .qbd-folder-list--defile::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--quiz-primary) 70%, transparent); }
+}
 .qbd-fiche-card-corps::-webkit-scrollbar-button,
 .qbd-folder-list--defile::-webkit-scrollbar-button { display: none; height: 0; }
 /* Le cours de l'étape (Learn, 2026-09-26) : au-dessus de la question, une
@@ -620,7 +632,9 @@
 	color: color-mix(in srgb, var(--text-normal) 88%, transparent);
 	font-size: 12.5px;
 }
-.qbd-fiche-meta .qbd-fiche-chip:hover { transform: none; }
+@media (hover: hover) {
+    .qbd-fiche-meta .qbd-fiche-chip:hover { transform: none; }
+}
 /* The "·" between two chips hangs at the END of the first one (`::after`),
    not at the start of the second: when the line wraps (narrow column), it
    stays at the end of the line instead of opening the next one. */
@@ -657,7 +671,9 @@
 	padding: 0 12px;
 	color: var(--text-normal);
 }
-.qbd-fiche-search:hover { background: var(--qbd-nc-bouton-survol); }
+@media (hover: hover) {
+    .qbd-fiche-search:hover { background: var(--qbd-nc-bouton-survol); }
+}
 /* Recherche mieux dessinée (2026-09-26) : plus haute que les pastilles
    (c'est le point d'entrée de la page), coins de pilule, loupe teintée ;
    au focus, le liseré passe au bleu avec un halo doux, au lieu du contour
@@ -716,8 +732,10 @@
 	border-radius: 4px;
 	transition: background-color 120ms ease, color 120ms ease;
 }
-.qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:hover:not(.is-active) {
-	background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+@media (hover: hover) {
+    .qbd-root .qbd-fiche-meta .qbd-fiche-mode-seg:hover:not(.is-active) {
+        background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+    }
 }
 .qbd-fiche-meta .qbd-fiche-mode-indic { border-radius: 4px; }
 .qbd-root .qbd-fiche-search-input::placeholder { color: var(--text-muted); }
@@ -739,7 +757,16 @@
 	cursor: pointer;
 	transition: var(--qbd-carte-transition);
 }
-.qbd-fiche-card.is-editable:hover,
+@media (hover: hover) {
+    .qbd-fiche-card.is-editable:hover {
+        /* Pas de liseré bleu au survol (Ahmed, 2026-09-27 : « ça sert à rien ») :
+	   le fond et l'ombre suffisent. Le focus CLAVIER garde son contour.
+	   Jetons partagés avec la liste de l'éditeur et les dossiers :
+	   dashboard-base.css. */
+        background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-survol), var(--qbd-glass-bg));
+        box-shadow: var(--qbd-glass-sheen), var(--qbd-carte-ombre-survol);
+    }
+}
 .qbd-fiche-card.is-editable:focus-visible {
 	/* Pas de liseré bleu au survol (Ahmed, 2026-09-27 : « ça sert à rien ») :
 	   le fond et l'ombre suffisent. Le focus CLAVIER garde son contour.
@@ -748,14 +775,14 @@
 	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-survol), var(--qbd-glass-bg));
 	box-shadow: var(--qbd-glass-sheen), var(--qbd-carte-ombre-survol);
 }
-.qbd-fiche-card.is-editable:active {
+.qbd-fiche-card.is-editable:is(body:not(.is-mobile) :active) {
 	background: color-mix(in srgb, var(--text-normal) var(--qbd-carte-voile-clic), var(--qbd-glass-bg));
 	transform: scale(var(--qbd-carte-echelle-clic));
 	transition: var(--qbd-carte-transition-clic);
 }
 .qbd-fiche-card.is-editable:focus-visible { outline: 2px solid var(--quiz-primary); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
-	.qbd-fiche-card.is-editable:active { transform: none; }
+	.qbd-fiche-card.is-editable:is(body:not(.is-mobile) :active) { transform: none; }
 }
 
 /* Image options on a question card (detail-fiche.ts): small thumbnails,

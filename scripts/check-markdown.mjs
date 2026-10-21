@@ -541,6 +541,11 @@ await withSrcModule(["src/engine/cloze.ts", "src/engine/code-highlight.ts"], ({ 
 		(html.match(/\d/g) || []).length, 3);
 	r.check("a blank in prose keeps its token (no __…__, which is bold)",
 		protege.endsWith("In prose, a 3."), true);
+	const enLigne = protectCodeSlots(markSlots("On écrit `commande {{2>>}} log.txt` ici.").marked);
+	r.check("a blank in an inline code span becomes an identifier", /`commande __NQ_SLOT_0__ log\.txt`/.test(enLigne), true);
+	const colEnLigne = colorerCode("commande __NQ_SLOT_0__ log.txt", "bash", esc, 100000);
+	r.check("the inline span's blank survives the highlighter",
+		restoreCodeSlots(typeof colEnLigne === "string" ? colEnLigne : colEnLigne.html).includes(String.fromCharCode(0xE000) + "0" + String.fromCharCode(0xE001)), true);
 	r.check("without the protection, the highlighter loses blanks",
 		((() => { const brut = colorerCode(marked.split("```c\n")[1].split("\n```")[0], "c", esc, 100000); return (typeof brut === "string" ? brut : brut.html); })().match(/\d/g) || []).length < 3, true);
 	r.done();

@@ -111,7 +111,9 @@
 	margin-top: 4px;
 }
 
-.qb-arr-add:hover { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+@media (hover: hover) {
+    .qb-arr-add:hover { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+}
 .qb-arr-add-icon { font-size: 1em; }
 
 
@@ -168,8 +170,10 @@
     user-select: none;
 }
 
-.qb-checkbox-wrap:hover {
-    background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qb-checkbox-wrap:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qb-checkbox-wrap.qb-exam-disabled {
@@ -248,8 +252,10 @@
 		transition: background 0.2s ease;
 	}
 
-	.qb-resource-toggle-btn:hover {
-		background: color-mix(in srgb, var(--background-modifier-border) 80%, var(--interactive-accent) 20%);
+	@media (hover: hover) {
+        .qb-resource-toggle-btn:hover {
+            background: color-mix(in srgb, var(--background-modifier-border) 80%, var(--interactive-accent) 20%);
+        }
 	}
 
 	.qb-resource-toggle-dot {
@@ -340,7 +346,9 @@
 	font-family: var(--font-interface);
 }
 
-.qb-arr-add:hover { filter: brightness(1.2); }
+@media (hover: hover) {
+    .qb-arr-add:hover { filter: brightness(1.2); }
+}
 
 .qb-resource-group .qb-field-label {
     color: var(--text-muted);

@@ -20,7 +20,7 @@ globalThis.document = document;
 const flush = () => new Promise(res => setTimeout(res, 0));
 const click = el => el.dispatchEvent(new document.defaultView.Event("click"));
 
-await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts", "src/code-catalogue.ts", "src/code-logos.ts", "src/dashboard/thinking-label.ts", "src/dashboard/queued-send.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }, { codeLanguageOf, codeLanguageBadgeSrc }, { CODE_LOGOS }, { verbAt, thoughtSummary, thinkingLabel, avantPremierJeton }, { lignesAArreter, premiereEnAttente }) => {
+await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/dashboard/live-thread.ts", "src/code-catalogue.ts", "src/code-logos.ts", "src/dashboard/thinking-label.ts", "src/dashboard/queued-send.ts", "src/dashboard/disclosure-motion.ts"], async ({ renderThread, threadHasLiveRow, renderOutput, renderTextOutput }, { installHost }, { threadFromRun }, { codeLanguageOf, codeLanguageBadgeSrc }, { CODE_LOGOS }, { verbAt, thoughtSummary, thinkingLabel, avantPremierJeton }, { lignesAArreter, premiereEnAttente }, { prepareDisclosure, setDisclosureOpen }) => {
 	const r = makeReporter("Vue de travail — texte jamais interprété (Focus 4)");
 	const CHARGE = "<img src=x onerror=alert(1)>";
 	const FIN = "</pre><script>x</script>";
@@ -187,7 +187,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			{ kind: "tool", id: "w1", name: "Write", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["a", CHARGE, "c"], removed: [] } },
 			{ kind: "tool", id: "w2", name: "Edit", input: JSON.stringify({ file_path: "C:\\x\\n.ts" }), preview: "", lines: 0, status: "ok", diff: { added: ["new"], removed: ["old"] } },
 		]), deps);
-		r.check("corps replié par défaut", root.querySelectorAll(".qbd-work-tool-body")[0].hidden, true);
+		r.check("corps replié par défaut", root.querySelectorAll(".qbd-work-tool-body")[0].inert, true);
 		root.querySelectorAll(".qbd-work-tool-head").forEach(h => click(h));
 		const resumes = root.querySelectorAll(".qbd-work-summary-text");
 		r.check("Write : « Wrote 3 lines »", resumes[0]?.textContent, "Wrote 3 lines");
@@ -209,8 +209,8 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		const cmd = { kind: "tool", id: "b1", name: "Bash", input: "echo " + CHARGE + "\n" + FIN, preview: "", lines: 0, status: "ok", diff: null };
 		renderThread(root, fil([cmd, { ...cmd, id: "b2", status: "error", preview: "boom " + FIN + "\nsuite" }]), deps);
 		const corps = root.querySelectorAll(".qbd-work-tool-body");
-		r.check("Bash ok : replié", corps[0].hidden, true);
-		r.check("Bash en erreur : replié", corps[1].hidden, true);
+		r.check("Bash ok : replié", corps[0].inert, true);
+		r.check("Bash en erreur : replié", corps[1].inert, true);
 		r.check("Bash en erreur : première ligne rouge", root.querySelector(".qbd-work-summary.is-error")?.textContent.includes("boom"), true);
 		r.check("Bash : aucun img/script hostile", root.querySelectorAll("img,script").length, 0);
 		const attente = document.createElement("div");
@@ -218,13 +218,13 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			{ kind: "tool", id: "b3", name: "Bash", input: "rm -rf x", preview: "", lines: 0, status: "running", diff: null },
 			{ kind: "permission", requestId: "p9", tool: "Bash", input: "rm -rf x", state: "pending" },
 		], true), deps);
-		r.check("Bash en attente de permission : ouvert", attente.querySelector(".qbd-work-tool-body").hidden, false);
+		r.check("Bash en attente de permission : ouvert", attente.querySelector(".qbd-work-tool-body").inert, false);
 		r.check("Bash en attente : carte Autoriser visible", attente.querySelectorAll(".qbd-work-permission").length, 1);
 		const enCours = document.createElement("div");
 		renderThread(enCours, fil([
 			{ kind: "tool", id: "b4", name: "Bash", input: "sleep 9", preview: "", lines: 0, status: "running", diff: null },
 		], true), deps);
-		r.check("Bash en cours sans permission : replié", enCours.querySelector(".qbd-work-tool-body").hidden, true);
+		r.check("Bash en cours sans permission : replié", enCours.querySelector(".qbd-work-tool-body").inert, true);
 		renderThread(enCours, fil([], false), deps);
 	}
 
@@ -266,7 +266,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		const texte = document.createElement("div");
 		renderThread(texte, fil([{ kind: "thinking", text: "Weighing the options. Then more detail follows here." }], false), deps);
 		r.check("réflexion finie avec texte : résumé gris", texte.querySelector(".qbd-work-thinking-label")?.textContent, "Weighing the options.");
-		r.check("réflexion finie avec texte : repliée sous un chevron", [texte.querySelectorAll(".qbd-work-chevron").length, texte.querySelector(".qbd-work-body")?.hidden], [1, true]);
+		r.check("réflexion finie avec texte : repliée sous un chevron", [texte.querySelectorAll(".qbd-work-chevron").length, texte.querySelector(".qbd-work-body")?.inert], [1, true]);
 	}
 
 	// 13. Keyboard: an expandable row is a button; Enter opens it.
@@ -281,7 +281,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		const touche = new document.defaultView.Event("keydown");
 		touche.key = "Enter";
 		tete.dispatchEvent(touche);
-		r.check("Entrée ouvre le corps", root.querySelector(".qbd-work-tool-body").hidden, false);
+		r.check("Entrée ouvre le corps", root.querySelector(".qbd-work-tool-body").inert, false);
 		r.check("corps ouvert : classe is-open", root.querySelector(".qbd-work-tool").classList.contains("is-open"), true);
 	}
 
@@ -328,7 +328,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		r.check("erreur : corps replié, message absent avant ouverture", root.textContent.split("line two of stack").length - 1, 0);
 		click(root.querySelector(".qbd-work-tool-head"));
 		r.check("erreur : message complet une fois après ouverture", root.textContent.split("line two of stack").length - 1, 1);
-		r.check("erreur : le corps est ouvert", root.querySelector(".qbd-work-tool-body").hidden, false);
+		r.check("erreur : le corps est ouvert", root.querySelector(".qbd-work-tool-body").inert, false);
 	}
 
 	// 16. A Claude Code `user` line carrying an Edit's structuredPatch: the diff keeps the
@@ -601,7 +601,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		let live = null;
 		const context = {
 			opts: { file: { live: () => live } }, deplies: expanded, replies: collapsed,
-			ouvertures: new Set(), blocs: blocks, host: hote, renderOutput, renderTextOutput, renderThread,
+			ouvertures: new Set(), blocs: blocks, host: hote, renderOutput, renderTextOutput, renderThread, prepareDisclosure, setDisclosureOpen,
 			threadHasLiveRow, LIGNES_AVANT_REPLI: 15,
 			t: (key, args = {}) => key + " " + Object.values(args).join(" "),
 			ajouter: (parent, tag, className, text) => {
@@ -644,7 +644,10 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		click(state.lignes.get("writing").bouton);
 		sync(root, state);
 		r.check("generation output: explicit collapse survives repaint", state.lignes.get("writing").bouton.getAttribute("aria-expanded"), "false");
-		r.check("generation output: folded details are removed", root.querySelector(".qbd-work-output"), null);
+		r.check("generation output: folded details stay mounted and inert", [!!root.querySelector(".qbd-work-output"), state.lignes.get("writing").detail.inert], [true, true]);
+		click(state.lignes.get("writing").bouton);
+		r.check("generation output: rapid reopening preserves content", [state.lignes.get("writing").detail.inert, root.querySelector(".qbd-work-output > pre") === preview], [false, true]);
+		click(state.lignes.get("writing").bouton);
 		state.vivant = true;
 		state.tr.text = "";
 		sync(root, state);

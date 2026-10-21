@@ -175,13 +175,15 @@
 	box-shadow: 0 2px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent);
 }
 
-.quiz-exam-start-btn:hover {
-	background: var(--quiz-primary-hover);
-	transform: translateY(-1px);
-	box-shadow: 0 4px 12px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+@media (hover: hover) {
+    .quiz-exam-start-btn:hover {
+        background: var(--quiz-primary-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+    }
 }
 
-.quiz-exam-start-btn:active {
+.quiz-exam-start-btn:is(body:not(.is-mobile) :active) {
 	transform: translateY(0);
 }
 
@@ -405,13 +407,15 @@
     margin-top: 8px;
 }
 
-.quiz-exam-start-btn:hover {
-    background: var(--interactive-accent-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+@media (hover: hover) {
+    .quiz-exam-start-btn:hover {
+        background: var(--interactive-accent-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+    }
 }
 
-.quiz-exam-start-btn:active {
+.quiz-exam-start-btn:is(body:not(.is-mobile) :active) {
     transform: translateY(0);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent);
 }
@@ -500,13 +504,15 @@
     margin-top: 4px;
 }
 
-.quiz-exam-start-btn:hover {
-    background: var(--interactive-accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+@media (hover: hover) {
+    .quiz-exam-start-btn:hover {
+        background: var(--interactive-accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+    }
 }
 
-.quiz-exam-start-btn:active {
+.quiz-exam-start-btn:is(body:not(.is-mobile) :active) {
     transform: translateY(0);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent);
 }
@@ -596,13 +602,15 @@
     margin-top: 4px;
 }
 
-.quiz-exam-start-btn:hover {
-    background: var(--interactive-accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+@media (hover: hover) {
+    .quiz-exam-start-btn:hover {
+        background: var(--interactive-accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+    }
 }
 
-.quiz-exam-start-btn:active {
+.quiz-exam-start-btn:is(body:not(.is-mobile) :active) {
     transform: translateY(0);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent);
 }
@@ -698,13 +706,15 @@
     box-sizing: border-box;
 }
 
-.quiz-exam-start-btn:hover {
-    background: var(--interactive-accent-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+@media (hover: hover) {
+    .quiz-exam-start-btn:hover {
+        background: var(--interactive-accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--quiz-primary) 40%, transparent);
+    }
 }
 
-.quiz-exam-start-btn:active {
+.quiz-exam-start-btn:is(body:not(.is-mobile) :active) {
     transform: translateY(0);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--quiz-primary) 30%, transparent);
 }

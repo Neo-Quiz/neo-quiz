@@ -343,6 +343,11 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 	const mobile = phoneLayoutNow();
 	if (mobile) {
 		retirer.remove();
+		// The phone's settings rows lead with an icon; the picture moves next to its name.
+		const icone = ajouter(rangee, "span", "nq-set-ligne-icone");
+		currentHost().ui.setIcon(icone, "image");
+		rangee.prepend(icone);
+		rangee.append(apercu);
 		currentHost().ui.setIcon(ajouter(rangee, "span", "nq-set-onglet-chevron"), "chevron-right");
 	}
 	/** Name and detail as the row shows them: a phone puts the label first. */
@@ -416,6 +421,7 @@ export function monterReglagesFond(section: HTMLElement): () => void {
 		cle: keyof EffetsFond, libelle: string, pas: number, afficher: (v: number) => string,
 	): (v: number) => void => {
 		const ligne = ajouter(section, "label", "nq-fond-curseur");
+		if (phoneLayoutNow()) currentHost().ui.setIcon(ajouter(ligne, "span", "nq-set-ligne-icone"), cle === "luminosite" ? "sun" : "droplet");
 		ajouter(ligne, "span", "nq-fond-curseur-libelle", libelle);
 		const entree = ajouter(ligne, "input", "nq-fond-curseur-entree");
 		entree.type = "range";

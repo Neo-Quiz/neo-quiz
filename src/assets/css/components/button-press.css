@@ -7,19 +7,27 @@
   transform-origin: center;
 }
 
+
 /* Hover/focus unifié. SAUF `.success` (2026-09-25) : l'action principale
    est un bouton « à presser » façon Brilliant, avec sa propre tranche et son
    propre enfoncement (action-buttons.css) — ces `!important` l'écrasaient. */
-.quiz-action-btn:not(.success):hover:not(:disabled),
-.quiz-action-btn:not(.success):focus-visible:not(:disabled),
-.quiz-hint-modal-close:hover,
-.quiz-hint-modal-close:focus-visible{
+body:not(.is-mobile) .quiz-action-btn:not(.success):focus-visible:not(:disabled),
+body:not(.is-mobile) .quiz-hint-modal-close:focus-visible{
   transform: translate3d(0,-1px,0) scale(1.015) !important;
 }
 
+@media (hover: hover) {
+body:not(.is-mobile) .quiz-action-btn:not(.success):hover:not(:disabled),
+body:not(.is-mobile) .quiz-hint-modal-close:hover{
+  transform: translate3d(0,-1px,0) scale(1.015) !important;
+}
+}
+
+
+
 /* Press / active unifié (sauf `.success`, voir plus haut) */
-.quiz-action-btn:not(.success):active:not(:disabled),
-.quiz-hint-modal-close:active{
+body:not(.is-mobile) .quiz-action-btn:not(.success):is(body:not(.is-mobile) :active):not(:disabled),
+body:not(.is-mobile) .quiz-hint-modal-close:is(body:not(.is-mobile) :active){
   transform: translate3d(0,3px,0) scale(0.955) !important;
   box-shadow:
     0 0 0 1.5px color-mix(in srgb, var(--background-modifier-border) 70%, transparent),

@@ -99,7 +99,7 @@ export function renderHomeFolder(
 	}
 
 	const bar = ajouter(card, "div", "qbd-homef-bar");
-	ajouter(bar, "div", "qbd-homef-bar-fill").style.width = `${moyenneDossier(group.quizzes, stats)}%`;
+	ajouter(bar, "div", "qbd-homef-bar-fill").style.width = `${moyenneDossier(group.quizzes, stats, ctx.sessionOf)}%`;
 
 	const meta = ajouter(card, "div", "qbd-homef-meta");
 	ajouter(meta, "span", undefined, t(tasks.length === 1 ? "dashboard.home.openTasksOne" : "dashboard.home.openTasksOther", { count: tasks.length }));

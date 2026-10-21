@@ -44,7 +44,12 @@
 	white-space: nowrap;
 	cursor: pointer;
 }
-.qbd-qz-sources-pill:hover,
+@media (hover: hover) {
+    .qbd-qz-sources-pill:hover {
+        background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+        color: var(--text-normal);
+    }
+}
 .qbd-qz-sources.is-open .qbd-qz-sources-pill {
 	background: color-mix(in srgb, var(--text-muted) 22%, transparent);
 	color: var(--text-normal);
@@ -79,7 +84,11 @@
 	top: -8px;
 	height: 8px;
 }
-.qbd-qz-sources:hover .qbd-qz-sources-panel,
+@media (hover: hover) {
+    .qbd-qz-sources:hover .qbd-qz-sources-panel {
+        display: flex;
+    }
+}
 .qbd-qz-sources:focus-within .qbd-qz-sources-panel,
 .qbd-qz-sources.is-open .qbd-qz-sources-panel {
 	display: flex;
@@ -100,7 +109,9 @@
 	text-align: left;
 	cursor: pointer;
 }
-.qbd-qz-sources-item:hover { background: var(--background-modifier-hover); }
+@media (hover: hover) {
+    .qbd-qz-sources-item:hover { background: var(--background-modifier-hover); }
+}
 .qbd-qz-sources-item[aria-disabled="true"] { opacity: 0.5; cursor: default; }
 .qbd-qz-sources-item-icon { flex: 0 0 auto; width: 16px; height: 16px; }
 
@@ -122,9 +133,11 @@
 	transition: background-color 120ms ease, color 120ms ease;
 }
 
-.qbd-pdf-chip:hover:not([aria-disabled="true"]) {
-	background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-pdf-chip:hover:not([aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-pdf-chip[aria-disabled="true"] {
@@ -163,9 +176,11 @@
 	cursor: pointer;
 }
 
-.quiz-lecture-source[data-cite]:hover {
-	color: var(--text-normal);
-	text-decoration: underline;
+@media (hover: hover) {
+    .quiz-lecture-source[data-cite]:hover {
+        color: var(--text-normal);
+        text-decoration: underline;
+    }
 }
 
 /* ── The viewer ── */
@@ -223,9 +238,11 @@
 	cursor: pointer;
 }
 
-.qbd-pdf-zoom-btn:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-pdf-zoom-btn:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-pdf-zoom-btn svg {

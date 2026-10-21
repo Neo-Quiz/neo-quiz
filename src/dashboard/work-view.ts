@@ -1,3 +1,4 @@
+import { animateContentSwap, prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 /**
  * The full AI work view of a live session: draws a `Thread`
  * (src/dashboard/live-thread.ts) into a root element, one row per tool call
@@ -266,7 +267,7 @@ function groupBlock(family: Family, items: ToolItem[], deps: WorkViewDeps, prev:
 	head.appendChild(chevron());
 	const body = el("div", "qbd-work-group-body");
 	const prevBody = prev?.children.item(1) as HTMLElement | null | undefined;
-	items.forEach((item, i) => body.appendChild(toolBlock(item, deps, prevBody?.children.item(i) as HTMLElement | undefined, false)));
+	items.forEach((item, i) => body.appendChild(toolBlock(item, deps, (prevBody?.querySelector(".nq-disclosure-inner") ?? prevBody)?.children.item(i) as HTMLElement | undefined, false)));
 	const open = prev ? prev.classList.contains("is-open") : false;
 	setOpen(block, body, open);
 	expandable(head, block, body);
@@ -278,11 +279,13 @@ function groupBlock(family: Family, items: ToolItem[], deps: WorkViewDeps, prev:
 /** Makes a head row open its body on click or Enter/Space, with the chevron that shows it. */
 function expandable(head: HTMLElement, block: HTMLElement, body: HTMLElement, onOpen?: () => void): void {
 	head.classList.add("is-expandable");
+	head.setAttribute("aria-expanded", String(block.classList.contains("is-open")));
 	if (!head.querySelector(".qbd-work-chevron")) head.appendChild(chevron());
 	toggleOn(head, () => {
 		const open = !block.classList.contains("is-open");
 		if (open) onOpen?.();
 		setOpen(block, body, open);
+		head.setAttribute("aria-expanded", String(open));
 	});
 }
 
@@ -294,7 +297,11 @@ function chevron(): HTMLElement {
 }
 
 function setOpen(block: HTMLElement, body: HTMLElement, open: boolean): void {
-	body.hidden = !open;
+	let content = body.querySelector<HTMLElement>(":scope > .nq-disclosure-inner");
+	if (!content) content = prepareDisclosure(body, open);
+	// Lazy tool builders append to the body; keep a single grid item.
+	for (const child of Array.from(body.childNodes)) if (child !== content) content.appendChild(child);
+	setDisclosureOpen(body, open);
 	if (open) block.classList.add("is-open");
 	else block.classList.remove("is-open");
 }
@@ -619,8 +626,10 @@ function diffNode(item: ToolItem, diff: ToolDiff): HTMLElement {
 		toggle.addEventListener("click", e => {
 			e.stopPropagation();
 			shown = !shown;
-			box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
-				if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+			animateContentSwap(box, () => {
+				box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
+					if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+				});
 			});
 			toggle.textContent = shown ? t("ai.work.showLess") : t("ai.work.showAll", { n: rows.length });
 		});
@@ -717,9 +726,11 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 		e.stopPropagation();
 		if (loaded) {
 			const open = full.hidden;
-			full.hidden = !open;
-			// The full output starts at line 1: the preview would show twice.
-			preview.hidden = open;
+			animateContentSwap(box, () => {
+				full.hidden = !open;
+				// The full output starts at line 1: the preview would show twice.
+				preview.hidden = open;
+			});
 			toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: item.lines });
 			return;
 		}
@@ -730,8 +741,10 @@ export function renderOutput(item: Pick<ToolItem, "id" | "preview" | "lines">, d
 			if (output === null) return;
 			loaded = true;
 			fillOutputPre(full, output);
-			full.hidden = false;
-			preview.hidden = true;
+			animateContentSwap(box, () => {
+				full.hidden = false;
+				preview.hidden = true;
+			});
 			toggle.textContent = t("ai.work.showLess");
 		}, () => {
 			loading = false;
@@ -821,8 +834,10 @@ function cappedProse(block: HTMLElement, text: string): void {
 		e.stopPropagation();
 		if (!built) { appendProse(full, text); built = true; }
 		const open = full.hidden;
-		full.hidden = !open;
-		preview.hidden = open;
+		animateContentSwap(block, () => {
+			full.hidden = !open;
+			preview.hidden = open;
+		});
 		toggle.textContent = open ? t("ai.work.showLess") : t("ai.work.showAll", { n: lines.length });
 	});
 	block.appendChild(toggle);
@@ -894,10 +909,12 @@ function quizRow(block: string, live: boolean): HTMLElement {
 			let shown = false;
 			montrer = tout => {
 				shown = tout;
-				box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
-					if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+				animateContentSwap(box, () => {
+					box.querySelectorAll(".qbd-work-diff-row").forEach((node, i) => {
+						if (i >= PREVIEW_LINES) (node as HTMLElement).hidden = !shown;
+					});
+					box.classList.toggle("is-capped", !shown);
 				});
-				box.classList.toggle("is-capped", !shown);
 				toggle.classList.toggle("is-stuck", shown);
 				toggle.textContent = shown ? t("ai.work.showLess") : t("ai.work.showAll", { n: lines.length });
 			};

@@ -136,6 +136,16 @@
 	min-height: 40px;
 }
 
+/* A quiz title on a phone wraps to two lines before it is cut: one line ended
+   « Bases de l'apprentissage automati… ». */
+.is-mobile .qbd-fiche-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 /* Terminé, Commencer le quiz and ⋮ stay on one row: the start button takes the
    room the three do not need, the ⋮ keeps its 40 px. */
 .is-mobile .qbd-fiche-actions {
@@ -337,4 +347,25 @@ html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
 
 .is-mobile .qbd-share-pick-all {
 	min-height: 44px;
+}
+
+/* Home task rows on a phone: the quiz name takes two lines before it is cut;
+   one line read « Apprendre · Bases de l'ap… » next to « Commencer ». */
+.is-mobile .qbd-homef-task-label {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	line-height: 1.3;
+}
+
+/* The folder's name heading a Home card wraps to two lines too. */
+.is-mobile .qbd-homef-name > span:first-child {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	text-align: left;
 }

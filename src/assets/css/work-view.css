@@ -93,10 +93,12 @@
 	max-width: 100%;
 }
 
-.qbd-work-tool-head.is-expandable:hover,
-.qbd-work-group-head:hover {
-	background-color: var(--background-modifier-hover);
-	cursor: pointer;
+@media (hover: hover) {
+    .qbd-work-tool-head.is-expandable:hover,
+    .qbd-work-group-head:hover {
+        background-color: var(--background-modifier-hover);
+        cursor: pointer;
+    }
 }
 
 .qbd-work-tool-head:focus-visible,
@@ -178,8 +180,10 @@
 	cursor: pointer;
 }
 
-.qbd-work-path.is-link:hover {
-	text-decoration: underline;
+@media (hover: hover) {
+    .qbd-work-path.is-link:hover {
+        text-decoration: underline;
+    }
 }
 
 .qbd-work-icon {
@@ -233,9 +237,19 @@
 	height: 12px;
 }
 
-.qbd-work-tool-head:hover .qbd-work-chevron,
-.qbd-work-tool-head:focus-visible .qbd-work-chevron,
-.qbd-work-group-head:hover .qbd-work-chevron,
+@media (hover: hover) {
+    .qbd-work-tool-head:hover .qbd-work-chevron {
+        opacity: 1;
+    }
+}
+.qbd-work-tool-head:focus-visible .qbd-work-chevron {
+	opacity: 1;
+}
+@media (hover: hover) {
+    .qbd-work-group-head:hover .qbd-work-chevron {
+        opacity: 1;
+    }
+}
 .qbd-work-group-head:focus-visible .qbd-work-chevron {
 	opacity: 1;
 }
@@ -504,9 +518,11 @@
 	cursor: pointer;
 }
 
-.qbd-work-toggle:hover {
-	background-color: var(--background-modifier-hover);
-	text-decoration: underline;
+@media (hover: hover) {
+    .qbd-work-toggle:hover {
+        background-color: var(--background-modifier-hover);
+        text-decoration: underline;
+    }
 }
 
 .qbd-work-permission {

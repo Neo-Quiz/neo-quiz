@@ -132,8 +132,10 @@
 	text-decoration: none;
 }
 
-.qbd-sync-lien:hover {
-	text-decoration: underline;
+@media (hover: hover) {
+    .qbd-sync-lien:hover {
+        text-decoration: underline;
+    }
 }
 
 .qbd-sync-lien:focus-visible {
@@ -312,8 +314,10 @@
 	cursor: pointer;
 }
 
-.qbd-sync-bouton:hover:not(:disabled) {
-	border-color: var(--text-accent);
+@media (hover: hover) {
+    .qbd-sync-bouton:hover:not(:disabled) {
+        border-color: var(--text-accent);
+    }
 }
 
 .qbd-sync-bouton:focus-visible,
@@ -337,9 +341,11 @@
 	font-weight: 600;
 }
 
-.qbd-sync-bouton-principal:hover:not(:disabled) {
-	border-color: var(--interactive-accent-hover, var(--interactive-accent));
-	background: var(--interactive-accent-hover, var(--interactive-accent));
+@media (hover: hover) {
+    .qbd-sync-bouton-principal:hover:not(:disabled) {
+        border-color: var(--interactive-accent-hover, var(--interactive-accent));
+        background: var(--interactive-accent-hover, var(--interactive-accent));
+    }
 }
 
 .qbd-sync-bouton-icone {
@@ -414,14 +420,18 @@
 	font-weight: 600;
 }
 
-.qbd-sync .qbd-sync-bouton-accepter:hover:not(:disabled) {
-	border-color: var(--qbd-sync-warn);
-	filter: brightness(1.1);
+@media (hover: hover) {
+    .qbd-sync .qbd-sync-bouton-accepter:hover:not(:disabled) {
+        border-color: var(--qbd-sync-warn);
+        filter: brightness(1.1);
+    }
 }
 
-.qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
-	border-color: var(--background-modifier-border);
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
+        border-color: var(--background-modifier-border);
+        background: var(--background-modifier-hover);
+    }
 }
 
 @media (max-width: 520px) {
@@ -482,8 +492,10 @@
 	cursor: pointer;
 }
 
-.qbd-sync-menu-item:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-sync-menu-item:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-sync-menu-item .qbd-sync-bouton-icone svg {
@@ -505,9 +517,11 @@
 	cursor: pointer;
 }
 
-.qbd-sync-plus:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-sync-plus:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-sync-plus svg {
@@ -622,10 +636,12 @@
 	color: var(--text-faint, var(--text-muted));
 }
 
-.qbd-sync-code .qbd-install-copy:hover {
-	border-color: transparent;
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-sync-code .qbd-install-copy:hover {
+        border-color: transparent;
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-sync-code .qbd-install-copy[data-copie] {
@@ -639,21 +655,28 @@
 	transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
 }
 
-.qbd-sync-modal-id .qbd-sync-bouton-principal:hover:not(:disabled) {
-	transform: translateY(-1px);
-	box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+@media (hover: hover) {
+    .qbd-sync-modal-id .qbd-sync-bouton-principal:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--interactive-accent) 70%, transparent);
+    }
 }
 
-.qbd-sync-modal-id .qbd-sync-bouton-principal:active:not(:disabled) {
+.qbd-sync-modal-id .qbd-sync-bouton-principal:is(body:not(.is-mobile) :active):not(:disabled) {
 	transform: translateY(0);
 	box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--interactive-accent) 60%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.qbd-sync-modal-id .qbd-sync-bouton-principal,
-	.qbd-sync-modal-id .qbd-sync-bouton-principal:hover:not(:disabled) {
+	.qbd-sync-modal-id .qbd-sync-bouton-principal {
 		transition: none;
 		transform: none;
+	}
+	@media (hover: hover) {
+        .qbd-sync-modal-id .qbd-sync-bouton-principal:hover:not(:disabled) {
+            transition: none;
+            transform: none;
+        }
 	}
 }
 
@@ -738,12 +761,14 @@
 	cursor: pointer;
 }
 
-.qbd-sync-ligne-action:active {
+.qbd-sync-ligne-action:is(body:not(.is-mobile) :active) {
 	background: var(--background-modifier-hover);
 }
 
-.qbd-sync-ligne-action:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-sync-ligne-action:hover:not(:disabled) {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-sync-ligne-action:disabled {
@@ -796,15 +821,26 @@
 	cursor: pointer;
 }
 
-.qbd-sync-action:hover,
-.qbd-sync-action:active {
+@media (hover: hover) {
+    .qbd-sync-action:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
+}
+.qbd-sync-action:is(body:not(.is-mobile) :active) {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
-.qbd-sync-action-danger,
-.qbd-sync-action-danger:hover,
-.qbd-sync-action-danger:active {
+.qbd-sync-action-danger {
+	color: var(--text-error, #e5484d);
+}
+@media (hover: hover) {
+    .qbd-sync-action-danger:hover {
+        color: var(--text-error, #e5484d);
+    }
+}
+.qbd-sync-action-danger:is(body:not(.is-mobile) :active) {
 	color: var(--text-error, #e5484d);
 }
 
@@ -934,9 +970,11 @@
 	color: var(--text-normal);
 }
 
-.qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
-	border-color: color-mix(in srgb, var(--qbd-sync-warn) 70%, transparent);
-	background: color-mix(in srgb, var(--qbd-sync-warn) 10%, transparent);
+@media (hover: hover) {
+    .qbd-sync-demande .qbd-sync-bouton:not(.qbd-sync-bouton-accepter):hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--qbd-sync-warn) 70%, transparent);
+        background: color-mix(in srgb, var(--qbd-sync-warn) 10%, transparent);
+    }
 }
 
 .qbd-sync-action[hidden] {
@@ -1095,8 +1133,10 @@
 	cursor: pointer;
 }
 
-.qbd-sync-ligne-info:hover {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-sync-ligne-info:hover {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-sync-ligne-info:focus-visible {

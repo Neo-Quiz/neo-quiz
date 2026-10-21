@@ -55,8 +55,10 @@
 
 /* Hover and focus leave the terminal fields alone (terminal-cmd.css,
    terminal-program.css): they draw their own look. */
-.quiz-textarea:not(.quiz-textarea-command):not(.quiz-textarea-program):hover:not(:focus):not([readonly]){
-  background: color-mix(in srgb, var(--text-normal) 3%, var(--background-secondary));
+@media (hover: hover){
+    .quiz-textarea:not(.quiz-textarea-command):not(.quiz-textarea-program):hover:not(:focus):not([readonly]){
+      background: color-mix(in srgb, var(--text-normal) 3%, var(--background-secondary));
+    }
 }
 
 .quiz-textarea:not(.quiz-textarea-command):not(.quiz-textarea-program):focus{

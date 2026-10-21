@@ -145,7 +145,7 @@ html.nq-mobile .modal-container {
 }
 
 .is-mobile .qbd-sidebar .qbd-nav-item.qbd-nav-item--active {
-	background: transparent !important;
+	background-color: transparent !important;
 	border-color: transparent !important;
 	backdrop-filter: none;
 	-webkit-backdrop-filter: none;
@@ -158,7 +158,7 @@ html.nq-mobile .modal-container {
 }
 
 /* Pressed: a quiet dip, no box. Keyboard focus keeps a ring. */
-.is-mobile .qbd-nav-item:active:not(:disabled):not(.qbd-nav-item--placeholder) {
+.is-mobile .qbd-nav-item:is(body:not(.is-mobile) :active):not(:disabled):not(.qbd-nav-item--placeholder) {
 	transform: none;
 	opacity: 0.6;
 }
@@ -270,17 +270,6 @@ html.nq-mobile .modal-container {
 	min-width: 0;
 }
 
-.is-mobile .qbd-quizzes-folder-hero .qbd-quizzes-title-text {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	line-clamp: 2;
-	white-space: normal;
-	overflow: hidden;
-	overflow-wrap: anywhere;
-	min-width: 0;
-	line-height: 1.15;
-}
 
 .is-mobile .qbd-quizzes-folder-hero .qbd-quizzes-title-icon {
 	flex: none;
@@ -503,7 +492,7 @@ body.is-mobile:has(.qbd-sidebar) .modal-container,
 	cursor: pointer;
 }
 
-.nq-set-retour:active {
+.nq-set-retour:is(body:not(.is-mobile) :active) {
 	background: var(--background-modifier-hover);
 }
 
@@ -943,10 +932,10 @@ html.nq-scrolled .is-mobile #neo-quiz-root:not(:has(> .qbd-qz))::before {
 
 	/* The press feedback is the ripple (ui/ripple.ts): no hover tint stuck
 	   under a finger, no card shrinking on top of it. */
-	.qbd-card:active,
-	.qbd-quiz-card:active,
-	.qbd-module-card:active,
-	.qbd-qz-card:active {
+	.qbd-card:is(body:not(.is-mobile) :active),
+	.qbd-quiz-card:is(body:not(.is-mobile) :active),
+	.qbd-module-card:is(body:not(.is-mobile) :active),
+	.qbd-qz-card:is(body:not(.is-mobile) :active) {
 		transform: none;
 	}
 
@@ -1204,12 +1193,6 @@ html.nq-mobile ::-webkit-scrollbar {
    choice shows its value and a chevron and opens a list; notes sit under
    their group; the wallpaper and language-pack rows are tiles too. */
 .is-mobile .nq-set-ligne-valeur {
-	flex: none;
-	max-width: 45%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-size: 15px;
 	color: var(--text-muted);
 }
 
@@ -1298,7 +1281,7 @@ html.nq-mobile ::-webkit-scrollbar {
 	cursor: pointer;
 }
 
-.nq-choix-option:active {
+.nq-choix-option:is(body:not(.is-mobile) :active) {
 	background: var(--background-modifier-hover);
 }
 
@@ -1317,33 +1300,23 @@ html.nq-mobile ::-webkit-scrollbar {
 }
 
 /* The wallpaper row: "Wallpaper", the picture's name on the right, a chevron. */
+/* Label with the picture's name UNDER it, as every phone settings row. */
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-texte {
 	flex: 1;
 	min-width: 0;
 	display: flex;
-	flex-direction: row;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
 	text-align: left;
-	flex-direction: row;
-	text-align: left;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-}
-
-.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
-	flex: 1;
-}
-
-.is-mobile .nq-set .nq-fond-rangee .nq-reglages-nom {
-	flex: 1;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-reglages-chemin {
-	max-width: 50%;
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 15px;
+	font-size: 14px;
 }
 
 .is-mobile .nq-set .nq-fond-rangee .nq-fond-apercu {
@@ -1431,10 +1404,15 @@ html.nq-mobile ::-webkit-scrollbar {
 	will-change: auto;
 }
 
-.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active,
-.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+.nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active {
 	animation: none;
 	background-image: none;
+}
+@media (hover: hover) {
+    .nq-mobile #neo-quiz-root > .qbd-qz .quiz-nav .quiz-tab.active:hover {
+        animation: none;
+        background-image: none;
+    }
 }
 
 /* ══════════════════════════════════════════════════════════

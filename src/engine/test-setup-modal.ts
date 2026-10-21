@@ -1,5 +1,4 @@
 import { ajouter } from "../dom";
-import { poserBouton3d } from "../dashboard/cta3d";
 import { currentHost, requireHost } from "../host/current";
 import { t } from "../i18n";
 import { fallbackExamDuration } from "../quiz-utils";
@@ -285,13 +284,12 @@ export function openTestSetupModal(opts: TestSetupModalOptions, signal?: AbortSi
 				}
 				sync();
 
-				// ── Footer: the app's 3D primary button, at the right ──
+				// ── Footer: a flat primary button, at the right (a 3D button never sits in a window) ──
 				const foot = ajouter(c, "div", "qbd-setup-foot");
 				const start = ajouter(foot, "button", "qbd-setup-start");
 				start.type = "button";
 				ui.setIcon(ajouter(start, "span", "qbd-btn-icon"), "play");
 				ajouter(start, "span", undefined, t("engine.testSetup.start"));
-				poserBouton3d(start);
 				const begin = (): void => {
 					commit();
 					answer({ ...setup });

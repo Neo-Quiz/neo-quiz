@@ -44,9 +44,22 @@
   transition: none !important;               /* supprime les transitions visuelles */
 }
 
-.quiz-command-shell.quiz-terminal-variant-bash:hover,
-.quiz-command-shell.quiz-terminal-variant-bash:focus-within,
-.quiz-command-shell[data-terminal-variant="bash"]:hover,
+@media (hover: hover){
+    .quiz-command-shell.quiz-terminal-variant-bash:hover{
+      border-color: #3a3348;
+      box-shadow: none !important;
+    }
+}
+.quiz-command-shell.quiz-terminal-variant-bash:focus-within{
+  border-color: #3a3348;
+  box-shadow: none !important;
+}
+@media (hover: hover){
+    .quiz-command-shell[data-terminal-variant="bash"]:hover{
+      border-color: #3a3348;
+      box-shadow: none !important;
+    }
+}
 .quiz-command-shell[data-terminal-variant="bash"]:focus-within{
   border-color: #3a3348;
   box-shadow: none !important;
@@ -145,9 +158,22 @@
   box-shadow: none !important;
 }
 
-.theme-light .quiz-command-shell.quiz-terminal-variant-bash:hover,
-.theme-light .quiz-command-shell.quiz-terminal-variant-bash:focus-within,
-.theme-light .quiz-command-shell[data-terminal-variant="bash"]:hover,
+@media (hover: hover){
+    .theme-light .quiz-command-shell.quiz-terminal-variant-bash:hover{
+      border-color: #3a3348 !important;
+      box-shadow: none !important;
+    }
+}
+.theme-light .quiz-command-shell.quiz-terminal-variant-bash:focus-within{
+  border-color: #3a3348 !important;
+  box-shadow: none !important;
+}
+@media (hover: hover){
+    .theme-light .quiz-command-shell[data-terminal-variant="bash"]:hover{
+      border-color: #3a3348 !important;
+      box-shadow: none !important;
+    }
+}
 .theme-light .quiz-command-shell[data-terminal-variant="bash"]:focus-within{
   border-color: #3a3348 !important;
   box-shadow: none !important;

@@ -85,8 +85,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-back:hover {
-	color: var(--nqm-text) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-back:hover {
+        color: var(--nqm-text) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-back .svg-icon {
@@ -168,8 +170,10 @@
 	transition: background 120ms ease;
 }
 
-.nq-moodle-modal .nqm-row:hover {
-	background: var(--nqm-hover);
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-row:hover {
+        background: var(--nqm-hover);
+    }
 }
 
 .nq-moodle-modal .nqm-row-icon {
@@ -269,15 +273,21 @@
 	transition: background-color 120ms ease-out;
 }
 
-.nq-moodle-modal .is-clickable:hover,
+@media (hover: hover) {
+    .nq-moodle-modal .is-clickable:hover {
+        background: var(--nqm-hover) !important;
+    }
+}
 .nq-moodle-modal .is-clickable:focus-visible {
 	background: var(--nqm-hover) !important;
 }
 
-.nq-moodle-modal .is-clickable:hover .nqm-row-name,
-.nq-moodle-modal .is-clickable:hover .nqm-row-open,
-.nq-moodle-modal .is-clickable:hover .nqm-row-type {
-	color: var(--nqm-text);
+@media (hover: hover) {
+    .nq-moodle-modal .is-clickable:hover .nqm-row-name,
+    .nq-moodle-modal .is-clickable:hover .nqm-row-open,
+    .nq-moodle-modal .is-clickable:hover .nqm-row-type {
+        color: var(--nqm-text);
+    }
 }
 
 .nq-moodle-modal .nqm-foot-hint {
@@ -359,8 +369,10 @@
 	color: var(--nqm-on-accent) !important;
 }
 
-.nq-moodle-modal .nqm-file-get.is-accent:hover {
-	background: var(--interactive-accent-hover) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-file-get.is-accent:hover {
+        background: var(--interactive-accent-hover) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-badge {
@@ -461,9 +473,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-ghost:hover {
-	background: var(--nqm-hover) !important;
-	border-color: var(--background-modifier-border-hover);
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-ghost:hover {
+        background: var(--nqm-hover) !important;
+        border-color: var(--background-modifier-border-hover);
+    }
 }
 
 /* A hidden element stays hidden whatever its display rule (the download button). */
@@ -543,8 +557,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-primary:hover:not(:disabled) {
-	background: color-mix(in srgb, var(--nqm-accent) 85%, white) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nqm-accent) 85%, white) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-primary:disabled {
@@ -665,9 +681,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-refresh:hover {
-	background: var(--nqm-hover) !important;
-	color: var(--nqm-text) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-refresh:hover {
+        background: var(--nqm-hover) !important;
+        color: var(--nqm-text) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-refresh-icon .svg-icon,
@@ -699,9 +717,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-filter:hover {
-	background: var(--nqm-hover) !important;
-	color: var(--nqm-text) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-filter:hover {
+        background: var(--nqm-hover) !important;
+        color: var(--nqm-text) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-filter.is-active {
@@ -746,8 +766,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-filter-option:hover {
-	background: var(--nqm-hover) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-filter-option:hover {
+        background: var(--nqm-hover) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-results {
@@ -780,8 +802,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-course:hover {
-	background: var(--nqm-hover) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-course:hover {
+        background: var(--nqm-hover) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-course-icon {
@@ -809,8 +833,10 @@
 	opacity: 0.55;
 }
 
-.nq-moodle-modal .nqm-course:hover {
-	background: rgba(var(--tc, 148, 163, 184), 0.12) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-course:hover {
+        background: rgba(var(--tc, 148, 163, 184), 0.12) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-year + .nqm-year {
@@ -869,7 +895,11 @@
 	outline: none;
 }
 
-.nq-moodle-modal .nqm-exam-pill:hover,
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-exam-pill:hover {
+        background: color-mix(in srgb, var(--nqm-orange) 26%, transparent);
+    }
+}
 .nq-moodle-modal .nqm-exam-pill:focus-visible {
 	background: color-mix(in srgb, var(--nqm-orange) 26%, transparent);
 }
@@ -933,9 +963,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-link:hover {
-	color: var(--nqm-accent) !important;
-	text-decoration: underline;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-link:hover {
+        color: var(--nqm-accent) !important;
+        text-decoration: underline;
+    }
 }
 
 .nq-moodle-modal .nqm-searchall {
@@ -953,9 +985,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-searchall:hover:not(:disabled) {
-	background: var(--nqm-hover) !important;
-	color: var(--nqm-text) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-searchall:hover:not(:disabled) {
+        background: var(--nqm-hover) !important;
+        color: var(--nqm-text) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-course-cohort {
@@ -1096,8 +1130,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-dl-item:hover {
-	background: var(--nqm-hover);
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-dl-item:hover {
+        background: var(--nqm-hover);
+    }
 }
 
 .nq-moodle-modal .nqm-dl-code {
@@ -1144,9 +1180,11 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-dl-hide:hover {
-	background: var(--nqm-hover) !important;
-	color: var(--nqm-text) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-dl-hide:hover {
+        background: var(--nqm-hover) !important;
+        color: var(--nqm-text) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-dl-send {
@@ -1163,8 +1201,10 @@
 	cursor: pointer;
 }
 
-.nq-moodle-modal .nqm-dl-send:hover {
-	color: var(--text-accent) !important;
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-dl-send:hover {
+        color: var(--text-accent) !important;
+    }
 }
 
 .nq-moodle-modal .nqm-dl-hide .svg-icon {
@@ -1274,15 +1314,21 @@
 	transition: opacity 120ms ease, color 120ms ease;
 }
 
-.nq-moodle-modal .nqm-course:hover .nqm-course-star,
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-course:hover .nqm-course-star {
+        opacity: 1;
+    }
+}
 .nq-moodle-modal .nqm-course-star:focus-visible,
 .nq-moodle-modal .nqm-course-star.is-on {
 	opacity: 1;
 }
 
-.nq-moodle-modal .nqm-course-star:hover {
-	background: var(--nqm-hover);
-	color: var(--nqm-text);
+@media (hover: hover) {
+    .nq-moodle-modal .nqm-course-star:hover {
+        background: var(--nqm-hover);
+        color: var(--nqm-text);
+    }
 }
 
 .nq-moodle-modal .nqm-course-star.is-on {

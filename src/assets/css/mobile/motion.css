@@ -1,0 +1,97 @@
+/* Mobile disclosure motion; desktop keeps mounted contents without movement. */
+.nq-disclosure {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+}
+.nq-disclosure > .nq-disclosure-inner { min-height: 0; min-width: 0; }
+.qbd-folder-attempts > .nq-disclosure-inner { display: flex; flex-direction: column; gap: 2px; }
+:is(.qbd-work-group-body, .qbd-work-tool-body) > .nq-disclosure-inner { display: flex; flex-direction: column; gap: 6px; }
+.nq-disclosure.is-disclosure-closed { grid-template-rows: 0fr; visibility: hidden; margin-block: 0; }
+.nq-disclosure.is-disclosure-closed > .nq-disclosure-inner { overflow: clip; }
+
+.is-mobile {
+  --nq-disclosure-duration: 280ms;
+  --nq-disclosure-easing: cubic-bezier(.2, .8, .2, 1);
+}
+.is-mobile .nq-disclosure {
+  transition: grid-template-rows var(--nq-disclosure-duration) var(--nq-disclosure-easing),
+    margin var(--nq-disclosure-duration) var(--nq-disclosure-easing), visibility 0s;
+  animation: none;
+}
+.is-mobile .nq-disclosure > .nq-disclosure-inner {
+  overflow: clip;
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--nq-disclosure-duration) ease-out,
+    transform var(--nq-disclosure-duration) var(--nq-disclosure-easing);
+}
+.is-mobile .nq-disclosure.is-disclosure-closed {
+  transition: grid-template-rows var(--nq-disclosure-duration) var(--nq-disclosure-easing),
+    margin var(--nq-disclosure-duration) var(--nq-disclosure-easing), visibility 0s linear var(--nq-disclosure-duration);
+}
+.is-mobile .nq-disclosure.is-disclosure-closed > .nq-disclosure-inner { opacity: 0; transform: translateY(-4px); }
+@starting-style {
+  .is-mobile .nq-disclosure:not(.is-disclosure-closed) { grid-template-rows: 0fr; }
+  .is-mobile .nq-disclosure:not(.is-disclosure-closed) > .nq-disclosure-inner { opacity: 0; transform: translateY(-4px); }
+}
+/* One glyph rotates in place, including historical and live reasoning. */
+.qbd-ai-transcript-chevron { transition: opacity 120ms ease, transform 280ms cubic-bezier(.2,.8,.2,1); }
+.qbd-ai-transcript-ligne[aria-expanded="true"] .qbd-ai-transcript-chevron { transform: rotate(90deg); }
+.is-mobile .qbd-ai-transcript-chevron { opacity: 1; }
+.is-mobile .qbd-work-chevron { transition: transform var(--nq-disclosure-duration) var(--nq-disclosure-easing), opacity 120ms ease; }
+.is-mobile :is(.qbd-quizzes-node-body, .qbd-qz-section-body, .qbd-quizzes-node-chevron, .qbd-qz-section-chevron) {
+  transition-duration: var(--nq-disclosure-duration);
+  transition-timing-function: var(--nq-disclosure-easing);
+}
+.is-mobile .nq-overlay-closing {
+  pointer-events: none;
+  animation: nq-overlay-out 180ms ease-out forwards !important;
+}
+@keyframes nq-overlay-out { to { opacity: 0; translate: 0 -4px; } }
+/* Preserve fixed placement and component transforms during the exit. */
+.is-mobile .modal-container > .modal.qbd-anim-modal:not(.nq-reglages-modal) {
+  animation: nq-mobile-dialog-in 250ms cubic-bezier(.2,.8,.2,1);
+}
+.is-mobile .modal-container > .modal.qbd-anim-modal.qbd-closing:not(.nq-reglages-modal) {
+  animation: nq-mobile-dialog-out 200ms ease-out forwards;
+  pointer-events: none;
+}
+.is-mobile .modal-container .modal-bg { background: rgb(0 0 0 / .3); backdrop-filter: none; }
+@keyframes nq-mobile-dialog-in { from { opacity: 0; transform: scale(1.05); } to { opacity: 1; transform: scale(1); } }
+@keyframes nq-mobile-dialog-out { to { opacity: 0; transform: scale(1.05); } }
+/* The dialog uses flat actions; page CTA geometry stays intact. */
+.is-mobile .modal :is(button, .qbd-cta3d-face, .qbd-create-btn, .qbd-btn-primary) {
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+.is-mobile .modal .qbd-cta3d { --qbd-cta3d-depth: 0px; }
+.is-mobile .modal .qbd-cta3d-face { translate: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .is-mobile .nq-disclosure,
+  .is-mobile .nq-disclosure > .nq-disclosure-inner,
+  .qbd-ai-transcript-chevron,
+  .is-mobile .qbd-work-chevron,
+  .is-mobile :is(.qbd-quizzes-node-body, .qbd-qz-section-body, .qbd-quizzes-node-chevron, .qbd-qz-section-chevron),
+  .is-mobile .qbd-qz-body--sheet > .qbd-qz-list,
+  .is-mobile .qbd-qz-list-scrim { transition: none; }
+  .is-mobile .nq-disclosure > .nq-disclosure-inner { transform: none; }
+  .is-mobile .modal-container > .modal.qbd-anim-modal { animation: none !important; }
+}
+
+/* Native details retain their keyboard semantics, with progressive intrinsic sizing. */
+@supports (interpolate-size: allow-keywords) {
+  .is-mobile details { interpolate-size: allow-keywords; }
+  .is-mobile details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition: block-size 280ms cubic-bezier(.2,.8,.2,1), opacity 280ms ease-out,
+      content-visibility 280ms allow-discrete;
+  }
+  .is-mobile details[open]::details-content { block-size: auto; opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .is-mobile details::details-content { transition: none; }
+  }
+}

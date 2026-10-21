@@ -272,9 +272,11 @@
 	cursor: pointer;
 }
 
-.qbd-root .qbd-qz-preview-back:hover {
-	background: transparent;
-	text-decoration: underline;
+@media (hover: hover) {
+    .qbd-root .qbd-qz-preview-back:hover {
+        background: transparent;
+        text-decoration: underline;
+    }
 }
 
 .qbd-qz-loading,
@@ -345,9 +347,11 @@
 	transition: color 0.14s ease, background 0.14s ease;
 }
 
-.qbd-root .qbd-qz-section-head:hover {
-	background: color-mix(in srgb, var(--text-normal) 6%, transparent);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-root .qbd-qz-section-head:hover {
+        background: color-mix(in srgb, var(--text-normal) 6%, transparent);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-root .qbd-qz-section-head:focus-visible {

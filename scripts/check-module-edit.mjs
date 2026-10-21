@@ -381,3 +381,60 @@ await withSrcModule(["src/dashboard/class-sessions-line.ts", "src/i18n.ts", "src
 		[{ kind: "empty" }, { kind: "value", v: "12" }, { kind: "invalid" }]);
 	r.done();
 });
+
+
+// Recent folders must use the same filesystem date shown on their cards.
+await withSrcModule(["src/dashboard/quizzes-render.ts", "src/dashboard/quiz-recent.ts", "src/host/current.ts"], async (Grid, Recent, Host) => {
+	const { parseHTML } = await import("linkedom");
+	const { document, window } = parseHTML("<html><body></body></html>");
+	globalThis.document = document;
+	globalThis.window = window;
+	const r = makeReporter("Recent folders — filesystem modification dates");
+	const now = Date.now(), day = 86400000;
+	const dates = new Map([["Root/New", now], ["Root/Month", now - 14 * day], ["Root/Old", now - 40 * day]]);
+	const infos = ["New", "Month", "Old", "Unreadable"].map(folder => ({ folder, name: folder, ue: null, path: "Root/" + folder }));
+	const map = { byFolder: new Map(infos.map(m => [m.folder, m])) };
+	Host.installHost({
+		fs: { modified: async path => {
+			if (path === "Root/Unreadable") throw new Error("Folder is unavailable");
+			return dates.get(path) ?? null;
+		} },
+		paths: { rootOf: () => "Root" }, ui: { setIcon: () => {} },
+	});
+	const deps = {
+		ctx: { settings: { quizzesModuleOverrides: Object.fromEntries(infos.map(m => [m.folder, { path: m.path }])) } },
+		isExpanded: () => false, toggleExpanded: () => {}, rerender: () => {}, openModule: () => {},
+	};
+	const root = document.createElement("main");
+	Grid.renderQuizGrid(deps, root, "recent", [], {}, map);
+	await new Promise(setImmediate);
+	const sections = [...root.querySelectorAll(".qbd-quizzes-node")].map(section => ({
+		label: section.querySelector(".qbd-quizzes-node-label").textContent,
+		folders: [...section.querySelectorAll(".qbd-module-card__title")].map(title => title.textContent),
+	}));
+	r.check("new empty folders follow their real modification date", sections, [
+		{ label: "Last 7 days", folders: ["New"] },
+		{ label: "Last 30 days", folders: ["Month"] },
+		{ label: "Older than one month", folders: ["Old", "Unreadable"] },
+	]);
+	r.check("the new folder also shows its modification date in its footer",
+		root.querySelector(".qbd-module-card__path-tete")?.textContent.startsWith("Modified "), true);
+	const module = { ...infos[0], quizzes: [{ path: "Root/New/quiz.md", mtime: now - 50 * day }], total: 1, mastered: 0 };
+	r.check("a modified folder stays recent even when its quiz is old",
+		Recent.buildRecentModuleGroups([module], {}, dates).map(g => g.key), ["recent:7d"]);
+	r.check("a recent quiz session still makes an old folder recent",
+		Recent.buildRecentModuleGroups([{ ...module, path: "Root/Old" }], { "Root/New/quiz.md": { lastPlayed: now } }, dates).map(g => g.key), ["recent:7d"]);
+	r.check("an unknown folder date retains the existing fallback",
+		Recent.buildRecentModuleGroups([{ ...module, path: undefined, quizzes: [] }], {}, dates).map(g => g.key), ["recent:older"]);
+	let release;
+	const pending = new Promise(resolve => { release = resolve; });
+	Host.currentHost().fs.modified = () => pending;
+	Grid.renderQuizGrid(deps, root, "recent", [], {}, map);
+	Grid.renderQuizGrid(deps, root, "folder", [], {}, map);
+	release(now);
+	await new Promise(setImmediate);
+	r.check("late folder dates cannot replace a newer grouping",
+		[...root.querySelectorAll(".qbd-module-card__title")].map(title => title.textContent), ["Month", "New", "Old", "Unreadable"]);
+	Host.uninstallHost();
+	r.done();
+});

@@ -94,10 +94,13 @@ button.quiz-fc-card{
   cursor: pointer;
   outline: none;
 }
-
+@media (hover: hover) {
 .quiz-fc.is-flipped .quiz-fc-card:hover .quiz-fc-face{
   background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-fc-face));
 }
+}
+
+
 
 .quiz-fc.is-flipped .quiz-fc-card:focus-visible .quiz-fc-face{
   box-shadow: var(--quiz-fc-rim), 0 0 0 2px var(--quiz-primary-ring-22), 0 var(--quiz-fc-depth) 0 0 var(--quiz-fc-edge);
@@ -144,17 +147,22 @@ button.quiz-fc-card{
   transform: rotateY(180deg);
 }
 
+
 /* The front invites a click: lighter face on hover, sinks when pressed —
    like an option. */
+@media (hover: hover) {
 button.quiz-fc-card:hover .quiz-fc-face.is-front{
   background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-fc-face));
 }
+}
 
-button.quiz-fc-card:active .quiz-fc-inner{
+
+
+button.quiz-fc-card:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) .quiz-fc-inner{
   transform: translateY(var(--quiz-fc-depth));
 }
 
-button.quiz-fc-card:active .quiz-fc-face.is-front{
+button.quiz-fc-card:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) .quiz-fc-face.is-front{
   box-shadow: var(--quiz-fc-rim), 0 0 0 0 var(--quiz-fc-edge);
 }
 
@@ -298,12 +306,15 @@ button.quiz-fc-card:focus-visible .quiz-fc-face.is-front{
   box-shadow: var(--quiz-fc-rim), 0 4px 0 0 var(--quiz-fc-rate-edge);
   transition: background-color 0.12s ease, transform 110ms cubic-bezier(0.3, 0, 0.5, 1), box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1);
 }
-
+@media (hover: hover) {
 .quiz-fc-rate:hover{
   background: color-mix(in srgb, var(--text-normal) 5%, var(--quiz-fc-rate-face));
 }
+}
 
-.quiz-fc-rate:active{
+
+
+.quiz-fc-rate:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: translateY(4px);
   box-shadow: var(--quiz-fc-rim), 0 0 0 0 var(--quiz-fc-rate-edge);
 }

@@ -318,10 +318,12 @@
   background-color: color-mix(in srgb, var(--co-c) 14%, color-mix(in srgb, var(--background-secondary) 55%, transparent));
   transition: box-shadow 0.25s ease;
 }
-.quiz-learn-objectives.is-folded:hover {
-  border-color: color-mix(in srgb, var(--co-c) 70%, transparent);
-  border-left-color: var(--co-c);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--co-c) 22%, transparent);
+@media (hover: hover){
+    .quiz-learn-objectives.is-folded:hover {
+      border-color: color-mix(in srgb, var(--co-c) 70%, transparent);
+      border-left-color: var(--co-c);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--co-c) 22%, transparent);
+    }
 }
 .quiz-learn-objectives.is-folded > summary {
   display: flex;

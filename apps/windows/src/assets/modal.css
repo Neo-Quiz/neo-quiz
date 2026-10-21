@@ -245,9 +245,11 @@ body:has(.qbd-sidebar) .modal-container {
 	color: var(--text-muted);
 	cursor: pointer;
 }
-.modal-close-button:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .modal-close-button:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 .modal-close-button svg {
 	width: 16px;

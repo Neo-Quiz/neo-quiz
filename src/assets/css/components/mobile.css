@@ -25,7 +25,14 @@
   /* Hovering and selecting an option: the same style as on desktop
      (quiz-options.css, 2026-09-27), without glow or slide. */
 
-  .quiz-option.correct:hover,
+  @media (hover: hover){
+      .quiz-option.correct:hover{
+        transform: translate3d(1px,0,0);
+        box-shadow:
+      0 0 0 1.5px var(--quiz-success-ring-20),
+      0 0 10px var(--quiz-success-ring-22);
+      }
+  }
   .quiz-option.correct:focus-visible{
     transform: translate3d(1px,0,0);
     box-shadow:
@@ -33,7 +40,14 @@
       0 0 10px var(--quiz-success-ring-22);
   }
 
-  .quiz-option.wrong:hover,
+  @media (hover: hover){
+      .quiz-option.wrong:hover{
+        transform: translate3d(1px,0,0);
+        box-shadow:
+      0 0 0 1.5px var(--quiz-danger-ring-20),
+      0 0 10px var(--quiz-danger-ring-22);
+      }
+  }
   .quiz-option.wrong:focus-visible{
     transform: translate3d(1px,0,0);
     box-shadow:
@@ -41,9 +55,19 @@
       0 0 10px var(--quiz-danger-ring-22);
   }
 
-  .quiz-action-btn:hover,
-  .quiz-action-btn:focus-visible,
-  .quiz-hint-modal-close:hover,
+  @media (hover: hover){
+      .quiz-action-btn:hover{
+        transform: translate3d(0,-1px,0);
+      }
+  }
+  .quiz-action-btn:focus-visible{
+    transform: translate3d(0,-1px,0);
+  }
+  @media (hover: hover){
+      .quiz-hint-modal-close:hover{
+        transform: translate3d(0,-1px,0);
+      }
+  }
   .quiz-hint-modal-close:focus-visible{
     transform: translate3d(0,-1px,0);
   }

@@ -221,8 +221,13 @@
   perspective: 800px;
 }
 
-.quiz-lecture-carte:hover,
-.quiz-lecture-carte:active{
+@media (hover: hover){
+    .quiz-lecture-carte:hover{
+      background: none;
+      box-shadow: none;
+    }
+}
+.quiz-lecture-carte:is(body:not(.is-mobile) :active){
   background: none;
   box-shadow: none;
 }

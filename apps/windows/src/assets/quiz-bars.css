@@ -198,10 +198,13 @@
 	cursor: pointer;
 	transition: background-color 0.12s ease, transform 0.08s ease, box-shadow 0.08s ease;
 }
-.qz-explain-btn:hover {
+@media (hover: hover) {
+.qz-explain-btn:hover{
 	background: var(--nq-face-hover, var(--quiz-primary-light));
 }
-.qz-explain-btn:active {
+}
+
+.qz-explain-btn:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) {
 	transform: translateY(var(--depth));
 	box-shadow: 0 0 0 0 var(--edge);
 }
@@ -528,12 +531,20 @@ html body:not(.nq-x) .modal-container.nq-explain-conteneur > .modal.nq-explain-m
 	transition: height 0.18s ease, opacity 0.18s ease, background-color 0.18s ease;
 	pointer-events: none;
 }
-.nq-explain-poignee:hover .nq-explain-poignee-grip,
-.nq-explain-poignee:focus-visible .nq-explain-poignee-grip {
+.nq-explain-poignee:focus-visible .nq-explain-poignee-grip{
 	height: 56px;
 	opacity: 0.8;
 	background: var(--text-muted);
 }
+
+@media (hover: hover) {
+.nq-explain-poignee:hover .nq-explain-poignee-grip{
+	height: 56px;
+	opacity: 0.8;
+	background: var(--text-muted);
+}
+}
+
 .nq-explain-poignee:focus-visible .nq-explain-poignee-grip { background: var(--interactive-accent); }
 .nq-explain-redimension .nq-explain-poignee::before { opacity: 0.45; }
 .nq-explain-redimension .nq-explain-poignee .nq-explain-poignee-grip {
@@ -647,11 +658,14 @@ body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone {
 body:not(.is-mobile) #neo-quiz-root > .qbd-qz:has(> .qz-explain-btn-icone) .qbd-qz-header {
 	padding-right: 48px;
 }
-body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:hover {
+@media (hover: hover) {
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:hover{
 	background: color-mix(in srgb, var(--text-normal) 8%, transparent);
 	color: var(--text-normal);
 }
-body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:active {
+}
+
+body:not(.is-mobile) .qz-explain-btn.qz-explain-btn-icone:is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]) {
 	transform: none;
 	box-shadow: none;
 }

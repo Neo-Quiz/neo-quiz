@@ -239,7 +239,7 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 				${scope ? `<span class="quiz-passage-scope">${ctx.sanitize.renderInlineText(scope)}</span>` : ""}
 				<button class="quiz-passage-toggle" type="button" data-passage-toggle="1" aria-expanded="${isCollapsed ? "false" : "true"}" aria-label="${ctx.escapeHtmlAttr(toggleLabel)}">${ICON_CHEVRON}</button>
 			</div>
-			<div class="quiz-passage-body"><div class="quiz-passage-content">${contentHtml}</div></div>
+			<div class="quiz-passage-body"${isCollapsed ? " inert" : ""}><div class="quiz-passage-clip"><div class="quiz-passage-content">${contentHtml}</div></div></div>
 		</div>`;
 	}
 
@@ -275,16 +275,23 @@ export function createPassageHandlers(ctx: EngineCtx): PassageHandlers {
 			);
 			twins.forEach(el => {
 				el.classList.toggle("is-collapsed", nowCollapsed);
+				const body = el.querySelector<HTMLElement>(".quiz-passage-body");
+				if (body) body.inert = nowCollapsed;
 				const btn = el.querySelector<HTMLButtonElement>("[data-passage-toggle]");
 				if (!btn) return;
 				btn.setAttribute("aria-expanded", nowCollapsed ? "false" : "true");
 				btn.setAttribute("aria-label", label);
 			});
 
-			/* Chaque carte touchée change de hauteur : leurs entrées de cache sont
-			   périmées. Pas d'animation de repli — un collapse animé laisse des
-			   pixels fantômes du compositeur sur la piste translatée. */
+			/* Active-slide ResizeObserver tracks the grid animation; refresh the shared
+			   height cache now and at its final size. The clip becomes invisible
+			   after closing so the translated track cannot retain painted pixels. */
 			resynchroniser();
+		});
+
+		root.querySelector(".quiz-passage-body")?.addEventListener("transitionend", event => {
+			const transition = event as TransitionEvent;
+			if (transition.target === transition.currentTarget && transition.propertyName === "grid-template-rows") resynchroniser();
 		});
 
 		function resynchroniser(): void {

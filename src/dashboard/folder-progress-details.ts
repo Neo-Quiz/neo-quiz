@@ -1,3 +1,4 @@
+import { prepareDisclosure, setDisclosureOpen } from "./disclosure-motion";
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import { currentHost } from "../host/current";
@@ -101,11 +102,10 @@ function renderLigneCours(parent: HTMLElement, ctx: DashboardShellCtx, quiz: Qui
 	return ligne;
 }
 
-/** Un mode d'un cours : barre + pourcentage, et si des tentatives existent
-    (réelles ou en attente d'annulation), la pastille « Meilleur » et le
-    chevron qui déplie leur liste. */
+/** A course mode: progress bar and percentage, then its best score and
+    expandable history when attempts exist (including pending deletions). */
 function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizIndexEntry, rec: QuizStatRecord | undefined, ouvertes: Set<string>, enAttente: EnAttenteAnnulation, redessiner: () => void): void {
-	const { state, pct } = computeQuizState(q, rec);
+	const { state, pct } = computeQuizState(q, rec, ctx.sessionOf?.(q.path) ?? null);
 	const valeur = state === "mastered" ? 100 : pct;
 	const bloc = ajouter(parent, "div", "qbd-folder-course-mode-bloc");
 	const ligne = ajouter(bloc, "div", "qbd-folder-course-mode");
@@ -136,12 +136,14 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 	bloc.classList.toggle("is-open", ouverte);
 
 	const corps = ajouter(bloc, "div", "qbd-folder-attempts");
-	corps.hidden = !ouverte;
+
 	const tentatives = [...reelles.map(tt => ({ tentative: tt, enAttente: false })), ...attentes.map(tt => ({ tentative: tt, enAttente: true }))]
 		.sort((a, b) => b.tentative.date - a.tentative.date);
 	for (const { tentative, enAttente: attente } of tentatives) {
 		renderLigneTentative(corps, ctx, q, tentative, attente, enAttente, redessiner);
 	}
+
+	prepareDisclosure(corps, ouverte);
 
 	bouton.addEventListener("click", () => {
 		const maintenant = !ouvertes.has(cle);
@@ -149,7 +151,7 @@ function renderModeCours(parent: HTMLElement, ctx: DashboardShellCtx, q: QuizInd
 		else ouvertes.delete(cle);
 		bouton.setAttribute("aria-expanded", String(maintenant));
 		bloc.classList.toggle("is-open", maintenant);
-		corps.hidden = !maintenant;
+		setDisclosureOpen(corps, maintenant);
 	});
 }
 

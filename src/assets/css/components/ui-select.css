@@ -65,14 +65,16 @@
    s'éclaircit (#191E29 → #232732, delta ~+10). Dérivée par color-mix :
    --background-modifier-border-hover résout à la MÊME valeur que la
    bordure de repos dans le thème d'Ahmed (vérifié live) → hover mort. */
-.qbd-select:hover {
-	border-color: color-mix(in srgb, var(--text-normal) 10%, var(--background-modifier-border));
+@media (hover: hover) {
+    .qbd-select:hover {
+        border-color: color-mix(in srgb, var(--text-normal) 10%, var(--background-modifier-border));
+    }
 }
 
 /* Clic StudySmarter : le trigger RÉTRÉCIT pendant l'appui puis reprend sa
    taille au relâché — « réellement sentir qu'on a cliqué » (annotation).
    Un <button disabled> ne reçoit pas :active, pas de guard nécessaire. */
-.qbd-select:active {
+.qbd-select:is(body:not(.is-mobile) :active) {
 	transform: scale(0.95);
 	transition-duration: 0.14s, 0.14s, 90ms;
 }
@@ -168,7 +170,7 @@
 	min-height: 38px;
 	padding: 8px 12px;
 	line-height: 1.35;
-	background: transparent !important;
+	background-color: transparent !important;
 	border: none;
 	box-shadow: none !important;
 	border-radius: 6px;
@@ -180,8 +182,10 @@
 	cursor: pointer;
 }
 
-.qbd-select-option:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-select-option:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 
 /* L'option active n'est signalée QUE par le check accent (cible SS : le
@@ -330,8 +334,10 @@
 	height: 14px;
 }
 
-.qbd-select-option:hover .qbd-action-menu-icon {
-	color: var(--interactive-accent);
+@media (hover: hover) {
+    .qbd-select-option:hover .qbd-action-menu-icon {
+        color: var(--interactive-accent);
+    }
 }
 
 .qbd-action-menu-body {
@@ -355,21 +361,29 @@
 	cursor: not-allowed;
 }
 
-.qbd-select-option--disabled:hover {
-	background: transparent !important;
+@media (hover: hover) {
+    .qbd-select-option--disabled:hover {
+        background: transparent !important;
+    }
 }
 
-.qbd-select-option--disabled:hover .qbd-action-menu-icon {
-	color: var(--text-muted);
+@media (hover: hover) {
+    .qbd-select-option--disabled:hover .qbd-action-menu-icon {
+        color: var(--text-muted);
+    }
 }
 
 /* Rangée destructrice (façon « Delete Study Set » StudySmarter) : libellé et
    icône teintés rouge, y compris au survol. */
 .qbd-select-option--danger,
 .qbd-select-option--danger .qbd-select-option-label,
-.qbd-select-option--danger .qbd-action-menu-icon,
-.qbd-select-option--danger:hover .qbd-action-menu-icon {
+.qbd-select-option--danger .qbd-action-menu-icon {
 	color: var(--color-red, #f87171);
+}
+@media (hover: hover) {
+    .qbd-select-option--danger:hover .qbd-action-menu-icon {
+        color: var(--color-red, #f87171);
+    }
 }
 
 /* ── Menu modèle + effort (façon claude.ai) ── */
@@ -395,11 +409,17 @@
 /* Le contrôle du milieu quand le canal est un SITE : un libellé, pas un
    bouton (Ahmed, 2026-09-20). Ni survol, ni curseur, ni chevron ; la
    non-sélection lui vient de `.qbd-select`, en tête de cette feuille. */
-.qbd-channel-trigger--inerte,
-.qbd-channel-trigger--inerte:hover {
+.qbd-channel-trigger--inerte {
 	cursor: default;
 	background: transparent !important;
 	box-shadow: none !important;
+}
+@media (hover: hover) {
+    .qbd-channel-trigger--inerte:hover {
+        cursor: default;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
 }
 
 .qbd-model-trigger-effort {
@@ -765,7 +785,11 @@
 
 /* Révélé au survol ou à la sélection (le picker met la couleur en gras une
    fois le niveau atteint ; au repos les niveaux normaux restent neutres). */
-.qbd-effort-option:hover .qbd-select-option-label,
+@media (hover: hover) {
+    .qbd-effort-option:hover .qbd-select-option-label {
+        color: var(--qbd-effort-color);
+    }
+}
 .qbd-effort-option.is-active .qbd-select-option-label {
 	color: var(--qbd-effort-color);
 }
@@ -796,7 +820,17 @@
    survol/actif. xhigh (magentaBright) reste uni : en dark-ansi son shimmer
    pointe sur la même couleur, donc pas d'animation perçue → géré par la règle
    générique ci-dessus. */
-.qbd-effort-option--max:hover .qbd-select-option-label,
+@media (hover: hover) {
+    .qbd-effort-option--max:hover .qbd-select-option-label {
+        background: linear-gradient(90deg, rgb(243, 139, 168), rgb(243, 139, 168), rgb(249, 226, 175), rgb(166, 227, 161), rgb(148, 226, 213), rgb(137, 180, 250), rgb(245, 194, 231), rgb(243, 139, 168));
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        animation: qbd-effort-rainbow 3.2s linear infinite;
+    }
+}
 .qbd-effort-option--max.is-active .qbd-select-option-label {
 	background: linear-gradient(90deg, rgb(243, 139, 168), rgb(243, 139, 168), rgb(249, 226, 175), rgb(166, 227, 161), rgb(148, 226, 213), rgb(137, 180, 250), rgb(245, 194, 231), rgb(243, 139, 168));
 	background-size: 200% auto;
@@ -813,7 +847,11 @@
 
 /* Accessibilité : pas d'animation si l'utilisateur la refuse (dégradé figé). */
 @media (prefers-reduced-motion: reduce) {
-	.qbd-effort-option--max:hover .qbd-select-option-label,
+	@media (hover: hover) {
+        .qbd-effort-option--max:hover .qbd-select-option-label {
+            animation: none;
+        }
+	}
 	.qbd-effort-option--max.is-active .qbd-select-option-label {
 		animation: none;
 	}

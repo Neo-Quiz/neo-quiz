@@ -22,6 +22,7 @@ export function mountListSheet(listCol: HTMLElement, count: number): void {
 	const body = listCol.parentElement;
 	if (!body) return;
 	body.classList.add("qbd-qz-body--sheet");
+	listCol.inert = !body.classList.contains("is-list-open");
 	let toggle = body.querySelector<HTMLButtonElement>(".qbd-qz-list-toggle");
 	if (!toggle) {
 		const bouton = ajouter(body, "button", "qbd-qz-list-toggle");
@@ -31,6 +32,8 @@ export function mountListSheet(listCol: HTMLElement, count: number): void {
 		ajouter(bouton, "span", "qbd-qz-list-toggle-label");
 		const scrim = ajouter(body, "div", "qbd-qz-list-scrim");
 		const set = (open: boolean): void => {
+			if (!open && listCol.contains(document.activeElement)) bouton.focus({ preventScroll: true });
+			listCol.inert = !open;
 			body.classList.toggle("is-list-open", open);
 			bouton.setAttribute("aria-expanded", String(open));
 		};

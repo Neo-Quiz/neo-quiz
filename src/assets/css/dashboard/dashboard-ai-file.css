@@ -61,8 +61,10 @@
 	font-size: 13px;
 	cursor: pointer;
 }
-.qbd-ai-explain-quiz-lien:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-explain-quiz-lien:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-ai-explain-quiz-icone {
 	display: inline-flex;
@@ -154,7 +156,9 @@
 
 /* A sent document chip opens its preview (ouvrirPieceEnvoyee): the same hover as a card of the composer. */
 .qbd-ai-message-piece.is-openable { cursor: pointer; }
-.qbd-ai-message-piece.is-openable:hover { background: var(--background-modifier-hover); }
+@media (hover: hover) {
+    .qbd-ai-message-piece.is-openable:hover { background: var(--background-modifier-hover); }
+}
 .qbd-ai-message-piece.is-openable:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 
 .qbd-ai-message-piece img {
@@ -347,8 +351,10 @@
 	cursor: pointer;
 }
 
-.qbd-ai-reponse-action:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-reponse-action:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 
 /* La carte du quiz écrit (ligne nette) : la carte ENTIÈRE est un bouton.
@@ -376,16 +382,18 @@
 	transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.qbd-ai-resultat:active {
+.qbd-ai-resultat:is(body:not(.is-mobile) :active) {
 	transform: translateY(0) scale(0.985);
 	box-shadow: none;
 	transition-duration: 0.08s;
 }
 
-.qbd-ai-resultat:hover {
-	border-color: color-mix(in srgb, var(--qbd-folder, var(--interactive-accent)) 45%, var(--background-modifier-border));
-	transform: translateY(-2px);
-	box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--qbd-folder, var(--interactive-accent)) 55%, transparent);
+@media (hover: hover) {
+    .qbd-ai-resultat:hover {
+        border-color: color-mix(in srgb, var(--qbd-folder, var(--interactive-accent)) 45%, var(--background-modifier-border));
+        transform: translateY(-2px);
+        box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--qbd-folder, var(--interactive-accent)) 55%, transparent);
+    }
 }
 
 .qbd-ai-resultat:focus-visible {
@@ -410,9 +418,11 @@
 	height: 22px;
 }
 
-.qbd-ai-resultat--inerte:hover {
-	transform: none;
-	box-shadow: none;
+@media (hover: hover) {
+    .qbd-ai-resultat--inerte:hover {
+        transform: none;
+        box-shadow: none;
+    }
 }
 
 /* The subject's tile (topic-art.ts `topicTuile`): the crisp tile of the
@@ -474,9 +484,11 @@
 
 .qbd-ai-resultat-fleche svg { display: block; width: 18px; height: 18px; }
 
-.qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
-	transform: translateX(2px);
-	color: var(--text-muted);
+@media (hover: hover) {
+    .qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
+        transform: translateX(2px);
+        color: var(--text-muted);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -485,13 +497,19 @@
 		transition: none;
 	}
 
-	.qbd-ai-resultat:hover,
-	.qbd-ai-resultat:active {
+	@media (hover: hover) {
+        .qbd-ai-resultat:hover {
+            transform: none;
+        }
+	}
+	.qbd-ai-resultat:is(body:not(.is-mobile) :active) {
 		transform: none;
 	}
 
-	.qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
-		transform: none;
+	@media (hover: hover) {
+        .qbd-ai-resultat:hover .qbd-ai-resultat-fleche {
+            transform: none;
+        }
 	}
 }
 
@@ -512,9 +530,11 @@
 	cursor: pointer;
 }
 
-.qbd-ai-file-btn:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-file-btn:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-ai-file-btn svg { width: 15px; height: 15px; }
@@ -640,9 +660,11 @@
 	cursor: pointer;
 }
 
-.qbd-ai-transcript-bascule:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-transcript-bascule:hover {
+        background: var(--background-modifier-hover);
+        color: var(--text-normal);
+    }
 }
 
 .qbd-ai-transcript-bascule-icone {
@@ -740,12 +762,14 @@
 	transition: color 120ms ease, background-color 120ms ease;
 }
 
-.qbd-ai-envoyer-maintenant:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-ai-envoyer-maintenant:hover {
+        color: var(--text-normal);
+        background: var(--background-modifier-hover);
+    }
 }
 
-.qbd-ai-envoyer-maintenant:active {
+.qbd-ai-envoyer-maintenant:is(body:not(.is-mobile) :active) {
 	background: var(--background-modifier-border);
 }
 
@@ -816,12 +840,16 @@
 	border-radius: 6px;
 }
 
-.qbd-ai-transcript-ligne:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-transcript-ligne:hover {
+        color: var(--text-normal);
+    }
 }
 
-.qbd-ai-transcript-ligne:hover .qbd-ai-transcript-ligne-in {
-	background: var(--background-modifier-hover);
+@media (hover: hover) {
+    .qbd-ai-transcript-ligne:hover .qbd-ai-transcript-ligne-in {
+        background: var(--background-modifier-hover);
+    }
 }
 
 .qbd-ai-transcript-ligne-texte {
@@ -848,7 +876,11 @@
 	transition: opacity 120ms ease;
 }
 
-.qbd-ai-transcript-ligne:hover .qbd-ai-transcript-chevron,
+@media (hover: hover) {
+    .qbd-ai-transcript-ligne:hover .qbd-ai-transcript-chevron {
+        opacity: 1;
+    }
+}
 .qbd-ai-transcript-ligne[aria-expanded="true"] .qbd-ai-transcript-chevron {
 	opacity: 1;
 }
@@ -997,14 +1029,22 @@
 
 /* The hover tint is translucent: layered OVER the opaque base, never in its
    place, or the thread shows through the button. */
-.qbd-ai-fil-bas:hover,
+@media (hover: hover) {
+    .qbd-ai-fil-bas:hover {
+        background: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary);
+    }
+}
 .qbd-ai-fil-bas:focus-visible {
 	background: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary);
 }
 
-.qbd-ai-fil-bas:hover .qbd-ai-fil-bas-points,
+@media (hover: hover) {
+    .qbd-ai-fil-bas:hover .qbd-ai-fil-bas-points { opacity: 0; }
+}
 .qbd-ai-fil-bas:focus-visible .qbd-ai-fil-bas-points { opacity: 0; }
-.qbd-ai-fil-bas:hover .qbd-ai-fil-bas-fleche,
+@media (hover: hover) {
+    .qbd-ai-fil-bas:hover .qbd-ai-fil-bas-fleche { opacity: 1; }
+}
 .qbd-ai-fil-bas:focus-visible .qbd-ai-fil-bas-fleche { opacity: 1; }
 
 /* Without a running generation the dots mean nothing: show the arrow at rest. */
@@ -1061,9 +1101,11 @@
 	text-align: left;
 	cursor: pointer;
 }
-.qbd-ai-lateral-item:hover:not(:disabled) {
-	background: var(--background-modifier-hover) !important;
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-lateral-item:hover:not(:disabled) {
+        background: var(--background-modifier-hover) !important;
+        color: var(--text-normal);
+    }
 }
 .qbd-ai-lateral-item:disabled {
 	opacity: 0.45;
@@ -1095,8 +1137,10 @@
 	text-align: left;
 	cursor: text;
 }
-.qbd-ai-lateral-recherche:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-lateral-recherche:hover {
+        color: var(--text-normal);
+    }
 }
 
 /* The search window (`chat-search.ts`): the field, the three tabs, the list. */
@@ -1135,8 +1179,10 @@
 	font-size: 14px;
 	cursor: pointer;
 }
-.qbd-search-onglet:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-search-onglet:hover {
+        color: var(--text-normal);
+    }
 }
 .qbd-search-onglet.is-active {
 	background: var(--background-modifier-hover) !important;
@@ -1215,7 +1261,11 @@
 	align-items: center;
 	border-radius: 8px;
 }
-.qbd-ai-chat-item:hover,
+@media (hover: hover) {
+    .qbd-ai-chat-item:hover {
+        background: var(--background-modifier-hover);
+    }
+}
 .qbd-ai-chat-item.is-active {
 	background: var(--background-modifier-hover);
 }
@@ -1280,12 +1330,18 @@
 	cursor: pointer;
 	visibility: hidden;
 }
-.qbd-ai-chat-item:hover .qbd-ai-chat-suppr,
+@media (hover: hover) {
+    .qbd-ai-chat-item:hover .qbd-ai-chat-suppr {
+        visibility: visible;
+    }
+}
 .qbd-ai-chat-suppr:focus-visible {
 	visibility: visible;
 }
-.qbd-ai-chat-suppr:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-chat-suppr:hover {
+        color: var(--text-normal);
+    }
 }
 .qbd-ai-chat-suppr svg {
 	width: 15px;
@@ -1365,8 +1421,10 @@
 	text-align: left;
 	cursor: pointer;
 }
-.qbd-ai-chats-ancien:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-chats-ancien:hover {
+        color: var(--text-normal);
+    }
 }
 .qbd-ai-chats-chevron {
 	display: inline-flex;
@@ -1455,8 +1513,10 @@
 	color: var(--text-normal);
 	cursor: pointer;
 }
-.qbd-ai-exam-cible-edit:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-exam-cible-edit:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-ai-exam-cible-edit svg {
 	width: 13px;
@@ -1481,13 +1541,20 @@
 	transform: scale(0.85);
 	transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.qbd-ai-exam-cible:hover .qbd-ai-exam-cible-retirer,
+@media (hover: hover) {
+    .qbd-ai-exam-cible:hover .qbd-ai-exam-cible-retirer {
+        opacity: 1;
+        transform: none;
+    }
+}
 .qbd-ai-exam-cible-retirer:focus-visible {
 	opacity: 1;
 	transform: none;
 }
-.qbd-ai-exam-cible-retirer:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-exam-cible-retirer:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-ai-exam-cible-retirer svg {
 	width: 12px;
@@ -1531,8 +1598,10 @@
 	text-align: left;
 	cursor: pointer;
 }
-.qbd-exam-docs-item:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-exam-docs-item:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-exam-docs-item.is-joint {
 	border-color: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
@@ -1577,8 +1646,10 @@
 	font-weight: 600;
 	cursor: pointer;
 }
-.qbd-exam-docs-fini:hover {
-	background: color-mix(in srgb, #fff 12%, var(--interactive-accent)) !important;
+@media (hover: hover) {
+    .qbd-exam-docs-fini:hover {
+        background: color-mix(in srgb, #fff 12%, var(--interactive-accent)) !important;
+    }
 }
 
 /* Where an "/exam" plan stands, under its request: the quiz being made. */
@@ -1637,8 +1708,10 @@
 	color: var(--text-normal);
 	cursor: pointer;
 }
-.qbd-ai-plan-etape.is-done:hover {
-	background: var(--background-modifier-hover) !important;
+@media (hover: hover) {
+    .qbd-ai-plan-etape.is-done:hover {
+        background: var(--background-modifier-hover) !important;
+    }
 }
 .qbd-ai-plan-etape.is-failed .qbd-ai-plan-icone {
 	color: var(--text-error);
@@ -1771,7 +1844,9 @@
 	transition: background-color 0.12s ease;
 }
 
-.qbd-ai-kind-option:hover { background: var(--background-modifier-hover) !important; }
+@media (hover: hover) {
+    .qbd-ai-kind-option:hover { background: var(--background-modifier-hover) !important; }
+}
 .qbd-ai-kind-option.is-active { background: color-mix(in srgb, var(--interactive-accent) 10%, transparent) !important; }
 .qbd-ai-kind-option:focus-visible { outline: 2px solid color-mix(in srgb, var(--interactive-accent) 60%, transparent); outline-offset: -2px; }
 
@@ -1843,7 +1918,9 @@
 	font-weight: 600;
 	cursor: pointer;
 }
-.qbd-ai-kind-ok:hover { filter: brightness(1.08); }
+@media (hover: hover) {
+    .qbd-ai-kind-ok:hover { filter: brightness(1.08); }
+}
 
 .qbd-ai-kind-aide { padding: 6px 6px 0; border-top: 1px solid var(--background-modifier-border); font-size: 11.5px; color: var(--text-faint); }
 
@@ -1893,8 +1970,10 @@
 	cursor: pointer;
 }
 
-.qbd-ai-relais-annuler:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-ai-relais-annuler:hover {
+        color: var(--text-normal);
+    }
 }
 
 .qbd-ai-relais-icone {
@@ -1985,8 +2064,10 @@
 	transition: background-color 120ms ease-out, color 120ms ease-out;
 }
 
-.qbd-gen-tab:hover {
-	color: var(--text-normal);
+@media (hover: hover) {
+    .qbd-gen-tab:hover {
+        color: var(--text-normal);
+    }
 }
 
 .qbd-gen-tab.is-active {
@@ -2060,7 +2141,12 @@
 	transition: border-color 150ms ease-out, transform 200ms ease-out, box-shadow 200ms ease-out;
 }
 
-.qbd-gen-card:hover,
+@media (hover: hover) {
+    .qbd-gen-card:hover {
+        border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
+        outline: none;
+    }
+}
 .qbd-gen-card:focus-visible {
 	border-color: color-mix(in srgb, var(--text-normal) 30%, transparent);
 	outline: none;
@@ -2150,22 +2236,37 @@
 
 .qbd-gen-art-tile > svg { width: 26px; height: 26px; color: #fff; stroke-width: 1.9; }
 
-.qbd-gen-card:hover,
+@media (hover: hover) {
+    .qbd-gen-card:hover {
+        transform: translateY(-4px);
+    }
+}
 .qbd-gen-card:focus-visible {
 	transform: translateY(-4px);
 }
 
-.qbd-gen-card:hover .qbd-gen-art-ghost,
+@media (hover: hover) {
+    .qbd-gen-card:hover .qbd-gen-art-ghost { transform: translate(-6px, -4px) rotate(-8deg) scale(1.05); opacity: 0.3; }
+}
 .qbd-gen-card:focus-visible .qbd-gen-art-ghost { transform: translate(-6px, -4px) rotate(-8deg) scale(1.05); opacity: 0.3; }
-.qbd-gen-card:hover .qbd-gen-art-wash,
+@media (hover: hover) {
+    .qbd-gen-card:hover .qbd-gen-art-wash { opacity: 1; }
+}
 .qbd-gen-card:focus-visible .qbd-gen-art-wash { opacity: 1; }
 
-.qbd-gen-card:active { transform: translateY(0) scale(0.99); }
+.qbd-gen-card:is(body:not(.is-mobile) :active) { transform: translateY(0) scale(0.99); }
 
 @media (prefers-reduced-motion: reduce) {
 	.qbd-gen-art-ghost, .qbd-gen-art-wash { transition: none; }
-	.qbd-gen-card:hover, .qbd-gen-card:focus-visible, .qbd-gen-card:active,
-	.qbd-gen-card:hover .qbd-gen-art-ghost, .qbd-gen-card:focus-visible .qbd-gen-art-ghost { transform: none; }
+	@media (hover: hover) {
+        .qbd-gen-card:hover { transform: none; }
+	}
+	.qbd-gen-card:focus-visible,
+	.qbd-gen-card:is(body:not(.is-mobile) :active) { transform: none; }
+	@media (hover: hover) {
+        .qbd-gen-card:hover .qbd-gen-art-ghost { transform: none; }
+	}
+	.qbd-gen-card:focus-visible .qbd-gen-art-ghost { transform: none; }
 }
 
 .qbd-gen-foot {

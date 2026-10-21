@@ -51,10 +51,12 @@
     box-shadow 110ms cubic-bezier(0.3, 0, 0.5, 1),
     transform 110ms cubic-bezier(0.3, 0, 0.5, 1);
 }
-
+@media (hover: hover) {
 .quiz-slot:hover{
   border-color: color-mix(in srgb, var(--quiz-primary) 55%, transparent);
 }
+}
+
 
 /* A piece is picked up: every slot says where it can go. */
 .quiz-slot.can-place{
@@ -106,12 +108,14 @@
   font-size: 0.9375rem;
   font-weight: 600;
 }
-
+@media (hover: hover) {
 .quiz-slot.filled:not(.correct):not(.wrong):hover{
   background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-piece-face));
 }
+}
 
-.quiz-slot.filled:not(.correct):not(.wrong):active{
+
+.quiz-slot.filled:not(.correct):not(.wrong):is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: translateY(var(--quiz-piece-depth));
   box-shadow: var(--quiz-piece-rim), 0 0 0 0 var(--quiz-piece-edge);
 }
@@ -211,12 +215,14 @@
   background: radial-gradient(circle, color-mix(in srgb, var(--text-normal) 38%, transparent) 1.4px, transparent 1.6px) 0 0 / 5px 5.5px;
   pointer-events: none;
 }
-
+@media (hover: hover) {
 .quiz-possibility:not(.used):not(.selected-pick):hover{
   background: color-mix(in srgb, var(--text-normal) 4%, var(--quiz-piece-face));
 }
+}
 
-.quiz-possibility:not(.used):active{
+
+.quiz-possibility:not(.used):is(body:not(.is-mobile) :active, [data-nq-press-family="depth"][data-nq-pressed="true"]){
   transform: translateY(var(--quiz-piece-depth));
   box-shadow: var(--quiz-piece-rim), 0 0 0 0 var(--quiz-piece-edge);
 }

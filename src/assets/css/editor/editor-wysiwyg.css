@@ -91,9 +91,11 @@
 	transition: all 0.15s;
 }
 
-.qb-wysiwyg-btn:hover {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
+@media (hover: hover) {
+    .qb-wysiwyg-btn:hover {
+        background: var(--background-modifier-hover);
+        border-color: var(--interactive-accent);
+    }
 }
 
 .qb-wysiwyg-editor {

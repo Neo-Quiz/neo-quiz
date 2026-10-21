@@ -155,10 +155,32 @@ export function renderQuizGrid(
 	if (garder && tous.length === 0) ajouter(ajouter(treeEl, "div", "qbd-empty-state"), "p", undefined, t("dashboard.quizzes.noSubjectMatch"));
 
 	if (mode === "recent") {
-		for (const g of buildRecentModuleGroups(modules, stats)) {
-			const body = renderCollapsibleSection(deps, treeEl, g.key, t(RECENT_GROUP_LABEL_KEYS[g.key]), g.modules.length, { entryDelay });
-			renderModuleGrid(deps, body, g.modules, map, entryDelay);
-		}
+		const renderRecent = (parent: HTMLElement, modified?: ReadonlyMap<string, number | null>): void => {
+			for (const g of buildRecentModuleGroups(modules, stats, modified)) {
+				const body = renderCollapsibleSection(deps, parent, g.key, t(RECENT_GROUP_LABEL_KEYS[g.key]), g.modules.length, { entryDelay });
+				renderModuleGrid(deps, body, g.modules, map, entryDelay);
+			}
+		};
+		const host = currentHost();
+		if (host.fs.modified && modules.some(m => m.path)) {
+			// A newly created empty folder has no quiz timestamp. Use the same
+			// filesystem date as its card footer before assigning Recent sections.
+			const anchor = document.createComment("recent folders");
+			treeEl.append(anchor);
+			void Promise.all(modules.map(async m => {
+				try {
+					return [m.path ?? "", m.path ? await host.fs.modified?.(m.path) ?? null : null] as const;
+				} catch {
+					return [m.path ?? "", null] as const;
+				}
+			})).then(dates => {
+				// A rerender removes the anchor: late reads cannot overwrite its view.
+				if (anchor.parentNode !== treeEl) return;
+				const recent = document.createElement("div");
+				renderRecent(recent, new Map(dates));
+				anchor.replaceWith(...recent.childNodes);
+			});
+		} else renderRecent(treeEl);
 	} else if (mode === "folder") {
 		// Axe Dossier : un en-tête par dossier parent. Clé « folder: » : « : »
 		// est interdit dans un chemin, aucune collision avec les autres axes.
