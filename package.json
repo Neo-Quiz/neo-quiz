@@ -92,6 +92,7 @@
     "fetch:syncthing": "node scripts/fetch-syncthing.mjs",
     "check:electron-video": "node scripts/check-electron-video.mjs",
     "check:electron-langages": "node scripts/check-electron-langages.mjs",
+    "check:python-catalogue": "node scripts/check-python-catalogue.mjs",
     "check:code-packages": "node scripts/check-code-packages.mjs",
     "check:python-zip": "node scripts/check-python-zip.mjs",
     "build:language-pack": "node scripts/build-language-pack.mjs",

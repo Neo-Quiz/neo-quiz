@@ -160,6 +160,11 @@ jobs:
       - name: Language pack installer
         run: npm run check:electron-langages
 
+      # The pinned Python catalogue: every dependency pinned, hosts
+      # trusted, torch closure without CUDA, import scanner.
+      - name: Python catalogue
+        run: npm run check:python-catalogue
+
       # The Python package proxy: a package file the pack lock does not
       # name never reaches the network, bytes that do not match the lock
       # (or the digest PyPI announced) are never served or cached, only
