@@ -571,3 +571,9 @@ code.quiz-code-tokens .token.keyword{ color: #7aa2f7; }
 code.quiz-code-tokens .token.function{ color: #7dcfff; }
 code.quiz-code-tokens .token.string{ color: #9ece6a; }
 code.quiz-code-tokens .token.number{ color: #ff9e64; }
+
+/* An inline formula and the punctuation right after it (engine/mathjax.ts)
+   never part at a line end. */
+.quiz-math-nobr{
+  white-space: nowrap;
+}

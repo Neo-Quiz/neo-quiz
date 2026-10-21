@@ -36,6 +36,9 @@ function hasMath(text: unknown): boolean {
    appel) et fire-and-forget : un re-render régénère le HTML source,
    donc jamais de double traitement. Les zones littérales (code, pre,
    textarea, éléments déjà rendus par MathJax) sont ignorées. */
+/** Punctuation that belongs to the formula before it (see mathifyElement). */
+const GLUED_PUNCTUATION = /^\u00A0?[?!:;,.)\u00BB]+/;
+
 async function mathifyElement(root: HTMLElement | null | undefined): Promise<void> {
 	if (!root) return;
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -84,13 +87,26 @@ async function mathifyElement(root: HTMLElement | null | undefined): Promise<voi
 		while ((m = MATH_SEGMENT.exec(text))) {
 			if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
 			const display = m[1] !== undefined;
+			last = m.index + m[0].length;
+			let rendered: Node;
 			try {
-				frag.appendChild(math.render(display ? m[1] : m[2], display));
+				rendered = math.render(display ? m[1] : m[2], display);
 			} catch (e) {
 				// LaTeX invalide → laisser le texte source tel quel.
-				frag.appendChild(document.createTextNode(m[0]));
+				rendered = document.createTextNode(m[0]);
 			}
-			last = m.index + m[0].length;
+			/* An inline formula and the punctuation stuck to it wrap as one:
+			   a line may break around an inline-block even before a no-break
+			   space, and « $y$ ? » left the « ? » alone on the next line. */
+			const glued = display ? null : GLUED_PUNCTUATION.exec(text.slice(last));
+			if (glued) {
+				const span = document.createElement("span");
+				span.className = "quiz-math-nobr";
+				span.append(rendered, glued[0]);
+				rendered = span;
+				last += glued[0].length;
+			}
+			frag.appendChild(rendered);
 		}
 		if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
 		node.replaceWith(frag);
