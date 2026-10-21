@@ -828,6 +828,19 @@
 	white-space: nowrap;
 }
 
+/* A folder's name wraps to two lines before it is cut, at every width: a
+   tablet showed « XTI306 - Introduction à l'in… » (2026-10-21). */
+.qbd-quizzes-folder-hero .qbd-quizzes-title-text {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	min-width: 0;
+	line-height: 1.15;
+}
+
 /* Trait 7a sous le titre, à l'accent du dossier : les 61 px correspondent
    exactement à l'icône 46 px + gap 15 px. */
 .qbd-quizzes-title-underline {
