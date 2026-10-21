@@ -136,6 +136,16 @@
 	min-height: 40px;
 }
 
+/* A quiz title on a phone wraps to two lines before it is cut: one line ended
+   « Bases de l'apprentissage automati… ». */
+.is-mobile .qbd-fiche-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 /* Terminé, Commencer le quiz and ⋮ stay on one row: the start button takes the
    room the three do not need, the ⋮ keeps its 40 px. */
 .is-mobile .qbd-fiche-actions {
