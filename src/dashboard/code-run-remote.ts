@@ -27,7 +27,7 @@ import type { PairedPeer } from "./remote-generations";
 ══════════════════════════════════════════════════════════ */
 
 /** A request file of another device, not yet validated. */
-export interface IncomingCodeRun { fileDevice: string; fileId: string; raw: unknown }
+export interface IncomingCodeRun { fileDevice: string; fileId: string; raw: unknown; /** Too large, unreadable or not JSON: never a request, but named so it stops taking a reading slot. */ unreadable?: true }
 
 /** The code-run files of the synced folder (apps/windows/src/host/code-run-files.ts). */
 export interface CodeRunFiles {
@@ -35,7 +35,7 @@ export interface CodeRunFiles {
 	deleteOwnRequest(id: string): Promise<void>;
 	/** `results/<device>/<id>.json`, parsed and size-bounded; null when absent or unreadable. Never throws. */
 	readResult(device: string, id: string): Promise<unknown>;
-	/** `requests/<other device>/*.json`, skipping (unread) the files `known` names. Never throws. */
+	/** `requests/<other device>/*.json`, skipping (unread) the files `known` names; a file that cannot be read comes back `unreadable`. Never throws. */
 	readIncoming(known: (fileDevice: string, fileId: string) => boolean): Promise<IncomingCodeRun[]>;
 	writeResult(res: CodeRunResult): Promise<void>;
 	/** Removes this device's request or result files older than `maxAgeMs` (or unreadable). Never throws. */
@@ -44,8 +44,19 @@ export interface CodeRunFiles {
 
 /* ── The PC ── */
 
-export interface PcState { busy: boolean; taken: TakenRun[] | null; refused: Set<string>; lastSweep: number }
-export const newPcState = (): PcState => ({ busy: false, taken: null, refused: new Set(), lastSweep: -Infinity });
+/** `refused`: request files not to read again, by sender + file name, with the time they may be read again
+    (`Infinity`: never). `runs`: the runs of the last hour, for the per-sender limit, kept apart from
+    the 200-entry taken list so that other senders' runs never push a sender's own out of its count. */
+export interface PcState { busy: boolean; taken: TakenRun[] | null; runs: TakenRun[] | null; refused: Map<string, number>; lastSweep: number }
+export const newPcState = (): PcState => ({ busy: false, taken: null, runs: null, refused: new Map(), lastSweep: -Infinity });
+
+/** At most this many refused files are remembered (the oldest are forgotten first). */
+export const MAX_REFUSED = 2_000;
+/** A file unreadable now (still syncing) or a little ahead of our clock is read again after this. */
+export const RETRY_MS = 30_000;
+/** `missing` names the root packages to install: at most this many, each a package name. */
+const MAX_MISSING = 20;
+const PACKAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 export interface PcDeps {
 	device: string;
@@ -75,7 +86,11 @@ async function runBlock(deps: PcDeps, req: CodeRunRequest): Promise<CodeRun> {
 	let run = await deps.run(job);
 	// Missing pinned libraries are installed once, as after a click on the PC, then the block runs once more.
 	if (run.status === "not-installed" && deps.install) {
-		const installed = await deps.install(run.missing ?? []);
+		/* Defence in depth: the main process installs pinned roots only, but a list
+		   longer than any real one, or a name that is not a package name, never leaves here. */
+		const missing = run.missing ?? [];
+		if (missing.length > MAX_MISSING || !missing.every(n => typeof n === "string" && PACKAGE_NAME.test(n))) return { status: "unavailable", stdout: "" };
+		const installed = await deps.install([...missing]);
 		if (installed !== "ok") return { status: "unavailable", stdout: "" };
 		run = await deps.run(job);
 	}
@@ -90,30 +105,50 @@ export async function traiterDemandes(deps: PcDeps): Promise<void> {
 	try {
 		if (st.taken === null) st.taken = (await deps.takenLog.read().catch(() => [])).slice(-MAX_TAKEN);
 		const taken = st.taken;
+		const now0 = deps.now();
+		// The runs of the last hour: seeded from the taken list, then counted apart from it.
+		st.runs = (st.runs ?? taken.map(t => ({ ...t }))).filter(t => !Number.isFinite(t.at) || now0 - t.at < 3600_000);
+		const runs = st.runs;
+		const refuse = (fileDevice: string, fileId: string, until: number): void => {
+			const k = keyOf(fileDevice, fileId);
+			st.refused.delete(k);
+			st.refused.set(k, until);
+			// A Map keeps insertion order: the first keys are the oldest.
+			for (const old of st.refused.keys()) { if (st.refused.size <= MAX_REFUSED) break; st.refused.delete(old); }
+		};
+		const isRefused = (k: string): boolean => {
+			const until = st.refused.get(k);
+			if (until === undefined) return false;
+			if (deps.now() < until) return true;
+			st.refused.delete(k);
+			return false;
+		};
 		if (deps.now() - st.lastSweep >= SWEEP_EVERY_MS) {
 			st.lastSweep = deps.now();
 			await deps.files.sweepOwn("results", RESULT_TTL_MS, deps.now());
 		}
 		const known = (fileDevice: string, fileId: string): boolean =>
-			st.refused.has(keyOf(fileDevice, fileId)) || taken.some(t => keyOf(t.from, t.id) === keyOf(fileDevice, fileId));
+			isRefused(keyOf(fileDevice, fileId)) || taken.some(t => keyOf(t.from, t.id) === keyOf(fileDevice, fileId));
 		for (const f of await deps.files.readIncoming(known)) {
+			if (f.unreadable) { refuse(f.fileDevice, f.fileId, deps.now() + RETRY_MS); continue; }
 			const verdict = validerDemandeCode(f.raw, { device: deps.device, fileDevice: f.fileDevice, fileId: f.fileId, now: deps.now() });
 			if (!verdict.ok) {
-				// Never read again (a clock a little ahead may still become valid: not remembered).
-				if (verdict.raison !== "futur") st.refused.add(keyOf(f.fileDevice, f.fileId));
+				// Never read again; a clock a little ahead may still become valid: read again later.
+				refuse(f.fileDevice, f.fileId, verdict.raison === "futur" ? deps.now() + RETRY_MS : Infinity);
 				if (verdict.raison !== "age") console.warn(`${LOG_PREFIX} code run request refused (${verdict.raison}):`, f.fileDevice, f.fileId);
 				continue;
 			}
 			const req = verdict.demande;
-			const admission = admettre(req, { taken, busy: false }, deps.now());
+			const admission = admettre(req, { taken, busy: false, runs }, deps.now());
 			if (admission === "known") continue;
 			if (admission === "rate") {
-				st.refused.add(keyOf(req.from, req.id));
+				refuse(req.from, req.id, Infinity);
 				await deps.files.writeResult(construireResultat(req.id, { status: "unavailable", stdout: "" }, deps.now())).catch(() => {});
 				continue;
 			}
 			// Taken BEFORE the run: a crash mid-run never runs it a second time.
 			taken.push({ id: req.id, from: req.from, at: deps.now() });
+			runs.push({ id: req.id, from: req.from, at: deps.now() });
 			if (taken.length > MAX_TAKEN) taken.splice(0, taken.length - MAX_TAKEN);
 			await deps.takenLog.write([...taken]).catch(e => console.warn(`${LOG_PREFIX} code run taken list not saved:`, e));
 			let run: CodeRun;

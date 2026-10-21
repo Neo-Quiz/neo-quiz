@@ -75,14 +75,14 @@ export function validerDemandeCode(raw: unknown, ctx: { device: string; fileDevi
 
 export interface TakenRun { id: string; from: string; at: number }
 
-/** Whether the PC runs this request now. Keyed on sender + id (two senders drawing the same id never collide); the limit is per sender. */
-export function admettre(req: Pick<CodeRunRequest, "id" | "from">, st: { taken: ReadonlyArray<TakenRun>; busy: boolean }, now: number): "run" | "known" | "busy" | "rate" {
+/** Whether the PC runs this request now. Keyed on sender + id (two senders drawing the same id never collide); the limit is per sender, counted on `runs` (the runs of the last hour, kept apart from the capped taken list; the taken list when absent). */
+export function admettre(req: Pick<CodeRunRequest, "id" | "from">, st: { taken: ReadonlyArray<TakenRun>; busy: boolean; runs?: ReadonlyArray<TakenRun> }, now: number): "run" | "known" | "busy" | "rate" {
 	const key = (e: { id: string; from: string }): string => e.from.toLowerCase() + "/" + e.id;
 	if (st.taken.some(t => key(t) === key(req))) return "known";
 	if (st.busy) return "busy";
 	if (!Number.isFinite(now)) return "rate";
 	// A taken entry with a corrupt time counts as recent: never a way around the limit.
-	const recent = st.taken.filter(t => sameDevice(t.from, req.from) && (!Number.isFinite(t.at) || now - t.at < 3600_000));
+	const recent = (st.runs ?? st.taken).filter(t => sameDevice(t.from, req.from) && (!Number.isFinite(t.at) || now - t.at < 3600_000));
 	return recent.length >= MAX_PER_HOUR ? "rate" : "run";
 }
 

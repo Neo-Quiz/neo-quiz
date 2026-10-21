@@ -244,8 +244,72 @@ await withSrcModule(
 			w.fs.files.set(`${BASE}/results/${PC}/old-00001.json`, JSON.stringify({ v: 1, id: "old-00001", at: NOW - 11 * 60_000, status: "ok", stdout: "" }));
 			w.fs.files.set(`${BASE}/results/${PC}/new-00001.json`, JSON.stringify({ v: 1, id: "new-00001", at: NOW - 60_000, status: "ok", stdout: "" }));
 			w.fs.files.set(`${BASE}/results/${PH}/old-00002.json`, JSON.stringify({ v: 1, id: "old-00002", at: NOW - 60 * 60_000, status: "ok", stdout: "" }));
+			// Temp files left by an interrupted write: judged by the same age.
+			w.fs.files.set(`${BASE}/results/${PC}/old-00003.json.tmp`, JSON.stringify({ v: 1, id: "old-00003", at: NOW - 11 * 60_000, status: "ok", stdout: "" }));
+			w.fs.files.set(`${BASE}/results/${PC}/torn-0001.json.tmp`, "{ torn");
+			w.fs.files.set(`${BASE}/results/${PC}/new-00002.json.tmp`, JSON.stringify({ v: 1, id: "new-00002", at: NOW - 60_000, status: "ok", stdout: "" }));
 			await w.pass();
-			r.check("PC: its results older than 10 min go, fresh ones and other devices' stay", [...w.fs.files.keys()].filter(k => k.includes("/results/")).sort(), [`${BASE}/results/${PC}/new-00001.json`, `${BASE}/results/${PH}/old-00002.json`]);
+			r.check("PC: its results (and temp files) older than 10 min go, fresh ones and other devices' stay", [...w.fs.files.keys()].filter(k => k.includes("/results/")).sort(), [`${BASE}/results/${PC}/new-00001.json`, `${BASE}/results/${PC}/new-00002.json.tmp`, `${BASE}/results/${PH}/old-00002.json`]);
+		}
+		{
+			// 50 junk files sorted first (torn, oversized, not an object) must not hide a real request behind the 20-file window.
+			const w = pcWorld();
+			for (let i = 0; i < 50; i++) {
+				const body = i % 3 === 0 ? "{ torn" : i % 3 === 1 ? "x".repeat(20_000) : "[1,2,3]";
+				w.fs.files.set(`${BASE}/requests/${PH}/0-junk-${String(i).padStart(2, "0")}.json`, body);
+			}
+			await w.send();
+			for (let i = 0; i < 4; i++) await w.pass();
+			r.check("PC: 50 junk files then a valid request -> the valid one runs", [w.runs.length, w.result("lq3k2-abc123")?.status], [1, "ok"]);
+			const reads = w.fs.reads.length;
+			await w.pass();
+			r.check("PC: junk is not read again on the next pass", w.fs.reads.length, reads);
+			w.now += 31_000;
+			for (let i = 0; i < 4; i++) await w.pass();
+			r.check("PC: unreadable files are read again after a while, and the run is never repeated", [w.fs.reads.length > reads, w.runs.length], [true, 1]);
+		}
+		{
+			// The refused memory is bounded: the oldest entries go first.
+			const w = pcWorld();
+			for (let i = 0; i < R.MAX_REFUSED; i++) w.state.refused.set("seed/" + i, Infinity);
+			w.fs.files.set(`${BASE}/requests/${PH}/bad-00001.json`, JSON.stringify({ v: 1 }));
+			await w.pass();
+			r.check("PC: refused memory capped, oldest forgotten, newest kept", [w.state.refused.size, w.state.refused.has("seed/0"), w.state.refused.has(PH.toLowerCase() + "/bad-00001")], [R.MAX_REFUSED, false, true]);
+		}
+		{
+			// Many senders fill the 200-entry taken list: a sender's own runs still count against its hourly limit.
+			const w = pcWorld();
+			const ownReq = (dev) => [...w.fs.files.keys()].filter(k => k.includes(`/requests/${dev}/`));
+			for (let i = 0; i < 20; i++) await w.send({ id: `ph-${String(i).padStart(2, "0")}-run` });
+			await w.pass();
+			for (const k of ownReq(PH)) w.fs.files.delete(k);
+			for (let s = 0; s < 10; s++) {
+				const dev = `44444444-4444-4444-8444-4444444444${String(s).padStart(2, "0")}`;
+				for (let i = 0; i < 20; i++) await w.send({ id: `s${s}-${String(i).padStart(2, "0")}-run` }, dev);
+				await w.pass();
+				for (const k of ownReq(dev)) w.fs.files.delete(k);
+			}
+			r.check("PC: 220 runs from 11 senders, the taken list holds 200", [w.runs.length, w.taken.length, w.taken.some(t => t.from === PH)], [220, 200, false]);
+			await w.send({ id: "ph-20-run" });
+			await w.pass();
+			r.check("PC: ... and the 21st run of the first sender in the hour is still refused", [w.runs.length, w.result("ph-20-run")?.status], [220, "unavailable"]);
+			r.check("admission: counted on the runs of the hour when given", Q.admettre({ id: "new-1234", from: PH }, { taken: [], busy: false, runs: twenty }, NOW), "rate");
+		}
+		{
+			// `missing` from a run is bounded before any install is asked.
+			for (const [n, missing] of [["21 names", Array.from({ length: 21 }, (_, i) => "pkg" + i)], ["a path", ["../evil"]], ["a space", ["a b"]], ["not a string", [3]]]) {
+				const w = pcWorld();
+				w.runImpl = async () => ({ status: "not-installed", stdout: "", missing });
+				await w.send();
+				await w.pass();
+				r.check("PC: install never asked for missing = " + n, [w.installs.length, w.result("lq3k2-abc123")?.status], [0, "unavailable"]);
+			}
+			const w = pcWorld();
+			let k = 0;
+			w.runImpl = async () => (++k === 1 ? { status: "not-installed", stdout: "", missing: ["scikit-learn", "typing_extensions"] } : { status: "ok", stdout: "" });
+			await w.send();
+			await w.pass();
+			r.check("PC: real package names pass", w.installs, [["scikit-learn", "typing_extensions"]]);
 		}
 
 		/* ── 4. The phone ── */

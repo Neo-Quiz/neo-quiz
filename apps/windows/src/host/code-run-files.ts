@@ -94,23 +94,30 @@ export function createCodeRunFiles(deps: CodeRunFilesDeps): CodeRunFiles {
 			const ids = names.filter(n => n.endsWith(".json") && !isConflictCopy(n)).map(n => n.slice(0, -5)).filter(id => SLUG.test(id) && !known(s.name, id)).sort();
 			for (const id of ids.slice(0, MAX_REQUEST_FILES)) {
 				const raw = await readJson(`${reqDir}/${s.name}/${id}.json`, MAX_REQUEST_CHARS);
-				if (raw === null) { console.warn(`${LOG_PREFIX} code run request unreadable or too large, ignored:`, s.name, id); continue; }
+				// Named all the same: the caller remembers it, so it stops taking one of the 20 slots of every pass.
+				if (raw === null) { console.warn(`${LOG_PREFIX} code run request unreadable or too large, ignored:`, s.name, id); out.push({ fileDevice: s.name, fileId: id, raw: null, unreadable: true }); continue; }
 				out.push({ fileDevice: s.name, fileId: id, raw });
 			}
 		}
 		return out;
 	}
 
+	/* Each file is judged and removed inside the write queue: a temp file being
+	   written right now is never read half-written, nor removed under its rename.
+	   A `.json.tmp` left by an interrupted write carries the same body: judged alike. */
 	async function sweepOwn(kind: "requests" | "results", maxAgeMs: number, now: number): Promise<void> {
 		const dir = own(kind);
 		let names: string[];
 		try { names = (await fs.list(dir)).map(baseName); } catch { return; }
 		for (const n of names) {
-			if (!n.endsWith(".json")) continue;
-			const raw = await readJson(`${dir}/${n}`, kind === "requests" ? MAX_REQUEST_CHARS : MAX_RESULT_CHARS);
-			const at = raw && typeof raw === "object" ? (raw as { at?: unknown }).at : undefined;
-			if (typeof at === "number" && Number.isFinite(at) && now - at <= maxAgeMs) continue;
-			await enqueue(() => fs.remove(`${dir}/${n}`)).catch(() => {});
+			if (!n.endsWith(".json") && !n.endsWith(".json.tmp")) continue;
+			await enqueue(async () => {
+				if (!(await fs.exists(`${dir}/${n}`))) return;
+				const raw = await readJson(`${dir}/${n}`, kind === "requests" ? MAX_REQUEST_CHARS : MAX_RESULT_CHARS);
+				const at = raw && typeof raw === "object" ? (raw as { at?: unknown }).at : undefined;
+				if (typeof at === "number" && Number.isFinite(at) && now - at <= maxAgeMs) return;
+				await fs.remove(`${dir}/${n}`);
+			}).catch(() => {});
 		}
 	}
 
