@@ -94,6 +94,11 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				return { texte: t("engine.code.notInstalled"), erreur: false, panne: true };
 			case "unavailable":
 			default:
+				/* The phone's Python runs on the PC (dashboard/code-run-remote.ts):
+				   these three codes say why it did not. */
+				if (resultat.error === "no-pc") return { texte: t("engine.code.noPc"), erreur: false, panne: true };
+				if (resultat.error === "pc-silent") return { texte: t("engine.code.pcSilent"), erreur: false, panne: true };
+				if (resultat.error === "changed") return { texte: t("engine.code.quizChanged"), erreur: false, panne: true };
 				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
 	}
@@ -121,10 +126,14 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		btn.classList.add("quiz-code-run-running");
 		sortie.hidden = false;
 		sortie.classList.remove("quiz-code-output-error", "quiz-code-output-panne");
-		sortie.textContent = t("engine.code.running");
+		const enCours = language === "python" && ctx.host.platform?.isMobile ? t("engine.code.runningOnPc") : t("engine.code.running");
+		sortie.textContent = enCours;
 
 		try {
-			const job = { language, code: source, stdin: "", timeoutMs: language === "python" ? TIMEOUT_PYTHON_MS : TIMEOUT_MS };
+			/* Python names its note: on the phone, the PC reads the block there itself. */
+			const job = language === "python"
+				? { language, code: source, stdin: "", timeoutMs: TIMEOUT_PYTHON_MS, sourcePath: ctx.sourcePath }
+				: { language, code: source, stdin: "", timeoutMs: TIMEOUT_MS };
 			let resultat = await code.run(job);
 			/* THE LANGUAGE IS DOWNLOADED ON FIRST USE (task 10): C and C++
 			   answer `not-installed` until their pack is there. With a host
@@ -145,7 +154,7 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 					return;
 				}
 				sortie.classList.remove("quiz-code-output-panne");
-				sortie.textContent = t("engine.code.running");
+				sortie.textContent = enCours;
 				resultat = await code.run(job);
 			}
 			const { texte, erreur, panne } = texteResultat(resultat);

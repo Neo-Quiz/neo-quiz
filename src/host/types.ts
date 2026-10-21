@@ -1008,6 +1008,10 @@ export interface CodeJob {
 	stdin: string;
 	after?: string;
 	timeoutMs: number;
+	/** The note the block is shown from (a contract path), set by the engine
+	    for Python: the phone sends it to the PC, which reads the block there
+	    itself (dashboard/code-run-remote.ts). Never read by the PC's own run. */
+	sourcePath?: string;
 }
 /** What the sandbox returns, never more than these fields. `compile-error`:
     the compiler refused the program; `error` carries its message.

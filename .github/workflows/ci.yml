@@ -82,6 +82,11 @@ jobs:
       # sous `.quiz-code-output`, seulement comme texte (`textContent`).
       - name: Python run button output never interpreted
         run: npm run check:code-run
+      # Python from the phone runs on the PC: a synced request names a note and
+      # the SHA-256 of one of its blocks; the PC runs only a block of that note
+      # whose hash matches, once, from a paired sender, never late.
+      - name: Python from the phone runs on the PC
+        run: npm run check:code-run-remote
       - name: AI work view renders text only
         run: npm run check:work-view
 

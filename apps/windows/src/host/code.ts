@@ -8,10 +8,12 @@
    rejects (window closed mid-call) becomes `unavailable`, never an
    exception on the card. All languages are offered before their pack is
    installed: ▶ then downloads it through `installer` — `"python"` for
-   Python, one pack, `"c"`, for both C and C++.
+   Python, one pack, `"c"`, for both C and C++. On the phone, Python never
+   reaches the bridge: it goes to the owner's PC (`brancherExecutionSurPc`).
 ══════════════════════════════════════════════════════════ */
 
-import type { HostCode, CodeRun } from "../../../../src/host/types";
+import type { HostCode, CodeJob, CodeRun } from "../../../../src/host/types";
+import { estMobile } from "./platform";
 import type { CodeLanguage } from "../../../../src/code-languages";
 import type { Pont } from "../../electron/pont";
 
@@ -41,6 +43,14 @@ export async function reglerLangageActif(langue: CodeLanguage, actif: boolean): 
 	desactives = suivant;
 }
 
+/* The phone's Python runner, set once the synced folder is there (main.ts). */
+let surPc: ((job: CodeJob) => Promise<CodeRun>) | null = null;
+
+/** Phone: where Python runs go (`executerSurPc` bound to this device's files). */
+export function brancherExecutionSurPc(run: (job: CodeJob) => Promise<CodeRun>): void {
+	surPc = run;
+}
+
 export function createWindowsCode(pont: () => Pont): HostCode {
 	pontCourant = pont;
 	desactives = [];
@@ -49,9 +59,13 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 	}).catch(() => undefined);
 	return {
 		languages: () => (["python", "c", "cpp"] as const).filter(langageActif),
-		run: job => langageActif(job.language)
-			? pont().code.run(job).catch((): CodeRun => ({ status: "unavailable", stdout: "" }))
-			: Promise.resolve<CodeRun>({ status: "unavailable", stdout: "" }),
+		run: job => {
+			if (!langageActif(job.language)) return Promise.resolve<CodeRun>({ status: "unavailable", stdout: "" });
+			/* The phone never runs Python: the run goes to the owner's PC
+			   (dashboard/code-run-remote.ts). C and C++ stay in the local sandbox. */
+			if (job.language === "python" && estMobile()) return surPc ? surPc(job) : Promise.resolve<CodeRun>({ status: "unavailable", stdout: "", error: "no-pc" });
+			return pont().code.run(job).catch((): CodeRun => ({ status: "unavailable", stdout: "" }));
+		},
 		avertissement: {
 			masque: async cle => {
 				const v = await pont().reglages.lire(CLE_AVERTISSEMENT_PYTHON);
@@ -64,7 +78,7 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 				await pont().reglages.ecrire(CLE_AVERTISSEMENT_PYTHON, liste.slice(-MAX_AVERTISSEMENTS));
 			},
 		},
-		warm: language => { if (!langageActif(language)) return; void pont().code.warm(language).catch(() => undefined); },
+		warm: language => { if (!langageActif(language) || (language === "python" && estMobile())) return; void pont().code.warm(language).catch(() => undefined); },
 		/* Python: `paquets` names the root libraries to download (`[]` = the
 		   interpreter alone). Mapping of the installer's codes: reseau -> "offline",
 		   empreinte -> "refused", anything else (disk, bad name) -> "failed".

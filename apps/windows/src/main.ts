@@ -31,6 +31,11 @@ import type { StatsStore } from "../../../src/dashboard/stats-store";
 import { creerJournalApp } from "./review/store";
 import { loadSharedState, sharedState } from "./host/shared-state";
 import { createChatFiles } from "./host/chat-files";
+import { createCodeRunFiles } from "./host/code-run-files";
+import { brancherExecutionSurPc } from "./host/code";
+import { choosePc, executerSurPc, newPcState, traiterDemandes } from "../../../src/dashboard/code-run-remote";
+import { RESULT_TTL_MS, lireTaken } from "../../../src/shared-state/code-run-request";
+import { chosenPc, getDevices, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver } from "../../../src/dashboard/remote-generations";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
 import { onQueueCreated } from "../../../src/dashboard/file-generation-app";
 import { createDevicePublisher } from "../../../src/dashboard/device-publisher";
@@ -38,7 +43,7 @@ import { demarrerMajCliAuto } from "../../../src/dashboard/cli-updates";
 import { checkClaudeCode, claudeModelsOffered, getProvider } from "../../../src/dashboard/ai-providers";
 import { MAX_TAKEN, createRemoteRunner } from "../../../src/dashboard/remote-runner";
 import type { TakenLogEntry } from "../../../src/dashboard/remote-runner";
-import { addFailedRequest } from "../../../src/dashboard/chat-requests";
+import { addFailedRequest, newRequestId } from "../../../src/dashboard/chat-requests";
 import { getChats, setChats } from "../../../src/dashboard/chat-store";
 import { chatDevice } from "../../../src/dashboard/chat-session";
 import { enregistrerQuiz } from "../../../src/dashboard/generation-demande";
@@ -657,6 +662,55 @@ async function demarrer(): Promise<void> {
 		} catch (e) {
 			console.warn(LOG_PREFIX, "chat sync not started:", e);
 		}
+		/* PYTHON FROM THE PHONE (dashboard/code-run-remote.ts): the phone never
+		   runs Python, it asks the owner's PC through the synced folder; the PC
+		   looks for requests every 2 s while the app runs (tray included) and as
+		   soon as Syncthing delivers files. */
+		const codeRunFiles = createCodeRunFiles({ fs: currentHost().fs, rootId: racineChats.id, deviceId: idAppareil });
+		let codeRunScan: (() => void) | null = null;
+		let stopCodeRuns: (() => void) | null = null;
+		if (estMobile()) {
+			void codeRunFiles.sweepOwn("requests", RESULT_TTL_MS, Date.now());
+			brancherExecutionSurPc(job => executerSurPc(job, {
+				device: idAppareil,
+				rootId: racineChats.id,
+				now: () => Date.now(),
+				sleep: ms => new Promise(r => setTimeout(r, ms)),
+				newId: newRequestId,
+				files: codeRunFiles,
+				pc: () => choosePc({ files: getRemoteGenerations(), now: Date.now(), lastEver: lastPcEver(), chosen: chosenPc(), devices: getDevices(), peers: getPairedPeers(), peerConnected: getPeerConnected() }),
+			}));
+		} else {
+			const etatCode = newPcState();
+			codeRunScan = () => {
+				void traiterDemandes({
+					device: idAppareil,
+					now: () => Date.now(),
+					files: codeRunFiles,
+					readNote: async rel => {
+						const path = absoluteInRoot(rel, racineChats.id);
+						if (!path) return null;
+						try {
+							// Size first: the note is a synced file another device may have made huge.
+							const size = await currentHost().fs.size(path);
+							if (size === null || size > 4_000_000) return null;
+							return await currentHost().fs.readBounded(path, 4_000_000);
+						} catch { return null; }
+					},
+					run: job => currentHost().code?.run(job) ?? Promise.resolve({ status: "unavailable", stdout: "" }),
+					install: missing => currentHost().code?.installer?.("python", () => {}, missing) ?? Promise.resolve("failed"),
+					takenLog: {
+						read: async () => lireTaken(await lireReglage<unknown>("codeRunsTaken")),
+						write: list => ecrireReglage("codeRunsTaken", list),
+					},
+					state: etatCode,
+				});
+			};
+			const minuterie = setInterval(codeRunScan, 2_000);
+			const desabonner = pont().sync?.surDonneesRecues(() => codeRunScan?.());
+			stopCodeRuns = () => { clearInterval(minuterie); desabonner?.(); codeRunScan = null; };
+			codeRunScan();
+		}
 		/* What this PC generates is published for the other devices as soon as the
 		   queue exists (it appears with the shell). Idle: no timer, no write. */
 		let stopGenerations: (() => void) | null = null;
@@ -901,6 +955,7 @@ async function demarrer(): Promise<void> {
 			// Closing cleanly: the file goes, so no other device waits for a dead PC.
 			stopGenerations?.();
 			stopRemote?.();
+			stopCodeRuns?.();
 			await chatFiles.clearGenerations().catch(() => {});
 			// Attendue : la fenêtre ne se ferme qu'une fois la session écrite.
 			await sessions.vider();

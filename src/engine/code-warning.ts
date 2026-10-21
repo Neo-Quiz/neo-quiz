@@ -1,6 +1,7 @@
 import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { EngineCtx } from "../types/engine-ctx";
+import { sha256Hex } from "../code-blocks";
 
 /* ══════════════════════════════════════════════════════════
    THE WARNING BEFORE A PYTHON RUN. Python runs natively on the PC, with
@@ -13,11 +14,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 
 /** `<sourcePath>#<sha256 hex of the code>`, through Web Crypto (no Node). */
 export async function cleAvertissement(sourcePath: string, code: string): Promise<string> {
-	const octets = new TextEncoder().encode(code);
-	const condense = new Uint8Array(await crypto.subtle.digest("SHA-256", octets));
-	let hex = "";
-	for (const b of condense) hex += b.toString(16).padStart(2, "0");
-	return `${sourcePath}#${hex}`;
+	return `${sourcePath}#${await sha256Hex(code)}`;
 }
 
 /** Resolves `true` when the run may go ahead: already dismissed for this key,

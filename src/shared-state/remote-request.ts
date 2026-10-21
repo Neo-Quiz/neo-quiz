@@ -56,17 +56,25 @@ const sameDevice = (a: string, b: string): boolean => a.toLowerCase() === b.toLo
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const invalid: Verdict = { ok: false, reason: "invalid" };
 
-function documentOk(d: unknown): d is { path: string } {
-	if (!isObj(d) || Object.keys(d).length !== 1 || typeof d.path !== "string") return false;
-	const p = d.path;
-	if (!isCleanRelativePath(p) || FORBIDDEN_IN_PATH.test(p) || !DOCUMENT_EXTENSION.test(p)) return false;
+/** Whether `p` is a relative document path a synced request may name: clean and
+    relative, NFC, ending in `extension` (never a global regex), no Windows trick
+    (a trailing dot or space, a device name, an 8.3 short name, a stream or a
+    drive), not a bare extension, never under the internal `.neo-quiz/` folder.
+    Shared by every synced request that names a note (generation documents,
+    code runs): one set of path rules. */
+export function isSafeDocumentPath(p: string, extension: RegExp = DOCUMENT_EXTENSION): boolean {
+	if (!isCleanRelativePath(p) || FORBIDDEN_IN_PATH.test(p) || !extension.test(p)) return false;
 	if (p.normalize("NFC") !== p) return false;
 	const segments = p.split("/");
 	// A segment ending in a dot or a space is read by Windows as another name (`x.md.` opens `x.md`).
 	if (segments.some(s => /[. ]$/.test(s) || DEVICE_NAME.test(s.split(".")[0].replace(/ +$/, "")) || SHORT_NAME.test(s))) return false;
 	// An extension with no name before it (`.md`) is a hidden file, not a document.
-	if (segments[segments.length - 1].replace(DOCUMENT_EXTENSION, "") === "") return false;
+	if (segments[segments.length - 1].replace(extension, "") === "") return false;
 	return segments[0].toLowerCase() !== ".neo-quiz";
+}
+
+function documentOk(d: unknown): d is { path: string } {
+	return isObj(d) && Object.keys(d).length === 1 && typeof d.path === "string" && isSafeDocumentPath(d.path);
 }
 
 /** A dense array of at most `max` items, each passing `ok` (holes and huge arrays refused). */
