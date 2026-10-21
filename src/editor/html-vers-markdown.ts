@@ -383,7 +383,10 @@ function attributsCanon(el: Element, nom: string): string {
 function canon(noeuds: Noeud[], pre: boolean): string {
 	let s = "";
 	for (const n of noeuds) {
-		if (n.type === "texte") { s += echapperCanon(pre ? n.valeur : blancs(n.valeur)); continue; }
+		/* A no-break space reads as a space: the renderer itself puts one before
+		   ? ! : ; and around « » (sanitizer.ts), so a plain space in the HTML and
+		   the rendered markdown are the same text. */
+		if (n.type === "texte") { s += echapperCanon(pre ? n.valeur : blancs(n.valeur.replace(/\u00A0/g, " "))); continue; }
 		const nom = nomCanon(n.nom);
 		// Enveloppes sans rendu propre (le rendu écrit toujours `thead`/`tbody`,
 		// une source peut les omettre : la ligne `th` dit l'en-tête).
