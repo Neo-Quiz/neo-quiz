@@ -13,6 +13,17 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Python blocks run in a real Python on your PC: fast, with every course library (such as PyTorch), downloaded the first time you need it.
+- A warning appears before each run, with "Don't show again for this quiz".
+- On the phone, Python blocks run on your PC.
+- Settings list the Python libraries with their size and let you uninstall them.
+
+### Changed
+
+- "Run online" is gone for Python blocks.
+
 ## [1.21.26] - 2026-10-21
 
 ### Fixed
