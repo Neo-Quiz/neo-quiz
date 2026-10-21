@@ -8,8 +8,18 @@
    pin (or a pin taken on a bad file) still cannot write outside its folder
    or fill the disk. `src/dashboard/zip.ts`'s reader is the renderer's
    (async `DecompressionStream`, share archives, skips what it cannot
-   read); this one is synchronous Node `zlib`, and refuses the WHOLE
-   archive at the first doubt: an install is all or nothing.
+   read); this one is Node `zlib`, and refuses the WHOLE archive at the
+   first doubt: an install is all or nothing.
+
+   TWO WAYS IN. `extraireZip` is the installer's: it validates the whole
+   central directory and every name against the destination first, then
+   inflates and writes ONE entry at a time, yielding to the event loop
+   between entries, so a torch wheel (about 124 MB compressed, 400 MB
+   inflated) costs the input plus one entry, never the whole archive in
+   memory, and never blocks the main process for seconds. `lireZip` +
+   `ecrireSous` hold every entry at once: small archives and the check.
+   Both share the same parsing (`analyserZip`) and the same inflate
+   (`inflerFiche`).
 
    THE CENTRAL DIRECTORY IS THE TRUTH. Names, sizes, CRCs and methods are
    read from it; a local header is only used to find where the data starts,
@@ -28,18 +38,26 @@
      another name or a device: `: * ? " < > |`, a control character, a
      segment ending in a dot or a space (Windows drops them, so `a./x` is
      `a/x`), a device name (`con.py`, `aux`, `nul.txt`), a non-ASCII name
-     without the UTF-8 flag (a code page we would have to guess), bad UTF-8;
+     without the UTF-8 flag (a code page we would have to guess), bad UTF-8,
+     a symbolic link (Unix mode `0xA000` in the external attributes: its
+     content would be written as a plain file, never followed, but no wheel
+     or interpreter zip carries one, so it is refused rather than reshaped);
    - "bombe": more entries than `maxEntrees`, a declared total over
      `maxOctets`, an entry whose inflated/compressed ratio exceeds
-     `maxRatio`, entries whose data overlap (one stream counted many times);
+     `maxRatio`, entries whose data overlap (one stream counted many times).
+     The ratio bound is PER ENTRY, with no size threshold: native libraries
+     padded with zeros do exist in real wheels, so a caller chooses
+     `maxRatio` knowing that a legitimate entry can compress far better than
+     source code, and lets `maxOctets` carry the real bound on disk use;
    - "doublon": two names the case-insensitive Windows filesystem sees as
      one file, or a file that is also a folder (`a` and `a/b`).
    Directory entries (`pkg/`) are checked like the rest, then dropped: the
-   folders are created by `ecrireSous` from the file names.
+   folders are created from the file names.
    ══════════════════════════════════════════════════════════ */
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
+import { setImmediate as tour } from "node:timers/promises";
 import { crc32, inflateRawSync } from "node:zlib";
 import { isReservedName } from "../../../../src/dashboard/share-names";
 import { nomEntreeAdmis } from "../langages";
@@ -118,6 +136,8 @@ const abime = (message: string): ErreurZip => new ErreurZip("abime", message);
 interface Fiche {
 	nom: string; nomOctets: Uint8Array; dossier: boolean;
 	methode: number; crc: number; compresse: number; decompresse: number; local: number;
+	/** Where the entry's data starts and ends, set from its local header. */
+	donnees: number; finDonnees: number;
 }
 
 /** Reads the name bytes of a central record: UTF-8 under flag 11, plain
@@ -131,13 +151,11 @@ function lireNom(octets: Uint8Array, drapeaux: number): string {
 	}
 }
 
-/**
- * Reads every file entry of `octets`, in central-directory order, each one
- * inflated and checked against its declared size and CRC-32. Throws
- * `ErreurZip` (see the header for each code); never returns part of an
- * archive.
- */
-export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
+/** Every check that needs no inflate: the end record, each central record,
+    every name, duplicates, the bounds on the declared sizes, the local
+    headers and overlaps. Returns the records, directories included, in
+    central-directory order, each with its data range. */
+function analyserZip(octets: Uint8Array, bornes: BornesZip): Fiche[] {
 	for (const [cleBorne, v] of Object.entries(bornes)) {
 		if (typeof v !== "number" || !Number.isFinite(v) || v < 0) throw new Error("invalid zip bound " + cleBorne + ": " + String(v));
 	}
@@ -176,6 +194,7 @@ export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
 		const longueurExtra = vue.getUint16(p + 30, true);
 		const longueurCommentaire = vue.getUint16(p + 32, true);
 		const disqueDebut = vue.getUint16(p + 34, true);
+		const attributs = vue.getUint32(p + 38, true);
 		const local = vue.getUint32(p + 42, true);
 		const suivant = p + TAILLE_CENTRAL + longueurNom + longueurExtra + longueurCommentaire;
 		if (suivant > fin) throw abime("central directory record " + i + " runs past the directory");
@@ -188,7 +207,8 @@ export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
 		const dossier = brut.endsWith("/");
 		const nom = dossier ? brut.slice(0, -1) : brut;
 		if (nomAdmis(nom) === null) throw new ErreurZip("nom", "unsafe entry name: " + JSON.stringify(brut));
-		fiches.push({ nom, nomOctets, dossier, methode, crc, compresse, decompresse, local });
+		if (((attributs >>> 16) & 0xf000) === 0xa000) throw new ErreurZip("nom", "symbolic link entry: " + JSON.stringify(brut));
+		fiches.push({ nom, nomOctets, dossier, methode, crc, compresse, decompresse, local, donnees: 0, finDonnees: 0 });
 		p = suivant;
 	}
 	if (p !== fin) throw abime("bytes between the central directory and its end record");
@@ -207,7 +227,7 @@ export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
 	}
 
 	/* Local headers: where each entry's data lies; no two may overlap. */
-	const plages = fiches.map((f) => {
+	for (const f of fiches) {
 		if (f.local + TAILLE_LOCAL > debutCentral || vue.getUint32(f.local, true) !== SIG_LOCAL) throw abime("local header of " + JSON.stringify(f.nom) + " is missing");
 		if (vue.getUint16(f.local + 8, true) !== f.methode) throw abime("local header of " + JSON.stringify(f.nom) + " names another method");
 		const longueurNom = vue.getUint16(f.local + 26, true);
@@ -216,32 +236,97 @@ export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
 		if (nomLocal.length !== f.nomOctets.length || nomLocal.some((b, i) => b !== f.nomOctets[i])) throw abime("local header of " + JSON.stringify(f.nom) + " names another file");
 		const finDonnees = debut + f.compresse;
 		if (finDonnees > debutCentral) throw abime("data of " + JSON.stringify(f.nom) + " runs into the central directory");
-		return { debut: f.local, fin: finDonnees, donnees: debut };
-	});
-	const triees = [...plages].sort((a, b) => a.debut - b.debut);
-	for (let i = 1; i < triees.length; i++) {
-		if (triees[i].debut < triees[i - 1].fin) throw new ErreurZip("bombe", "two entries share their data");
+		f.donnees = debut;
+		f.finDonnees = finDonnees;
 	}
+	const triees = [...fiches].sort((a, b) => a.local - b.local);
+	for (let i = 1; i < triees.length; i++) {
+		if (triees[i].local < triees[i - 1].finDonnees) throw new ErreurZip("bombe", "two entries share their data");
+	}
+	return fiches;
+}
 
-	/* Inflate, capped at the declared size + 1: longer or shorter is a lie. */
+/** One entry's content, inflated capped at the declared size + 1 (longer
+    or shorter is a lie), then its CRC-32 checked. A stored entry is a view
+    of `octets`; `lireZip` copies it out so its result never pins the
+    whole archive. */
+function inflerFiche(octets: Uint8Array, f: Fiche): Uint8Array {
+	const brut = octets.subarray(f.donnees, f.finDonnees);
+	let contenu: Uint8Array;
+	if (f.methode === 0) contenu = brut;
+	else {
+		try {
+			contenu = inflateRawSync(brut, { maxOutputLength: f.decompresse + 1 });
+		} catch {
+			throw abime("entry " + JSON.stringify(f.nom) + " does not inflate to its declared size");
+		}
+	}
+	if (contenu.length !== f.decompresse) throw abime("entry " + JSON.stringify(f.nom) + " does not inflate to its declared size");
+	if ((crc32(contenu) >>> 0) !== f.crc) throw abime("entry " + JSON.stringify(f.nom) + " has a wrong CRC-32");
+	return contenu;
+}
+
+/**
+ * Reads every file entry of `octets`, in central-directory order, each one
+ * inflated and checked against its declared size and CRC-32. Throws
+ * `ErreurZip` (see the header for each code); never returns part of an
+ * archive. Holds every entry at once: for a large archive, `extraireZip`.
+ */
+export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
+	const fiches = analyserZip(octets, bornes);
+	/* Directories are inflated too: their CRC and size are checked like the rest. */
+	const contenus = fiches.map((f) => inflerFiche(octets, f));
 	const entrees: EntreeZip[] = [];
 	fiches.forEach((f, i) => {
-		const brut = octets.subarray(plages[i].donnees, plages[i].fin);
-		let contenu: Uint8Array;
-		if (f.methode === 0) contenu = brut;
-		else {
-			try {
-				contenu = inflateRawSync(brut, { maxOutputLength: f.decompresse + 1 });
-			} catch {
-				throw abime("entry " + JSON.stringify(f.nom) + " does not inflate to its declared size");
-			}
-		}
-		if (contenu.length !== f.decompresse) throw abime("entry " + JSON.stringify(f.nom) + " does not inflate to its declared size");
-		if ((crc32(contenu) >>> 0) !== f.crc) throw abime("entry " + JSON.stringify(f.nom) + " has a wrong CRC-32");
-		/* A stored entry is copied out so the result never pins the whole archive. */
-		if (!f.dossier) entrees.push({ nom: f.nom, octets: f.methode === 0 ? new Uint8Array(contenu) : contenu });
+		if (!f.dossier) entrees.push({ nom: f.nom, octets: f.methode === 0 ? new Uint8Array(contenus[i]) : contenus[i] });
 	});
 	return entrees;
+}
+
+/** The absolute target of each name under `dest`: every name checked by
+    the same rules as `lireZip` (duplicates included), then the resolved
+    path re-checked to fall under `dest` (a second, independent gate that
+    would still catch a bug in the first). Throws before returning anything. */
+function ciblesSous(dest: string, noms: string[]): string[] {
+	const destAbs = resolve(dest);
+	verifierNoms(noms);
+	return noms.map((nom) => {
+		const cible = resolve(destAbs, ...nom.split("/"));
+		if (!cible.startsWith(destAbs + sep)) throw new ErreurZip("nom", "entry escapes its folder: " + JSON.stringify(nom));
+		return cible;
+	});
+}
+
+/**
+ * Unpacks `octets` under `dest` one entry at a time, and returns the
+ * relative names written, in order. EVERYTHING that needs no inflate is
+ * checked first (`analyserZip` and `ciblesSous`): an archive with one
+ * hostile name, a duplicate or a bound exceeded anywhere in it writes
+ * nothing at all. Then each entry is inflated, checked (size, CRC-32),
+ * written with `wx` (an existing file is never overwritten) and dropped
+ * before the next, with a turn of the event loop between entries: peak
+ * memory is the input plus one entry.
+ *
+ * A failure found only at inflate time (a wrong CRC, a stream that lies
+ * about its size) or a write error THROWS AFTER EARLIER ENTRIES WERE
+ * WRITTEN: the caller extracts into a fresh staging folder and must remove
+ * it on any rejection; this function never deletes anything.
+ */
+export async function extraireZip(octets: Uint8Array, dest: string, bornes: BornesZip): Promise<string[]> {
+	const fiches = analyserZip(octets, bornes);
+	const fichiers = fiches.filter((f) => !f.dossier);
+	const cibles = ciblesSous(dest, fichiers.map((f) => f.nom));
+	/* Directory entries carry no bytes, but their size and CRC are still checked. */
+	for (const f of fiches) if (f.dossier) inflerFiche(octets, f);
+	const ecrits: string[] = [];
+	for (let i = 0; i < fichiers.length; i++) {
+		const contenu = inflerFiche(octets, fichiers[i]);
+		await mkdir(dirname(cibles[i]), { recursive: true });
+		await writeFile(cibles[i], contenu, { flag: "wx" });
+		ecrits.push(fichiers[i].nom);
+		await tour();
+	}
+	return ecrits;
 }
 
 /**
@@ -253,13 +338,7 @@ export function lireZip(octets: Uint8Array, bornes: BornesZip): EntreeZip[] {
  * overwritten (the caller writes into a fresh staging folder).
  */
 export async function ecrireSous(dest: string, entrees: EntreeZip[]): Promise<void> {
-	const destAbs = resolve(dest);
-	verifierNoms(entrees.map((e) => e.nom));
-	const cibles = entrees.map((e) => {
-		const cible = resolve(destAbs, ...e.nom.split("/"));
-		if (!cible.startsWith(destAbs + sep)) throw new ErreurZip("nom", "entry escapes its folder: " + JSON.stringify(e.nom));
-		return cible;
-	});
+	const cibles = ciblesSous(dest, entrees.map((e) => e.nom));
 	for (let i = 0; i < entrees.length; i++) {
 		await mkdir(dirname(cibles[i]), { recursive: true });
 		await writeFile(cibles[i], entrees[i].octets, { flag: "wx" });

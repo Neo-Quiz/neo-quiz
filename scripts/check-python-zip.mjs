@@ -20,12 +20,15 @@
  *   (`a/B.py`, `a/b.py`), or a file that is also a folder (`a`, `a/b`);
  * - a truncated archive, a wrong CRC, an unknown method, an encrypted entry,
  *   zip64, a local header that names another file, read as if valid;
- * - `ecrireSous` writing ANY file of a list that holds one hostile name.
+ * - `ecrireSous` writing ANY file of a list that holds one hostile name, and
+ *   `extraireZip` writing anything when a check that needs no inflate fails
+ *   on ANY entry (a hostile name, a symlink, a duplicate, a bound), even the
+ *   last one; a symbolic link entry being read at all.
  *
  *     npm run check:python-zip
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
@@ -54,12 +57,12 @@ function snapshot(dir) {
 			if (e.isDirectory()) { out.push(`${p}/`); walk(join(d, e.name), p); } else out.push(`${p} ${sha(readFileSync(join(d, e.name)))}`);
 		}
 	};
-	walk(dir, "");
+	if (existsSync(dir)) walk(dir, "");
 	return out;
 }
 
 try {
-	await withSrcModule("apps/windows/electron/python/zip-lecture.ts", async ({ lireZip, ecrireSous, ErreurZip }) => {
+	await withSrcModule("apps/windows/electron/python/zip-lecture.ts", async ({ lireZip, ecrireSous, extraireZip, ErreurZip }) => {
 		/** The `code` of the ErreurZip thrown, or a description of what happened instead. */
 		const codeDe = (octets, bornes = BORNES) => {
 			try {
@@ -190,6 +193,47 @@ try {
 			r.check("ecrireSous with two names Windows sees as one: doublon", await codeEcrire([bon, { nom: "PKG/OK.py", octets: Buffer.from("y") }]), "doublon");
 			r.check("ecrireSous with a duplicate: nothing written anywhere", snapshot(base), avant);
 		}
+
+		/* ── 8. extraireZip: everything checked first, then one entry at a time ── */
+		const extraire = (octets, dossier, bornes = BORNES) =>
+			extraireZip(octets, join(base, dossier), bornes).then((noms) => noms, (e) => (e instanceof ErreurZip ? e.code : "not an ErreurZip: " + String(e)));
+		r.check("extraireZip returns the names written, in order", await extraire(valide, "x1"), ["pkg/__init__.py", "pkg/_core.pyd", "pkg/stored.bin", "pkg/empty.txt", "pkg/empty-stored.txt"]);
+		r.check("extraireZip writes every entry, byte for byte", snapshot(join(base, "x1")), snapshot(dest));
+		const cinq = (cinquieme) => [
+			{ name: "pkg/a.py", bytes: "a" }, { name: "pkg/b.py", bytes: "b" }, { name: "pkg/c.py", bytes: "c" },
+			{ name: "pkg/d.py", bytes: "d" }, cinquieme,
+		];
+		for (const [libelle, cinquieme, code, bornes] of [
+			["a hostile name", { name: "../outside/evil.txt", bytes: "evil" }, "nom", BORNES],
+			["a name with a stream", { name: "pkg/e.py:evil", bytes: "evil" }, "nom", BORNES],
+			["a symbolic link", { name: "pkg/link", bytes: "../../outside", madeBy: 0x0314, attrs: (0o120777 << 16) >>> 0 }, "nom", BORNES],
+			["a duplicate by case", { name: "PKG/A.py", bytes: "x" }, "doublon", BORNES],
+			["a ratio over the bound", { name: "pkg/zeros.bin", bytes: zeros }, "bombe", BORNES],
+			["a total over the bound", { name: "pkg/big.bin", bytes: binaire }, "bombe", { ...BORNES, maxOctets: 100_000 }],
+			["a local header naming another file", { name: "pkg/e.py", bytes: "e", localNameBytes: Buffer.from("pkg/f.py") }, "abime", BORNES],
+		]) {
+			const avant = snapshot(base);
+			r.check("extraireZip, " + libelle + " as entry 5 of 5: " + code, await extraire(forgeZip(cinq(cinquieme)), "x2", bornes), code);
+			r.check("extraireZip, " + libelle + " as entry 5 of 5: nothing written anywhere", snapshot(base), avant);
+		}
+		{
+			const z = forgeZip([
+				{ name: "pkg/a.py", bytes: "a" }, { name: "pkg/b.py", bytes: "b" }, { name: "pkg/c.py", bytes: "c", crc: 1 },
+				{ name: "pkg/d.py", bytes: "d" }, { name: "pkg/e.py", bytes: "e" },
+			]);
+			r.check("extraireZip, a wrong CRC on entry 3 of 5: abime", await extraire(z, "x3"), "abime");
+			r.check("extraireZip, a wrong CRC on entry 3 of 5: entries 1-2 written, 3-5 never (the caller removes its staging)", snapshot(join(base, "x3")), [
+				"pkg/", "pkg/a.py " + sha(Buffer.from("a")), "pkg/b.py " + sha(Buffer.from("b")),
+			]);
+		}
+		{
+			mkdirSync(join(base, "x4", "pkg"), { recursive: true });
+			writeFileSync(join(base, "x4", "pkg", "b.py"), "mine");
+			r.check("extraireZip never overwrites an existing file", (await extraire(forgeZip(cinq({ name: "pkg/e.py", bytes: "e" })), "x4")).startsWith?.("not an ErreurZip: Error: EEXIST"), true);
+			r.check("extraireZip leaves the existing file as it was", readFileSync(join(base, "x4", "pkg", "b.py"), "utf8"), "mine");
+		}
+		r.check("lireZip, a symbolic link: nom", codeDe(forgeZip([{ name: "pkg/link", bytes: "target", madeBy: 0x0314, attrs: (0o120777 << 16) >>> 0 }])), "nom");
+		r.check("lireZip, a regular Unix file (mode 0100644) reads", codeDe(forgeZip([{ name: "pkg/a.py", bytes: "x", madeBy: 0x0314, attrs: (0o100644 << 16) >>> 0 }])), "no error (1 entries)");
 	});
 } finally {
 	rmSync(tmp, { recursive: true, force: true });
