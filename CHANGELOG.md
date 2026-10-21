@@ -16,7 +16,7 @@ release notes.
 ### Changed
 
 - On the phone, every button, card, row, tab, menu item and answer reacts the instant it is touched and settles back smoothly; folding sections and menus open and close with motion, and the bottom bar ripple no longer sparkles.
-- Phone settings rows share one look: an icon, the label with its value under it, and a chevron; the wallpaper sliders get their own rows.
+- Phone settings rows share one look: an icon, the label with its value under it, and a chevron; the wallpaper sliders get their own rows, the language rows line up with the others, and Languages no longer sits under a double gap.
 - On the phone, a folder's three progress counts sit side by side, and a long quiz title wraps to two lines before it is cut, on the quiz page, on Home and on folder cards.
 - On a tablet or a narrow window, folders show two per row instead of one, and a long folder name wraps to two lines.
 - The Set up your test window starts with a flat button, like every other window, and so does the unanswered questions window shown when handing in a Test, with the same plain dimmed backdrop.

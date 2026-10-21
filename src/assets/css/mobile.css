@@ -1217,6 +1217,9 @@ html.nq-mobile ::-webkit-scrollbar {
 .is-mobile .nq-set .nq-reglages-section {
 	display: flex;
 	flex-direction: column;
+	/* The category already spaces its groups: the desktop 26 px under a
+	   section doubled the gap before the next one (Appearance, Languages). */
+	padding-bottom: 0;
 }
 
 /* One title per group: the category's, not a second one inside it. */
@@ -1234,6 +1237,18 @@ html.nq-mobile ::-webkit-scrollbar {
 	border: 0;
 	border-radius: 16px;
 	background: var(--background-secondary);
+}
+
+/* A language row lines up with every other setting row: the desktop rule
+   for a row alone in its section (10 px 16 px, an 18 px icon) set its icon
+   and label a few pixels off the rows above. */
+.is-mobile .nq-set .nq-reglages-section > .nq-reglages-dossier {
+	padding: 12px 18px;
+}
+
+.is-mobile .nq-set .nq-reglages-dossier > .nq-reglages-icone svg {
+	width: 22px;
+	height: 22px;
 }
 
 .is-mobile .nq-set .nq-reglages-dossier .nq-reglages-nom,
