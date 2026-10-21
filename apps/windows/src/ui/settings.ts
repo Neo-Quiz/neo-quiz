@@ -388,7 +388,7 @@ export function renderSettings(
 	/* PHONE: the in-app updater (version, manual check). The desktop's menu has its own. */
 	let demonterMajAndroid: () => void = () => {};
 	if (mobile) {
-		const controle = row(general, t("app.update.android.row"), " ", "div", "circle-arrow-down");
+		const controle = row(general, t("app.update.android.row"), " ", "div", phone ? "circle-arrow-down" : undefined);
 		const aide = controle.parentElement!.querySelector<HTMLElement>(".nq-set-ligne-aide")!;
 		demonterMajAndroid = monterLigneMajAndroid(controle, aide);
 		/* The in-app bug report, only once the relay is configured; the form's fallback (and the
