@@ -370,6 +370,19 @@ html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
 	text-align: left;
 }
 
+/* A folder card on a phone sizes to its content: one column, no row to keep
+   level, and the desktop 148 px left an empty band under a folder without a
+   subject line. */
+.is-mobile .qbd-module-card {
+	height: auto;
+}
+
+/* The spacer that pushed the footer down now keeps the counts off the rule. */
+.is-mobile .qbd-module-card__spacer {
+	flex: none;
+	height: 12px;
+}
+
 /* A folder card's name on a phone: two lines before the ellipsis (one column,
    so no row of cards to keep level). */
 .is-mobile .qbd-module-card__title {
@@ -402,4 +415,21 @@ html:not(.nq-bar-native) .is-mobile .qbd-sel-bar {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Home quick actions on a phone: the description takes two lines before it is
+   cut; one line read « Un dossier vide à remplir de vos propres quiz q… ». */
+.is-mobile .qbd-home-quick .qbd-create-option-desc {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	white-space: normal;
+}
+
+/* The quiz page's question cards on a phone: one column, so no row of cards
+   to keep level; the desktop 216 px minimum left a short question with a
+   third of its card empty. */
+.is-mobile .qbd-fiche-grid {
+	grid-auto-rows: auto;
 }
