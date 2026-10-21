@@ -28,7 +28,9 @@ const CAS = [
 	["barré", "le port ~~25~~ 587", "le port <del>25</del> 587"],
 
 	// Ce qui ne doit PAS être interprété.
-	["formule LaTeX intacte", "on compte : $128 - TTL_{reçu}$.", "on compte : $128 - TTL_{reçu}$."],
+	["formule LaTeX intacte", "on compte : $128 - TTL_{reçu}$.", "on compte\u00A0: $128 - TTL_{reçu}$."],
+	["espace insécable avant un point d’interrogation", "Que sont x et y ?", "Que sont x et y\u00A0?"],
+	["espace insécable : formule et code intacts", "$a : b$ ? et `c ? d` !", "$a : b$\u00A0? et <code>c ? d</code>\u00A0!"],
 	["étoile dans une formule", "aire $a*b*c$ finale", "aire $a*b*c$ finale"],
 	["multiplication espacée", "calcule 3 * 4 * 5 ici", "calcule 3 * 4 * 5 ici"],
 	["multiplication collée", "calcule 3*4*5 ici", "calcule 3*4*5 ici"],
@@ -140,7 +142,7 @@ const CAS_NUS = [
 	// ligne (la vignette de la liste) la demandent eux-mêmes.
 	["indentation d'un placeholder préservée",
 		"Exemple :\n    SELECT **x**\n    FROM t",
-		"Exemple :\n    SELECT x\n    FROM t"],
+		"Exemple\u00A0:\n    SELECT x\n    FROM t"],
 ];
 
 await withSrcModule("src/engine/sanitizer.ts", ({ renderInlineText, stripInlineMarkdown }) => {
@@ -243,7 +245,7 @@ await withSrcModule(
 
 	r.check("paragraphes", rendre("un" + NL + NL + "deux"), P("un") + P("deux"));
 	r.check("liste à puces", rendre("Choisis :" + NL + "- `a`" + NL + "- **b**"),
-		P("Choisis :") + `<ul class="quiz-md-liste"><li><code>a</code></li><li><strong>b</strong></li></ul>`);
+		P("Choisis\u00A0:") + `<ul class="quiz-md-liste"><li><code>a</code></li><li><strong>b</strong></li></ul>`);
 	r.check("liste numérotée qui commence à 3", rendre("x" + NL + "3. a" + NL + "4. b"),
 		P("x") + `<ol class="quiz-md-liste" start="3"><li>a</li><li>b</li></ol>`);
 	r.check("sous-liste par l'indentation", rendre("- a" + NL + "  - b" + NL + "- c"),
@@ -386,9 +388,9 @@ await withSrcModule(
 	/* A quote callout (2026-10-19): the quote centred, the author apart. */
 	const QUOTE = (texte, auteur) => `<div class="quiz-md-quote"><blockquote class="quiz-md-quote-texte">${texte}</blockquote>${auteur ? `<div class="quiz-md-quote-auteur">— ${auteur}</div>` : ""}</div>`;
 	r.check("quote: plain form, author on its own line", rendre("> [!quote]" + NL + "> « Apprendre sans être programmé »" + NL + "> — Arthur Samuel"),
-		QUOTE("« Apprendre sans être programmé »", "Arthur Samuel"));
+		QUOTE("«\u00A0Apprendre sans être programmé\u00A0»", "Arthur Samuel"));
 	r.check("quote: the Obsidian one-line form loses <center> and the outer italics", rendre("> [!QUOTE]" + NL + "> *<center>« Plus d'exemples »</center>* <br> **— Tom Mitchell**"),
-		QUOTE("« Plus d&#39;exemples »", "Tom Mitchell"));
+		QUOTE("«\u00A0Plus d&#39;exemples\u00A0»", "Tom Mitchell"));
 	r.check("quote: without an author", rendre("> [!cite]" + NL + "> une phrase"), QUOTE("une phrase", ""));
 	r.check("quote: a lone dash line is the quote, not an author", rendre("> [!quote]" + NL + "> — seule"), QUOTE("— seule", ""));
 	r.check("quote: its text stays escaped", rendre("> [!quote]" + NL + "> <img src=x onerror=alert(1)>" + NL + "> — <b>x</b>"),

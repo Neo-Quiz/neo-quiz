@@ -31,6 +31,10 @@ release notes.
 - On a narrow phone, a quiz card's counts wrap between items instead of breaking inside each one.
 - Four editor and usage labels left in English in the French interface are translated.
 - Android Back closes an open action menu or picker before leaving the folder, closing the window beneath it or exiting the app.
+- On the phone, a code block in a reading stays inside its card instead of running past its left edge.
+- On a touch screen, the hint under a reading's flip cards says to tap a card instead of clicking or pressing Enter.
+- On the phone, folder cards and question cards size to their content instead of leaving an empty band, and Home quick actions show two lines of description.
+- A question mark, colon or closing quote never wraps alone onto its own line.
 
 ## [1.21.23] - 2026-10-21
 

@@ -168,6 +168,12 @@ function inlineMarkdown(escaped: string): string {
 		out = out.replace(motifFlanc(delim), (_m, avant: string, contenu: string) => avant + o + contenu + f);
 	}
 
+	/* French spacing: the space before ? ! : ; and » (and after «) never
+	   breaks, or a line wrap left « ? » alone on the last line of a question.
+	   Code and formulas are already set aside as tokens, so their own spaces
+	   stay as written. */
+	out = out.replace(/ (?=[?!:;\u00BB])/g, "\u00A0").replace(/\u00AB /g, "\u00AB\u00A0");
+
 	/* Restauration RÉPÉTÉE : une entrée du stash peut en contenir une autre.
 	   Chaque entrée ne cite que des entrées plus anciennes, donc la boucle
 	   s'arrête ; la borne n'est qu'un filet. Aucun jeton ne sort jamais : un
