@@ -167,6 +167,13 @@ jobs:
       - name: Python package proxy
         run: npm run check:code-packages
 
+      # The main-process zip reader for the Python interpreter and wheels:
+      # names that escape or that Windows reads differently, bombs (entry
+      # count, ratio, total, overlapping data), duplicates by case, sizes or
+      # CRCs that lie, truncated archives; and a hostile name writes nothing.
+      - name: Python zip reader
+        run: npm run check:python-zip
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar
