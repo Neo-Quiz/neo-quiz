@@ -13,6 +13,10 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Formulas can be selected along with the text around them, and copying them gives their LaTeX (`$…$`).
+
 ## [1.21.25] - 2026-10-21
 
 ### Changed

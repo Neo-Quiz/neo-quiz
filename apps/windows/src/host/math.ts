@@ -23,6 +23,44 @@ import { latexPourMathLive } from "./latex-mathlive";
    de ce module, avant tout champ math. */
 provideMathlive(mathlive);
 
+/* Rendered formulas are selectable (2026-10-21; MathLive's static CSS sets
+   `user-select: none` on `.ML__latex`, overridden in quiz-card.css). Their
+   glyph spans make poor text (a fraction copies as its numerator and
+   denominator side by side), so a copy whose selection touches a formula puts
+   that formula's LaTeX source in the clipboard, between `$` (or `$$`), as the
+   quiz wrote it. Installed once, on the first formula rendered. */
+let copieInstallee = false;
+function copierFormulesEnLatex(): void {
+	if (copieInstallee) return;
+	copieInstallee = true;
+	document.addEventListener("copy", (e) => {
+		const sel = document.getSelection();
+		if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !e.clipboardData) return;
+		const morceaux: string[] = [];
+		let formule = false;
+		for (let i = 0; i < sel.rangeCount; i++) {
+			const range = sel.getRangeAt(i).cloneRange();
+			// A selection that starts or ends inside a formula takes the whole formula.
+			const debut = (range.startContainer.parentElement ?? null)?.closest<HTMLElement>(".math[data-latex]");
+			const fin = (range.endContainer.parentElement ?? null)?.closest<HTMLElement>(".math[data-latex]");
+			if (debut) range.setStartBefore(debut);
+			if (fin) range.setEndAfter(fin);
+			const copie = document.createElement("div");
+			copie.append(range.cloneContents());
+			const maths = copie.querySelectorAll<HTMLElement>(".math[data-latex]");
+			if (maths.length) formule = true;
+			maths.forEach(m => {
+				const bloc = m.classList.contains("math-block");
+				m.replaceWith(bloc ? `$$${m.dataset.latex}$$` : `$${m.dataset.latex}$`);
+			});
+			morceaux.push(copie.textContent ?? "");
+		}
+		if (!formule) return;
+		e.clipboardData.setData("text/plain", morceaux.join("\n"));
+		e.preventDefault();
+	});
+}
+
 /** Le réglage des fontes n'est posé qu'UNE fois par session. */
 let fontesConfigurees = false;
 
@@ -50,6 +88,9 @@ export function createWindowsMath(): HostMath {
 			// `math` : la classe que le parcours de `engine/mathjax.ts` écarte, pour
 			// qu'un second passage ne re-rende pas une formule déjà rendue.
 			span.className = display ? "math math-block" : "math math-inline";
+			// The source, for `copierFormulesEnLatex`: a copy gives `$…$`, not the glyphs.
+			span.dataset.latex = String(latex ?? "");
+			copierFormulesEnLatex();
 			/* LE SEUL `innerHTML` NON ASSAINI DE L'APPLICATION, et la raison doit
 			   être écrite noir sur blanc : le HTML injecté ici est la SORTIE de
 			   `convertLatexToMarkup`, fabriquée par MathLive — ce n'est ni le

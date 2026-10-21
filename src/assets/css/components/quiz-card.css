@@ -577,3 +577,11 @@ code.quiz-code-tokens .token.number{ color: #ff9e64; }
 .quiz-math-nobr{
   white-space: nowrap;
 }
+
+/* A rendered formula is selectable like the text around it: MathLive's static
+   CSS sets `user-select: none` on `.ML__latex`. A copy gives its LaTeX
+   (`copierFormulesEnLatex`, apps/windows/src/host/math.ts). */
+.math .ML__latex{
+  -webkit-user-select: text;
+  user-select: text;
+}
