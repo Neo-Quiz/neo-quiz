@@ -25,6 +25,10 @@ let pontCourant: (() => Pont) | null = null;
 
 const interrupteur = (langue: CodeLanguage): string => (langue === "cpp" ? "c" : langue);
 
+/** Settings key: warning keys (note path + code hash) the user dismissed. */
+export const CLE_AVERTISSEMENT_PYTHON = "pythonWarningDismissed";
+const MAX_AVERTISSEMENTS = 500;
+
 export function langageActif(langue: CodeLanguage): boolean {
 	return !desactives.includes(interrupteur(langue));
 }
@@ -48,6 +52,18 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 		run: job => langageActif(job.language)
 			? pont().code.run(job).catch((): CodeRun => ({ status: "unavailable", stdout: "" }))
 			: Promise.resolve<CodeRun>({ status: "unavailable", stdout: "" }),
+		avertissement: {
+			masque: async cle => {
+				const v = await pont().reglages.lire(CLE_AVERTISSEMENT_PYTHON);
+				return Array.isArray(v) && v.includes(cle);
+			},
+			masquer: async cle => {
+				const v = await pont().reglages.lire(CLE_AVERTISSEMENT_PYTHON);
+				const liste = Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x !== cle) : [];
+				liste.push(cle);
+				await pont().reglages.ecrire(CLE_AVERTISSEMENT_PYTHON, liste.slice(-MAX_AVERTISSEMENTS));
+			},
+		},
 		warm: language => { if (!langageActif(language)) return; void pont().code.warm(language).catch(() => undefined); },
 		/* Python: `paquets` names the root libraries to download (`[]` = the
 		   interpreter alone). Mapping of the installer's codes: reseau -> "offline",

@@ -2,6 +2,7 @@ import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
 import type { CodeRun } from "../host/types";
+import { cleAvertissement, demanderAvertissement } from "./code-warning";
 import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../code-languages";
 
 /* ══════════════════════════════════════════════════════════
@@ -48,6 +49,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 	    at the first appearance of a runnable block — `warm()` has no effect
 	    if it is already loaded (contract `HostCode`). */
 	let prechauffe = false;
+	/** One warning at a time: a second click while the modal is up does nothing. */
+	let avertissementOuvert = false;
 
 	function sortieDe(bloc: HTMLElement): HTMLElement {
 		let sortie = bloc.querySelector<HTMLElement>(":scope > .quiz-code-output");
@@ -101,6 +104,18 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		const bloc = btn.closest<HTMLElement>(".quiz-code-block");
 		if (!bloc) return;
 		const sortie = sortieDe(bloc);
+
+		/* Python runs natively on the PC: warn before EVERY run (C/C++ stay in
+		   their sandbox and never ask). Cancel or no modal host = no run. */
+		if (language === "python") {
+			if (avertissementOuvert) return;
+			avertissementOuvert = true;
+			let accord = false;
+			try { accord = await demanderAvertissement(ctx, await cleAvertissement(ctx.sourcePath, source)); }
+			catch { accord = false; }
+			finally { avertissementOuvert = false; }
+			if (!accord) return;
+		}
 
 		btn.disabled = true;
 		btn.classList.add("quiz-code-run-running");

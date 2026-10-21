@@ -271,6 +271,11 @@ export const EN_ENGINE = {
 	/* ── Run button on a Python code block ── */
 	"engine.code.run": "Run",
 	"engine.code.answerPlaceholder": "Your code…",
+	"engine.code.warningTitle": "Run this code on your PC?",
+	"engine.code.warningText": "This code will run on your PC with access to your files and the Internet. Only run code you trust.",
+	"engine.code.warningDontShow": "Don't show again for this quiz",
+	"engine.code.warningRun": "Run",
+	"engine.code.warningCancel": "Cancel",
 	"engine.code.running": "Running…",
 	"engine.code.output": "Output",
 	"engine.code.empty": "(no output)",

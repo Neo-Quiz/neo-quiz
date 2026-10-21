@@ -1036,6 +1036,10 @@ export interface HostCode {
 	    but failed its integrity check and was not installed. OPTIONAL: a
 	    host whose languages are all built in has nothing to download. */
 	installer?(language: CodeLanguage, onProgress: (percent: number) => void, paquets?: string[]): Promise<"ok" | "offline" | "refused" | "failed">;
+	/** The « run this code on your PC? » warning shown before every Python
+	    run: `masque(cle)` is true once the user ticked « don't show again » for
+	    that key (note path + code hash). Without it, Python is never run. */
+	avertissement?: { masque(cle: string): Promise<boolean>; masquer(cle: string): Promise<void> };
 }
 
 /**

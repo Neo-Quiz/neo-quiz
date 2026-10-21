@@ -252,6 +252,11 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	/* ── Bouton Exécuter d'un bloc de code Python ── */
 	"engine.code.run": "Exécuter",
 	"engine.code.answerPlaceholder": "Ton code…",
+	"engine.code.warningTitle": "Exécuter ce code sur ton PC ?",
+	"engine.code.warningText": "Ce code va s'exécuter sur ton PC avec accès à tes fichiers et à Internet. N'exécute que du code de confiance.",
+	"engine.code.warningDontShow": "Ne plus afficher pour ce quiz",
+	"engine.code.warningRun": "Exécuter",
+	"engine.code.warningCancel": "Annuler",
 	"engine.code.running": "Exécution…",
 	"engine.code.output": "Sortie",
 	"engine.code.empty": "(aucune sortie)",
