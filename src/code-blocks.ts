@@ -14,7 +14,13 @@ import { langageDeBloc } from "./code-languages";
    (`decouperBlocs`, grammaire-blocs.ts) on every string of every
    ```quiz-blocks block, each string also cut the way a reading in steps cuts
    its text (`paragraphes`, lecture-style.ts). Taking more candidates than the
-   screen shows is harmless: every one is a Python block of the note. The
+   screen shows is harmless: every one is a Python block of the note.
+   ACCEPTED LIMIT (final review M2): a block the engine keeps hidden (▶ masked
+   in a statement not yet corrected, a hint not yet revealed) is a candidate
+   too, so a phone may ask for a block it does not show. It is still the
+   owner's note's own code, run only after the phone's warning and the PC's
+   one-time authorization of that device (electron/python/distant.ts); the
+   masking is about not giving answers away, not a security boundary. The
    HTML parser turns CR and CR LF into LF and drops NUL in text: the same is
    done here, since `textContent` reads the parsed text.
 ══════════════════════════════════════════════════════════ */

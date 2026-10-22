@@ -130,7 +130,14 @@ export function sansSequenceCoupee(octets: Buffer): Buffer {
 const taskkill = () => join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe");
 
 /** Kills `enfant` and every process it started, while it is alive (`/T`
-    walks the tree from a LIVE root). Resolves once the kill was tried. */
+    walks the tree from a LIVE root). Resolves once the kill was tried.
+    ACCEPTED LIMIT (final review M4): a pid is a number, and between the
+    interpreter's exit and the moment `taskkill` resolves it, Windows may
+    give it to another process. Every caller only kills while the run has
+    not exited (`arreter` returns once `sorti`), and the sweep checks
+    creation times, so the window is that of a process exiting at the very
+    instant of its kill; closing it needs a Job Object, which needs native
+    code. */
 function tuerArbre(enfant: ChildProcess): Promise<void> {
 	const pid = enfant.pid;
 	if (pid === undefined) return Promise.resolve();
