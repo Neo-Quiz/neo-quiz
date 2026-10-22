@@ -194,12 +194,13 @@ jobs:
       # Running one Python block: imports judged before Python starts, the
       # process tree killed on timeout and past 256 KiB of output, an
       # environment built from nothing. The real runs need Windows and
-      # CPython 3.12: on this Linux runner all 25 are SKIPPED, and the step
-      # fails if that count changes (never silently green).
+      # CPython 3.12: on this Linux runner all 26 are SKIPPED, and the step
+      # fails if that count changes (never silently green). They run for
+      # real in the windows-latest job below.
       - name: Python block runner
         run: npm run check:python-run
         env:
-          NQ_PYTHON_RUN_EXPECT_SKIPPED: "25"
+          NQ_PYTHON_RUN_EXPECT_SKIPPED: "26"
 
       # The service canaux.ts calls for a Python block: package-name checks,
       # error mapping, the run held behind an install. Its real run is skipped
@@ -729,6 +730,25 @@ jobs:
 
       - name: Code sandbox (Pyodide isolation)
         run: npm run check:code-sandbox
+
+      # The real Python runs (final review M7): the Linux job skips them, here
+      # they run on CPython 3.12, and the step fails if any is skipped.
+      - name: Setup Python 3.12
+        id: py312
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python block runner (real CPython 3.12)
+        run: npm run check:python-run
+        env:
+          NQ_PYTHON_EXE: ${{ steps.py312.outputs.python-path }}
+          NQ_PYTHON_RUN_EXPECT_SKIPPED: "0"
+
+      - name: Python service (real CPython 3.12)
+        run: npm run check:python-service
+        env:
+          NQ_PYTHON_EXE: ${{ steps.py312.outputs.python-path }}
 
       # The Windows host implementation of src/host/types.ts.
       - name: Windows host contract

@@ -135,7 +135,7 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 
 	/* ── The real interpreter ── */
 	const exe = pythonDuDeveloppeur();
-	const REELS = 25;
+	const REELS = 26;
 	let sautes = 0;
 	if (!exe) {
 		sautes = REELS;
