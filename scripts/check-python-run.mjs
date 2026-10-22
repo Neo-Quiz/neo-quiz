@@ -41,7 +41,8 @@ process.env.NQ_SECRET_TOKEN = "leak";
 /** Variables that libuv adds to EVERY Windows child environment (its
     `required_vars` in `process.c`), whatever the parent passes. */
 const INJECTEES_WINDOWS = ["HOMEDRIVE", "HOMEPATH", "LOGONSERVER", "SYSTEMDRIVE", "USERDOMAIN", "USERNAME", "USERPROFILE", "WINDIR"];
-const PERMISES = ["MPLBACKEND", "MPLCONFIGDIR", "PATH", "PYTHONIOENCODING", "SYSTEMROOT", "TEMP", "TMP"];
+/* M5: the user's folders are passed (USERPROFILE, HOMEDRIVE and HOMEPATH are also libuv's). */
+const PERMISES = ["APPDATA", "LOCALAPPDATA", "MPLBACKEND", "MPLCONFIGDIR", "PATH", "PYTHONIOENCODING", "SYSTEMROOT", "TEMP", "TMP"];
 
 /** The developer's CPython 3.12, or null. */
 function pythonDuDeveloppeur() {
@@ -181,6 +182,9 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 		const envRun = await run("import os\nprint(','.join(sorted(k.upper() for k in os.environ)))\n");
 		const cles = envRun.stdout.trim().split(",");
 		r.check("environment: only the allowed keys (and libuv's)", cles, [...PERMISES, ...INJECTEES_WINDOWS].sort());
+		const profil = await run("import os, pathlib\nprint(str(pathlib.Path.home()))\nprint(os.path.expanduser('~'))\nprint(os.environ.get('APPDATA'))\nprint(os.environ.get('LOCALAPPDATA'))\n");
+		r.check("M5: ~ and Path.home() are the real profile, APPDATA/LOCALAPPDATA the real ones",
+			profil.stdout.trim().split("\n"), [process.env.USERPROFILE, process.env.USERPROFILE, process.env.APPDATA, process.env.LOCALAPPDATA]);
 
 		const lieux = await run("import os, tempfile\nprint(os.getcwd())\nprint(os.environ['TEMP'] == os.getcwd() == os.environ['MPLCONFIGDIR'])\nprint(os.environ['PATH'])\n");
 		const [cwd, memes, path] = lieux.stdout.trim().split("\n");

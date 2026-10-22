@@ -17,9 +17,11 @@
      user's home). It is removed afterwards, on every outcome.
    - THE ENVIRONMENT is built from nothing: `SystemRoot` (Windows sockets and
      crypto need it), the run folder, UTF-8 output, matplotlib's `Agg`
-     backend, and a `PATH` that names the interpreter's folder only. No
-     variable of the app's own environment (tokens, proxies, `PYTHON*`) is
-     passed on.
+     backend, a `PATH` that names the interpreter's folder only, and the
+     five variables naming the user's folders (`USERPROFILE`, `HOMEDRIVE`,
+     `HOMEPATH`, `LOCALAPPDATA`, `APPDATA`: `~` resolves as in a terminal).
+     No other variable of the app's own environment (tokens, proxies,
+     `PYTHON*`) is passed on.
    - NO SHELL, no console window, stdin closed (`ignore`).
    - `timeoutMs` (the caller passes up to 60 s) → the WHOLE TREE is killed
      (`taskkill /pid N /T /F`: a `subprocess.Popen` grandchild dies too) and
@@ -230,6 +232,18 @@ export async function executerPython(job: JobPython, contexte: ContextePython): 
 /** The result, and the sweep that follows it (see the cleanup). */
 interface IssuePython { resultat: CodeRun; balayage: Promise<void> }
 
+/** The five variables that name the user's folders, copied from the real
+    environment when set (never invented). */
+const VARIABLES_PROFIL = ["USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA"] as const;
+function profilUtilisateur(): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const k of VARIABLES_PROFIL) {
+		const v = process.env[k];
+		if (typeof v === "string" && v !== "") out[k] = v;
+	}
+	return out;
+}
+
 function lancer(job: JobPython, contexte: ContextePython, dossier: string): Promise<IssuePython> {
 	return new Promise<IssuePython>((resolve) => {
 		const env: NodeJS.ProcessEnv = {
@@ -240,6 +254,11 @@ function lancer(job: JobPython, contexte: ContextePython, dossier: string): Prom
 			MPLBACKEND: "Agg",
 			MPLCONFIGDIR: dossier,
 			PATH: dirname(contexte.executable),
+			/* The user's folders (final review M5): `~`, `Path.home()` and the
+			   caches of the libraries resolve to the real profile, as in a
+			   terminal. The code already has the user's file access; these only
+			   say where things are. */
+			...profilUtilisateur(),
 		};
 		const debut = Date.now();
 		let enfant: ChildProcess;
