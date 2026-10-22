@@ -13,7 +13,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.about.repo": "Code source et versions sur GitHub",
 
 	"settings.languages.title": "Langages",
-	"settings.languages.hint": "Chaque langage se télécharge une fois, depuis la source indiquée, et tourne isolé de tes fichiers et du réseau.",
+	"settings.languages.hint": "C et C++ se téléchargent une fois, depuis la source indiquée, et tournent isolés de tes fichiers et du réseau. Python s'exécute sur ce PC avec accès à tes fichiers et à Internet, après un avertissement.",
 	"settings.languages.c": "C et C++ (Clang)",
 	"settings.languages.python": "Python",
 	"settings.python.libraries": "Bibliothèques installées · {size} Mo",

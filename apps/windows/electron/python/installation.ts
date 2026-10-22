@@ -54,7 +54,7 @@ import { join, resolve } from "node:path";
 import { LOG_PREFIX } from "../../../../src/branding";
 import { demander, transportDefaut } from "../telechargement";
 import type { CodeInstallation, TransportInstallation } from "../telechargement";
-import { INTERPRETE, PAQUETS, fermeture } from "./catalogue";
+import { INTERPRETE, PAQUETS, RACINES, fermeture } from "./catalogue";
 import { ErreurZip, extraireZip } from "./zip-lecture";
 import type { BornesZip } from "./zip-lecture";
 
@@ -108,6 +108,8 @@ export interface FichierEpingle { version: string; url: string; sha256: string; 
 export interface CataloguePython {
 	interprete: FichierEpingle;
 	paquets: Record<string, FichierEpingle & { dependances: readonly string[] }>;
+	/** The root libraries (what a block imports); absent = every package is one. */
+	racines?: readonly string[];
 }
 
 /** The two disk writes the check makes fail (a folder in use, a full
@@ -126,6 +128,11 @@ export interface EtatPython {
 	paquets: { nom: string; version: string; octets: number; requisPar: string[] }[];
 	/** Bytes on disk of the interpreter folder plus every library folder. */
 	octetsTotal: number;
+	/** What Settings lists: the installed ROOT libraries only. `octets`
+	    counts the root and every installed dependency that no other
+	    installed root needs (what its uninstall frees); `requisPar` the
+	    other installed roots that need it (its uninstall is refused). */
+	racines: { nom: string; version: string; octets: number; requisPar: string[] }[];
 }
 
 export interface InstallationPython {
@@ -140,6 +147,12 @@ export interface InstallationPython {
 	    Rejects `ErreurPython` `occupe` (its folder is in use) or `io`, with
 	    the folder still installed and the `_pth` unchanged. */
 	desinstaller(paquet: string): Promise<{ ok: true } | { ok: false; requisPar: string[] }>;
+	/** Uninstalls a ROOT library and every installed dependency no other
+	    installed root needs (a root is never removed as a dependency). Same
+	    refusals and same `.suppr` discipline as `desinstaller`: every folder
+	    goes aside first; if one cannot, the ones already moved come back and
+	    nothing changed. A name that is not a root throws. */
+	desinstallerRacine(racine: string): Promise<{ ok: true } | { ok: false; requisPar: string[] }>;
 	/** Every library (dependents first), then the interpreter. Stops at the
 	    first folder that cannot be removed: what is left is still a
 	    consistent install. */
@@ -240,7 +253,7 @@ function aplatirData(dossier: string): void {
 export function creerInstallationPython(
 	racine: string,
 	transport: TransportInstallation = transportDefaut,
-	catalogue: CataloguePython = { interprete: INTERPRETE, paquets: PAQUETS },
+	catalogue: CataloguePython = { interprete: INTERPRETE, paquets: PAQUETS, racines: RACINES },
 	disque: DisquePython = DISQUE_REEL,
 ): InstallationPython {
 	const base = resolve(racine);
@@ -267,6 +280,15 @@ export function creerInstallationPython(
 	}
 
 	const requisPar = (nom: string): string[] => installes().filter((n) => n !== nom && fermetureDe(n).includes(nom));
+	const estRacine = (nom: string): boolean => (catalogue.racines ?? Object.keys(catalogue.paquets)).includes(nom);
+	const racinesInstallees = (): string[] => installes().filter(estRacine);
+	/** The installed roots other than `racine` whose closure needs it. */
+	const racinesQuiRequierent = (racine: string): string[] => racinesInstallees().filter((n) => n !== racine && fermetureDe(n).includes(racine));
+	/** The installed non-root dependencies of `racine` that no other installed root needs. */
+	function exclusives(racine: string): string[] {
+		const autres = new Set(racinesInstallees().filter((n) => n !== racine).flatMap(fermetureDe));
+		return fermetureDe(racine).filter((n) => n !== racine && !estRacine(n) && installe(n) && !autres.has(n));
+	}
 
 	/** Rewrites the `_pth` from the disk, in one synchronous step (no other
 	    task can interleave): a temp file, then a rename over the old one. */
@@ -459,11 +481,19 @@ export function creerInstallationPython(
 				octets: tailleDossier(dossierPaquet(nom)),
 				requisPar: requisPar(nom),
 			}));
+			const taille = new Map(paquets.map((p) => [p.nom, p.octets]));
+			const racines = racinesInstallees().map((nom) => ({
+				nom,
+				version: catalogue.paquets[nom].version,
+				octets: [nom, ...exclusives(nom)].reduce((s, n) => s + (taille.get(n) ?? 0), 0),
+				requisPar: racinesQuiRequierent(nom),
+			}));
 			return {
 				interprete,
 				version: interprete ? catalogue.interprete.version : null,
 				paquets,
 				octetsTotal: tailleDossier(dossierInterprete) + paquets.reduce((s, p) => s + p.octets, 0),
+				racines,
 			};
 		},
 
@@ -502,6 +532,32 @@ export function creerInstallationPython(
 				const dependants = requisPar(paquet);
 				if (dependants.length) return { ok: false as const, requisPar: dependants };
 				retirerPaquet(paquet);
+				return { ok: true as const };
+			}));
+		},
+
+		desinstallerRacine(racine) {
+			if (!connu(racine) || !estRacine(racine)) return Promise.reject(new Error("Not a root library: " + racine));
+			return enFile(() => garder(async () => {
+				nettoyerLibs();
+				if (!installe(racine)) { ecrirePth(); return { ok: true as const }; }
+				const dependants = racinesQuiRequierent(racine);
+				if (dependants.length) return { ok: false as const, requisPar: dependants };
+				/* The root first, then its dependencies: every folder aside
+				   BEFORE the _pth stops naming them; any refusal puts back
+				   what was moved, so the install is left as it was. */
+				const noms = [racine, ...exclusives(racine)];
+				const deplaces: Array<{ final: string; aCote: string }> = [];
+				try {
+					for (const n of noms) { const final = dossierPaquet(n); deplaces.push({ final, aCote: mettreDeCote(final) }); }
+					ecrirePth();
+				} catch (e) {
+					for (const { final, aCote } of deplaces.reverse()) {
+						try { disque.renommer(aCote, final); } catch (e2) { console.warn(LOG_PREFIX, "python library not put back:", final, e2); }
+					}
+					throw e;
+				}
+				for (const { aCote } of deplaces) retirer(aCote);
 				return { ok: true as const };
 			}));
 		},

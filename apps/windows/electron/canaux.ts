@@ -2196,7 +2196,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	/* NATIVE PYTHON. `paquets` names are checked against the pinned catalogue
 	   in the service (a name that is not a key of `PAQUETS` is refused before
 	   anything moves); progress is pushed like the language packs'. */
-	ipcMain.handle(CANAUX.pythonEtat, (e) => (depuisFenetrePrincipale(e) ? deps.python.etat() : Promise.resolve({ interprete: false, version: null, paquets: [], octetsTotal: 0 })));
+	ipcMain.handle(CANAUX.pythonEtat, (e) => (depuisFenetrePrincipale(e) ? deps.python.etat() : Promise.resolve({ interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] })));
 	ipcMain.handle(CANAUX.pythonInstaller, (e, paquets: unknown) => {
 		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ ok: false, code: "echec" });
 		return deps.python.installer(paquets, (recus, total) => deps.envoyer(CANAUX.pythonProgression, { recus, total }));

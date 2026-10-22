@@ -19,14 +19,20 @@ import { PAGES_PACKS } from "../../electron/pont";
 import { langageActif, reglerLangageActif } from "../host/code";
 import { estMobile } from "../host/platform";
 import { currentHost } from "../../../../src/host/current";
-import { t } from "../../../../src/i18n";
+import { currentLang, t } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
 
 type Pack = "c";
 
-/** Bytes as whole megabytes, the unit a 120 MB pack is read in. */
-function megaOctets(octets: number): number {
-	return Math.max(1, Math.round(octets / 1_000_000));
+/** Megabytes in the UI language's own digits (`Intl.NumberFormat`: "0,6"
+    in French, "0.6" in English): one decimal under 10 MB, whole above, and
+    "< 0,1" rather than a "0" for a library of a few KB. */
+export function megaOctets(octets: number): string {
+	const mo = octets / 1_000_000;
+	const format = (decimales: number, n: number): string =>
+		new Intl.NumberFormat(currentLang(), { minimumFractionDigits: decimales, maximumFractionDigits: decimales }).format(n);
+	if (mo < 0.05) return "< " + format(1, 0.1);
+	return mo < 9.95 ? format(1, mo) : format(0, Math.round(mo));
 }
 
 function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean): void {
@@ -120,17 +126,14 @@ function mountRow(section: HTMLElement, pack: Pack, isDestroyed: () => boolean):
 	void draw();
 }
 
-/** Megabytes for the Python lists: one decimal under 10 MB, whole above. */
-function megaOctetsPrecis(octets: number): string {
-	const mo = octets / 1_000_000;
-	return mo < 10 ? (Math.round(mo * 10) / 10).toFixed(1) : String(Math.round(mo));
-}
-
 /* The NATIVE Python (`pont().python`): the managed interpreter, then one
-   plain line per installed library. Libraries download by themselves the
+   plain line per installed library A USER INSTALLS (torch, numpy, pandas…,
+   `etat().racines`), never a line for a dependency on its own: each size
+   counts the library and the dependencies no other installed one needs,
+   which its uninstall removes with it. Libraries download by themselves the
    first time a block imports them; here they can only be removed, a library
-   that other installed ones need being refused (button off, the line says by
-   whom). On the phone Python runs on the PC, so the row is a single line. */
+   that another installed one needs being refused (button off, the line says
+   by whom). On the phone Python runs on the PC, so the row is a single line. */
 function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void {
 	const row = ajouter(section, "div", "nq-reglages-dossier nq-langage nq-python");
 	currentHost().ui.setIcon(ajouter(row, "span", "nq-reglages-icone"), "file-code-2");
@@ -195,7 +198,7 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 	});
 
 	async function draw(): Promise<void> {
-		const st = await pont().python.etat().catch(() => ({ interprete: false, version: null, paquets: [], octetsTotal: 0 }));
+		const st = await pont().python.etat().catch(() => ({ interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] }));
 		if (isDestroyed()) return;
 		remove.hidden = !st.interprete;
 		remove.disabled = false;
@@ -204,22 +207,23 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 		downloadIcon.hidden = false;
 		percentLabel.hidden = true;
 		state.textContent = st.interprete
-			? t("settings.languages.installed", { version: st.version ?? "", size: megaOctetsPrecis(st.octetsTotal) })
+			? t("settings.languages.installed", { version: st.version ?? "", size: megaOctets(st.octetsTotal) })
 			: t("settings.languages.notInstalled");
 		libs.replaceChildren();
 		libs.hidden = !st.interprete;
 		if (!st.interprete) return;
-		if (!st.paquets.length) {
+		const racines = st.racines ?? [];
+		if (!racines.length) {
 			ajouter(libs, "div", "nq-python-lib-vide", t("settings.python.none"));
 			return;
 		}
 		const somme = st.paquets.reduce((n, p) => n + p.octets, 0);
-		ajouter(libs, "div", "nq-python-libs-titre", t("settings.python.libraries", { size: megaOctetsPrecis(somme) }));
-		for (const p of st.paquets) {
+		ajouter(libs, "div", "nq-python-libs-titre", t("settings.python.libraries", { size: megaOctets(somme) }));
+		for (const p of racines) {
 			const ligne = ajouter(libs, "div", "nq-python-lib");
 			const nom = ajouter(ligne, "div", "nq-python-lib-texte");
 			ajouter(nom, "span", "nq-python-lib-nom", p.nom + " " + p.version);
-			const taille = t("settings.python.size", { size: megaOctetsPrecis(p.octets) });
+			const taille = t("settings.python.size", { size: megaOctets(p.octets) });
 			ajouter(nom, "span", "nq-python-lib-detail", p.requisPar.length ? taille + " · " + t("settings.python.requiredBy", { names: p.requisPar.join(", ") }) : taille);
 			const bouton = ajouter(ligne, "button", "qbd-sync-action qbd-sync-action-danger nq-python-lib-bouton", t("settings.python.uninstall"));
 			bouton.type = "button";

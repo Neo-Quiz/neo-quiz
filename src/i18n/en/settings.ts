@@ -13,7 +13,7 @@ export const EN_SETTINGS = {
 
 	/* ── Settings › Languages (app only): the downloadable language packs ── */
 	"settings.languages.title": "Languages",
-	"settings.languages.hint": "Each language downloads once, from the source shown, and runs isolated from your files and the network.",
+	"settings.languages.hint": "C and C++ download once, from the source shown, and run isolated from your files and the network. Python runs on this PC with access to your files and the Internet, after a warning.",
 	"settings.languages.c": "C and C++ (Clang)",
 	"settings.languages.python": "Python",
 	"settings.python.libraries": "Installed libraries · {size} MB",

@@ -339,7 +339,7 @@ const pont: Pont = {
 	   the shared host code (`host/code.ts`) keeps working here; the rest is empty. */
 	python: {
 		// Always "no native interpreter": Android shows "Python runs on your PC" (Task 7).
-		etat: async () => ({ interprete: false, version: null, paquets: [], octetsTotal: 0 }),
+		etat: async () => ({ interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] }),
 		async installer(_paquets, surProgression) {
 			const off = abonner<{ recus: number; total: number }>("langages.progression", (d) => surProgression(d.recus, d.total));
 			try {

@@ -10,6 +10,9 @@ export const PAQUETS: Record<string, { version: string; url: string; sha256: str
 /** Import name to root package. */
 export const IMPORTS: Record<string, string> = IMPORTS_DATA;
 export const STDLIB: ReadonlySet<string> = new Set(STDLIB_DATA);
+/** The libraries a user installs (what a block imports), as Settings lists them:
+    every other pinned package is only ever a dependency of one of these. */
+export const RACINES: readonly string[] = [...new Set(Object.values(IMPORTS))].sort();
 
 /** The package and its transitive dependencies, dependencies first.
     `paquets` is the installer check's seam (a fake catalogue); a name that

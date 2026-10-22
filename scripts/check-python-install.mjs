@@ -35,6 +35,8 @@ import { forgeZip } from "./lib/zip-forge.mjs";
 
 const r = makeReporter("Python installer");
 const tmp = mkdtempSync(join(tmpdir(), "neo-python-install-"));
+/* B2 runs in its own folder: the snapshots of the other sections cover `tmp` whole. */
+const tmpR = mkdtempSync(join(tmpdir(), "neo-python-install-roots-"));
 
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 
@@ -192,7 +194,7 @@ try {
 		const racineA = join(tmp, "a", "python");
 		const tA = transportFaux();
 		const instA = creerInstallationPython(racineA, tA, CATALOGUE);
-		r.check("a fresh root reads as nothing installed", await instA.etat(), { interprete: false, version: null, paquets: [], octetsTotal: 0 });
+		r.check("a fresh root reads as nothing installed", await instA.etat(), { interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] });
 		r.check("chemins: python.exe in the interpreter folder", instA.chemins(), { executable: join(resolve(racineA), "interpreteur", "python.exe"), dossier: join(resolve(racineA), "interpreteur") });
 
 		const progres = [];
@@ -412,6 +414,37 @@ try {
 			pannes.length = 0;
 		}
 
+		/* ── 16b. B2: Settings lists ROOTS; uninstalling a root takes its own dependencies ── */
+		{
+			/* `alt` shares tzdata with pandas (the leaf wheel's bytes under another name). */
+			const CAT_R = { ...CATALOGUE, paquets: { ...CATALOGUE.paquets, alt: pin(urlDe("leaf-"), leafZip, "1.0", ["tzdata"]) }, racines: ["alt", "numpy", "pandas"] };
+			const racineR = join(tmpR, "r", "python");
+			const instR = creerInstallationPython(racineR, transportFaux(), CAT_R, DISQUE_FAUX);
+			await instR.installer(["pandas"], () => {});
+			const eR = await instR.etat();
+			const tailleDe = (nom, version) => taille(join(racineR, "libs", nom + "-" + version));
+			r.check("B2: etat.racines lists the roots only (tzdata is a dependency)", eR.racines.map((x) => x.nom), ["numpy", "pandas"]);
+			r.check("B2: a root's size counts the dependencies no other root needs (pandas + tzdata, not numpy)",
+				eR.racines.find((x) => x.nom === "pandas").octets, tailleDe("pandas", "3.0.6") + tailleDe("tzdata", "2026.1"));
+			r.check("B2: a root another root needs says so (numpy needed by pandas)", eR.racines.find((x) => x.nom === "numpy").requisPar, ["pandas"]);
+			r.check("B2: uninstalling a root another root needs is refused", await instR.desinstallerRacine("numpy"), { ok: false, requisPar: ["pandas"] });
+			r.check("B2: a dependency is not a root: refused before anything moves", await codeDe(instR.desinstallerRacine("tzdata")), "not an install error: Not a root library: tzdata");
+			const avantR = snapshot(tmpR);
+			pannes.push({ op: "renommer", quand: (de) => de.endsWith("tzdata-2026.1"), code: "EBUSY" });
+			r.check("B2: a dependency in use: occupe", await codeDe(instR.desinstallerRacine("pandas")), "occupe");
+			r.check("B2: ...and the root moved aside first is put back: nothing changed", snapshot(tmpR), avantR);
+			pannes.length = 0;
+			pannes.push({ op: "ecrire", quand: (c) => c.endsWith("._pth.tmp"), code: "ENOSPC" });
+			r.check("B2: a _pth that cannot be written: io, everything put back", [await codeDe(instR.desinstallerRacine("pandas")), JSON.stringify(snapshot(tmpR)) === JSON.stringify(avantR)], ["io", true]);
+			pannes.length = 0;
+			await instR.installer(["alt"], () => {});
+			const eR2 = await instR.etat();
+			r.check("B2: with alt installed, pandas' size no longer counts the shared tzdata", eR2.racines.find((x) => x.nom === "pandas").octets, tailleDe("pandas", "3.0.6"));
+			r.check("B2: uninstalling pandas keeps tzdata (alt needs it) and numpy (a root)", [await instR.desinstallerRacine("pandas"), readdirSync(join(racineR, "libs")).sort()], [{ ok: true }, ["alt-1.0", "numpy-2.5.4", "tzdata-2026.1"]]);
+			r.check("B2: uninstalling alt then takes tzdata with it", [await instR.desinstallerRacine("alt"), readdirSync(join(racineR, "libs")).sort(), lirePth(racineR)], [{ ok: true }, ["numpy-2.5.4"], ["python312.zip", ".", lib(racineR, "numpy-2.5.4")]]);
+			r.check("B2: no .suppr left behind", readdirSync(join(racineR, "libs")).some((n) => n.endsWith(".suppr")), false);
+		}
+
 		/* ── 17. A disk error during an install is io, not reseau ── */
 		pannes.push({ op: "renommer", quand: (de) => de.endsWith("leaf-1.0.part"), code: "ENOSPC" });
 		r.check("a rename refused by the disk during an install: io", await codeDe(instH.installer(["leaf"], () => {})), "io");
@@ -461,11 +494,12 @@ try {
 		pannes.length = 0;
 		r.check("remove everything: ok", await instH.supprimerTout(), { ok: true });
 		r.check("...nothing is left under the root", readdirSync(racineH), []);
-		r.check("...etat reads nothing installed", await instH.etat(), { interprete: false, version: null, paquets: [], octetsTotal: 0 });
+		r.check("...etat reads nothing installed", await instH.etat(), { interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] });
 		await instH.installer(["leaf"], () => {});
 		r.check("...and a new install after it works", readdirSync(join(racineH, "libs")), ["leaf-1.0"]);
 	});
 } finally {
 	rmSync(tmp, { recursive: true, force: true });
+	rmSync(tmpR, { recursive: true, force: true });
 }
 r.done();

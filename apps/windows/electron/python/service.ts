@@ -12,7 +12,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { CodeRun } from "../../../../src/host/types";
-import { PAQUETS } from "./catalogue";
+import { PAQUETS, RACINES } from "./catalogue";
 import { executerPython, verifierImports } from "./execution";
 import type { EtatPython, InstallationPython } from "./installation";
 import { estErreurPython } from "./installation";
@@ -28,6 +28,8 @@ export interface ServicePython {
 	etat(): Promise<EtatPython>;
 	/** Every name must be a key of `PAQUETS`, else refused (`echec`) before anything moves. */
 	installer(paquets: unknown, progression: (recus: number, total: number) => void): Promise<ResultatInstallation>;
+	/** A ROOT library (Settings lists only those), with the dependencies no
+	    other installed root needs. Any other name: `inconnu`. */
 	desinstaller(paquet: unknown): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
 	/** Removes every library then the interpreter ("Delete" in Settings). */
 	supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
@@ -88,9 +90,9 @@ export function creerServicePython(installation: InstallationPython, dossierTemp
 		},
 
 		async desinstaller(paquet) {
-			if (typeof paquet !== "string" || !Object.hasOwn(PAQUETS, paquet)) return { ok: false, code: "inconnu" };
+			if (typeof paquet !== "string" || !RACINES.includes(paquet)) return { ok: false, code: "inconnu" };
 			try {
-				return await installation.desinstaller(paquet);
+				return await installation.desinstallerRacine(paquet);
 			} catch (err) {
 				return { ok: false, code: estErreurPython(err) && err.code === "occupe" ? "occupe" : "io" };
 			}
