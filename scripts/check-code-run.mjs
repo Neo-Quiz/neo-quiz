@@ -179,8 +179,8 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 		r.check("C keeps 10 s", jobs[0]?.timeoutMs, 10000);
 	}
 
-	// WARNING BEFORE A PYTHON RUN.
-	async function essai({ reponse = "run", coche = false, modals = true, langue = "python", masques = new Set(), codeSource = 'print("x")', clics = 1 } = {}) {
+	// WARNING BEFORE A PYTHON RUN: the PHONE's modal (on the PC the main process asks, final review I1).
+	async function essai({ reponse = "run", coche = false, modals = true, langue = "python", masques = new Set(), codeSource = 'print("x")', clics = 1, mobile = true } = {}) {
 		const container = fabriquerBloc(langue);
 		container.querySelector("code").textContent = codeSource;
 		const runs = [], masquees = [];
@@ -191,6 +191,7 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 				avertissement: { masque: async c => masques.has(c), masquer: async c => { masquees.push(c); masques.add(c); } },
 			},
 			ui: { setIcon: () => {} },
+			platform: { isMobile: mobile },
 		};
 		if (modals) host.modals = fauxModals(reponse, coche);
 		const ctx = { container, sourcePath: "Q/a.md", host };
@@ -247,6 +248,7 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 			code: { languages: () => ["python"], run: async () => { runs++; return { status: "ok", stdout: "" }; }, warm: () => {}, avertissement: { masque: async () => false, masquer: async () => {} } },
 			modals: { open: spec => { ouvert++; const contentEl = document.createElement("div"); const handle = { panelEl: contentEl, contentEl, close: () => spec.onClose?.() }; spec.onOpen(handle); fermer = () => contentEl.querySelectorAll("button")[1].dispatchEvent(new document.defaultView.Event("click")); return handle; } },
 			ui: { setIcon: () => {} },
+			platform: { isMobile: true },
 		};
 		createCodeRunHandlers({ container, sourcePath: "Q/a.md", host }).bindCodeRunButtons();
 		await clic(container); await clic(container);
@@ -254,6 +256,82 @@ await withSrcModule(["src/engine/code-run.ts"], async ({ createCodeRunHandlers }
 		fermer();
 		for (let i = 0; i < 6; i++) await new Promise(res => setTimeout(res, 0));
 		r.check("double click: a single run", runs, 1);
+	}
+
+	// I1: ON THE PC the window asks nothing and decides nothing: the job goes
+	// to the main process, which shows the native warning (garde.ts).
+	{
+		const e = await essai({ mobile: false, reponse: "cancel", masques: new Set() });
+		r.check("PC: no renderer modal", e.ouvertures, 0);
+		r.check("PC: the job goes to the main process once", e.runs.length, 1);
+		r.check("PC: the job names its note (the main process keys the warning on it)", e.runs[0]?.sourcePath, "Q/a.md");
+	}
+
+	// STOP: while a Python run is under way, ▶ is Stop; Stop cancels THAT run.
+	function hoteArretable({ langue = "python", resultat = { status: "ok", stdout: "fini" } } = {}) {
+		const jobs = [], annules = [], icones = [];
+		let finir = null;
+		const host = {
+			code: {
+				languages: () => [langue],
+				run: job => { jobs.push(job); return new Promise(res => { finir = () => res(resultat); }); },
+				warm: () => {},
+				cancel: id => { annules.push(id); finir?.(); },
+			},
+			ui: { setIcon: (el, nom) => { icones.push(nom); el.replaceChildren(); } },
+		};
+		return { host, jobs, annules, icones, finir: () => finir?.() };
+	}
+	{
+		const h = hoteArretable({ resultat: { status: "unavailable", stdout: "" } });
+		const container = fabriquerBloc();
+		creer({ container, host: h.host }).bindCodeRunButtons();
+		const btn = container.querySelector(".quiz-code-run-btn");
+		btn.innerHTML = '<svg><polygon points="6 3 20 12 6 21 6 3"/></svg>'; // the play icon grammaire-blocs.ts emits
+		await clic(container);
+		r.check("Stop: while running, the button is Stop (enabled, square, aria-label)", [btn.disabled, btn.classList.contains("quiz-code-run-stop"), h.icones.at(-1), btn.getAttribute("aria-label")], [false, true, "square", "Stop"]);
+		r.check("Stop: the job carries an id", typeof h.jobs[0]?.id === "string" && h.jobs[0].id.length >= 8, true);
+		await clic(container);
+		r.check("Stop: cancel called once, with the job's id", h.annules, [h.jobs[0]?.id]);
+		r.check("Stop: no second run", h.jobs.length, 1);
+		r.check("Stop: the output says Stopped, nothing more", container.querySelector(".quiz-code-output").textContent, "Stopped.");
+		r.check("Stop: the button is Run again, with its play icon", [btn.disabled, btn.classList.contains("quiz-code-run-stop"), btn.getAttribute("aria-label"), !!btn.querySelector("svg polygon")], [false, false, "Run", true]);
+	}
+	{
+		const h = hoteArretable();
+		const container = fabriquerBloc();
+		creer({ container, host: h.host }).bindCodeRunButtons();
+		await clic(container);
+		h.finir();
+		for (let i = 0; i < 6; i++) await new Promise(res => setTimeout(res, 0));
+		r.check("Stop not pressed: the output is the run's", container.querySelector(".quiz-code-output").textContent, "fini");
+		r.check("Stop not pressed: cancel never called", h.annules.length, 0);
+	}
+	{
+		const h = hoteArretable({ langue: "c" });
+		const container = fabriquerBloc("c");
+		creer({ container, host: h.host }).bindCodeRunButtons();
+		const btn = container.querySelector(".quiz-code-run-btn");
+		await clic(container);
+		r.check("C: no Stop (disabled while it runs, no id)", [btn.disabled, btn.classList.contains("quiz-code-run-stop"), h.jobs[0]?.id], [true, false, undefined]);
+		h.finir();
+	}
+	{
+		/* Cancel in the main process's native warning: the output stays hidden, no message. */
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => ({ status: "unavailable", stdout: "", error: "cancelled" }), warm: () => {}, cancel: () => {} }, ui: { setIcon: () => {} } };
+		creer({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		const sortie = container.querySelector(".quiz-code-output");
+		r.check("PC: Cancel in the native warning shows nothing", [sortie.hidden, sortie.textContent], [true, ""]);
+	}
+	// The PC's answers to the phone, by name.
+	for (const [error, attendu] of [["refused", "Your PC refused to run code for this device."], ["pc-installing", "Your PC is downloading a library: try again in a minute."]]) {
+		const container = fabriquerBloc();
+		const host = { code: { languages: () => ["python"], run: async () => ({ status: "unavailable", stdout: "", error }), warm: () => {} }, ui: { setIcon: () => {} } };
+		creer({ container, host }).bindCodeRunButtons();
+		await clic(container);
+		r.check("phone answer " + error + " named", container.querySelector(".quiz-code-output").textContent, attendu);
 	}
 
 	r.done();

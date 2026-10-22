@@ -50,6 +50,16 @@ export const EN_APP = {
 	"app.aiHost.detail": "This server is neither a known host nor on your local network. Allow it only if you set it up yourself.",
 	"app.aiHost.allow": "Allow",
 	"app.aiHost.deny": "Cancel",
+	/* The native dialogs of a Python run (electron/python/garde.ts); the run
+	   warning itself reuses engine.code.warning*. */
+	"app.pythonRun.moreLines": "… and {count} more lines",
+	"app.pythonRun.longLines": "Some lines are longer than 200 characters: their end is not shown.",
+	"app.pythonRun.hiddenChars": "This code contains invisible or direction-changing characters (shown as �): it may not do what it looks like.",
+	"app.pythonDevice.title": "Python from another device",
+	"app.pythonDevice.message": "Allow {name} to run Python on this PC?",
+	"app.pythonDevice.detail": "It will then be able to run the Python code of your quizzes on this PC, with access to your files and the Internet, without asking each time.",
+	"app.pythonDevice.allow": "Allow",
+	"app.pythonDevice.refuse": "Refuse",
 	"app.aiTrust.title": "Trust this folder?",
 	"app.aiTrust.able": "Claude Code and Codex will be able to read, edit and run files in this folder.",
 	"app.aiTrust.short": "Are these your own courses, or files from people you trust? A received file (a shared quiz, a downloaded PDF) can hold instructions the AI might follow.",

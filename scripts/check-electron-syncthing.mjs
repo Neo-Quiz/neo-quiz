@@ -487,6 +487,11 @@ await withSrcModule(
 				if (req.url === "/rest/system/status") { res.end(JSON.stringify({ myID: ID })); return; }
 				if (req.url === "/rest/boom") { res.statusCode = 500; res.end("boom"); return; }
 				if (req.url.startsWith("/rest/events")) { res.end("[]"); return; }
+				if (req.url.startsWith("/rest/db/file?")) {
+					if (req.url.includes("missing")) { res.statusCode = 404; res.end("No such object in the index"); return; }
+					res.end(JSON.stringify({ global: { modifiedBy: "ABCDEFG", blocksHash: "h", deleted: false, invalid: false, type: "FILE_INFO_TYPE_FILE" } }));
+					return;
+				}
 				if (req.url.startsWith("/rest/db/status")) { res.end(JSON.stringify({ state: "idle", globalBytes: 1, inSyncBytes: 1 })); return; }
 				if (req.url === "/rest/config/devices") { res.end(JSON.stringify([{ deviceID: ID, name: "x" }])); return; }
 				res.statusCode = 200;
@@ -523,6 +528,13 @@ await withSrcModule(
 				r.check("events carries since and the type filter", requetes.at(-1).url, "/rest/events?since=41&timeout=1&events=StateChanged%2CItemFinished");
 				r.check("folderStatus", await api.folderStatus("neo-quiz"), { state: "idle", globalBytes: 1, inSyncBytes: 1 });
 				r.check("folderStatus url", requetes.at(-1).url, "/rest/db/status?folder=neo-quiz");
+				/* The remote Python gate's one call (python/distant.ts): who made the
+				   current version of a file. The path is a query value, encoded. */
+				r.check("dbFile reads the global record", (await api.dbFile("neo-quiz", ".neo-quiz/code-runs/requests/x/a b.json")).global.modifiedBy, "ABCDEFG");
+				r.check("dbFile url: folder and file, the file encoded", requetes.at(-1).url, "/rest/db/file?folder=neo-quiz&file=.neo-quiz%2Fcode-runs%2Frequests%2Fx%2Fa%20b.json");
+				let introuvable = null;
+				try { await api.dbFile("neo-quiz", "missing.json"); } catch (e) { introuvable = String(e.message); }
+				r.check("dbFile on a file not in the index throws (404)", !!introuvable && introuvable.includes("404"), true);
 				await api.setIgnores("neo-quiz", ["a", "b"]);
 				r.check("setIgnores posts the lines", { m: requetes.at(-1).method, u: requetes.at(-1).url, b: JSON.parse(requetes.at(-1).corps) }, { m: "POST", u: "/rest/db/ignores?folder=neo-quiz", b: { ignore: ["a", "b"] } });
 				await api.patchOptions({ startBrowser: false });
@@ -540,10 +552,10 @@ await withSrcModule(
 			});
 			await cas(r, "rest refuses an id that is not a path segment", async () => {
 				let refus = 0;
-				for (const f of [() => api.dismissPendingDevice("x&device=y"), () => api.deleteDevice("../folders/x"), () => api.putFolder({ id: "../x" }), () => api.folderStatus("a&b=c")]) {
+				for (const f of [() => api.dismissPendingDevice("x&device=y"), () => api.deleteDevice("../folders/x"), () => api.putFolder({ id: "../x" }), () => api.folderStatus("a&b=c"), () => api.dbFile("a&file=b", "x")]) {
 					try { await f(); } catch { refus++; }
 				}
-				r.check("path-like ids never reach a URL", refus, 4);
+				r.check("path-like ids never reach a URL", refus, 5);
 			});
 		} finally {
 			serveur.closeAllConnections();
@@ -612,6 +624,22 @@ await withSrcModule(
 						r.check("the paired device is listed, not connected", apres.appareils.map(a => [a.id, a.connecte]), [[AUTRE_ID, false]]);
 						await h.oublier(AUTRE_ID);
 						r.check("forgetting removes it", (await h.etat()).appareils.length, 0);
+						/* The remote Python gate (python/distant.ts) on the real index: a file
+						   written HERE is unknown until scanned, then made by THIS device, and
+						   its blocksHash is SHA-256(SHA-256(bytes)) for a one-block file. */
+						const rel = ".neo-quiz/code-runs/requests/bbbbbbbb-0000-4000-8000-000000000002/req-real.json";
+						mkdirSync(join(tmp, "r2", ".neo-quiz", "code-runs", "requests", "bbbbbbbb-0000-4000-8000-000000000002"), { recursive: true });
+						const octets = Buffer.from('{"forged":true}');
+						writeFileSync(join(tmp, "r2", ...rel.split("/")), octets);
+						const o = await h.origine();
+						r.check("origine: the folder, our id, no paired device", [o?.racine, o?.idPropre === etat.appareil, o?.pairs], [join(tmp, "r2"), true, []]);
+						r.check("origine: a file written here, not scanned yet: not in the index", await o.fichier(rel), null);
+						h.signalerEcriture(join(tmp, "r2", ...rel.split("/")));
+						let info = null;
+						for (const fin = Date.now() + 15000; !info && Date.now() < fin;) { await new Promise(ok => setTimeout(ok, 250)); info = await o.fichier(rel); }
+						const { createHash } = await import("node:crypto");
+						const attendu = createHash("sha256").update(createHash("sha256").update(octets).digest()).digest("base64");
+						r.check("origine: once scanned, made by THIS device, blocksHash of its bytes", info && [info.modifiedBy === etat.appareil.slice(0, 7), info.blocksHash === attendu, info.deleted, info.type], [true, true, false, "FILE_INFO_TYPE_FILE"]);
 					} finally {
 						await h.stop();
 					}

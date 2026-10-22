@@ -16,9 +16,10 @@ release notes.
 ### Added
 
 - Python blocks run in a real Python on your PC: fast, with every course library (such as PyTorch), downloaded the first time you need it.
-- A warning appears before each run, with "Don't show again for this quiz".
-- On the phone, Python blocks run on your PC.
-- Settings list the Python libraries with their size and let you uninstall them.
+- A warning appears before each run, showing the code, with "Don't show again for this quiz".
+- On the phone, Python blocks run on your PC; the first time, your PC asks you to allow that phone.
+- A running Python block can be stopped.
+- Settings list the Python libraries you use with their size and let you uninstall them.
 
 ### Changed
 

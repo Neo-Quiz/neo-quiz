@@ -1012,6 +1012,12 @@ export interface CodeJob {
 	    for Python: the phone sends it to the PC, which reads the block there
 	    itself (dashboard/code-run-remote.ts). Never read by the PC's own run. */
 	sourcePath?: string;
+	/** A Python run's id, chosen by the engine, for `HostCode.cancel`. */
+	id?: string;
+	/** A phone's request this PC is asked to run (dashboard/code-run-remote.ts):
+	    the device and the request file, relative to the synced root. The main
+	    process judges that file itself before anything runs. */
+	distant?: { appareil: string; demande: string };
 }
 /** What the sandbox returns, never more than these fields. `compile-error`:
     the compiler refused the program; `error` carries its message.
@@ -1040,10 +1046,16 @@ export interface HostCode {
 	    but failed its integrity check and was not installed. OPTIONAL: a
 	    host whose languages are all built in has nothing to download. */
 	installer?(language: CodeLanguage, onProgress: (percent: number) => void, paquets?: string[]): Promise<"ok" | "offline" | "refused" | "failed">;
-	/** The « run this code on your PC? » warning shown before every Python
-	    run: `masque(cle)` is true once the user ticked « don't show again » for
-	    that key (note path + code hash). Without it, Python is never run. */
+	/** The PHONE's « run this code on your PC? » warning, shown before every
+	    Python run it sends to the PC: `masque(cle)` is true once the user
+	    ticked « don't show again » for that key (note path + code hash).
+	    Without it, the phone never sends Python. On the PC the warning is a
+	    native dialog of the main process (electron/python/garde.ts): the
+	    Windows host has no such store there. */
 	avertissement?: { masque(cle: string): Promise<boolean>; masquer(cle: string): Promise<void> };
+	/** Stops the Python run started with `job.id` (the engine's Stop button):
+	    its `run` then answers `unavailable`. OPTIONAL. */
+	cancel?(id: string): void;
 }
 
 /**

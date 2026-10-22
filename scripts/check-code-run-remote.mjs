@@ -87,8 +87,10 @@ await withSrcModule(
 		r.check("expediteur: `from` is this PC (its own folder never runs)", v(good({ from: PC }), ctx({ fileDevice: PC })).raison, "expediteur");
 		r.check("expediteur: `from` is not a device id", v(good({ from: "bob" }), ctx({ fileDevice: "bob" })).raison, "expediteur");
 		r.check("destinataire: addressed to another PC", v(good({ target: PH2 })).raison, "destinataire");
-		r.check("age: 119 s old is accepted", v(good({ at: NOW - 119_000 })).ok, true);
-		r.check("age: 121 s old is dropped, never run late", v(good({ at: NOW - 121_000 })).raison, "age");
+		/* I3: a request never STARTS after the phone gave up (90 s): 60 s at most. */
+		r.check("age: MAX_AGE_MS is 15 s or more below the phone's wait", [Q.MAX_AGE_MS, Q.PHONE_WAIT_MS, R.WAIT_MS], [60_000, 90_000, 90_000]);
+		r.check("age: 59 s old is accepted", v(good({ at: NOW - 59_000 })).ok, true);
+		r.check("age: 61 s old is dropped, never run late", v(good({ at: NOW - 61_000 })).raison, "age");
 		r.check("futur: 29 s ahead is tolerated", v(good({ at: NOW + 29_000 })).ok, true);
 		r.check("futur: 31 s ahead is refused", v(good({ at: NOW + 31_000 })).raison, "futur");
 		for (const bad of ["../x.md", "a/../../x.md", "/etc/x.md", "C:/x.md", "c:x.md", "a\\b.md", "\\\\srv\\share\\x.md", "a/b.md::$DATA", "a/b.md ", "a/b.md.", ".neo-quiz/x.md", ".NEO-QUIZ/journal/x.md", "x.txt", "x.markdown", "x.py", "con.md", "Cours/aux.md", "PROGRA~1/x.md", "", ".md", "a//b.md", "a/./b.md", "x?.md", "Cours/e\u0301.md", "a\u202e.md", "a".repeat(600) + ".md"]) {
@@ -147,7 +149,6 @@ await withSrcModule(
 				device: PC, now: () => w.now, files: w.files, state: w.state,
 				readNote: async (rel) => { w.noteReads.push(rel); return notes[rel] ?? null; },
 				run: async (job) => { w.runs.push(job); return w.runImpl(job); },
-				install: async (missing) => { w.installs.push(missing); return "ok"; },
 				takenLog: { read: async () => [...w.taken], write: async (list) => { w.taken = [...list]; } },
 			});
 			w.pass = () => quiet(() => R.traiterDemandes(w.deps()));
@@ -218,10 +219,13 @@ await withSrcModule(
 		{
 			const w = pcWorld();
 			let n = 0;
-			w.runImpl = async () => (++n === 1 ? { status: "not-installed", stdout: "", missing: ["torch"] } : { status: "ok", stdout: "tensor\n" });
+			w.runImpl = async () => (++n === 1 ? { status: "not-installed", stdout: "", missing: ["torch"], error: "pc-installing" } : { status: "ok", stdout: "tensor\n" });
 			await w.send();
 			await w.pass();
-			r.check("PC: missing pinned libraries installed once, then one more run", [w.installs, w.runs.length, w.result("lq3k2-abc123")?.stdout], [[["torch"]], 2, "tensor\n"]);
+			/* I2/I3: the window installs nothing for a phone: the main process does,
+			   inline or in the background, and the answer says which. */
+			r.check("PC: the window never installs; 'pc-installing' reaches the phone's result", [w.runs.length, w.result("lq3k2-abc123")?.status, w.result("lq3k2-abc123")?.error], [1, "not-installed", "pc-installing"]);
+			r.check("PC: the job names the request file for the main process to judge", w.runs[0]?.distant, { appareil: PH, demande: Q.requestPath(PH, "lq3k2-abc123") });
 		}
 		{
 			const w = pcWorld();
@@ -296,20 +300,17 @@ await withSrcModule(
 			r.check("admission: counted on the runs of the hour when given", Q.admettre({ id: "new-1234", from: PH }, { taken: [], busy: false, runs: twenty }, NOW), "rate");
 		}
 		{
-			// `missing` from a run is bounded before any install is asked.
-			for (const [n, missing] of [["21 names", Array.from({ length: 21 }, (_, i) => "pkg" + i)], ["a path", ["../evil"]], ["a space", ["a b"]], ["not a string", [3]]]) {
-				const w = pcWorld();
-				w.runImpl = async () => ({ status: "not-installed", stdout: "", missing });
-				await w.send();
-				await w.pass();
-				r.check("PC: install never asked for missing = " + n, [w.installs.length, w.result("lq3k2-abc123")?.status], [0, "unavailable"]);
-			}
+			// Any other not-installed (no error) is written as unavailable.
 			const w = pcWorld();
-			let k = 0;
-			w.runImpl = async () => (++k === 1 ? { status: "not-installed", stdout: "", missing: ["scikit-learn", "typing_extensions"] } : { status: "ok", stdout: "" });
+			w.runImpl = async () => ({ status: "not-installed", stdout: "", missing: ["torch"] });
 			await w.send();
 			await w.pass();
-			r.check("PC: real package names pass", w.installs, [["scikit-learn", "typing_extensions"]]);
+			r.check("PC: a plain not-installed is answered unavailable", [w.runs.length, w.result("lq3k2-abc123")?.status, w.result("lq3k2-abc123")?.error], [1, "unavailable", undefined]);
+			const w2 = pcWorld();
+			w2.runImpl = async () => ({ status: "unavailable", stdout: "", error: "refused" });
+			await w2.send();
+			await w2.pass();
+			r.check("PC: the owner's refusal reaches the phone's result", w2.result("lq3k2-abc123")?.error, "refused");
 		}
 
 		/* ── 4. The phone ── */
@@ -360,11 +361,36 @@ await withSrcModule(
 		}
 		{
 			const w = pcWorld();
-			w.deps = ((orig) => () => ({ ...orig(), install: undefined }))(w.deps);
 			w.runImpl = async () => ({ status: "not-installed", stdout: "", missing: ["torch"] });
 			const d = phone(w);
 			d.onSleep = async () => { await w.pass(); };
 			r.check("round trip: the phone never asks to install (not-installed -> unavailable)", (await R.executerSurPc(job(), d)).status, "unavailable");
+		}
+		{
+			const w = pcWorld();
+			w.runImpl = async () => ({ status: "not-installed", stdout: "", missing: ["torch"], error: "pc-installing" });
+			const d = phone(w);
+			d.onSleep = async () => { await w.pass(); };
+			r.check("round trip: the PC downloading -> the phone says pc-installing", await R.executerSurPc(job(), d), { status: "unavailable", stdout: "", error: "pc-installing" });
+		}
+		{
+			const w = pcWorld();
+			w.runImpl = async () => ({ status: "unavailable", stdout: "", error: "refused" });
+			const d = phone(w);
+			d.onSleep = async () => { await w.pass(); };
+			r.check("round trip: the PC refused this device -> refused", await R.executerSurPc(job(), d), { status: "unavailable", stdout: "", error: "refused" });
+		}
+		{
+			/* Stop on the phone: the request is withdrawn at once, so a PC that has
+			   not started it finds no file and never runs it. */
+			const w = pcWorld();
+			const d = phone(w);
+			const arret = new AbortController();
+			let polls = 0;
+			d.onSleep = async () => { if (++polls === 2) arret.abort(); };
+			const out = await R.executerSurPc(job(), d, arret.signal);
+			await w.pass();
+			r.check("phone Stop: stopped, request withdrawn, the PC runs nothing", [out.error, ownRequests(w), w.runs.length], ["stopped", [], 0]);
 		}
 		{
 			const w = pcWorld();
@@ -381,7 +407,7 @@ await withSrcModule(
 				return container;
 			}
 			const texts = [];
-			for (const error of ["no-pc", "pc-silent", "changed"]) {
+			for (const error of ["no-pc", "pc-silent", "changed", "refused", "pc-installing"]) {
 				const container = block();
 				let release;
 				const jobs = [];
@@ -398,6 +424,8 @@ await withSrcModule(
 				["Running on your PC…", "Python runs on your PC: pair one in Sync.", `${ROOT}/Cours/A.md`],
 				["Running on your PC…", "Your PC did not answer: is it on, with Neo Quiz open?", `${ROOT}/Cours/A.md`],
 				["Running on your PC…", "The quiz changed: open it again.", `${ROOT}/Cours/A.md`],
+				["Running on your PC…", "Your PC refused to run code for this device.", `${ROOT}/Cours/A.md`],
+				["Running on your PC…", "Your PC is downloading a library: try again in a minute.", `${ROOT}/Cours/A.md`],
 			]);
 		}
 		r.done();

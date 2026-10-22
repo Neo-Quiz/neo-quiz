@@ -2,7 +2,7 @@ import { LOG_PREFIX } from "../branding";
 import type { CodeJob, CodeRun } from "../host/types";
 import { blocsPython, sha256Hex } from "../code-blocks";
 import { relativeToRoot } from "../shared-state/chat-merge";
-import { MAX_TAKEN, RESULT_TTL_MS, admettre, construireResultat, lireResultat, validerDemandeCode } from "../shared-state/code-run-request";
+import { MAX_TAKEN, PHONE_WAIT_MS, RESULT_TTL_MS, admettre, construireResultat, lireResultat, requestPath, validerDemandeCode } from "../shared-state/code-run-request";
 import type { CodeRunRequest, CodeRunResult, TakenRun } from "../shared-state/code-run-request";
 import { activityOf, pcReachable, pickTarget, preferredPc } from "./remote-send";
 import type { GenerationsFile } from "../shared-state/generations";
@@ -17,10 +17,14 @@ import type { PairedPeer } from "./remote-generations";
    writes a request naming the note and the SHA-256 of the block it shows
    (`executerSurPc`), then waits for the PC's result file. The PC
    (`traiterDemandes`, every 2 s while the app runs) validates each request
-   (code-run-request.ts), reads the note ITSELF, runs only the block whose hash
-   matches (code-blocks.ts) through its own `HostCode.run` — no modal: the
-   phone already showed the warning and `accepted` is its answer — and writes
-   the result in its own folder. One run at a time, 20 per sender per hour,
+   (code-run-request.ts), reads the note ITSELF, finds the block whose hash
+   matches (code-blocks.ts) and hands it to its own `HostCode.run` with the
+   request file's name (`job.distant`). That is a REQUEST, not a decision: the
+   PC's main process reads the file again, asks Syncthing which device wrote
+   it, checks the code against the note, asks the owner once per device, and
+   installs a missing library itself (apps/windows/electron/python/distant.ts,
+   final review I2) — a window could have forged the file. It writes the
+   result in its own folder. One run at a time, 20 per sender per hour,
    each request run once (local taken list, settings `codeRunsTaken`). Each
    device writes only its own folders: the phone deletes its request, the PC
    its results older than 10 minutes.
@@ -54,9 +58,6 @@ export const newPcState = (): PcState => ({ busy: false, taken: null, runs: null
 export const MAX_REFUSED = 2_000;
 /** A file unreadable now (still syncing) or a little ahead of our clock is read again after this. */
 export const RETRY_MS = 30_000;
-/** `missing` names the root packages to install: at most this many, each a package name. */
-const MAX_MISSING = 20;
-const PACKAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 export interface PcDeps {
 	device: string;
@@ -64,10 +65,8 @@ export interface PcDeps {
 	files: CodeRunFiles;
 	/** The note at a path relative to the synced root, bounded; null when absent or unreadable. */
 	readNote(rel: string): Promise<string | null>;
-	/** The PC's own `HostCode.run` (the Run button's). */
+	/** The PC's own `HostCode.run`, with `job.distant` set: the main process decides. */
 	run(job: CodeJob): Promise<CodeRun>;
-	/** The PC's `HostCode.installer` for Python: pinned libraries only (checked in the main process). */
-	install?(missing: string[]): Promise<"ok" | "offline" | "refused" | "failed">;
 	takenLog: { read(): Promise<TakenRun[]>; write(list: TakenRun[]): Promise<void> };
 	state: PcState;
 }
@@ -82,19 +81,12 @@ async function runBlock(deps: PcDeps, req: CodeRunRequest): Promise<CodeRun> {
 	let code: string | null = null;
 	for (const b of blocsPython(note)) if (await sha256Hex(b) === req.sha256) { code = b; break; }
 	if (code === null) return { status: "unavailable", stdout: "", error: "changed" };
-	const job: CodeJob = { language: "python", code, stdin: "", timeoutMs: RUN_TIMEOUT_MS };
-	let run = await deps.run(job);
-	// Missing pinned libraries are installed once, as after a click on the PC, then the block runs once more.
-	if (run.status === "not-installed" && deps.install) {
-		/* Defence in depth: the main process installs pinned roots only, but a list
-		   longer than any real one, or a name that is not a package name, never leaves here. */
-		const missing = run.missing ?? [];
-		if (missing.length > MAX_MISSING || !missing.every(n => typeof n === "string" && PACKAGE_NAME.test(n))) return { status: "unavailable", stdout: "" };
-		const installed = await deps.install([...missing]);
-		if (installed !== "ok") return { status: "unavailable", stdout: "" };
-		run = await deps.run(job);
-	}
-	return run.status === "not-installed" ? { status: "unavailable", stdout: "" } : run;
+	const job: CodeJob = { language: "python", code, stdin: "", timeoutMs: RUN_TIMEOUT_MS, distant: { appareil: req.from, demande: requestPath(req.from, req.id) } };
+	const run = await deps.run(job);
+	/* The main process installs a missing library itself, inline when the phone
+	   can wait for it, in the background otherwise (`pc-installing`). */
+	if (run.status === "not-installed") return run.error === PC_INSTALLING ? { status: "not-installed", stdout: "", error: PC_INSTALLING } : { status: "unavailable", stdout: "" };
+	return run;
 }
 
 /** One pass of the PC: every new request of the other devices, one at a time. Returns at once while a run is in progress. Never throws. */
@@ -179,7 +171,10 @@ export interface PhoneDeps {
 }
 
 export const POLL_MS = 1_000;
-export const WAIT_MS = 90_000;
+export const WAIT_MS = PHONE_WAIT_MS;
+/** The PC's answers the phone names (`engine.code.pcRefused`, `engine.code.pcInstalling`). */
+export const PC_REFUSED = "refused";
+export const PC_INSTALLING = "pc-installing";
 
 /** Which PC runs the phone's Python: the remote generation's choice (`pickTarget`), reachable as `pcReachable` says; no paired device at all is no PC. */
 export function choosePc(i: { files: ReadonlyArray<{ device: string; file: GenerationsFile }>; now: number; lastEver: string | null; chosen: string | null; devices: ReadonlyArray<DeviceFile>; peers: ReadonlyArray<PairedPeer>; peerConnected: boolean }): { target: string | null; reachable: boolean } {
@@ -189,8 +184,10 @@ export function choosePc(i: { files: ReadonlyArray<{ device: string; file: Gener
 	return { target, reachable: pcReachable(target, i.files, i.now, i.peerConnected) };
 }
 
-/** Runs a Python block of the note on screen on the PC. `unavailable` with `error: "no-pc"` (no PC to ask), `"pc-silent"` (no answer in time) or `"changed"` (the PC found no such block). Never throws. */
-export async function executerSurPc(job: CodeJob, deps: PhoneDeps): Promise<CodeRun> {
+/** Runs a Python block of the note on screen on the PC. `unavailable` with `error: "no-pc"` (no PC to ask), `"pc-silent"` (no answer in time),
+    `"changed"` (the PC found no such block), `"refused"` (the PC's owner refused this device) or `"pc-installing"` (the PC is downloading a
+    library), or `"stopped"` (`signal`, the Stop button: the request is withdrawn, and a PC that has not started it never will). Never throws. */
+export async function executerSurPc(job: CodeJob, deps: PhoneDeps, signal?: AbortSignal): Promise<CodeRun> {
 	if (job.language !== "python") return { status: "unavailable", stdout: "" };
 	const pc = deps.pc();
 	if (!pc.target || !pc.reachable) return { status: "unavailable", stdout: "", error: "no-pc" };
@@ -214,7 +211,9 @@ export async function executerSurPc(job: CodeJob, deps: PhoneDeps): Promise<Code
 	let result: CodeRunResult | null = null;
 	try {
 		while (deps.now() - start < wait) {
+			if (signal?.aborted) return { status: "unavailable", stdout: "", error: "stopped" };
 			await deps.sleep(poll);
+			if (signal?.aborted) return { status: "unavailable", stdout: "", error: "stopped" };
 			// Only the target's own folder: a result written by any other device is never read.
 			result = lireResultat(await deps.files.readResult(target, req.id), req.id);
 			if (result) break;
@@ -224,7 +223,7 @@ export async function executerSurPc(job: CodeJob, deps: PhoneDeps): Promise<Code
 	}
 	if (!result) return { status: "unavailable", stdout: "", error: "pc-silent" };
 	// The phone installs nothing: a PC that could not install answers `unavailable`.
-	if (result.status === "not-installed") return { status: "unavailable", stdout: "" };
+	if (result.status === "not-installed") return result.error === PC_INSTALLING ? { status: "unavailable", stdout: "", error: PC_INSTALLING } : { status: "unavailable", stdout: "" };
 	const run: CodeRun = { status: result.status, stdout: result.stdout };
 	if (result.error !== undefined) run.error = result.error;
 	if (result.unsupported) run.unsupported = result.unsupported;

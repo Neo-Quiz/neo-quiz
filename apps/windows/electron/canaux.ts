@@ -129,6 +129,9 @@ import type { BacASable } from "./code-sandbox";
 import { etatLangage, installerLangage, PACKS, supprimerLangage } from "./langages";
 import type { NomPack } from "./langages";
 import type { ServicePython } from "./python/service";
+import { creerAutorisationsAppareils, creerGardePython, creerMemoireAvertissements, executerPorte } from "./python/garde";
+import type { LibellesGarde } from "./python/garde";
+import { creerExecutionDistante } from "./python/distant";
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
    `main.ts` (never from the window). Only the three verbs below reach it. */
 import type { GestionSync } from "./syncthing";
@@ -186,6 +189,10 @@ export interface DependancesCanaux {
 	/** The native Python (`./python/service.ts`): runs Python blocks and manages
 	    the interpreter and libraries. Python never reaches `code` (the sandbox). */
 	python: ServicePython;
+	/** `userData/python`: where the main-only memory of the Python gate lives
+	    (`avertissements.json`, `appareils.json`), never reachable through the
+	    `reglages` channels. */
+	dossierDonneesPython: string;
 	/** The embedded Syncthing, `null` where there is none (Linux): the `sync`
 	    channels are then not registered at all. */
 	sync: GestionSync | null;
@@ -2128,7 +2135,57 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	   sender only on the RETURN channel (`code-sandbox.ts`) left this one
 	   without a symmetrical guard. */
 	const depuisFenetrePrincipale = (e: Electron.IpcMainInvokeEvent) => e.sender === deps.fenetreCourante()?.webContents;
-	ipcMain.handle(CANAUX.codeRun, (e, job: unknown): Promise<CodeRun> => {
+
+	/* THE PYTHON GATE (final review I1, I2): a Python run never starts on the
+	   window's word. A local run passes the native warning (`garde.ts`), a
+	   phone's run the request checks and the device authorization
+	   (`distant.ts`). Texts resolved HERE, on the language `main.ts` set. */
+	const libellesGarde = (): LibellesGarde => ({
+		titre: t("engine.code.warningTitle"),
+		message: t("engine.code.warningText"),
+		lancer: t("engine.code.warningRun"),
+		annuler: t("engine.code.warningCancel"),
+		nePlusAfficher: t("engine.code.warningDontShow"),
+		lignesRestantes: count => t("app.pythonRun.moreLines", { count }),
+		lignesLongues: t("app.pythonRun.longLines"),
+		invisibles: t("app.pythonRun.hiddenChars"),
+		appareilTitre: t("app.pythonDevice.title"),
+		appareilMessage: name => t("app.pythonDevice.message", { name }),
+		appareilDetail: t("app.pythonDevice.detail"),
+		autoriser: t("app.pythonDevice.allow"),
+		refuser: t("app.pythonDevice.refuse"),
+	});
+	const gardePython = creerGardePython({
+		dialogue: async options => {
+			const parent = deps.fenetreCourante();
+			const { response, checkboxChecked } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+			return { response, checkboxChecked };
+		},
+		libelles: libellesGarde,
+		avertissements: creerMemoireAvertissements(path.join(deps.dossierDonneesPython, "avertissements.json")),
+	});
+	const pythonDistant = creerExecutionDistante({
+		sync: async () => (deps.sync ? deps.sync.origine() : null),
+		/* The id the window generated once (`host/device.ts`). Read, not trusted:
+		   it only decides which phone requests count as addressed to this PC,
+		   every one of which still needs its device's authorization. */
+		idAppareil: async () => { const v = await reglagesOuErreur().lire("deviceId"); return typeof v === "string" ? v : null; },
+		autorisations: creerAutorisationsAppareils(path.join(deps.dossierDonneesPython, "appareils.json")),
+		garde: gardePython,
+		service: deps.python,
+		now: () => Date.now(),
+	});
+	/* Stop (the engine's Stop button): the running or queued Python runs of
+	   the window, by the id it gave. */
+	const runsPython = new Map<string, { sender: Electron.WebContents; controleur: AbortController }>();
+	const ID_RUN = /^[A-Za-z0-9-]{8,64}$/;
+	ipcMain.handle(CANAUX.codeAnnuler, (e, id: unknown) => {
+		if (!depuisFenetrePrincipale(e) || typeof id !== "string") return;
+		const run = runsPython.get(id);
+		if (run && run.sender === e.sender) run.controleur.abort();
+	});
+
+	ipcMain.handle(CANAUX.codeRun, async (e, job: unknown): Promise<CodeRun> => {
 		if (!depuisFenetrePrincipale(e)) return Promise.resolve({ status: "unavailable", stdout: "", error: "job refused" });
 		const o = (job ?? {}) as Record<string, unknown>;
 		const texte = (v: unknown) => typeof v === "string" && v.length <= PLAFOND_CODE;
@@ -2140,11 +2197,26 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		const plafond = o.language === "python" ? 60000 : 10000;
 		const delai = Math.min(plafond, Math.max(100, Number.isFinite(o.timeoutMs) ? Number(o.timeoutMs) : 5000));
 		if (o.language === "python") {
-			/* Closing the window frees a queued run and kills a running one. */
+			const code = o.code as string;
+			const id = o.id === undefined ? null : typeof o.id === "string" && ID_RUN.test(o.id) && !runsPython.has(o.id) ? o.id : undefined;
+			if (id === undefined) return { status: "unavailable", stdout: "", error: "job refused" };
+			/* Closing the window, or Stop, frees a queued run and kills a running one. */
 			const controleur = new AbortController();
 			const surFermeture = (): void => controleur.abort();
 			e.sender.once("destroyed", surFermeture);
-			return trackRun(() => deps.python.run({ code: o.code as string, timeoutMs: delai, signal: controleur.signal })).finally(() => { e.sender.removeListener("destroyed", surFermeture); });
+			if (id) runsPython.set(id, { sender: e.sender, controleur });
+			try {
+				/* A phone's request is judged whole in `distant.ts` (no per-run
+				   dialog); a click on this PC passes the native warning first,
+				   outside `trackRun` (a dialog left open is not a run). */
+				return await executerPorte(
+					{ code, distant: o.distant, sourcePath: o.sourcePath, timeoutMs: delai, signal: controleur.signal },
+					{ garde: gardePython, distant: pythonDistant, service: deps.python, suivre: trackRun },
+				);
+			} finally {
+				e.sender.removeListener("destroyed", surFermeture);
+				if (id) runsPython.delete(id);
+			}
 		}
 		return trackRun(() => deps.code.run({ language: o.language as CodeLanguage, code: o.code as string, stdin: (o.stdin as string) ?? "", after: o.after as string | undefined, timeoutMs: delai }));
 	});

@@ -332,6 +332,9 @@ const pont: Pont = {
 	code: {
 		run: (job) => appeler("code.run", [job]),
 		warm: (language) => appeler("code.warm", [language]),
+		/* Python never runs on the phone (it goes to the PC through files) and C/C++
+		   has no Stop: nothing to stop here, no Kotlin channel. */
+		annuler: async () => {},
 	},
 
 	/* Android keeps its own Python (the Pyodide pack, `langages`): the native

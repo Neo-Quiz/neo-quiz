@@ -99,6 +99,7 @@
     "check:python-install": "node scripts/check-python-install.mjs",
     "check:python-run": "node scripts/check-python-run.mjs",
     "check:python-service": "node scripts/check-python-service.mjs",
+    "check:python-gate": "node scripts/check-python-gate.mjs",
     "build:language-pack": "node scripts/build-language-pack.mjs",
     "build:language-pack:python": "node scripts/build-language-pack.mjs python",
     "check:electron-comptes": "node scripts/check-electron-comptes.mjs",

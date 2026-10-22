@@ -274,6 +274,10 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.code.installingLibraries": "Téléchargement de {names}… {percent} %",
 	"engine.code.unsupportedLibrary": "Bibliothèque non prise en charge : {names}",
 	"engine.code.installFailed": "Le téléchargement n'a pas pu aboutir.",
+	"engine.code.pcRefused": "Ton PC a refusé d'exécuter du code pour cet appareil.",
+	"engine.code.pcInstalling": "Ton PC télécharge une bibliothèque : réessaie dans une minute.",
+	"engine.code.stop": "Arrêter",
+	"engine.code.stopped": "Arrêté.",
 
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Fermer le clavier",

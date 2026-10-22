@@ -207,6 +207,14 @@ jobs:
       - name: Python service
         run: npm run check:python-service
 
+      # The Python gate of the main process: no spawn without the native
+      # warning (local) or, for a phone's request, without Syncthing naming a
+      # paired device as its author, the bytes it indexed, the note's block
+      # and the owner's one-time authorization of that device; never a run
+      # the phone stopped waiting for. Injected dialog, fake index.
+      - name: Python gate
+        run: npm run check:python-gate
+
       # Le contenu d'un dossier (documents, notes, `Liens.md`) et ce que
       # « Créer avec l'IA » joint depuis un dossier : pur, lecture seule.
       - name: Folder contents and links grammar

@@ -1036,6 +1036,7 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 			reglagesOuErreur,
 			code,
 			python: creerServicePython(creerInstallationPython(path.join(app.getPath("userData"), "python")), app.getPath("temp")),
+			dossierDonneesPython: path.join(app.getPath("userData"), "python"),
 			dossierLangages,
 			/* LU À CHAQUE APPEL, jamais capturé : l'utilisateur peut changer ce
 			   dossier en cours de session, et les canaux doivent servir le

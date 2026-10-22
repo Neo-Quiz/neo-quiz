@@ -27,7 +27,10 @@ let pontCourant: (() => Pont) | null = null;
 
 const interrupteur = (langue: CodeLanguage): string => (langue === "cpp" ? "c" : langue);
 
-/** Settings key: warning keys (note path + code hash) the user dismissed. */
+/** Settings key, ON THE PHONE ONLY: warning keys (note path + code hash) the
+    user dismissed. The PC never reads it: its warning is a native dialog of
+    the main process, remembered in a file the window cannot reach
+    (electron/python/garde.ts, final review I1). */
 export const CLE_AVERTISSEMENT_PYTHON = "pythonWarningDismissed";
 const MAX_AVERTISSEMENTS = 500;
 
@@ -44,11 +47,20 @@ export async function reglerLangageActif(langue: CodeLanguage, actif: boolean): 
 }
 
 /* The phone's Python runner, set once the synced folder is there (main.ts). */
-let surPc: ((job: CodeJob) => Promise<CodeRun>) | null = null;
+let surPc: ((job: CodeJob, signal: AbortSignal) => Promise<CodeRun>) | null = null;
+/** The phone's runs in progress, by job id: Stop stops waiting for the PC. */
+const arretsTelephone = new Map<string, AbortController>();
 
 /** Phone: where Python runs go (`executerSurPc` bound to this device's files). */
-export function brancherExecutionSurPc(run: (job: CodeJob) => Promise<CodeRun>): void {
+export function brancherExecutionSurPc(run: (job: CodeJob, signal: AbortSignal) => Promise<CodeRun>): void {
 	surPc = run;
+}
+
+function surLeTelephone(job: CodeJob): Promise<CodeRun> {
+	if (!surPc) return Promise.resolve<CodeRun>({ status: "unavailable", stdout: "", error: "no-pc" });
+	const arret = new AbortController();
+	if (job.id) arretsTelephone.set(job.id, arret);
+	return surPc(job, arret.signal).finally(() => { if (job.id) arretsTelephone.delete(job.id); });
 }
 
 export function createWindowsCode(pont: () => Pont): HostCode {
@@ -63,10 +75,11 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 			if (!langageActif(job.language)) return Promise.resolve<CodeRun>({ status: "unavailable", stdout: "" });
 			/* The phone never runs Python: the run goes to the owner's PC
 			   (dashboard/code-run-remote.ts). C and C++ stay in the local sandbox. */
-			if (job.language === "python" && estMobile()) return surPc ? surPc(job) : Promise.resolve<CodeRun>({ status: "unavailable", stdout: "", error: "no-pc" });
+			if (job.language === "python" && estMobile()) return surLeTelephone(job);
 			return pont().code.run(job).catch((): CodeRun => ({ status: "unavailable", stdout: "" }));
 		},
-		avertissement: {
+		/* The phone only: on the PC the main process asks (see CLE_AVERTISSEMENT_PYTHON). */
+		avertissement: estMobile() ? {
 			masque: async cle => {
 				const v = await pont().reglages.lire(CLE_AVERTISSEMENT_PYTHON);
 				return Array.isArray(v) && v.includes(cle);
@@ -77,6 +90,11 @@ export function createWindowsCode(pont: () => Pont): HostCode {
 				liste.push(cle);
 				await pont().reglages.ecrire(CLE_AVERTISSEMENT_PYTHON, liste.slice(-MAX_AVERTISSEMENTS));
 			},
+		} : undefined,
+		cancel: id => {
+			const arret = arretsTelephone.get(id);
+			if (arret) { arret.abort(); return; }
+			if (!estMobile()) void pont().code.annuler(id).catch(() => undefined);
 		},
 		warm: language => { if (!langageActif(language) || (language === "python" && estMobile())) return; void pont().code.warm(language).catch(() => undefined); },
 		/* Python: `paquets` names the root libraries to download (`[]` = the

@@ -1,7 +1,7 @@
 import type { EngineCtx } from "../types/engine-ctx";
 import { t } from "../i18n";
 import { nettoyerTraceback } from "../code-exercise/traceback";
-import type { CodeRun } from "../host/types";
+import type { CodeJob, CodeRun } from "../host/types";
 import { cleAvertissement, demanderAvertissement } from "./code-warning";
 import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../code-languages";
 
@@ -37,6 +37,13 @@ import { executionVisible, runInLastHintProbleme, type CodeLanguage } from "../c
 const TIMEOUT_MS = 10_000;
 const TIMEOUT_PYTHON_MS = 60_000;
 
+/** A run's id for Stop (`HostCode.cancel`, the main process's `neo:code/annuler`). */
+function nouvelId(): string {
+	return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+		? crypto.randomUUID()
+		: "run-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
 export interface CodeRunHandlers {
 	/** Unmasks (and wires up) every « Run » button under `rootEl` if the host
 	    provides `HostCode`, or removes it otherwise. Call right after
@@ -51,6 +58,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 	let prechauffe = false;
 	/** One warning at a time: a second click while the modal is up does nothing. */
 	let avertissementOuvert = false;
+	/** The Stop of each button whose Python run is under way. */
+	const arrets = new WeakMap<HTMLButtonElement, () => void>();
 
 	function sortieDe(bloc: HTMLElement): HTMLElement {
 		let sortie = bloc.querySelector<HTMLElement>(":scope > .quiz-code-output");
@@ -99,6 +108,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				if (resultat.error === "no-pc") return { texte: t("engine.code.noPc"), erreur: false, panne: true };
 				if (resultat.error === "pc-silent") return { texte: t("engine.code.pcSilent"), erreur: false, panne: true };
 				if (resultat.error === "changed") return { texte: t("engine.code.quizChanged"), erreur: false, panne: true };
+				if (resultat.error === "refused") return { texte: t("engine.code.pcRefused"), erreur: false, panne: true };
+				if (resultat.error === "pc-installing") return { texte: t("engine.code.pcInstalling"), erreur: false, panne: true };
 				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
 	}
@@ -110,9 +121,13 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 		if (!bloc) return;
 		const sortie = sortieDe(bloc);
 
-		/* Python runs natively on the PC: warn before EVERY run (C/C++ stay in
-		   their sandbox and never ask). Cancel or no modal host = no run. */
-		if (language === "python") {
+		/* Python runs natively on the PC. ON THE PC the warning is a native
+		   dialog of the main process, before every run (final review I1: a
+		   window may be compromised, it cannot be the one that decides). ON THE
+		   PHONE the run leaves for the PC through files: this modal is its
+		   warning, and the PC still asks its owner once per device. C/C++ stay
+		   in their sandbox and never ask. Cancel or no modal host = no run. */
+		if (language === "python" && ctx.host.platform?.isMobile) {
 			if (avertissementOuvert) return;
 			avertissementOuvert = true;
 			let accord = false;
@@ -121,6 +136,30 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			finally { avertissementOuvert = false; }
 			if (!accord) return;
 		}
+
+		/* Python's ▶ becomes Stop while the code runs (C/C++ runs end in 10 s). */
+		const icone = [...btn.childNodes];
+		let arrete = false;
+		const executerAvecArret = async (job: CodeJob): Promise<CodeRun> => {
+			const id = language === "python" && code.cancel ? nouvelId() : null;
+			if (!id) return code.run(job);
+			btn.disabled = false;
+			btn.classList.remove("quiz-code-run-running");
+			btn.classList.add("quiz-code-run-stop");
+			btn.setAttribute("aria-label", t("engine.code.stop"));
+			ctx.host.ui?.setIcon(btn, "square");
+			arrets.set(btn, () => { arrete = true; btn.disabled = true; code.cancel?.(id); });
+			try {
+				return await code.run({ ...job, id });
+			} finally {
+				arrets.delete(btn);
+				btn.classList.remove("quiz-code-run-stop");
+				btn.replaceChildren(...icone);
+				btn.setAttribute("aria-label", t("engine.code.run"));
+				btn.disabled = true;
+				btn.classList.add("quiz-code-run-running");
+			}
+		};
 
 		btn.disabled = true;
 		btn.classList.add("quiz-code-run-running");
@@ -134,12 +173,12 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			const job = language === "python"
 				? { language, code: source, stdin: "", timeoutMs: TIMEOUT_PYTHON_MS, sourcePath: ctx.sourcePath }
 				: { language, code: source, stdin: "", timeoutMs: TIMEOUT_MS };
-			let resultat = await code.run(job);
+			let resultat = await executerAvecArret(job);
 			/* THE LANGUAGE IS DOWNLOADED ON FIRST USE (task 10): C and C++
 			   answer `not-installed` until their pack is there. With a host
 			   that can install it, the progress replaces "Running…", then
 			   the program runs ONCE more — never in a loop. */
-			if (resultat.status === "not-installed" && code.installer) {
+			if (!arrete && resultat.status === "not-installed" && code.installer) {
 				/* Python names the libraries it lacks (`missing`; `[]` = only the
 				   interpreter): they are downloaded with their own progress line. */
 				const manquants = resultat.missing ?? [];
@@ -155,7 +194,18 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 				}
 				sortie.classList.remove("quiz-code-output-panne");
 				sortie.textContent = enCours;
-				resultat = await code.run(job);
+				resultat = await executerAvecArret(job);
+			}
+			if (arrete) {
+				sortie.textContent = t("engine.code.stopped");
+				sortie.classList.add("quiz-code-output-panne");
+				return;
+			}
+			/* Cancel in the PC's native warning: nothing ran, nothing to show. */
+			if (resultat.status === "unavailable" && resultat.error === "cancelled") {
+				sortie.textContent = "";
+				sortie.hidden = true;
+				return;
 			}
 			const { texte, erreur, panne } = texteResultat(resultat);
 			sortie.textContent = texte;
@@ -233,6 +283,8 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			btn.dataset.quizCodeBound = "1";
 			btn.addEventListener("click", e => {
 				e.preventDefault();
+				const arreter = arrets.get(btn);
+				if (arreter) { arreter(); return; }
 				if (btn.disabled) return;
 				const codeEl = bloc.querySelector("code");
 				void executer(btn, codeEl?.textContent ?? "", language);

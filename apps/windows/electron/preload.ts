@@ -375,6 +375,7 @@ const pont: Pont = {
 	code: {
 		run: job => ipcRenderer.invoke(CANAUX.codeRun, job),
 		warm: language => ipcRenderer.invoke(CANAUX.codeWarm, language),
+		annuler: id => ipcRenderer.invoke(CANAUX.codeAnnuler, id),
 	},
 
 	/* LIVE AI SESSIONS: typed values only; the main process validates them. */

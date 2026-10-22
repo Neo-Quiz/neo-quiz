@@ -12,7 +12,7 @@
 ══════════════════════════════════════════════════════════ */
 
 import type { CodeRun } from "../../../../src/host/types";
-import { PAQUETS, RACINES } from "./catalogue";
+import { INTERPRETE, PAQUETS, RACINES, fermeture } from "./catalogue";
 import { executerPython, verifierImports } from "./execution";
 import type { EtatPython, InstallationPython } from "./installation";
 import { estErreurPython } from "./installation";
@@ -31,6 +31,11 @@ export interface ServicePython {
 	/** A ROOT library (Settings lists only those), with the dependencies no
 	    other installed root needs. Any other name: `inconnu`. */
 	desinstaller(paquet: unknown): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
+	/** Bytes still to download for `paquets` (roots) and the interpreter;
+	    `Infinity` for a name that is not a pinned package. */
+	octetsAInstaller(paquets: unknown): Promise<number>;
+	/** An install is in flight (a run would wait behind it). */
+	installationEnCours(): boolean;
 	/** Removes every library then the interpreter ("Delete" in Settings). */
 	supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
 	run(job: { code: string; timeoutMs: number; signal?: AbortSignal }): Promise<CodeRun>;
@@ -61,6 +66,11 @@ export function creerServicePython(installation: InstallationPython, dossierTemp
 	return {
 		etat: () => installation.etat(),
 
+		/* ACCEPTED LIMIT (final review M6): these downloads do not look at a
+		   metered connection (`connexion-limitee.ts`, which holds back app
+		   updates). One only starts because a block that needs the library was
+		   run, here or from a paired phone (`distant.ts`), and its size is that
+		   of the library the code imports. */
 		async installer(paquets, progression) {
 			if (!nomsValides(paquets)) return { ok: false, code: "echec" };
 			const cibles = [...new Set(paquets)].sort();
@@ -88,6 +98,22 @@ export function creerServicePython(installation: InstallationPython, dossierTemp
 		supprimerTout() {
 			return installation.supprimerTout();
 		},
+
+		async octetsAInstaller(paquets) {
+			if (!nomsValides(paquets)) return Infinity;
+			const etat = await installation.etat();
+			const installes = new Set(etat.paquets.map((p) => p.nom));
+			const vus = new Set<string>();
+			let total = etat.interprete ? 0 : INTERPRETE.taille;
+			for (const r of paquets) for (const n of fermeture(r)) {
+				if (installes.has(n) || vus.has(n)) continue;
+				vus.add(n);
+				total += PAQUETS[n].taille;
+			}
+			return total;
+		},
+
+		installationEnCours: () => enCours.size > 0,
 
 		async desinstaller(paquet) {
 			if (typeof paquet !== "string" || !RACINES.includes(paquet)) return { ok: false, code: "inconnu" };

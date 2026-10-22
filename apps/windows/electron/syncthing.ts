@@ -38,6 +38,7 @@ import { MAX_JOURNAL, type LigneJournal } from "../../../src/dashboard/sync-etat
 import { creerFenetreAppairage, codeDansNom, PERIODE_MS, sansCode, texteQr } from "./appairage-qr";
 import { createRest } from "./syncthing-rest";
 import type { Rest } from "./syncthing-rest";
+import type { InfoFichierSync, OrigineSync } from "./python/distant";
 import type { EvenementSync } from "./syncthing-regles";
 import {
 	cheminAScanner,
@@ -78,6 +79,9 @@ export interface SyncHandle {
 	appairer(deviceId: string, viaQr?: boolean, nomAnnonce?: string): Promise<ResultatAppairage>;
 	/** Our own device id. */
 	idPropre(): string;
+	/** What the remote Python gate needs (`python/distant.ts`): the folder,
+	    our id, the paired devices and the index record of one file. */
+	origine(): Promise<OrigineSync | null>;
 	/** The devices asking to pair, with the name they announce (raw, may end
 	    with a pairing code). Never throws: no request when unreadable. */
 	demandesBrutes(): Promise<Array<{ id: string; nom: string }>>;
@@ -679,6 +683,30 @@ export async function startSync(opts: StartOpts): Promise<SyncHandle> {
 		etat: calculerEtat,
 
 		idPropre: () => courant.ownId,
+		async origine() {
+			if (mort || arrete) return null;
+			const { rest, ownId } = courant;
+			let devices: Awaited<ReturnType<Rest["devices"]>>;
+			try { devices = await rest.devices(); } catch { return null; }
+			return {
+				racine: opts.root,
+				idPropre: ownId,
+				pairs: devices.filter(d => d.deviceID !== ownId && !retraits.has(d.deviceID)).map(d => ({ id: d.deviceID, nom: d.name || "" })),
+				async fichier(rel: string): Promise<InfoFichierSync | null> {
+					try {
+						const g = (await rest.dbFile(FOLDER_ID, rel)).global;
+						if (!g || typeof g !== "object") return null;
+						return {
+							modifiedBy: typeof g.modifiedBy === "string" ? g.modifiedBy : "",
+							blocksHash: typeof g.blocksHash === "string" ? g.blocksHash : "",
+							deleted: g.deleted === true,
+							invalid: g.invalid === true,
+							type: typeof g.type === "string" ? g.type : "",
+						};
+					} catch { return null; }
+				},
+			};
+		},
 		signalerEcriture,
 		journal,
 
@@ -847,6 +875,8 @@ export interface GestionSync {
 	qrSuivant(): Promise<{ texte: string; periodeMs: number } | null>;
 	/** The dialog closed: every code dies at once. */
 	qrFermer(): void;
+	/** See `SyncHandle.origine`. Never starts the instance: `null` when sync is not running. */
+	origine(): Promise<OrigineSync | null>;
 	/** The app wrote `abs` (see `SyncHandle.signalerEcriture`). Never starts
 	    the instance: when sync is not running there is nothing to send. */
 	signalerEcriture(abs: string): void;
@@ -998,6 +1028,7 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		},
 		qrFermer() { fenetreQr.fermer(); jugesQr.clear(); },
 		signalerEcriture(abs) { handle?.signalerEcriture(abs); },
+		async origine() { return handle ? handle.origine() : null; },
 		async demarrerSiActif() { if ((await o.lireActif()) === true) await obtenir(); },
 		async arreter() {
 			fin = true;

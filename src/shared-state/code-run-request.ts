@@ -13,16 +13,23 @@ import type { CodeRun } from "../host/types";
    hash matches, byte for byte. Everything else is checked here first:
    strict schema (unknown key refused, `__proto__` included), sender =
    directory and never this device, target = this device, a short age (the
-   phone stops waiting after 90 s: a request older than that is dropped,
-   never run late), the path rules shared with remote generation
+   phone stops waiting after `PHONE_WAIT_MS`, 90 s; a request older than
+   `MAX_AGE_MS`, 60 s, is dropped, so a run never STARTS after the phone
+   gave up, final review I3), the path rules shared with remote generation
    (`isSafeDocumentPath`). `accepted` is the phone's answer to the run
-   warning (spec §9: a device the owner paired is trusted for that answer).
+   warning. The PC's main process judges the same file again before any run
+   (apps/windows/electron/python/distant.ts): who wrote it, per Syncthing,
+   and whether the owner allowed that device on this PC.
    No DOM, no host, no clock: `now` is always an input.
 ══════════════════════════════════════════════════════════ */
 
 /** Folder of the code runs under `.neo-quiz/`, then `requests/` and `results/`. */
 export const CODE_RUNS_DIR = "code-runs";
-export const MAX_AGE_MS = 120_000;
+/** How long the phone waits for a result (`executerSurPc`). */
+export const PHONE_WAIT_MS = 90_000;
+/** A request older than this never starts: it must be below the phone's wait, with
+    room for the run itself (`PHONE_WAIT_MS` - 15 s at least, final review I3). */
+export const MAX_AGE_MS = 60_000;
 export const FUTURE_SKEW_MS = 30_000;
 /** stdout and error of a result, in characters each. */
 export const MAX_OUTPUT = 256 * 1024;
@@ -36,6 +43,16 @@ export const RESULT_TTL_MS = 10 * 60_000;
 export const MAX_REQUEST_CHARS = 4_000;
 /** A result file past this is not read (two capped outputs, JSON-escaped, fit with margin when written). */
 export const MAX_RESULT_CHARS = 1_200_000;
+
+/** Where a request file lives, relative to the synced root. */
+export const requestPath = (device: string, id: string): string => `.neo-quiz/${CODE_RUNS_DIR}/requests/${device}/${id}.json`;
+const REQUEST_PATH = /^\.neo-quiz\/code-runs\/requests\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/([a-z0-9][a-z0-9-]{3,63})\.json$/;
+/** The device and id a request path names, or null when it is not exactly one (`requestPath`). */
+export function parseRequestPath(rel: unknown): { device: string; id: string } | null {
+	if (typeof rel !== "string" || rel.length > 200) return null;
+	const m = REQUEST_PATH.exec(rel);
+	return m && SLUG.test(m[2]) ? { device: m[1], id: m[2] } : null;
+}
 
 export interface CodeRunRequest { v: 1; id: string; at: number; from: string; target: string; path: string; sha256: string; accepted: true }
 export interface CodeRunResult { v: 1; id: string; at: number; status: CodeRun["status"]; stdout: string; error?: string; unsupported?: string[] }

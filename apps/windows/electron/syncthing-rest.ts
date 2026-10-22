@@ -119,6 +119,13 @@ export function createRest(port: number, apiKey: string, fetchImpl: FetchLike = 
 			await appeler("POST", `/rest/db/scan?folder=${segment(folderId)}${q}`);
 		},
 		folderStatus: (id: string) => json<FolderStatus>("GET", `/rest/db/status?folder=${segment(id)}`),
+		/** What the index says of ONE file of the folder (relative, `/`): its
+		    `global` record carries `modifiedBy` (the 7-character short id of the
+		    device that made this version) and `blocksHash`. HTTP 404 ("no such
+		    object in the index", a file not scanned yet) throws like any non-2xx.
+		    Read by the remote Python gate (`python/distant.ts`) only. */
+		dbFile: (folder: string, file: string) =>
+			json<{ global?: Record<string, unknown> }>("GET", `/rest/db/file?folder=${segment(folder)}&file=${encodeURIComponent(file)}`),
 		/** Dismisses ONE pending device (the owner chose Ignore); it may come back the next time that device tries. */
 		async dismissPendingDevice(id: string): Promise<void> { await appeler("DELETE", `/rest/cluster/pending/devices?device=${segment(id)}`); },
 		deviceStats: () => json<DeviceStats>("GET", "/rest/stats/device"),

@@ -38,5 +38,9 @@
 		"resolveJsonModule": true,
 		"types": ["node"]
 	},
-	"include": ["electron/**/*.ts"]
+	/* `src/global.d.ts` (types only): the main process reads quiz notes since
+	   2026-10-22 (`electron/python/distant.ts` → `src/code-blocks.ts`), and the
+	   quiz types it reaches name the engine's DOM augmentations. No runtime
+	   code comes with it, and it imports nothing. */
+	"include": ["electron/**/*.ts", "../../src/global.d.ts"]
 }

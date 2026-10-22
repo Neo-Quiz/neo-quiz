@@ -4,9 +4,14 @@ import type { EngineCtx } from "../types/engine-ctx";
 import { sha256Hex } from "../code-blocks";
 
 /* ══════════════════════════════════════════════════════════
-   THE WARNING BEFORE A PYTHON RUN. Python runs natively on the PC, with
-   access to its files and the Internet: the modal is shown before EVERY run
-   of every quiz, unless the user ticked « Don't show again for this quiz » for
+   THE PHONE'S WARNING BEFORE A PYTHON RUN. Python runs natively on the PC,
+   with access to its files and the Internet. On the PC itself the warning is
+   a NATIVE dialog of the main process (apps/windows/electron/python/garde.ts,
+   final review I1): a window may be compromised and must not be the one that
+   decides. This modal is only the phone's (code-run.ts calls it when
+   `platform.isMobile`), whose run leaves for the PC through files, where the
+   main process asks its owner once per device. Shown before EVERY run of
+   every quiz, unless the user ticked « Don't show again for this quiz » for
    that exact code. The key is `<note path>#<sha256 of the code>`, so a quiz
    whose code changed by one character asks again (a shared quiz may swap the
    code under a dismissed warning). A host without modals never runs unwarned.

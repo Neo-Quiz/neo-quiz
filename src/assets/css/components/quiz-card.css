@@ -454,6 +454,9 @@ code.quiz-md-code-inline :is(.token.variable, .token.parameter, .token.property,
 .quiz-code-run-btn.quiz-code-run-running{ opacity: 1; color: var(--quiz-primary, var(--interactive-accent)); }
 .quiz-code-run-btn.quiz-code-run-running svg{ animation: quiz-code-run-spin 0.8s linear infinite; }
 @keyframes quiz-code-run-spin{ to { transform: rotate(360deg); } }
+/* Stop, while a Python run is under way (code-run.ts): the same button, a
+   square, the accent colour, clickable. */
+.quiz-code-run-btn.quiz-code-run-stop{ opacity: 1; color: var(--quiz-primary, var(--interactive-accent)); }
 
 /* La sortie : du texte de programme, jamais du HTML (posé en `textContent`
    par code-run.ts). Pas d'ascenseur interne (règle « lecture, jamais de

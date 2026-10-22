@@ -1133,6 +1133,9 @@ export interface Pont {
 	code: {
 		run(job: CodeJob): Promise<CodeRun>;
 		warm(language: CodeLanguage): Promise<void>;
+		/** Stops the Python run started with this `job.id` (queued or running):
+		    it answers `unavailable`. Unknown or finished: nothing happens. */
+		annuler(id: string): Promise<void>;
 	};
 
 	/**
@@ -1388,6 +1391,7 @@ export const CANAUX = {
 	videoAnnuler: "neo:video/annuler",
 	codeRun: "neo:code/run",
 	codeWarm: "neo:code/warm",
+	codeAnnuler: "neo:code/annuler",
 	pythonEtat: "neo:python/etat",
 	pythonInstaller: "neo:python/installer",
 	pythonDesinstaller: "neo:python/desinstaller",

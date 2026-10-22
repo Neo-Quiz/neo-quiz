@@ -293,6 +293,10 @@ export const EN_ENGINE = {
 	"engine.code.installingLibraries": "Downloading {names}… {percent} %",
 	"engine.code.unsupportedLibrary": "Library not supported: {names}",
 	"engine.code.installFailed": "The download could not be completed.",
+	"engine.code.pcRefused": "Your PC refused to run code for this device.",
+	"engine.code.pcInstalling": "Your PC is downloading a library: try again in a minute.",
+	"engine.code.stop": "Stop",
+	"engine.code.stopped": "Stopped.",
 
 	/* ── Clavier mathématique (MathLive) ── */
 	"engine.math.closeKeyboard": "Close the keyboard",

@@ -671,7 +671,7 @@ async function demarrer(): Promise<void> {
 		let stopCodeRuns: (() => void) | null = null;
 		if (estMobile()) {
 			void codeRunFiles.sweepOwn("requests", RESULT_TTL_MS, Date.now());
-			brancherExecutionSurPc(job => executerSurPc(job, {
+			brancherExecutionSurPc((job, signal) => executerSurPc(job, {
 				device: idAppareil,
 				rootId: racineChats.id,
 				now: () => Date.now(),
@@ -679,7 +679,7 @@ async function demarrer(): Promise<void> {
 				newId: newRequestId,
 				files: codeRunFiles,
 				pc: () => choosePc({ files: getRemoteGenerations(), now: Date.now(), lastEver: lastPcEver(), chosen: chosenPc(), devices: getDevices(), peers: getPairedPeers(), peerConnected: getPeerConnected() }),
-			}));
+			}, signal));
 		} else {
 			const etatCode = newPcState();
 			codeRunScan = () => {
@@ -697,8 +697,8 @@ async function demarrer(): Promise<void> {
 							return await currentHost().fs.readBounded(path, 4_000_000);
 						} catch { return null; }
 					},
+					/* `job.distant` names the request: the main process judges it and installs what is missing. */
 					run: job => currentHost().code?.run(job) ?? Promise.resolve({ status: "unavailable", stdout: "" }),
-					install: missing => currentHost().code?.installer?.("python", () => {}, missing) ?? Promise.resolve("failed"),
 					takenLog: {
 						read: async () => lireTaken(await lireReglage<unknown>("codeRunsTaken")),
 						write: list => ecrireReglage("codeRunsTaken", list),
