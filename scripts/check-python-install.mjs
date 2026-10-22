@@ -187,7 +187,7 @@ const lirePth = (racine) => readFileSync(join(racine, "interpreteur", "python312
 const lib = (racine, dossier) => resolve(racine, "libs", dossier);
 
 try {
-	await withSrcModule("apps/windows/electron/python/installation.ts", async ({ creerInstallationPython }) => {
+	await withSrcModule("apps/windows/electron/python/installation.ts", async ({ creerInstallationPython, surHote }) => {
 		/* ── 1. Fresh install: interpreter, then the closure, deps first ── */
 		const racineA = join(tmp, "a", "python");
 		const tA = transportFaux();
@@ -298,6 +298,21 @@ try {
 		tD.retablir();
 		const fauxHote = creerInstallationPython(join(tmp, "d2", "python"), transportFaux(), { ...CATALOGUE, interprete: { ...CATALOGUE.interprete, url: "https://python.example.org/x.zip" } });
 		r.check("an interpreter URL off the list is refused: reseau", await codeDe(fauxHote.installer([], () => {})), "reseau");
+		/* M1: each kind of file has ONE host. github.com and files.pythonhosted.org
+		   are on the GLOBAL list, which used to be the only judge. */
+		const tM = transportFaux();
+		const interpreteAilleurs = creerInstallationPython(join(tmp, "d3", "python"), tM, { ...CATALOGUE, interprete: { ...CATALOGUE.interprete, url: PH + "python-3.12.10-embed-amd64.zip" } });
+		r.check("M1: an interpreter pin on files.pythonhosted.org is refused: reseau", await codeDe(interpreteAilleurs.installer([], () => {})), "reseau");
+		const roueAilleurs = creerInstallationPython(join(tmp, "d4", "python"), tM, { ...CATALOGUE, paquets: { ...CATALOGUE.paquets, leaf: { ...CATALOGUE.paquets.leaf, url: "https://github.com/x/leaf.whl" } } });
+		await roueAilleurs.installer([], () => {});
+		r.check("M1: a wheel pin on github.com (global list) is refused: reseau", await codeDe(roueAilleurs.installer(["leaf"], () => {})), "reseau");
+		tM.remplacer(CATALOGUE.interprete.url, { redirige: PH + "python-3.12.10-embed-amd64.zip" });
+		r.check("M1: an interpreter redirect to files.pythonhosted.org is refused: reseau", await codeDe(creerInstallationPython(join(tmp, "d5", "python"), tM, CATALOGUE).installer([], () => {})), "reseau");
+		r.check("M1: ...and neither foreign URL reached the transport", tM.appels.filter((u) => u.includes("github.com") || u === PH + "python-3.12.10-embed-amd64.zip"), []);
+		tM.retablir();
+		r.check("M1: a port, credentials, http or a look-alike host are refused", [
+			"https://www.python.org:8443/x.zip", "https://u:p@www.python.org/x.zip", "http://www.python.org/x.zip", "https://www.python.org.evil.example/x.zip",
+		].map((u) => surHote("www.python.org")(u)), [false, false, false, false]);
 
 		/* ── 7. Archives refused after their hash matched ── */
 		const avantE = snapshot(tmp);

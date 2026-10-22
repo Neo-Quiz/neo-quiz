@@ -10,9 +10,9 @@
      libs/<package>-<version>/     one wheel each
 
    THE PINS DECIDE, the network does not: every file is fetched through
-   `demander` (https only, every redirect hop re-judged against the host
-   list), streamed into a buffer of exactly its pinned size, refused past
-   that size, and refused when its SHA-256 differs from the pin, before a
+   `demander` (https only, every redirect hop re-judged against the ONE host
+   its kind of file may come from, `HOTE_INTERPRETE` or `HOTE_ROUES`),
+   streamed into a buffer of exactly its pinned size, refused past that size, and refused when its SHA-256 differs from the pin, before a
    single byte is unpacked. One file is held at a time: every download goes
    through ONE queue, so a torch wheel (124 MB) never shares memory with
    another.
@@ -157,6 +157,25 @@ export interface InstallationPython {
 const BORNES_INTERPRETE: BornesZip = { maxEntrees: 500, maxOctets: 128 * 1024 * 1024, maxRatio: 200 };
 const BORNES_ROUE: BornesZip = { maxEntrees: 50_000, maxOctets: 1536 * 1024 * 1024, maxRatio: 2000 };
 
+/* THE TWO HOSTS a Python download may reach, each for its own files only
+   (final review M1): the interpreter comes from www.python.org, every wheel
+   from files.pythonhosted.org, and every redirect hop is judged against that
+   ONE host. The global host list (`reseau.ts`) admits many more (GitHub,
+   Ollama, Moodle sites): a pin, or a hop, pointing at any of them is refused. */
+export const HOTE_INTERPRETE = "www.python.org";
+export const HOTE_ROUES = "files.pythonhosted.org";
+/** `https://<hote>/...` exactly: no other host, no port, no credentials. */
+export function surHote(hote: string): (url: string) => boolean {
+	return (url) => {
+		try {
+			const u = new URL(url);
+			return u.protocol === "https:" && u.hostname === hote && u.port === "" && u.username === "" && u.password === "";
+		} catch {
+			return false;
+		}
+	};
+}
+
 /** Written into the interpreter folder: the pin it was installed from. */
 const MARQUEUR = "neo-quiz-interpreteur.json";
 /** The queue key of the interpreter (no package name has a `#`). */
@@ -270,8 +289,8 @@ export function creerInstallationPython(
 
 	/** The pinned file's bytes, or `reseau` / `empreinte`. The buffer is
 	    allocated once at the pinned size; nothing past it is ever kept. */
-	async function telecharger(pin: FichierEpingle, surRecus: (recus: number) => void): Promise<Uint8Array> {
-		const reponse = await demander(pin.url, "GET", transport);
+	async function telecharger(pin: FichierEpingle, hote: string, surRecus: (recus: number) => void): Promise<Uint8Array> {
+		const reponse = await demander(pin.url, "GET", transport, 3, undefined, surHote(hote));
 		if (reponse.status !== 200) throw erreurPython("reseau", "status " + reponse.status + " for " + pin.url);
 		/* No body stream: refused rather than read whole by `texte()`, which
 		   would buffer an unbounded body before any size check. */
@@ -315,7 +334,7 @@ export function creerInstallationPython(
 		try {
 			retirer(partiel);
 			retirer(ancien);
-			const octets = await telecharger(catalogue.interprete, surRecus);
+			const octets = await telecharger(catalogue.interprete, HOTE_INTERPRETE, surRecus);
 			await deballer(octets, partiel, BORNES_INTERPRETE);
 			if (!existsSync(join(partiel, "python.exe"))) throw erreurPython("empreinte", "the interpreter archive has no python.exe");
 			writeFileSync(join(partiel, MARQUEUR), JSON.stringify({ version: catalogue.interprete.version, sha256: catalogue.interprete.sha256 }));
@@ -352,7 +371,7 @@ export function creerInstallationPython(
 		const partiel = final + ".part";
 		try {
 			retirer(partiel);
-			const octets = await telecharger(catalogue.paquets[nom], surRecus);
+			const octets = await telecharger(catalogue.paquets[nom], HOTE_ROUES, surRecus);
 			await deballer(octets, partiel, BORNES_ROUE);
 			aplatirData(partiel);
 			disque.renommer(partiel, final);
