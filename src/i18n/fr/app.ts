@@ -33,7 +33,7 @@ export const FR_APP: Record<keyof typeof EN_APP, string> = {
 	"app.pythonRun.hiddenChars": "Ce code contient des caractères invisibles ou qui changent le sens du texte (affichés �) : il peut ne pas faire ce qu'il semble faire.",
 	"app.pythonDevice.title": "Python depuis un autre appareil",
 	"app.pythonDevice.message": "Autoriser {name} à exécuter du Python sur ce PC ?",
-	"app.pythonDevice.detail": "Il pourra ensuite exécuter le code Python de tes quiz sur ce PC, avec accès à tes fichiers et à Internet, sans te demander à chaque fois.",
+	"app.pythonDevice.detail": "Il pourra ensuite exécuter le code Python de tes quiz sur ce PC, avec accès à tes fichiers et à Internet, sans te demander à chaque fois. N'autorise que si tu viens d'appuyer sur Exécuter sur cet appareil.",
 	"app.pythonDevice.allow": "Autoriser",
 	"app.pythonDevice.refuse": "Refuser",
 	"app.aiTrust.title": "Faire confiance à ce dossier ?",

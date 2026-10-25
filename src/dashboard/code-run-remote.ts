@@ -2,26 +2,29 @@ import { LOG_PREFIX } from "../branding";
 import type { CodeJob, CodeRun } from "../host/types";
 import { blocsPython, sha256Hex } from "../code-blocks";
 import { relativeToRoot } from "../shared-state/chat-merge";
-import { MAX_TAKEN, PHONE_WAIT_MS, RESULT_TTL_MS, admettre, construireResultat, lireResultat, requestPath, validerDemandeCode } from "../shared-state/code-run-request";
+import { MAX_TAKEN, PHONE_WAIT_MS, RESULT_TTL_MS, admettre, construireResultat, lireResultat, requestPath, signedMessage, validerDemandeCode } from "../shared-state/code-run-request";
 import type { CodeRunRequest, CodeRunResult, TakenRun } from "../shared-state/code-run-request";
 import { activityOf, pcReachable, pickTarget, preferredPc } from "./remote-send";
 import type { GenerationsFile } from "../shared-state/generations";
 import { soleOnlinePc } from "../shared-state/devices";
 import type { DeviceFile } from "../shared-state/devices";
 import type { PairedPeer } from "./remote-generations";
+import type { RequestSigner } from "./code-run-key";
 
 /* ══════════════════════════════════════════════════════════
    PYTHON FROM THE PHONE, RUN ON THE PC (host-agnostic, through deps)
 
    The phone never runs Python and never sends code (spec §9): its Run button
-   writes a request naming the note and the SHA-256 of the block it shows
-   (`executerSurPc`), then waits for the PC's result file. The PC
+   writes a request naming the note and the SHA-256 of the block it shows,
+   signed with the phone's own key (`executerSurPc`, code-run-key.ts), then
+   waits for the PC's result file. The PC
    (`traiterDemandes`, every 2 s while the app runs) validates each request
    (code-run-request.ts), reads the note ITSELF, finds the block whose hash
    matches (code-blocks.ts) and hands it to its own `HostCode.run` with the
    request file's name (`job.distant`). That is a REQUEST, not a decision: the
-   PC's main process reads the file again, asks Syncthing which device wrote
-   it, checks the code against the note, asks the owner once per device, and
+   PC's main process reads the file again, checks the signature, asks
+   Syncthing which device wrote it, checks the code against the note, asks
+   the owner once per device (and pins its key), and
    installs a missing library itself (apps/windows/electron/python/distant.ts,
    final review I2) — a window could have forged the file. It writes the
    result in its own folder. One run at a time, 20 per sender per hour,
@@ -164,6 +167,8 @@ export interface PhoneDeps {
 	sleep(ms: number): Promise<void>;
 	newId(): string;
 	files: CodeRunFiles;
+	/** Signs each request with this phone's own key (code-run-key.ts), which the PC pins. */
+	signer: RequestSigner;
 	/** The PC to ask, and whether it can answer now (`choosePc`). */
 	pc(): { target: string | null; reachable: boolean };
 	pollMs?: number;
@@ -196,7 +201,8 @@ export async function executerSurPc(job: CodeJob, deps: PhoneDeps, signal?: Abor
 	const path = relativeToRoot(job.sourcePath ?? "", deps.rootId);
 	let req: CodeRunRequest;
 	try {
-		const raw = { v: 1, id: deps.newId(), at: deps.now(), from: deps.device, target, path, sha256: await sha256Hex(job.code), accepted: true };
+		const champs = { id: deps.newId(), at: deps.now(), from: deps.device, target, path, sha256: await sha256Hex(job.code) };
+		const raw = { v: 1, ...champs, accepted: true, key: await deps.signer.publicKey(), sig: await deps.signer.sign(signedMessage(champs)) };
 		// The PC's own validator judges first: a request it would refuse is never written.
 		const verdict = validerDemandeCode(raw, { device: target, fileDevice: deps.device, fileId: raw.id, now: raw.at });
 		if (!verdict.ok) return { status: "unavailable", stdout: "" };

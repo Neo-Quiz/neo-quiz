@@ -171,6 +171,8 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 	percentLabel.hidden = true;
 
 	const libs = ajouter(section, "div", "nq-python-libs");
+	const devices = ajouter(section, "div", "nq-python-libs");
+	devices.hidden = true;
 
 	function refuse(code: string): void {
 		currentHost().ui.notice(t(code === "occupe" ? "settings.python.busy" : "settings.python.failed"));
@@ -196,6 +198,30 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 			return draw();
 		}, () => { if (!isDestroyed()) { currentHost().ui.notice(t("settings.languages.offline")); void draw(); } });
 	});
+
+	/* The devices that asked this PC to run Python (main-only list, `garde.ts`):
+	   allowed or refused, each removable so that its next request asks again. */
+	async function drawDevices(): Promise<void> {
+		const list = await pont().python.appareils().catch(() => []);
+		if (isDestroyed()) return;
+		devices.replaceChildren();
+		devices.hidden = list.length === 0;
+		if (!list.length) return;
+		ajouter(devices, "div", "nq-python-libs-titre", t("settings.python.devices"));
+		for (const d of list) {
+			const ligne = ajouter(devices, "div", "nq-python-lib");
+			const nom = ajouter(ligne, "div", "nq-python-lib-texte");
+			ajouter(nom, "span", "nq-python-lib-nom", d.nom);
+			ajouter(nom, "span", "nq-python-lib-detail", t(d.etat === "autorise" ? "settings.python.allowed" : "settings.python.refused"));
+			const bouton = ajouter(ligne, "button", "qbd-sync-action qbd-sync-action-danger nq-python-lib-bouton", t("settings.python.removeDevice"));
+			bouton.type = "button";
+			bouton.setAttribute("aria-label", t("settings.python.removeDeviceLabel", { name: d.nom }));
+			bouton.addEventListener("click", () => {
+				bouton.disabled = true;
+				void pont().python.oublierAppareil(d.id).catch(() => undefined).then(drawDevices);
+			});
+		}
+	}
 
 	async function draw(): Promise<void> {
 		const st = await pont().python.etat().catch(() => ({ interprete: false, version: null, paquets: [], octetsTotal: 0, racines: [] }));
@@ -239,6 +265,7 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 	}
 
 	void draw();
+	void drawDevices();
 }
 
 export function mountLanguagePackSettings(section: HTMLElement): () => void {

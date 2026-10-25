@@ -57,7 +57,7 @@ export const EN_APP = {
 	"app.pythonRun.hiddenChars": "This code contains invisible or direction-changing characters (shown as �): it may not do what it looks like.",
 	"app.pythonDevice.title": "Python from another device",
 	"app.pythonDevice.message": "Allow {name} to run Python on this PC?",
-	"app.pythonDevice.detail": "It will then be able to run the Python code of your quizzes on this PC, with access to your files and the Internet, without asking each time.",
+	"app.pythonDevice.detail": "It will then be able to run the Python code of your quizzes on this PC, with access to your files and the Internet, without asking each time. Allow it only if you just pressed Run on that device.",
 	"app.pythonDevice.allow": "Allow",
 	"app.pythonDevice.refuse": "Refuse",
 	"app.aiTrust.title": "Trust this folder?",

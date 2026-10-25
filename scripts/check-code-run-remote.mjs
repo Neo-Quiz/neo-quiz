@@ -62,6 +62,10 @@ const NOTE_A = [
 	`  ${JSON.stringify({ prompt: `C\n\n${F}c\nint main(){}\n${F}`, type: "text", answer: "y" })},`,
 	"]", F, "",
 ].join("\n");
+/* A key and a signature of the right FORM (the window only checks the form;
+   the main process verifies the signature: check:python-gate). */
+const KEY = "B" + "A".repeat(86);
+const SIG = "S".repeat(86);
 const CODE_B = `print("note B")`;
 const NOTE_B = [`${F}quiz-blocks`, "[", `  ${JSON.stringify({ prompt: `B\n\n${F}python\n${CODE_B}\n${F}`, type: "text", answer: "z" })}`, "]", F].join("\n");
 
@@ -72,7 +76,7 @@ await withSrcModule(
 
 		/* ── 1. The validator ── */
 		const SHA = "a".repeat(64);
-		const good = (over = {}) => ({ v: 1, id: "lq3k2-abc123", at: NOW - 1000, from: PH, target: PC, path: "Cours/A.md", sha256: SHA, accepted: true, ...over });
+		const good = (over = {}) => ({ v: 1, id: "lq3k2-abc123", at: NOW - 1000, from: PH, target: PC, path: "Cours/A.md", sha256: SHA, accepted: true, key: KEY, sig: SIG, ...over });
 		const ctx = (over = {}) => ({ device: PC, fileDevice: PH, fileId: "lq3k2-abc123", now: NOW, ...over });
 		const v = (raw, c = ctx()) => Q.validerDemandeCode(raw, c);
 		r.check("a good request is accepted, copied field by field", v(good()), { ok: true, demande: good() });
@@ -80,7 +84,10 @@ await withSrcModule(
 			["forged prototype", Object.assign(Object.create({ evil: 1 }), good())], ["id is not the file name", good({ id: "other-1234" })], ["id not a slug", good({ id: "../x" })],
 			["sha256 not hex", good({ sha256: "g".repeat(64) })], ["sha256 uppercase", good({ sha256: "A".repeat(64) })], ["sha256 short", good({ sha256: "a".repeat(63) })],
 			["accepted false", good({ accepted: false })], ["accepted missing", (() => { const g = good(); delete g.accepted; return g; })()], ["accepted string", good({ accepted: "true" })],
-			["path not a string", good({ path: ["A.md"] })], ["time not a number", good({ at: "now" })], ["time NaN", good({ at: NaN })]]) {
+			["path not a string", good({ path: ["A.md"] })], ["time not a number", good({ at: "now" })], ["time NaN", good({ at: NaN })],
+			["key missing", (() => { const g = good(); delete g.key; return g; })()], ["sig missing", (() => { const g = good(); delete g.sig; return g; })()],
+			["key too short", good({ key: KEY.slice(1) })], ["key with padding", good({ key: KEY.slice(1) + "=" })], ["key standard base64", good({ key: "+" + KEY.slice(1) })],
+			["sig too long", good({ sig: SIG + "A" })], ["sig not a string", good({ sig: 3 })]]) {
 			r.check("schema: " + n, v(raw).ok === false && v(raw).raison, "schema");
 		}
 		r.check("expediteur: the folder is not `from` (impersonation)", v(good(), ctx({ fileDevice: PH2 })).raison, "expediteur");
@@ -153,7 +160,7 @@ await withSrcModule(
 			});
 			w.pass = () => quiet(() => R.traiterDemandes(w.deps()));
 			w.result = (id) => { const s = fs.files.get(`${BASE}/results/${PC}/${id}.json`); return s ? JSON.parse(s) : null; };
-			w.send = async (over = {}, dev = PH) => { const q = { v: 1, id: "lq3k2-abc123", at: w.now - 1000, from: dev, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, ...over }; await w.phone(dev).writeRequest(q); return q; };
+			w.send = async (over = {}, dev = PH) => { const q = { v: 1, id: "lq3k2-abc123", at: w.now - 1000, from: dev, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, key: KEY, sig: SIG, ...over }; await w.phone(dev).writeRequest(q); return q; };
 			return w;
 		}
 		{
@@ -184,7 +191,7 @@ await withSrcModule(
 		{
 			const w = pcWorld();
 			// Written by hand: the phone's own writer would never produce these.
-			const hostile = async (id, over) => { w.fs.files.set(`${BASE}/requests/${PH}/${id}.json`, JSON.stringify({ v: 1, id, at: w.now - 1000, from: PH, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, ...over })); };
+			const hostile = async (id, over) => { w.fs.files.set(`${BASE}/requests/${PH}/${id}.json`, JSON.stringify({ v: 1, id, at: w.now - 1000, from: PH, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, key: KEY, sig: SIG, ...over })); };
 			await hostile("esc-0001", { path: "../A.md" });
 			await hostile("esc-0002", { path: ".neo-quiz/A.md" });
 			await hostile("esc-0003", { path: "C:/Cours/A.md" });
@@ -198,9 +205,9 @@ await withSrcModule(
 		{
 			const w = pcWorld();
 			// The PC's own folder: never a sender (the real files never list it, the validator refuses it).
-			w.fs.files.set(`${BASE}/requests/${PC}/self-0001.json`, JSON.stringify({ v: 1, id: "self-0001", at: w.now, from: PC, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true }));
+			w.fs.files.set(`${BASE}/requests/${PC}/self-0001.json`, JSON.stringify({ v: 1, id: "self-0001", at: w.now, from: PC, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, key: KEY, sig: SIG }));
 			// A phone folder claiming to be another device.
-			w.fs.files.set(`${BASE}/requests/${PH}/fake-0001.json`, JSON.stringify({ v: 1, id: "fake-0001", at: w.now, from: PH2, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true }));
+			w.fs.files.set(`${BASE}/requests/${PH}/fake-0001.json`, JSON.stringify({ v: 1, id: "fake-0001", at: w.now, from: PH2, target: PC, path: "Cours/A.md", sha256: await sha(CODE_QUOTE), accepted: true, key: KEY, sig: SIG }));
 			await w.send({ id: "other-0001", target: PH2 });
 			await w.send({ id: "old-00001", at: w.now - 121_000 });
 			await w.pass();
@@ -323,8 +330,10 @@ await withSrcModule(
 			const deps = {
 				device: PH, rootId: ROOT, now: () => w.now, newId: () => "ph" + (++ids) + "-run1",
 				sleep: async (ms) => { w.now += ms; if (deps.onSleep) await deps.onSleep(); },
-				files: w.phone(PH), pc: () => ({ target: PC, reachable: true }), ...over,
+				files: w.phone(PH), pc: () => ({ target: PC, reachable: true }),
+				signer: { publicKey: async () => KEY, sign: async (m) => { deps.signed.push(m); return SIG; } }, ...over,
 			};
+			deps.signed = [];
 			deps.elapsed = () => w.now - t0;
 			return deps;
 		}
@@ -335,6 +344,20 @@ await withSrcModule(
 			r.check("phone: no PC -> no-pc at once, nothing written", [await R.executerSurPc(job(), phone(w, { pc: () => ({ target: null, reachable: false }) })), w.fs.files.size], [{ status: "unavailable", stdout: "", error: "no-pc" }, 0]);
 			r.check("phone: a PC not reachable -> no-pc at once", (await R.executerSurPc(job(), phone(w, { pc: () => ({ target: PC, reachable: false }) }))).error, "no-pc");
 			r.check("phone: a note outside the synced root -> nothing written", [(await R.executerSurPc(job({ sourcePath: "Other/A.md" }), phone(w))).status, w.fs.files.size], ["unavailable", 0]);
+		}
+		{
+			const w = pcWorld();
+			const d = phone(w);
+			let written = null;
+			const files = w.phone(PH);
+			d.files = { ...files, writeRequest: async (q) => { written = q; return files.writeRequest(q); } };
+			d.waitMs = 1000;
+			await quiet(() => R.executerSurPc(job(), d));
+			r.check("phone: the request carries the signer's key and signature", [written?.key, written?.sig], [KEY, SIG]);
+			r.check("phone: what is signed is the request's own fields (signedMessage)", d.signed, written ? [Q.signedMessage(written)] : ["no request"]);
+			const w2 = pcWorld();
+			const d2 = phone(w2, { signer: { publicKey: async () => KEY, sign: async () => { throw new Error("no key store"); } } });
+			r.check("phone: no key to sign with -> unavailable, nothing written", [(await quiet(() => R.executerSurPc(job(), d2))).status, w2.fs.files.size], ["unavailable", 0]);
 		}
 		{
 			const w = pcWorld();

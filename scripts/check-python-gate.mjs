@@ -70,7 +70,7 @@ function fauxService() {
 }
 
 try {
-	await withSrcModule(["apps/windows/electron/python/garde.ts", "apps/windows/electron/python/distant.ts", "src/shared-state/code-run-request.ts"], async (G, D, Q) => {
+	await withSrcModule(["apps/windows/electron/python/garde.ts", "apps/windows/electron/python/distant.ts", "src/shared-state/code-run-request.ts", "src/dashboard/code-run-key.ts"], async (G, D, Q, K) => {
 		/* ══════════ A1: the local warning ══════════ */
 		const fichierAv = join(tmp, "userData", "python", "avertissements.json");
 		const boites = faussesBoites();
@@ -163,12 +163,26 @@ try {
 		const shaCode = createHash("sha256").update(CODE).digest("hex");
 		let horloge = 1_800_000_000_000;
 		let n = 0;
-		/** Writes a request file of the phone; `modifie` says who Syncthing says made it. */
-		function demande({ at = horloge, target = PC, from = TEL, sha = shaCode, path = "Cours/a.md" } = {}) {
+		/* Keys made and used exactly as the phone does (WebCrypto, P1363 signature,
+		   base64url of code-run-key.ts): the main process must verify what the phone signs. */
+		const nouvelleCle = async () => {
+			const paire = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, ["sign", "verify"]);
+			return {
+				publique: K.base64url(new Uint8Array(await crypto.subtle.exportKey("raw", paire.publicKey))),
+				signer: async (m) => K.base64url(new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, paire.privateKey, new TextEncoder().encode(m)))),
+			};
+		};
+		const CLE_TEL = await nouvelleCle();
+		const CLE_PIRATE = await nouvelleCle();
+		/** Writes a request file of the phone, signed by `cle` (the phone's own by default);
+		    `apres` may change the signed fields before writing (a tampered file). */
+		async function demande({ at = horloge, target = PC, from = TEL, sha = shaCode, path = "Cours/a.md", cle = CLE_TEL, signePar = cle, apres = (q) => q } = {}) {
 			const id = "req-" + (++n).toString(36).padStart(4, "0");
 			const rel = Q.requestPath(TEL, id);
 			mkdirSync(join(racine, ".neo-quiz", "code-runs", "requests", TEL), { recursive: true });
-			writeFileSync(join(racine, ...rel.split("/")), JSON.stringify({ v: 1, id, at, from, target, path, sha256: sha, accepted: true }));
+			const champs = { id, at, from, target, path, sha256: sha };
+			const q = apres({ v: 1, ...champs, accepted: true, key: cle.publique, sig: await signePar.signer(Q.signedMessage(champs)) });
+			writeFileSync(join(racine, ...rel.split("/")), JSON.stringify(q));
 			return { id, rel };
 		}
 		/** The index as Syncthing would answer, from the bytes on disk NOW (or as told). */
@@ -186,43 +200,88 @@ try {
 
 		{
 			const { svc, ex } = distant();
-			const d = demande();
+			const d = await demande();
 			indexer(d.rel, ID_ST_PC.slice(0, 7));
 			r.check("A2: a request written on THIS PC (modifiedBy = self) -> refused, no dialog, no spawn",
 				[(await ex.executer(job(d))).status, boitesD.appels.length, svc.runs.length], ["unavailable", 0, 0]);
-			const d2 = demande();
+			const d2 = await demande();
 			const verdict = async (d) => { const res = await ex.executer(job(d)); return [res.status, res.error ?? null, boitesD.appels.length, svc.runs.length]; };
 			r.check("A2: a request Syncthing has not indexed -> refused, no dialog", await verdict(d2), ["unavailable", null, 0, 0]);
-			const d3 = demande();
+			const d3 = await demande();
 			indexer(d3.rel, ID_ST_TEL.slice(0, 7));
 			writeFileSync(join(racine, ...d3.rel.split("/")), readFileSync(join(racine, ...d3.rel.split("/")), "utf8").replace('"at":' + horloge, '"at":' + (horloge - 1)));
 			r.check("A2: the phone's file overwritten here before the rescan (bytes differ) -> refused, no dialog", await verdict(d3), ["unavailable", null, 0, 0]);
-			const d4 = demande();
+			const d4 = await demande();
 			indexer(d4.rel, "ZZZZZZZ");
 			r.check("A2: written by a device that is not paired -> refused, no dialog", await verdict(d4), ["unavailable", null, 0, 0]);
-			const d6 = demande();
+			const d6 = await demande();
 			indexer(d6.rel, ID_ST_PC.slice(0, 7));
 			r.check("A2: modifiedBy = this PC, checked again after the others -> refused, no dialog", await verdict(d6), ["unavailable", null, 0, 0]);
-			const d5 = demande();
+			const d5 = await demande();
 			indexer(d5.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: no sync running -> refused", (await distant({ svc, syncOk: false }).ex.executer(job(d5))).status, "unavailable");
 		}
 		{
+			/* The signature, before anything else is asked. */
 			const { svc, ex } = distant();
-			const d = demande();
+			const avant = boitesD.appels.length;
+			const signe = async (o) => { const d = await demande(o); indexer(d.rel, ID_ST_TEL.slice(0, 7)); const res = await ex.executer(job(d)); return [res.status, res.error ?? null, boitesD.appels.length - avant, svc.runs.length]; };
+			r.check("A4: a signed field changed after signing (the hash) -> refused, no dialog, no spawn",
+				await signe({ apres: (q) => ({ ...q, sha256: "0".repeat(64) }) }), ["unavailable", null, 0, 0]);
+			r.check("A4: the note path changed after signing -> refused", await signe({ apres: (q) => ({ ...q, path: "Cours/b.md" }) }), ["unavailable", null, 0, 0]);
+			r.check("A4: the phone's key, signed by ANOTHER key -> refused, no dialog", await signe({ signePar: CLE_PIRATE }), ["unavailable", null, 0, 0]);
+			r.check("A4: a signature of the right form but random -> refused", await signe({ apres: (q) => ({ ...q, sig: "A".repeat(86) }) }), ["unavailable", null, 0, 0]);
+			r.check("A4: a key that is not a P-256 point -> refused", await signe({ apres: (q) => ({ ...q, key: "BA" + "A".repeat(85) }) }), ["unavailable", null, 0, 0]);
+			r.check("A4: a valid signature passes signatureValide (WebCrypto P1363 = node ieee-p1363)", await (async () => {
+				const champs = { id: "req-zz01", at: horloge, from: TEL, target: PC, path: "Cours/a.md", sha256: shaCode };
+				return D.signatureValide({ ...champs, key: CLE_TEL.publique, sig: await CLE_TEL.signer(Q.signedMessage(champs)) });
+			})(), true);
+		}
+		{
+			/* A refusal is remembered, per Syncthing device, in its own file. */
+			const fichierRefus = join(tmp, "userDataR", "appareils.json");
+			const { svc, ex } = distant({ autorisations: G.creerAutorisationsAppareils(fichierRefus) });
+			const d = await demande();
 			indexer(d.rel, ID_ST_TEL.slice(0, 7));
 			boitesD.appels.length = 0;
 			boitesD.repondre({ response: 1, checkboxChecked: false });
 			const res = await ex.executer(job(d));
 			r.check("A2: a device never allowed -> the native authorization, naming it", [boitesD.appels.length, boitesD.appels[0]?.message, boitesD.appels[0]?.buttons, boitesD.appels[0]?.defaultId, boitesD.appels[0]?.cancelId],
 				[1, "Allow Pixel 9 to run Python on this PC?", ["Allow", "Refuse"], 1, 1]);
-			r.check("A2: Refuse -> 'refused' result, no spawn, nothing remembered", [res.status, res.error, svc.runs.length, existsSync(fichierApp)], ["unavailable", "refused", 0, false]);
-			const d2 = demande();
+			r.check("A2: Refuse -> 'refused' result, no spawn, the refusal remembered", [res.status, res.error, svc.runs.length, JSON.parse(readFileSync(fichierRefus, "utf8")).refus.map((x) => x.syncthing)], ["unavailable", "refused", 0, [ID_ST_TEL]]);
+			const dR = await demande();
+			indexer(dR.rel, ID_ST_TEL.slice(0, 7));
+			r.check("A2: after Refuse, the same device -> refused WITHOUT asking again", [(await ex.executer(job(dR))).error, boitesD.appels.length, svc.runs.length], ["refused", 1, 0]);
+			const { ex: exR } = distant({ autorisations: G.creerAutorisationsAppareils(fichierRefus) });
+			const dR2 = await demande();
+			indexer(dR2.rel, ID_ST_TEL.slice(0, 7));
+			r.check("A2: the refusal survives a restart", [(await exR.executer(job(dR2))).error, boitesD.appels.length], ["refused", 1]);
+			const memR = G.creerAutorisationsAppareils(fichierRefus);
+			r.check("A2: Settings lists the refused device by its Syncthing id", memR.lister().map((l) => [l.id, l.nom, l.etat]), [[ID_ST_TEL, "Pixel 9", "refuse"]]);
+			memR.oublier(ID_ST_TEL);
+			const { ex: exO } = distant({ autorisations: memR });
+			const dO = await demande();
+			indexer(dO.rel, ID_ST_TEL.slice(0, 7));
+			boitesD.repondre({ response: 1, checkboxChecked: false });
+			await exO.executer(job(dO));
+			r.check("A2: removed in Settings -> the next request asks again", boitesD.appels.length, 2);
+			/* No answer (another dialog open, a failed dialog) is not a refusal. */
+			const fichierN = join(tmp, "userDataN", "appareils.json");
+			const { ex: exN } = distant({ autorisations: G.creerAutorisationsAppareils(fichierN) });
+			const dN = await demande();
+			indexer(dN.rel, ID_ST_TEL.slice(0, 7));
+			boitesD.repondre(new Error("dialog failed"));
+			const resN = await exN.executer(job(dN));
+			r.check("A2: a dialog that fails -> not run, nothing remembered", [resN.status, resN.error ?? null, existsSync(fichierN)], ["unavailable", null, false]);
+		}
+		{
+			const { svc, ex } = distant();
+			const d2 = await demande();
 			indexer(d2.rel, ID_ST_TEL.slice(0, 7));
 			boitesD.repondre({ response: 0, checkboxChecked: false });
 			const ok = await ex.executer(job(d2));
 			r.check("A2: Allow -> one spawn of the note's block", [ok.status, svc.runs.map((j) => j.code)], ["ok", [CODE]]);
-			r.check("A2: Allow persisted in the main-only file, bound to the Syncthing device", JSON.parse(readFileSync(fichierApp, "utf8")).appareils.map((a) => [a.appareil, a.syncthing, a.nom]), [[TEL, ID_ST_TEL, "Pixel 9"]]);
+			r.check("A2: Allow persisted in the main-only file, bound to the Syncthing device and the key", JSON.parse(readFileSync(fichierApp, "utf8")).appareils.map((a) => [a.appareil, a.syncthing, a.cle, a.nom]), [[TEL, ID_ST_TEL, CLE_TEL.publique, "Pixel 9"]]);
 			r.check("A2: a remote run never shows the per-run warning", boitesD.appels.every((a) => a.title === "T"), true);
 			r.check("A2: the same request again -> refused (runs once)", [(await ex.executer(job(d2))).status, svc.runs.length], ["unavailable", 1]);
 		}
@@ -230,20 +289,32 @@ try {
 			/* A restart: the allowed device is read back, no dialog. */
 			const { svc, ex } = distant();
 			const avant = boitesD.appels.length;
-			const d = demande();
+			const d = await demande();
 			indexer(d.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: allowed device after a restart -> runs without a dialog", [(await ex.executer(job(d))).status, boitesD.appels.length - avant, svc.runs.length], ["ok", 0, 1]);
-			const d2 = demande();
+			const d2 = await demande();
 			indexer(d2.rel, ID_ST_AUTRE.slice(0, 7));
-			r.check("A2: the allowed device's folder written by ANOTHER paired device -> refused, no dialog",
-				[(await ex.executer(job(d2))).error, boitesD.appels.length - avant, svc.runs.length], ["refused", 0, 1]);
-			const d3 = demande();
+			r.check("A2: the allowed device's folder written by ANOTHER paired device -> unknown-key, no dialog",
+				[(await ex.executer(job(d2))).error, boitesD.appels.length - avant, svc.runs.length], ["unknown-key", 0, 1]);
+			/* The impersonation Syncthing cannot rule out: a compromised paired device
+			   claiming the phone's modifiedBy. It cannot sign with the phone's key. */
+			const dK = await demande({ cle: CLE_PIRATE });
+			indexer(dK.rel, ID_ST_TEL.slice(0, 7));
+			r.check("A5: the phone's id and Syncthing device, signed by ANOTHER key -> unknown-key, no dialog, no spawn",
+				[(await ex.executer(job(dK))).error, boitesD.appels.length - avant, svc.runs.length], ["unknown-key", 0, 1]);
+			r.check("A5: Settings lists the allowed phone", G.creerAutorisationsAppareils(fichierApp).lister().map((l) => [l.id, l.etat]), [[ID_ST_TEL, "autorise"]]);
+			/* An entry written before requests were signed (no key) allows nothing. */
+			const ancien = join(tmp, "userDataV1", "appareils.json");
+			mkdirSync(join(tmp, "userDataV1"), { recursive: true });
+			writeFileSync(ancien, JSON.stringify({ v: 1, appareils: [{ appareil: TEL, syncthing: ID_ST_TEL, nom: "Pixel 9", at: 1 }] }));
+			r.check("A5: an allowed entry without a pinned key (v1 file) is dropped", G.creerAutorisationsAppareils(ancien).trouver(TEL), null);
+			const d3 = await demande();
 			indexer(d3.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: code that is not the note's block -> 'changed', no spawn", [(await ex.executer(job(d3, "import os; os.remove('x')"))).error, svc.runs.length], ["changed", 1]);
-			const d4 = demande({ sha: "0".repeat(64) });
+			const d4 = await demande({ sha: "0".repeat(64) });
 			indexer(d4.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: a hash no block of the note has -> 'changed'", [(await ex.executer(job(d4))).error, svc.runs.length], ["changed", 1]);
-			const d5 = demande({ target: "cccccccc-0000-4000-8000-000000000003" });
+			const d5 = await demande({ target: "cccccccc-0000-4000-8000-000000000003" });
 			indexer(d5.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: addressed to another PC -> refused", [(await ex.executer(job(d5))).status, svc.runs.length], ["unavailable", 1]);
 			for (const [nom, dist] of [
@@ -258,7 +329,7 @@ try {
 		{
 			/* A3: never run late. */
 			const { svc, ex } = distant();
-			const vieille = demande({ at: horloge - Q.MAX_AGE_MS - 1 });
+			const vieille = await demande({ at: horloge - Q.MAX_AGE_MS - 1 });
 			indexer(vieille.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A3: MAX_AGE_MS < the phone's wait - 15 s", Q.MAX_AGE_MS <= Q.PHONE_WAIT_MS - 15_000, true);
 			r.check("A3: a request past MAX_AGE_MS -> refused", [(await ex.executer(job(vieille))).status, svc.runs.length], ["unavailable", 0]);
@@ -268,19 +339,19 @@ try {
 			   withdrawn (Stop on the phone) or aged during the dialog never runs. */
 			const fichier2 = join(tmp, "userData2", "appareils.json");
 			const { svc, ex } = distant({ autorisations: G.creerAutorisationsAppareils(fichier2) });
-			const d = demande();
+			const d = await demande();
 			indexer(d.rel, ID_ST_TEL.slice(0, 7));
 			boitesD.repondre(() => { unlinkSync(join(racine, ...d.rel.split("/"))); return Promise.resolve({ response: 0, checkboxChecked: false }); });
 			r.check("A3: request deleted while the dialog was open -> no spawn", [(await ex.executer(job(d))).status, svc.runs.length], ["unavailable", 0]);
 			const { svc: svc2, ex: ex2 } = distant({ autorisations: G.creerAutorisationsAppareils(join(tmp, "userData3", "appareils.json")) });
-			const d2 = demande();
+			const d2 = await demande();
 			indexer(d2.rel, ID_ST_TEL.slice(0, 7));
 			boitesD.repondre(() => { horloge += Q.MAX_AGE_MS + 1; return Promise.resolve({ response: 0, checkboxChecked: false }); });
 			r.check("A3: request too old once the owner answered -> no spawn", [(await ex2.executer(job(d2))).status, svc2.runs.length], ["unavailable", 0]);
 		}
 		{
 			const { svc, ex } = distant();
-			const d = demande();
+			const d = await demande();
 			indexer(d.rel, ID_ST_TEL.slice(0, 7));
 			await ex.executer(job(d));
 			r.check("A3: the run ends before the phone stops waiting", svc.runs[0].timeoutMs <= Q.PHONE_WAIT_MS - 8000 && svc.runs[0].timeoutMs >= 1000, true);
@@ -289,7 +360,7 @@ try {
 			svcI.reponses.push({ status: "not-installed", stdout: "", missing: ["torch"] });
 			svcI.octets = 124_000_000;
 			const exI = distant({ svc: svcI }).ex;
-			const di = demande();
+			const di = await demande();
 			indexer(di.rel, ID_ST_TEL.slice(0, 7));
 			const resI = await exI.executer(job(di));
 			r.check("A3: install longer than the phone waits -> not-installed + pc-installing", [resI.status, resI.error], ["not-installed", "pc-installing"]);
@@ -297,13 +368,13 @@ try {
 			const svcS = fauxService();
 			svcS.reponses.push({ status: "not-installed", stdout: "", missing: ["seaborn"] });
 			svcS.octets = 300_000;
-			const ds = demande();
+			const ds = await demande();
 			indexer(ds.rel, ID_ST_TEL.slice(0, 7));
 			const resS = await distant({ svc: svcS }).ex.executer(job(ds));
 			r.check("A3: a small install the phone can wait for -> installed, then run once more", [resS.status, svcS.installs, svcS.runs.length], ["ok", [["seaborn"]], 2]);
 			const svcE = fauxService();
 			svcE.enCours = true;
-			const de = demande();
+			const de = await demande();
 			indexer(de.rel, ID_ST_TEL.slice(0, 7));
 			const resE = await distant({ svc: svcE }).ex.executer(job(de));
 			r.check("A3: an install under way -> pc-installing at once, nothing run", [resE.error, svcE.runs.length], ["pc-installing", 0]);

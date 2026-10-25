@@ -17,9 +17,14 @@ import type { CodeRun } from "../host/types";
    `MAX_AGE_MS`, 60 s, is dropped, so a run never STARTS after the phone
    gave up, final review I3), the path rules shared with remote generation
    (`isSafeDocumentPath`). `accepted` is the phone's answer to the run
-   warning. The PC's main process judges the same file again before any run
-   (apps/windows/electron/python/distant.ts): who wrote it, per Syncthing,
-   and whether the owner allowed that device on this PC.
+   warning. `key` and `sig` are the phone's own ECDSA P-256 public key and
+   its signature of `signedMessage(request)`: Syncthing does not prove which
+   device wrote a file (a compromised paired device can claim another
+   device's `modifiedBy`), so the PC pins the key on the owner's first
+   "Allow" and later runs only requests signed by it. The PC's main process
+   judges the same file again before any run
+   (apps/windows/electron/python/distant.ts): the signature, who wrote it per
+   Syncthing, and whether the owner allowed that device and key on this PC.
    No DOM, no host, no clock: `now` is always an input.
 ══════════════════════════════════════════════════════════ */
 
@@ -54,13 +59,22 @@ export function parseRequestPath(rel: unknown): { device: string; id: string } |
 	return m && SLUG.test(m[2]) ? { device: m[1], id: m[2] } : null;
 }
 
-export interface CodeRunRequest { v: 1; id: string; at: number; from: string; target: string; path: string; sha256: string; accepted: true }
+export interface CodeRunRequest { v: 1; id: string; at: number; from: string; target: string; path: string; sha256: string; accepted: true; key: string; sig: string }
+
+/** The bytes the phone signs: every field the PC acts on, in a fixed order,
+    behind a label that no other signed message of the app shares. */
+export const signedMessage = (r: Pick<CodeRunRequest, "id" | "at" | "from" | "target" | "path" | "sha256">): string =>
+	JSON.stringify(["neo-quiz/code-run/1", r.id, r.at, r.from, r.target, r.path, r.sha256]);
+/** base64url (no padding) of a 65-byte uncompressed P-256 point. */
+export const PUBLIC_KEY = /^[A-Za-z0-9_-]{87}$/;
+/** base64url (no padding) of a 64-byte IEEE P1363 (r || s) ECDSA signature. */
+export const SIGNATURE = /^[A-Za-z0-9_-]{86}$/;
 export interface CodeRunResult { v: 1; id: string; at: number; status: CodeRun["status"]; stdout: string; error?: string; unsupported?: string[] }
 
 export type CodeRunRefusal = "schema" | "expediteur" | "destinataire" | "age" | "futur" | "chemin";
 export type CodeRunVerdict = { ok: true; demande: CodeRunRequest } | { ok: false; raison: CodeRunRefusal };
 
-const KEYS = new Set(["v", "id", "at", "from", "target", "path", "sha256", "accepted"]);
+const KEYS = new Set(["v", "id", "at", "from", "target", "path", "sha256", "accepted", "key", "sig"]);
 const SHA256 = /^[0-9a-f]{64}$/;
 const NOTE = /\.md$/i;
 const STATUSES: ReadonlySet<string> = new Set<CodeRun["status"]>(["ok", "error", "compile-error", "timeout", "too-long", "unavailable", "not-installed", "unsupported"]);
@@ -78,16 +92,17 @@ const schema: CodeRunVerdict = { ok: false, raison: "schema" };
 
 export function validerDemandeCode(raw: unknown, ctx: { device: string; fileDevice: string; fileId: string; now: number }): CodeRunVerdict {
 	if (!isPlain(raw) || Object.keys(raw).some(k => !KEYS.has(k)) || raw.v !== 1) return schema;
-	const { id, at, from, target, path, sha256, accepted } = raw;
+	const { id, at, from, target, path, sha256, accepted, key, sig } = raw;
 	if (typeof id !== "string" || !SLUG.test(id) || id !== ctx.fileId) return schema;
 	if (typeof at !== "number" || !Number.isFinite(at) || !Number.isFinite(ctx.now)) return schema;
 	if (typeof path !== "string" || typeof sha256 !== "string" || !SHA256.test(sha256) || accepted !== true) return schema;
+	if (typeof key !== "string" || !PUBLIC_KEY.test(key) || typeof sig !== "string" || !SIGNATURE.test(sig)) return schema;
 	if (typeof from !== "string" || !DEVICE.test(from) || !sameDevice(from, ctx.fileDevice) || sameDevice(from, ctx.device)) return { ok: false, raison: "expediteur" };
 	if (typeof target !== "string" || !sameDevice(target, ctx.device)) return { ok: false, raison: "destinataire" };
 	if (at > ctx.now + FUTURE_SKEW_MS) return { ok: false, raison: "futur" };
 	if (ctx.now - at > MAX_AGE_MS) return { ok: false, raison: "age" };
 	if (!isSafeDocumentPath(path, NOTE)) return { ok: false, raison: "chemin" };
-	return { ok: true, demande: { v: 1, id, at, from, target, path, sha256, accepted: true } };
+	return { ok: true, demande: { v: 1, id, at, from, target, path, sha256, accepted: true, key, sig } };
 }
 
 export interface TakenRun { id: string; from: string; at: number }

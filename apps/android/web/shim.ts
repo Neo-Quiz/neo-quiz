@@ -355,6 +355,9 @@ const pont: Pont = {
 		},
 		desinstaller: async () => ({ ok: false, code: "inconnu" }),
 		supprimerTout: async () => ({ ok: false, code: "io" }),
+		// The phone asks the PC; only the PC keeps a list of devices.
+		appareils: async () => [],
+		oublierAppareil: async () => {},
 	},
 
 	langages: {

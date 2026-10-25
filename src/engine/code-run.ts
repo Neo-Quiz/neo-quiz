@@ -104,12 +104,13 @@ export function createCodeRunHandlers(ctx: EngineCtx): CodeRunHandlers {
 			case "unavailable":
 			default:
 				/* The phone's Python runs on the PC (dashboard/code-run-remote.ts):
-				   these three codes say why it did not. */
+				   these codes say why it did not. */
 				if (resultat.error === "no-pc") return { texte: t("engine.code.noPc"), erreur: false, panne: true };
 				if (resultat.error === "pc-silent") return { texte: t("engine.code.pcSilent"), erreur: false, panne: true };
 				if (resultat.error === "changed") return { texte: t("engine.code.quizChanged"), erreur: false, panne: true };
 				if (resultat.error === "refused") return { texte: t("engine.code.pcRefused"), erreur: false, panne: true };
 				if (resultat.error === "pc-installing") return { texte: t("engine.code.pcInstalling"), erreur: false, panne: true };
+				if (resultat.error === "unknown-key") return { texte: t("engine.code.pcUnknownKey"), erreur: false, panne: true };
 				return { texte: t("engine.code.unavailable"), erreur: false, panne: true };
 		}
 	}

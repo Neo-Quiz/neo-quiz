@@ -10,8 +10,9 @@
 
    1. reads the request file from the disk ITSELF, under the Syncthing folder
       (the pinned `syncRoot`, never a path from the window), size-bounded,
-      and validates it with the shared pure validator (schema, sender =
-      folder, target = this PC, age);
+      validates it with the shared pure validator (schema, sender = folder,
+      target = this PC, age) and checks its ECDSA P-256 signature against
+      the public key it carries (`signatureValide`);
    2. asks the embedded Syncthing (REST key held here) who wrote it:
       `/rest/db/file` → `global.modifiedBy`, the 7-character short id of the
       device that made the current version, and `global.blocksHash`, which
@@ -28,8 +29,16 @@
       the window sent to be that block, byte for byte;
    4. asks the owner, ONCE per device, with a native dialog
       (`garde.ts`): the Neo Quiz device id is bound to the Syncthing device
-      seen writing for it, and a later request from that folder written by
-      another device is refused without asking;
+      seen writing for it AND to the request's public key. Syncthing's
+      `modifiedBy` is the sending device's own claim (a compromised paired
+      device can name another one), so after that first "Allow" the KEY is
+      what proves the phone: a later request with another key, from another
+      Syncthing device, or naming another Neo Quiz id through a Syncthing
+      device already bound, is refused without asking (`unknown-key`); a
+      refused Syncthing device is refused without asking until the owner
+      removes it in Settings. What remains is trust on first use: before the
+      owner's first "Allow", a compromised paired device could pose as the
+      phone, and the dialog says to allow only right after pressing Run;
    5. checks again, right before the run, that the request still exists and
       is still young enough (`MAX_AGE_MS`), and bounds the run so that it
       ends before the phone stops waiting (`PHONE_WAIT_MS`);
@@ -43,12 +52,13 @@
    (`canaux.ts` in the app, `scripts/check-python-service.mjs` in checks).
 ══════════════════════════════════════════════════════════ */
 
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { join, relative, isAbsolute } from "node:path";
 import type { CodeRun } from "../../../../src/host/types";
 import { blocsPython } from "../../../../src/code-blocks";
-import { MAX_AGE_MS, MAX_REQUEST_CHARS, PHONE_WAIT_MS, parseRequestPath, validerDemandeCode } from "../../../../src/shared-state/code-run-request";
+import { MAX_AGE_MS, MAX_REQUEST_CHARS, PHONE_WAIT_MS, parseRequestPath, signedMessage, validerDemandeCode } from "../../../../src/shared-state/code-run-request";
+import type { CodeRunRequest } from "../../../../src/shared-state/code-run-request";
 import type { ServicePython } from "./service";
 import type { AutorisationsAppareils, GardePython } from "./garde";
 
@@ -88,6 +98,8 @@ export interface DepsDistant {
 /** The phone's result codes this module adds (`engine.code.pcRefused`, `engine.code.pcInstalling`). */
 export const ERREUR_REFUS = "refused";
 export const ERREUR_INSTALLATION = "pc-installing";
+/** The request is signed by a key this PC does not know for that device (`engine.code.pcUnknownKey`). */
+export const ERREUR_CLE = "unknown-key";
 
 /** A note past this is not read (same bound as the window's reader). */
 const MAX_NOTE = 4_000_000;
@@ -105,6 +117,18 @@ const indisponible = (error?: string): CodeRun => (error ? { status: "unavailabl
 export function blocksHashUnBloc(octets: Uint8Array): string {
 	const bloc = createHash("sha256").update(octets).digest();
 	return createHash("sha256").update(bloc).digest("base64");
+}
+
+/** Whether `sig` is a valid ECDSA P-256 / SHA-256 signature, by `key`, of the
+    request's `signedMessage`. Any malformed key or signature: false. */
+export function signatureValide(d: Pick<CodeRunRequest, "id" | "at" | "from" | "target" | "path" | "sha256" | "key" | "sig">): boolean {
+	try {
+		const point = Buffer.from(d.key, "base64url");
+		const sig = Buffer.from(d.sig, "base64url");
+		if (point.length !== 65 || point[0] !== 4 || sig.length !== 64) return false;
+		const cle = createPublicKey({ key: { kty: "EC", crv: "P-256", x: point.subarray(1, 33).toString("base64url"), y: point.subarray(33).toString("base64url") }, format: "jwk" });
+		return verify("sha256", Buffer.from(signedMessage(d), "utf8"), { key: cle, dsaEncoding: "ieee-p1363" }, sig);
+	} catch { return false; }
 }
 
 /** The paired device that made this version of the file, or why not. Pure. */
@@ -179,6 +203,10 @@ export function creerExecutionDistante(deps: DepsDistant): ExecutionDistante {
 			const verdict = validerDemandeCode(brut, { device: idPc, fileDevice: nom.device, fileId: nom.id, now: deps.now() });
 			if (!verdict.ok) return indisponible();
 			const demande = verdict.demande;
+			if (!signatureValide(demande)) {
+				console.warn("[python] remote request refused: bad-signature", rel);
+				return indisponible();
+			}
 
 			/* 2. Who wrote it, per Syncthing. */
 			const qui = jugerOrigine(await origine.fichier(rel).catch(() => null), octets, origine.idPropre, origine.pairs);
@@ -202,13 +230,21 @@ export function creerExecutionDistante(deps: DepsDistant): ExecutionDistante {
 			const bloc = blocsPython(note.toString("utf8")).find((b) => createHash("sha256").update(b, "utf8").digest("hex") === demande.sha256);
 			if (bloc === undefined || bloc !== job.code) return indisponible("changed");
 
-			/* 4. The owner's authorization of this device, once. */
+			/* 4. The owner's authorization of this device and key, once. */
+			const st = qui.pair.id;
+			if (deps.autorisations.refuse(st)) return indisponible(ERREUR_REFUS);
 			const connu = deps.autorisations.trouver(demande.from);
-			if (connu) {
-				if (connu.syncthing !== qui.pair.id) return indisponible(ERREUR_REFUS);
+			if (connu || deps.autorisations.parSyncthing(st)) {
+				/* Pinned: this Neo Quiz id, through this Syncthing device, signed by this key. */
+				if (!connu || connu.syncthing !== st || connu.cle !== demande.key) return indisponible(ERREUR_CLE);
 			} else {
-				if (!(await deps.garde.autoriserAppareil(qui.pair.nom || qui.pair.id.slice(0, 7)))) return indisponible(ERREUR_REFUS);
-				deps.autorisations.ajouter({ appareil: demande.from, syncthing: qui.pair.id, nom: qui.pair.nom, at: deps.now() });
+				const reponse = await deps.garde.autoriserAppareil(qui.pair.nom || st.slice(0, 7));
+				if (reponse === null) return indisponible();
+				if (reponse === "refuser") {
+					deps.autorisations.refuser({ syncthing: st, nom: qui.pair.nom, at: deps.now() });
+					return indisponible(ERREUR_REFUS);
+				}
+				deps.autorisations.ajouter({ appareil: demande.from, syncthing: st, cle: demande.key, nom: qui.pair.nom, at: deps.now() });
 			}
 
 			/* 5. Still asked, still young, and the time the phone still waits. */

@@ -276,6 +276,7 @@ export const FR_ENGINE: Record<keyof typeof EN_ENGINE, string> = {
 	"engine.code.installFailed": "Le téléchargement n'a pas pu aboutir.",
 	"engine.code.pcRefused": "Ton PC a refusé d'exécuter du code pour cet appareil.",
 	"engine.code.pcInstalling": "Ton PC télécharge une bibliothèque : réessaie dans une minute.",
+	"engine.code.pcUnknownKey": "Ton PC ne reconnaît plus cet appareil. Sur ton PC, retire-le dans Réglages › Langages, puis relance.",
 	"engine.code.stop": "Arrêter",
 	"engine.code.stopped": "Arrêté.",
 

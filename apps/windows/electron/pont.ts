@@ -1183,6 +1183,10 @@ export interface Pont {
 		desinstaller(paquet: string): Promise<{ ok: true } | { ok: false; requisPar: string[] } | { ok: false; code: "occupe" | "io" | "inconnu" }>;
 		/** Uninstalls every library, then the interpreter. */
 		supprimerTout(): Promise<{ ok: true } | { ok: false; code: "occupe" | "io" }>;
+		/** The devices allowed or refused to run Python here (by their Syncthing id). */
+		appareils(): Promise<Array<{ id: string; nom: string; etat: "autorise" | "refuse"; at: number }>>;
+		/** Forgets a device: its next request asks the owner again (a removal can only make the gate stricter). */
+		oublierAppareil(id: string): Promise<void>;
 	};
 
 	langages: {
@@ -1397,6 +1401,8 @@ export const CANAUX = {
 	pythonDesinstaller: "neo:python/desinstaller",
 	pythonProgression: "neo:python/progression",
 	pythonSupprimerTout: "neo:python/supprimer-tout",
+	pythonAppareils: "neo:python/appareils",
+	pythonOublierAppareil: "neo:python/oublier-appareil",
 	langagesEtat: "neo:langages/etat",
 	langagesInstaller: "neo:langages/installer",
 	langagesSupprimer: "neo:langages/supprimer",

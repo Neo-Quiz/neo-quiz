@@ -16,7 +16,10 @@
      a key for byte-identical code the user already accepted.
    - A REMOTE RUN (asked by a paired phone, `distant.ts`): one authorization
      per device, asked the first time that device's request is about to run,
-     remembered in another main-only file. The phone showed its own warning.
+     remembered in another main-only file with the public key that signed
+     the request; a refusal is remembered too, per Syncthing device, so a
+     device cannot make the question come back until the owner removes it in
+     Settings. The phone showed its own warning.
 
    One dialog at a time: a second request while one is open is refused, so a
    window cannot stack dialogs. No Electron import: the dialog is injected
@@ -166,29 +169,73 @@ export function creerMemoireAvertissements(chemin: string): MemoireAvertissement
 }
 /** A device allowed to run Python here: its Neo Quiz id (its folder name in
     `.neo-quiz/code-runs/requests/`), bound to the Syncthing device that
-    writes there, and the name shown when it was allowed. */
-export interface AppareilAutorise { appareil: string; syncthing: string; nom: string; at: number }
+    writes there AND to the public key that signs its requests (pinned on the
+    owner's "Allow": Syncthing's word on who wrote a file is the sender's
+    own), and the name shown when it was allowed. */
+export interface AppareilAutorise { appareil: string; syncthing: string; cle: string; nom: string; at: number }
+/** A Syncthing device the owner refused: asked again only once removed in Settings. */
+export interface AppareilRefuse { syncthing: string; nom: string; at: number }
+/** What Settings lists (`neo:python/appareils`), keyed by Syncthing device. */
+export interface LigneAppareil { id: string; nom: string; etat: "autorise" | "refuse"; at: number }
 
 export interface AutorisationsAppareils {
 	/** The entry of this Neo Quiz device id, if any. */
 	trouver(appareil: string): AppareilAutorise | null;
+	/** The allowed entry bound to this Syncthing device, if any. */
+	parSyncthing(syncthing: string): AppareilAutorise | null;
 	ajouter(a: AppareilAutorise): void;
+	refuse(syncthing: string): boolean;
+	refuser(r: AppareilRefuse): void;
+	lister(): LigneAppareil[];
+	/** Forgets every entry of this Syncthing device: its next request asks again. */
+	oublier(syncthing: string): void;
 }
 
+/** A public key as `code-run-request.ts` accepts it (base64url, 65 bytes). */
+const CLE_PUBLIQUE = /^[A-Za-z0-9_-]{87}$/;
+
 export function creerAutorisationsAppareils(chemin: string): AutorisationsAppareils {
-	const f = fichierJson<AppareilAutorise[]>(chemin, (b) => {
-		const liste = (b as { appareils?: unknown } | null)?.appareils;
-		if (!Array.isArray(liste)) return [];
-		return liste.filter((a): a is AppareilAutorise => !!a && typeof a === "object"
+	type Contenu = { appareils: AppareilAutorise[]; refus: AppareilRefuse[] };
+	const f = fichierJson<Contenu>(chemin, (b) => {
+		const o = (b ?? {}) as { appareils?: unknown; refus?: unknown };
+		/* An entry without a pinned key (written before requests were signed)
+		   is dropped: that device is asked again. */
+		const appareils = (Array.isArray(o.appareils) ? o.appareils : []).filter((a): a is AppareilAutorise => !!a && typeof a === "object"
 			&& typeof (a as AppareilAutorise).appareil === "string" && typeof (a as AppareilAutorise).syncthing === "string"
+			&& typeof (a as AppareilAutorise).cle === "string" && CLE_PUBLIQUE.test((a as AppareilAutorise).cle)
 			&& typeof (a as AppareilAutorise).nom === "string" && typeof (a as AppareilAutorise).at === "number").slice(-MAX_APPAREILS);
-	}, () => [], (appareils) => ({ v: 1, appareils }));
+		const refus = (Array.isArray(o.refus) ? o.refus : []).filter((r): r is AppareilRefuse => !!r && typeof r === "object"
+			&& typeof (r as AppareilRefuse).syncthing === "string" && typeof (r as AppareilRefuse).nom === "string"
+			&& typeof (r as AppareilRefuse).at === "number").slice(-MAX_APPAREILS);
+		return { appareils, refus };
+	}, () => ({ appareils: [], refus: [] }), (c) => ({ v: 2, ...c }));
+	const meme = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 	return {
-		trouver: (appareil) => f.valeur().find((a) => a.appareil.toLowerCase() === appareil.toLowerCase()) ?? null,
+		trouver: (appareil) => f.valeur().appareils.find((a) => meme(a.appareil, appareil)) ?? null,
+		parSyncthing: (syncthing) => f.valeur().appareils.find((a) => a.syncthing === syncthing) ?? null,
 		ajouter(a) {
-			const liste = f.valeur().filter((x) => x.appareil.toLowerCase() !== a.appareil.toLowerCase());
-			liste.push(a);
-			f.ecrire(liste.slice(-MAX_APPAREILS));
+			const c = f.valeur();
+			const appareils = c.appareils.filter((x) => !meme(x.appareil, a.appareil) && x.syncthing !== a.syncthing);
+			appareils.push(a);
+			f.ecrire({ appareils: appareils.slice(-MAX_APPAREILS), refus: c.refus.filter((r) => r.syncthing !== a.syncthing) });
+		},
+		refuse: (syncthing) => f.valeur().refus.some((r) => r.syncthing === syncthing),
+		refuser(r) {
+			const c = f.valeur();
+			const refus = c.refus.filter((x) => x.syncthing !== r.syncthing);
+			refus.push(r);
+			f.ecrire({ appareils: c.appareils.filter((a) => a.syncthing !== r.syncthing), refus: refus.slice(-MAX_APPAREILS) });
+		},
+		lister() {
+			const c = f.valeur();
+			return [
+				...c.appareils.map((a): LigneAppareil => ({ id: a.syncthing, nom: nomAffiche(a.nom) || a.syncthing.slice(0, 7), etat: "autorise", at: a.at })),
+				...c.refus.map((r): LigneAppareil => ({ id: r.syncthing, nom: nomAffiche(r.nom) || r.syncthing.slice(0, 7), etat: "refuse", at: r.at })),
+			];
+		},
+		oublier(syncthing) {
+			const c = f.valeur();
+			f.ecrire({ appareils: c.appareils.filter((a) => a.syncthing !== syncthing), refus: c.refus.filter((r) => r.syncthing !== syncthing) });
 		},
 	};
 }
@@ -200,8 +247,9 @@ export interface GardePython {
 	    dismissed for this key, or Run pressed). Cancel, a closed dialog, a
 	    dialog already open, a bad `sourcePath`: `false`. */
 	autoriserLocal(sourcePath: unknown, code: string): Promise<boolean>;
-	/** A remote device's first run: asks once, remembers an Allow. */
-	autoriserAppareil(nom: string): Promise<boolean>;
+	/** A remote device's first run: the owner's answer, or `null` when there is
+	    none (a dialog already open, a dialog that failed). */
+	autoriserAppareil(nom: string): Promise<"autoriser" | "refuser" | null>;
 }
 
 export interface DepsGarde {
@@ -245,7 +293,7 @@ export function creerGardePython(deps: DepsGarde): GardePython {
 			});
 		},
 		autoriserAppareil(nom) {
-			return unSeul(false, async () => {
+			return unSeul<"autoriser" | "refuser" | null>(null, async () => {
 				const l = deps.libelles();
 				const { response } = await deps.dialogue({
 					type: "question",
@@ -257,7 +305,8 @@ export function creerGardePython(deps: DepsGarde): GardePython {
 					cancelId: 1,
 					noLink: true,
 				});
-				return response === 0;
+				/* Refuse, Esc and closing the dialog are all `cancelId`: a refusal. */
+				return response === 0 ? "autoriser" : "refuser";
 			});
 		},
 	};

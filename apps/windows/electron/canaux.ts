@@ -2164,13 +2164,15 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		libelles: libellesGarde,
 		avertissements: creerMemoireAvertissements(path.join(deps.dossierDonneesPython, "avertissements.json")),
 	});
+	/* One instance: Settings lists and forgets what the gate reads. */
+	const appareilsPython = creerAutorisationsAppareils(path.join(deps.dossierDonneesPython, "appareils.json"));
 	const pythonDistant = creerExecutionDistante({
 		sync: async () => (deps.sync ? deps.sync.origine() : null),
 		/* The id the window generated once (`host/device.ts`). Read, not trusted:
 		   it only decides which phone requests count as addressed to this PC,
 		   every one of which still needs its device's authorization. */
 		idAppareil: async () => { const v = await reglagesOuErreur().lire("deviceId"); return typeof v === "string" ? v : null; },
-		autorisations: creerAutorisationsAppareils(path.join(deps.dossierDonneesPython, "appareils.json")),
+		autorisations: appareilsPython,
 		garde: gardePython,
 		service: deps.python,
 		now: () => Date.now(),
@@ -2275,6 +2277,13 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 	});
 	ipcMain.handle(CANAUX.pythonSupprimerTout, (e) => (depuisFenetrePrincipale(e) ? deps.python.supprimerTout() : Promise.resolve({ ok: false, code: "io" })));
 	ipcMain.handle(CANAUX.pythonDesinstaller, (e, paquet: unknown) => (depuisFenetrePrincipale(e) ? deps.python.desinstaller(paquet) : Promise.resolve({ ok: false, code: "inconnu" })));
+	/* The devices of the Python gate. Forgetting only REMOVES an entry (its
+	   next request asks the owner again in a native dialog): a window that
+	   lies can make the gate ask, never make it run. */
+	ipcMain.handle(CANAUX.pythonAppareils, (e) => (depuisFenetrePrincipale(e) ? appareilsPython.lister() : []));
+	ipcMain.handle(CANAUX.pythonOublierAppareil, (e, id: unknown) => {
+		if (depuisFenetrePrincipale(e) && typeof id === "string" && id.length <= 100) appareilsPython.oublier(id);
+	});
 
 	ipcMain.handle(CANAUX.videoInstaller, async (): Promise<EnveloppeVideo<null, CodeInstallation>> => {
 		try {

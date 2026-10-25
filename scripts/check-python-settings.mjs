@@ -4,7 +4,9 @@
  * list that hides what takes disk space, an Uninstall that is live on a
  * library other ones need (the main process would refuse, the button must say
  * so first), a "busy" refusal that vanishes silently, and the phone getting
- * download / delete / list controls for a Python that only runs on the PC.
+ * download / delete / list controls for a Python that only runs on the PC;
+ * and a device allowed (or refused) to run Python here that the owner can
+ * neither see nor remove.
  *
  *     npm run check:python-settings
  */
@@ -25,7 +27,8 @@ await withSrcModule(["apps/windows/src/ui/language-packs.ts", "src/host/current.
 
 	let etat;
 	let desinstalleReponse = { ok: true };
-	const appels = { desinstaller: [], supprimerTout: 0 };
+	const appels = { desinstaller: [], supprimerTout: 0, oublier: [] };
+	let appareils = [];
 	const lecture = { interprete: true, version: "3.14.0", octetsTotal: 2_600_000_000 };
 	/* B2: every installed package is in `paquets`; Settings lists `racines` only
 	   (each with the dependencies no other installed root needs). */
@@ -51,6 +54,8 @@ await withSrcModule(["apps/windows/src/ui/language-packs.ts", "src/host/current.
 			installer: async () => ({ ok: true }),
 			desinstaller: async nom => { appels.desinstaller.push(nom); if (desinstalleReponse.ok) etat.racines = etat.racines.filter(p => p.nom !== nom); return desinstalleReponse; },
 			supprimerTout: async () => { appels.supprimerTout++; return { ok: true }; },
+			appareils: async () => structuredClone(appareils),
+			oublierAppareil: async id => { appels.oublier.push(id); appareils = appareils.filter(a => a.id !== id); },
 		},
 		langages: { etat: async () => ({ installe: false, version: null, octets: 0 }), installer: async () => ({ ok: true }), supprimer: async () => {} },
 	};
@@ -93,6 +98,24 @@ await withSrcModule(["apps/windows/src/ui/language-packs.ts", "src/host/current.
 		await attendre();
 		r.check("the row's bin removes everything", appels.supprimerTout === 1);
 		demonter();
+	}
+
+	// The devices of the Python gate: listed with their state, each removable.
+	{
+		appareils = [{ id: "TELTEL3-AAA", nom: "Pixel 9", etat: "autorise", at: 1 }, { id: "AUTRE45-BBB", nom: "Tablet", etat: "refuse", at: 2 }];
+		const { section, demonter } = await monter();
+		const bloc = [...section.querySelectorAll(".nq-python-libs")].find(b => b.textContent.includes("Devices that can ask"));
+		const lignes = bloc ? [...bloc.querySelectorAll(".nq-python-lib")] : [];
+		r.check("devices: one row per device, name and state", lignes.length === 2 && lignes[0].textContent.includes("Pixel 9") && lignes[0].textContent.includes("Allowed") && lignes[1].textContent.includes("Refused"));
+		r.check("devices: each Remove names its device for screen readers", lignes[0]?.querySelector("button")?.getAttribute("aria-label") === "Remove Pixel 9");
+		lignes[1]?.querySelector("button").dispatchEvent(new window.Event("click"));
+		await attendre();
+		r.check("devices: Remove forgets that device by its Syncthing id, the row leaves", appels.oublier.join() === "AUTRE45-BBB" && bloc.querySelectorAll(".nq-python-lib").length === 1);
+		appareils = [];
+		demonter();
+		const vide = await monter();
+		r.check("devices: none -> no heading", !vide.section.textContent.includes("Devices that can ask"));
+		vide.demonter();
 	}
 
 	// Interpreter without libraries: the hint, no heading.
