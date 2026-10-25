@@ -24,6 +24,7 @@ export const EN_SETTINGS = {
 	"settings.python.onPc": "Python runs on your PC.",
 	"settings.python.busy": "Python is running: try again in a moment.",
 	"settings.python.failed": "Python could not be removed.",
+	"settings.python.deviceCode": "This device's code: {code}",
 	"settings.python.devices": "Devices that can ask this PC to run Python",
 	"settings.python.allowed": "Allowed",
 	"settings.python.refused": "Refused",

@@ -69,6 +69,22 @@ export const signedMessage = (r: Pick<CodeRunRequest, "id" | "at" | "from" | "ta
 export const PUBLIC_KEY = /^[A-Za-z0-9_-]{87}$/;
 /** base64url (no padding) of a 64-byte IEEE P1363 (r || s) ECDSA signature. */
 export const SIGNATURE = /^[A-Za-z0-9_-]{86}$/;
+
+/** The short code of a phone's key that the owner compares on both screens
+    before the PC's first "Allow" ("ABCD-2345"): base32 of the first 40 bits of
+    SHA-256(UTF-8 of `key`). Each side hashes with its own crypto and passes the
+    digest here. Without it, a compromised paired device racing the phone's
+    first request would get the owner's "Allow" for its own key. */
+export function keyFingerprint(digest: Uint8Array): string {
+	const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+	let bits = 0, n = 0, out = "";
+	for (const b of digest.subarray(0, 5)) {
+		n = (n << 8) | b;
+		bits += 8;
+		while (bits >= 5) { bits -= 5; out += A[(n >> bits) & 31]; }
+	}
+	return out.slice(0, 4) + "-" + out.slice(4, 8);
+}
 export interface CodeRunResult { v: 1; id: string; at: number; status: CodeRun["status"]; stdout: string; error?: string; unsupported?: string[] }
 
 export type CodeRunRefusal = "schema" | "expediteur" | "destinataire" | "age" | "futur" | "chemin";

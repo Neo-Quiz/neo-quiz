@@ -34,7 +34,7 @@ import { createChatFiles } from "./host/chat-files";
 import { createCodeRunFiles } from "./host/code-run-files";
 import { brancherExecutionSurPc } from "./host/code";
 import { choosePc, executerSurPc, newPcState, traiterDemandes } from "../../../src/dashboard/code-run-remote";
-import { createIndexedDbSigner } from "../../../src/dashboard/code-run-key";
+import { deviceSigner } from "../../../src/dashboard/code-run-key";
 import { RESULT_TTL_MS, lireTaken } from "../../../src/shared-state/code-run-request";
 import { chosenPc, getDevices, getPairedPeers, getPeerConnected, getRemoteGenerations, lastPcEver } from "../../../src/dashboard/remote-generations";
 import { publishGenerations } from "../../../src/dashboard/generations-publisher";
@@ -672,7 +672,7 @@ async function demarrer(): Promise<void> {
 		let stopCodeRuns: (() => void) | null = null;
 		if (estMobile()) {
 			void codeRunFiles.sweepOwn("requests", RESULT_TTL_MS, Date.now());
-			const signataire = createIndexedDbSigner();
+			const signataire = deviceSigner();
 			brancherExecutionSurPc((job, signal) => executerSurPc(job, {
 				device: idAppareil,
 				rootId: racineChats.id,

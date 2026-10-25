@@ -24,6 +24,7 @@ export const FR_SETTINGS: Record<keyof typeof EN_SETTINGS, string> = {
 	"settings.python.onPc": "Python s'exécute sur ton PC.",
 	"settings.python.busy": "Python est en cours d'exécution : réessaie dans un instant.",
 	"settings.python.failed": "Python n'a pas pu être supprimé.",
+	"settings.python.deviceCode": "Code de cet appareil : {code}",
 	"settings.python.devices": "Appareils qui peuvent demander du Python à ce PC",
 	"settings.python.allowed": "Autorisé",
 	"settings.python.refused": "Refusé",

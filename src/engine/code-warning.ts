@@ -2,6 +2,7 @@ import { ajouter } from "../dom";
 import { t } from "../i18n";
 import type { EngineCtx } from "../types/engine-ctx";
 import { sha256Hex } from "../code-blocks";
+import { deviceSigner, fingerprintOf } from "../dashboard/code-run-key";
 
 /* ══════════════════════════════════════════════════════════
    THE PHONE'S WARNING BEFORE A PYTHON RUN. Python runs natively on the PC,
@@ -42,6 +43,14 @@ export async function demanderAvertissement(ctx: EngineCtx, cle: string): Promis
 			onOpen: m => {
 				const c = m.contentEl;
 				ajouter(c, "p", "qbd-code-warning-text", t("engine.code.warningText"));
+				/* The code the PC's first "Allow" dialog must show too
+				   (code-run-key.ts): a different one there is another device. */
+				const empreinte = ajouter(c, "p", "qbd-code-warning-text");
+				empreinte.hidden = true;
+				void deviceSigner().publicKey().then(fingerprintOf).then(code => {
+					empreinte.textContent = t("engine.code.deviceCode", { code });
+					empreinte.hidden = false;
+				}, () => undefined);
 				const ligne = ajouter(c, "label", "qbd-share-pick-row");
 				const box = ajouter(ligne, "input", "qbd-share-pick-box");
 				box.type = "checkbox";

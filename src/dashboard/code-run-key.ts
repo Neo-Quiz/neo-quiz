@@ -15,6 +15,8 @@
    until the owner removes the device in Settings and allows it again.
 ══════════════════════════════════════════════════════════ */
 
+import { keyFingerprint } from "../shared-state/code-run-request";
+
 export interface RequestSigner {
 	/** base64url of the raw (65-byte, uncompressed) public key. */
 	publicKey(): Promise<string>;
@@ -65,6 +67,10 @@ const estPaire = (v: unknown): v is CryptoKeyPair =>
     used: a key kept only in memory would change at the next start, and the
     PC would refuse it. */
 async function paire(): Promise<CryptoKeyPair> {
+	/* Persistent storage: under storage pressure Android may otherwise evict
+	   IndexedDB, and a new key would be refused by the PC (security review
+	   2026-10-26). A refusal changes nothing here. */
+	try { await navigator.storage?.persist?.(); } catch { /* best effort */ }
 	const lue = await transaction("readonly", s => s.get(CLE) as IDBRequest<unknown>);
 	if (estPaire(lue)) return lue;
 	const neuve = await crypto.subtle.generateKey(ALGO, false, ["sign", "verify"]);
@@ -77,6 +83,19 @@ async function paire(): Promise<CryptoKeyPair> {
 		throw new Error("code run key not stored");
 	}
 	return neuve;
+}
+
+/** The short code of `key` (`keyFingerprint`), hashed with Web Crypto. */
+export async function fingerprintOf(key: string): Promise<string> {
+	return keyFingerprint(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key))));
+}
+
+let signataire: RequestSigner | null = null;
+/** This device's one signer: the run requests, the run warning and Settings
+    all show or use the same key. */
+export function deviceSigner(): RequestSigner {
+	signataire ??= createIndexedDbSigner();
+	return signataire;
 }
 
 /** The phone's signer, its key pair read (or made) on first use. */

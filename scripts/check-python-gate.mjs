@@ -36,7 +36,7 @@ const attendre = (ms = 20) => new Promise((res) => setTimeout(res, ms));
 const LIBELLES = {
 	titre: "Run this code on your PC?", message: "M", lancer: "Run", annuler: "Cancel", nePlusAfficher: "Don't show again for this quiz",
 	lignesRestantes: (n) => `… and ${n} more lines`, lignesLongues: "LONG", invisibles: "HIDDEN",
-	appareilTitre: "T", appareilMessage: (nom) => `Allow ${nom} to run Python on this PC?`, appareilDetail: "D", autoriser: "Allow", refuser: "Refuse",
+	appareilTitre: "T", appareilMessage: (nom) => `Allow ${nom} to run Python on this PC?`, appareilDetail: (code) => `D ${code}`, autoriser: "Allow", refuser: "Refuse",
 };
 
 /** A native dialog that answers from a queue (or never, with `null`), recording each call. */
@@ -178,12 +178,12 @@ try {
 		    `apres` may change the signed fields before writing (a tampered file). */
 		async function demande({ at = horloge, target = PC, from = TEL, sha = shaCode, path = "Cours/a.md", cle = CLE_TEL, signePar = cle, apres = (q) => q } = {}) {
 			const id = "req-" + (++n).toString(36).padStart(4, "0");
-			const rel = Q.requestPath(TEL, id);
-			mkdirSync(join(racine, ".neo-quiz", "code-runs", "requests", TEL), { recursive: true });
+			const rel = Q.requestPath(from, id);
+			mkdirSync(join(racine, ".neo-quiz", "code-runs", "requests", from), { recursive: true });
 			const champs = { id, at, from, target, path, sha256: sha };
 			const q = apres({ v: 1, ...champs, accepted: true, key: cle.publique, sig: await signePar.signer(Q.signedMessage(champs)) });
 			writeFileSync(join(racine, ...rel.split("/")), JSON.stringify(q));
-			return { id, rel };
+			return { id, rel, appareil: from };
 		}
 		/** The index as Syncthing would answer, from the bytes on disk NOW (or as told). */
 		const index = new Map();
@@ -192,11 +192,11 @@ try {
 		const sync = { racine, idPropre: ID_ST_PC, pairs: [{ id: ID_ST_TEL, nom: "Pixel 9" }, { id: ID_ST_AUTRE, nom: "Tablet" }], fichier: async (rel) => index.get(rel) ?? null };
 		const boitesD = faussesBoites();
 		const fichierApp = join(tmp, "userData", "python", "appareils.json");
-		function distant({ svc = fauxService(), autorisations = G.creerAutorisationsAppareils(fichierApp), syncOk = true } = {}) {
+		function distant({ svc = fauxService(), autorisations = G.creerAutorisationsAppareils(fichierApp), syncOk = true, vues } = {}) {
 			const gd = G.creerGardePython({ dialogue: boitesD, libelles: () => LIBELLES, avertissements: G.creerMemoireAvertissements(join(tmp, "av2.json")) });
-			return { svc, ex: D.creerExecutionDistante({ sync: async () => (syncOk ? sync : null), idAppareil: async () => PC, autorisations, garde: gd, service: svc, now: () => horloge }) };
+			return { svc, ex: D.creerExecutionDistante({ sync: async () => (syncOk ? sync : null), idAppareil: async () => PC, autorisations, garde: gd, service: svc, now: () => horloge, vues }) };
 		}
-		const job = (d, code = CODE) => ({ code, distant: { appareil: TEL, demande: d.rel } });
+		const job = (d, code = CODE) => ({ code, distant: { appareil: d.appareil ?? TEL, demande: d.rel } });
 
 		{
 			const { svc, ex } = distant();
@@ -283,6 +283,8 @@ try {
 			r.check("A2: Allow -> one spawn of the note's block", [ok.status, svc.runs.map((j) => j.code)], ["ok", [CODE]]);
 			r.check("A2: Allow persisted in the main-only file, bound to the Syncthing device and the key", JSON.parse(readFileSync(fichierApp, "utf8")).appareils.map((a) => [a.appareil, a.syncthing, a.cle, a.nom]), [[TEL, ID_ST_TEL, CLE_TEL.publique, "Pixel 9"]]);
 			r.check("A2: a remote run never shows the per-run warning", boitesD.appels.every((a) => a.title === "T"), true);
+			r.check("A6: the first dialog shows the short code of the request's key, as the phone computes it",
+				boitesD.appels.at(-1)?.detail, "D " + (await K.fingerprintOf(CLE_TEL.publique)));
 			r.check("A2: the same request again -> refused (runs once)", [(await ex.executer(job(d2))).status, svc.runs.length], ["unavailable", 1]);
 		}
 		{
@@ -302,12 +304,30 @@ try {
 			indexer(dK.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A5: the phone's id and Syncthing device, signed by ANOTHER key -> unknown-key, no dialog, no spawn",
 				[(await ex.executer(job(dK))).error, boitesD.appels.length - avant, svc.runs.length], ["unknown-key", 0, 1]);
+			/* A new Neo Quiz id coming through the phone's (bound) Syncthing device. */
+			const X = "eeeeeeee-0000-4000-8000-000000000005";
+			const dX = await demande({ from: X, cle: CLE_PIRATE });
+			indexer(dX.rel, ID_ST_TEL.slice(0, 7));
+			r.check("A5: another Neo Quiz id through the phone's bound Syncthing device -> unknown-key, no dialog",
+				[(await ex.executer(job(dX))).error, boitesD.appels.length - avant, svc.runs.length], ["unknown-key", 0, 1]);
 			r.check("A5: Settings lists the allowed phone", G.creerAutorisationsAppareils(fichierApp).lister().map((l) => [l.id, l.etat]), [[ID_ST_TEL, "autorise"]]);
 			/* An entry written before requests were signed (no key) allows nothing. */
 			const ancien = join(tmp, "userDataV1", "appareils.json");
 			mkdirSync(join(tmp, "userDataV1"), { recursive: true });
 			writeFileSync(ancien, JSON.stringify({ v: 1, appareils: [{ appareil: TEL, syncthing: ID_ST_TEL, nom: "Pixel 9", at: 1 }] }));
 			r.check("A5: an allowed entry without a pinned key (v1 file) is dropped", G.creerAutorisationsAppareils(ancien).trouver(TEL), null);
+			{
+				const m = G.creerAutorisationsAppareils(join(tmp, "userDataM", "appareils.json"));
+				m.ajouter({ appareil: TEL, syncthing: ID_ST_TEL, cle: CLE_TEL.publique, nom: "Pixel 9", at: 1 });
+				m.ajouter({ appareil: "ffffffff-0000-4000-8000-000000000006", syncthing: ID_ST_TEL, cle: CLE_PIRATE.publique, nom: "Pixel 9", at: 2 });
+				r.check("A5: one allowed entry per Syncthing device (ajouter replaces)", m.lister().map((l) => l.id), [ID_ST_TEL]);
+				m.refuser({ syncthing: ID_ST_TEL, nom: "Pixel 9", at: 3 });
+				r.check("A5: refusing a device removes its allowed entry", [m.trouver(TEL), m.parSyncthing(ID_ST_TEL), m.refuse(ID_ST_TEL)], [null, null, true]);
+				m.ajouter({ appareil: TEL, syncthing: ID_ST_TEL, cle: CLE_TEL.publique, nom: "Pixel 9", at: 4 });
+				r.check("A5: allowing it again lifts the refusal", [m.refuse(ID_ST_TEL), m.lister().map((l) => l.etat)], [false, ["autorise"]]);
+				m.oublier(ID_ST_TEL);
+				r.check("A5: forgetting an allowed device removes it", [m.trouver(TEL), m.lister()], [null, []]);
+			}
 			const d3 = await demande();
 			indexer(d3.rel, ID_ST_TEL.slice(0, 7));
 			r.check("A2: code that is not the note's block -> 'changed', no spawn", [(await ex.executer(job(d3, "import os; os.remove('x')"))).error, svc.runs.length], ["changed", 1]);
@@ -325,6 +345,18 @@ try {
 			]) r.check("A2: request named by " + nom + " -> refused", [(await ex.executer({ code: CODE, distant: dist })).status, svc.runs.length], ["unavailable", 1]);
 			/* The window cannot write the allowed list: it is this file, read here only. */
 			r.check("A2: the allowed list is the main-only file, not the window's settings", G.creerAutorisationsAppareils(join(tmp, "elsewhere.json")).trouver(TEL), null);
+		}
+		{
+			/* A7: a restart of the main process does not run the same request twice. */
+			const fichierVues = join(tmp, "userDataV", "demandes-vues.json");
+			const { svc, ex } = distant({ vues: G.creerMemoireVues(fichierVues) });
+			const d = await demande();
+			indexer(d.rel, ID_ST_TEL.slice(0, 7));
+			r.check("A7: a request runs once", (await ex.executer(job(d))).status, "ok");
+			const { svc: svc2, ex: ex2 } = distant({ vues: G.creerMemoireVues(fichierVues) });
+			r.check("A7: the same signed bytes after a restart -> refused, no spawn", [(await ex2.executer(job(d))).status, svc.runs.length + svc2.runs.length], ["unavailable", 1]);
+			r.check("A7: keyFingerprint: base32 of the first 40 bits, as 4-4",
+				[Q.keyFingerprint(new Uint8Array(32)), Q.keyFingerprint(new Uint8Array(32).fill(255)), Q.keyFingerprint(Uint8Array.from([0x08, 0x42, 0x10, 0x84, 0x21]))], ["AAAA-AAAA", "7777-7777", "BBBB-BBBB"]);
 		}
 		{
 			/* A3: never run late. */

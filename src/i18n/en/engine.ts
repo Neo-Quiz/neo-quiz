@@ -295,6 +295,7 @@ export const EN_ENGINE = {
 	"engine.code.installFailed": "The download could not be completed.",
 	"engine.code.pcRefused": "Your PC refused to run code for this device.",
 	"engine.code.pcInstalling": "Your PC is downloading a library: try again in a minute.",
+	"engine.code.deviceCode": "This device's code: {code}. The first time, your PC shows it too: allow only if it is the same.",
 	"engine.code.pcUnknownKey": "Your PC no longer recognizes this device. On your PC, remove it in Settings › Languages, then run again.",
 	"engine.code.stop": "Stop",
 	"engine.code.stopped": "Stopped.",

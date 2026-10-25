@@ -129,7 +129,7 @@ import type { BacASable } from "./code-sandbox";
 import { etatLangage, installerLangage, PACKS, supprimerLangage } from "./langages";
 import type { NomPack } from "./langages";
 import type { ServicePython } from "./python/service";
-import { creerAutorisationsAppareils, creerGardePython, creerMemoireAvertissements, executerPorte } from "./python/garde";
+import { creerAutorisationsAppareils, creerGardePython, creerMemoireAvertissements, creerMemoireVues, executerPorte } from "./python/garde";
 import type { LibellesGarde } from "./python/garde";
 import { creerExecutionDistante } from "./python/distant";
 /* THE SYNC (task 6 of the Android v1 plan): the embedded Syncthing, created by
@@ -2151,7 +2151,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		invisibles: t("app.pythonRun.hiddenChars"),
 		appareilTitre: t("app.pythonDevice.title"),
 		appareilMessage: name => t("app.pythonDevice.message", { name }),
-		appareilDetail: t("app.pythonDevice.detail"),
+		appareilDetail: code => t("app.pythonDevice.detail", { code }),
 		autoriser: t("app.pythonDevice.allow"),
 		refuser: t("app.pythonDevice.refuse"),
 	});
@@ -2176,6 +2176,7 @@ export function enregistrerCanaux(deps: DependancesCanaux): ResultatCanaux {
 		garde: gardePython,
 		service: deps.python,
 		now: () => Date.now(),
+		vues: creerMemoireVues(path.join(deps.dossierDonneesPython, "demandes-vues.json")),
 	});
 	/* Stop (the engine's Stop button): the running or queued Python runs of
 	   the window, by the id it gave. */

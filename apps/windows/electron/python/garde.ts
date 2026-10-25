@@ -91,7 +91,7 @@ export interface LibellesGarde {
 	invisibles: string;
 	appareilTitre: string;
 	appareilMessage(nom: string): string;
-	appareilDetail: string;
+	appareilDetail(code: string): string;
 	autoriser: string;
 	refuser: string;
 }
@@ -191,6 +191,29 @@ export interface AutorisationsAppareils {
 	oublier(syncthing: string): void;
 }
 
+/** Requests already judged, by `<device>/<id>`, kept on disk so that a
+    restart of the main process does not let the same signed bytes run twice
+    (security review 2026-10-26). An entry outlives any request's validity. */
+export interface MemoireVues { vue(cle: string, now: number): boolean; marquer(cle: string, now: number): void }
+const DUREE_VUE_MS = 10 * 60_000;
+const MAX_VUES = 2_000;
+
+export function creerMemoireVues(chemin: string): MemoireVues {
+	const f = fichierJson<Array<{ cle: string; at: number }>>(chemin, (b) => {
+		const l = (b as { vues?: unknown } | null)?.vues;
+		return Array.isArray(l) ? l.filter((e): e is { cle: string; at: number } => !!e && typeof e === "object" && typeof (e as { cle: unknown }).cle === "string" && typeof (e as { at: unknown }).at === "number").slice(-MAX_VUES) : [];
+	}, () => [], (vues) => ({ v: 1, vues }));
+	return {
+		/* A corrupt time counts as recent: never a way to run twice. */
+		vue: (cle, now) => f.valeur().some((e) => e.cle === cle && (!Number.isFinite(e.at) || now - e.at < DUREE_VUE_MS)),
+		marquer(cle, now) {
+			const l = f.valeur().filter((e) => e.cle !== cle && now - e.at < DUREE_VUE_MS);
+			l.push({ cle, at: now });
+			f.ecrire(l.slice(-MAX_VUES));
+		},
+	};
+}
+
 /** A public key as `code-run-request.ts` accepts it (base64url, 65 bytes). */
 const CLE_PUBLIQUE = /^[A-Za-z0-9_-]{87}$/;
 
@@ -248,8 +271,9 @@ export interface GardePython {
 	    dialog already open, a bad `sourcePath`: `false`. */
 	autoriserLocal(sourcePath: unknown, code: string): Promise<boolean>;
 	/** A remote device's first run: the owner's answer, or `null` when there is
-	    none (a dialog already open, a dialog that failed). */
-	autoriserAppareil(nom: string): Promise<"autoriser" | "refuser" | null>;
+	    none (a dialog already open, a dialog that failed). `empreinte` is the
+	    short code of the request's key, which the phone shows too. */
+	autoriserAppareil(nom: string, empreinte: string): Promise<"autoriser" | "refuser" | null>;
 }
 
 export interface DepsGarde {
@@ -292,14 +316,14 @@ export function creerGardePython(deps: DepsGarde): GardePython {
 				return true;
 			});
 		},
-		autoriserAppareil(nom) {
+		autoriserAppareil(nom, empreinte) {
 			return unSeul<"autoriser" | "refuser" | null>(null, async () => {
 				const l = deps.libelles();
 				const { response } = await deps.dialogue({
 					type: "question",
 					title: l.appareilTitre,
 					message: l.appareilMessage(nomAffiche(nom) || "?"),
-					detail: l.appareilDetail,
+					detail: l.appareilDetail(empreinte),
 					buttons: [l.autoriser, l.refuser],
 					defaultId: 1,
 					cancelId: 1,

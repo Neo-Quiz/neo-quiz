@@ -36,9 +36,12 @@
       Syncthing device, or naming another Neo Quiz id through a Syncthing
       device already bound, is refused without asking (`unknown-key`); a
       refused Syncthing device is refused without asking until the owner
-      removes it in Settings. What remains is trust on first use: before the
-      owner's first "Allow", a compromised paired device could pose as the
-      phone, and the dialog says to allow only right after pressing Run;
+      removes it in Settings. What remains is trust on first use, closed by
+      the owner's eyes: the first dialog shows the short code of the key
+      (`keyFingerprint`), which the phone shows in its run warning and in
+      Settings, and says to allow only when both are the same (a paired
+      device racing the phone's first request has another key, so another
+      code);
    5. checks again, right before the run, that the request still exists and
       is still young enough (`MAX_AGE_MS`), and bounds the run so that it
       ends before the phone stops waiting (`PHONE_WAIT_MS`);
@@ -46,9 +49,9 @@
       `not-installed` with `pc-installing` and starts the download in the
       background, so the next try finds the library.
 
-   Each request runs at most once here (a key kept in memory: a request is
-   only valid for `MAX_AGE_MS`, a restart costs one more run of the same
-   approved code at worst). No Electron import: every dependency is injected
+   Each request runs at most once here (its key kept in a main-only file,
+   `creerMemoireVues`, longer than any request stays valid: a restart does
+   not let the same signed bytes run again). No Electron import: every dependency is injected
    (`canaux.ts` in the app, `scripts/check-python-service.mjs` in checks).
 ══════════════════════════════════════════════════════════ */
 
@@ -57,10 +60,10 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import { join, relative, isAbsolute } from "node:path";
 import type { CodeRun } from "../../../../src/host/types";
 import { blocsPython } from "../../../../src/code-blocks";
-import { MAX_AGE_MS, MAX_REQUEST_CHARS, PHONE_WAIT_MS, parseRequestPath, signedMessage, validerDemandeCode } from "../../../../src/shared-state/code-run-request";
+import { MAX_AGE_MS, MAX_REQUEST_CHARS, PHONE_WAIT_MS, keyFingerprint, parseRequestPath, signedMessage, validerDemandeCode } from "../../../../src/shared-state/code-run-request";
 import type { CodeRunRequest } from "../../../../src/shared-state/code-run-request";
 import type { ServicePython } from "./service";
-import type { AutorisationsAppareils, GardePython } from "./garde";
+import type { AutorisationsAppareils, GardePython, MemoireVues } from "./garde";
 
 /** What Syncthing says of one file (`/rest/db/file`, its `global` record). */
 export interface InfoFichierSync {
@@ -91,6 +94,8 @@ export interface DepsDistant {
 	garde: Pick<GardePython, "autoriserAppareil">;
 	service: Pick<ServicePython, "run" | "installer" | "octetsAInstaller" | "installationEnCours">;
 	now(): number;
+	/** Requests already judged, on disk (`garde.ts`); in memory only when absent. */
+	vues?: MemoireVues;
 	/** The disk: the app passes nothing (node:fs); the check may. */
 	disque?: { lire(abs: string, max: number): Promise<Buffer | null>; existe(abs: string): Promise<boolean>; reel(abs: string): Promise<string> };
 }
@@ -108,8 +113,6 @@ const MARGE_TELEPHONE_MS = 8_000;
 /** An install the phone may wait for: estimated at 1 MB/s plus 10 s of unpacking. */
 const DEBIT_ESTIME = 1_000_000;
 const COUT_FIXE_INSTALL_MS = 10_000;
-/** Remembered request keys (each runs at most once). */
-const MAX_VUES = 2_000;
 
 const indisponible = (error?: string): CodeRun => (error ? { status: "unavailable", stdout: "", error } : { status: "unavailable", stdout: "" });
 
@@ -171,11 +174,10 @@ export interface ExecutionDistante {
 
 export function creerExecutionDistante(deps: DepsDistant): ExecutionDistante {
 	const disque = deps.disque ?? disqueReel;
-	const vues = new Set<string>();
-	const marquer = (cle: string): void => {
-		vues.add(cle);
-		for (const vieille of vues) { if (vues.size <= MAX_VUES) break; vues.delete(vieille); }
-	};
+	const vues: MemoireVues = deps.vues ?? (() => {
+		const m = new Map<string, number>();
+		return { vue: (cle) => m.has(cle), marquer: (cle, now) => { m.set(cle, now); if (m.size > 2_000) m.delete(m.keys().next().value as string); } };
+	})();
 
 	return {
 		async executer(job) {
@@ -217,8 +219,8 @@ export function creerExecutionDistante(deps: DepsDistant): ExecutionDistante {
 
 			/* Each request once. */
 			const cle = nom.device + "/" + nom.id;
-			if (vues.has(cle)) return indisponible();
-			marquer(cle);
+			if (vues.vue(cle, deps.now())) return indisponible();
+			vues.marquer(cle, deps.now());
 
 			/* 3. The note, read here; the code must be its block. */
 			const absNote = join(origine.racine, ...demande.path.split("/"));
@@ -238,7 +240,8 @@ export function creerExecutionDistante(deps: DepsDistant): ExecutionDistante {
 				/* Pinned: this Neo Quiz id, through this Syncthing device, signed by this key. */
 				if (!connu || connu.syncthing !== st || connu.cle !== demande.key) return indisponible(ERREUR_CLE);
 			} else {
-				const reponse = await deps.garde.autoriserAppareil(qui.pair.nom || st.slice(0, 7));
+				const empreinte = keyFingerprint(createHash("sha256").update(demande.key, "utf8").digest());
+				const reponse = await deps.garde.autoriserAppareil(qui.pair.nom || st.slice(0, 7), empreinte);
 				if (reponse === null) return indisponible();
 				if (reponse === "refuser") {
 					deps.autorisations.refuser({ syncthing: st, nom: qui.pair.nom, at: deps.now() });

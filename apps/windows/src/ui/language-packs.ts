@@ -21,6 +21,7 @@ import { estMobile } from "../host/platform";
 import { currentHost } from "../../../../src/host/current";
 import { currentLang, t } from "../../../../src/i18n";
 import { ajouter } from "../../../../src/dom";
+import { deviceSigner, fingerprintOf } from "../../../../src/dashboard/code-run-key";
 
 type Pack = "c";
 
@@ -142,6 +143,14 @@ function mountPythonRow(section: HTMLElement, isDestroyed: () => boolean): void 
 	const state = ajouter(text, "span", "nq-reglages-chemin");
 	if (estMobile()) {
 		state.textContent = t("settings.python.onPc");
+		/* The code the PC shows before allowing this phone (code-run-key.ts). */
+		const code = ajouter(text, "span", "nq-reglages-chemin");
+		code.hidden = true;
+		void deviceSigner().publicKey().then(fingerprintOf).then(f => {
+			if (isDestroyed()) return;
+			code.textContent = t("settings.python.deviceCode", { code: f });
+			code.hidden = false;
+		}, () => undefined);
 		return;
 	}
 
