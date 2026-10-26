@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.27] - 2026-10-26
+
 ### Added
 
 - Python blocks run in a real Python on your PC: fast, with every course library (such as PyTorch), downloaded the first time you need it.
