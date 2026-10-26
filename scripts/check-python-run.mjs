@@ -278,11 +278,21 @@ await withSrcModule([ENTREE, "apps/windows/electron/python/catalogue.ts"], async
 			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
 		}
-		{
-			const { mod, dir } = await mutant("if (fin || termine || sorti) return;", "if (fin || termine) return;");
+		/* The timer must fire AFTER the exit and BEFORE `close`. On a fast
+		   machine (the CI runner) the sweep closed the pipes within 400 ms
+		   and the mutant answered "ok": the sweep is delayed by 1.5 s here so
+		   the window always exists. The control proves the delay alone keeps
+		   the outcome, so only the guard separates the two. */
+		const SWEEP = "balayage = balayer(enfant.pid, debut, Date.now())";
+		const SWEEP_LATE = "balayage = new Promise((r) => setTimeout(r, 1500)).then(() => balayer(enfant.pid, debut, Date.now()))";
+		for (const [label, guard, expected] of [
+			["control: late sweep alone keeps the clean exit", null, "ok"],
+			["mutant whose late timer rewrites the outcome answers timeout", ["if (fin || termine || sorti) return;", "if (fin || termine) return;"], "timeout"],
+		]) {
+			const { mod, dir } = await mutant(guard ? [guard, [SWEEP, SWEEP_LATE]] : [[SWEEP, SWEEP_LATE]]);
 			const res = await mod.executerPython({ code: SURVIVANT_PIPES, timeoutMs: 400 }, ctx());
 			const p = Number.parseInt(res.stdout, 10);
-			r.check("mutant whose late timer rewrites the outcome answers timeout", res.status, "timeout");
+			r.check(label, res.status, expected);
 			if (p > 0) tuer(p);
 			await mod.attendreNettoyages();
 			rmSync(dir, { recursive: true, force: true });
