@@ -120,6 +120,14 @@ export interface StartOpts {
 	sys?: SysSync;
 	/** Poll period of the loop. 10 s in the app; shorter only in checks. */
 	intervalMs?: number;
+	/** Create the shared folder when it is missing (`true`, the default, and
+	    what the FIRST pin of a fresh install needs). `false` says the folder
+	    was pinned before and must ALREADY exist: if it vanished (the owner
+	    renamed or moved it, or a drive is not mounted), starting would `mkdir`
+	    it EMPTY and share it, and Syncthing would then propagate the deletion
+	    of the whole vault to every paired device — so `lancer` throws instead,
+	    and sync stays off until the folder is back or re-pinned. */
+	creerSiAbsent?: boolean;
 }
 
 /** How long writes of the app are gathered before one scan call. */
@@ -273,7 +281,20 @@ async function lancer(opts: StartOpts): Promise<Lancement> {
 		throw new Error(`syncthing.exe not found: ${opts.exe}`);
 	}
 	await fs.mkdir(opts.home, { recursive: true });
-	await fs.mkdir(opts.root, { recursive: true });
+	if (opts.creerSiAbsent === false) {
+		/* A pinned shared folder that vanished is NEVER recreated empty and
+		   shared. Known limits of this guard, kept on purpose: it only catches a
+		   MISSING path, not a path that still exists but was emptied in place
+		   (there Syncthing's own `.stfolder` marker is the backstop — never
+		   remove it from `folderConfig`); and a refusal here does not retry on
+		   its own, so a drive slow to mount at boot leaves sync off until the
+		   next `obtenir` (opening the Sync page, or `activer`). */
+		let present = false;
+		try { present = (await fs.stat(opts.root)).isDirectory(); } catch { present = false; }
+		if (!present) throw new Error(`shared folder missing, not recreated: ${opts.root}`);
+	} else {
+		await fs.mkdir(opts.root, { recursive: true });
+	}
 	/* A survivor of a previous run (hard kill, or a child left behind when the
 	   wrapper died) would hold the home lock: clear it first. */
 	await libererHome(opts.home, opts.sys ?? sysReel);
@@ -961,11 +982,15 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 		return demarrage ??= (async () => {
 			try {
 				let root = await o.lireRoot();
+				const premierDemarrage = !root;
 				if (!root) {
 					root = path.resolve(o.racineParDefaut());
 					await o.poserRoot(root);
 				}
-				const h = await demarrer({ exe: o.exe, home: o.home, root, confirmer: o.confirmer, sys: o.sys });
+				/* A folder pinned before but gone now (renamed, moved, a drive not
+				   mounted) is NOT recreated empty and shared — that would delete the
+				   vault on every paired device. Only the FIRST pin creates it. */
+				const h = await demarrer({ exe: o.exe, home: o.home, root, confirmer: o.confirmer, sys: o.sys, creerSiAbsent: premierDemarrage });
 				if (fin) { await h.stop(); return null; }
 				h.surEtat(e => { for (const a of abonnesEtat) a(e); });
 				h.surDonneesRecues(() => { for (const a of abonnesDonnees) a(); });

@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Refuse to start sync on a pinned folder that was renamed or moved, instead of recreating it empty and sharing it
+
 ## [1.21.27] - 2026-10-26
 
 ### Added

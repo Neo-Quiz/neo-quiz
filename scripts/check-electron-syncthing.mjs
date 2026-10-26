@@ -360,8 +360,9 @@ await withSrcModule(
 		await cas(r, "creerGestionSync root", async () => {
 			const memoire = {};
 			const demarres = [];
+			const creers = [];
 			const ignores = [];
-			const faussaire = async (o) => { demarres.push(o.root); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, ignorer: async (id) => { ignores.push(id); }, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
+			const faussaire = async (o) => { demarres.push(o.root); creers.push(o.creerSiAbsent); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, ignorer: async (id) => { ignores.push(id); }, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
 			const fabriquer = (defaut) => sync.creerGestionSync({
 				exe: "x", home: "h", racineParDefaut: () => defaut,
 				lireRoot: async () => memoire.root ?? null, poserRoot: async (v) => { memoire.root = v; },
@@ -370,6 +371,7 @@ await withSrcModule(
 			const g1 = fabriquer(join(tmpO, "A"));
 			await g1.etat();
 			r.check("the first start pins the default folder as syncRoot", [memoire.root, demarres[0]], [join(tmpO, "A"), join(tmpO, "A")]);
+			r.check("the first pin may create the folder", creers[0], true);
 			await g1.ignorer(AUTRE_ID);
 			r.check("ignorer reaches the running instance", ignores, [AUTRE_ID]);
 			{
@@ -393,6 +395,7 @@ await withSrcModule(
 			const g2 = fabriquer(join(tmpO, "B"));
 			await g2.etat();
 			r.check("changing the default folder afterwards does not move the shared folder", [memoire.root, demarres[1]], [join(tmpO, "A"), join(tmpO, "A")]);
+			r.check("a start on an already pinned folder never recreates it", creers[1], false);
 			await g2.arreter();
 		});
 
@@ -591,6 +594,21 @@ await withSrcModule(
 				try { await sync.startSync({ exe: process.execPath, home: join(tmp, "h3"), root: join(tmp, "r3"), confirmer: async () => false, sys: sysFaux }); } catch (e) { msg = String(e.message); }
 				r.check("a start first kills a survivor holding the same home", sysFaux.tues, [31337]);
 				r.check("a binary that exits at startup rejects fast", [!!msg && msg.includes("exited"), Date.now() - t0 < 15000], [true, true]);
+			});
+
+			await cas(r, "a pinned folder that vanished is never recreated and shared", async () => {
+				/* The data-loss guard: the owner renamed or moved the shared folder,
+				   so the pinned path no longer exists. Starting with `creerSiAbsent`
+				   false must REJECT before any `mkdir` or spawn — never create the
+				   folder empty and share it, which would delete the vault on every
+				   paired device. `process.execPath` is only a binary that exists, so
+				   the `fs.access(exe)` check passes and the guard is reached. */
+				const avant = compter();
+				const root = join(tmp, "gone-" + Date.now());
+				let msg = null;
+				try { await sync.startSync({ exe: process.execPath, home: join(tmp, "hgone"), root, creerSiAbsent: false, confirmer: async () => false }); } catch (e) { msg = String(e.message); }
+				r.check("a missing pinned folder rejects, names the folder, never recreates it, spawns nothing",
+					[!!msg && msg.includes("missing"), existsSync(root), compter()], [true, false, avant]);
 			});
 
 			const exe = join("apps", "windows", "vendor", "syncthing", "syncthing.exe");
