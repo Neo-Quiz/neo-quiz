@@ -66,9 +66,9 @@ interface SyncBackend {
  * through [SyncBackend]. The engine is created once, lazily, by whichever
  * comes first: the Sync page asking for its state, or the service.
  *
- * The shared folder is ALWAYS `/storage/emulated/0/Neo Quiz` ([ShareRules.sharedRoot]);
- * once sync starts, that directory is admitted to the bridge's perimeter
- * ([allowRoot]) so it can be an app root.
+ * The shared folder is ALWAYS directly under `/storage/emulated/0` ([ShareRules.sharedRoot]), named
+ * [rootName] (`Neo Quiz` until a rename made on the PCs is followed, [prepareRoot]); once sync
+ * starts, that directory is admitted to the bridge's perimeter ([allowRoot]) so it can be an app root.
  */
 class SyncHub private constructor(private val appContext: Context) : SyncBackend {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -114,22 +114,84 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     }
 
     /**
-     * Resolves `/storage/emulated/0/Neo Quiz` on the disk and admits it to the perimeter. `null` (sync
+     * Resolves `/storage/emulated/0/<rootName>` on the disk and admits it to the perimeter. `null` (sync
      * must not start) when it cannot be resolved, resolves anywhere else (a symlink), or the old
      * `Documents/Neo Quiz` still holds files ([FolderMove]: moved first, never merged).
      */
     private fun admitRoot(): File? {
         val storage = Environment.getExternalStorageDirectory()
-        val shared = ShareRules.sharedRoot(storage)
+        val name = rootName()
+        val shared = ShareRules.sharedRoot(storage, name)
+        // A renamed folder always came from a synced one: without its marker it is not the folder
+        // (moved away, recreated empty) and is never created nor shared (the Windows `creerSiAbsent`).
+        if (name != RootRename.DEFAULT_NAME && !File(shared, ".stfolder").exists()) return null
         val legacy = FolderMove.legacyRoot(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS))
         FolderMove.move(legacy, shared)
         if (FolderMove.blocked(legacy)) return null
         shared.mkdirs()
         val real = resolveReal(shared) ?: return null
         val realStorage = resolveReal(storage) ?: return null
-        if (!ShareRules.isCanonicalSharedRoot(real, realStorage)) return null
+        if (!ShareRules.isCanonicalSharedRoot(real, realStorage, name)) return null
         allowRoot?.invoke(real)
         return real
+    }
+
+    /** The synced folder's current name: [RootRename.DEFAULT_NAME] until a rename was followed. */
+    fun rootName(): String =
+        prefs.getString(KEY_ROOT_NAME, null)?.takeIf { RootRename.isValidName(it) } ?: RootRename.DEFAULT_NAME
+
+    /** The folder's path before the last rename, while the settings still point there; see [clearRootMovedFrom]. */
+    fun rootMovedFrom(): String? = prefs.getString(KEY_ROOT_MOVED_FROM, null)
+
+    fun clearRootMovedFrom() { prefs.edit().remove(KEY_ROOT_MOVED_FROM).commit() }
+
+    /** Held only around a rename and around reading the name for the bridge: never while Syncthing starts or stops. */
+    private val rootLock = Any()
+
+    /** True while [launchEngine] starts Syncthing or [shutdown] stops it: the folder must not move then. */
+    @Volatile private var engineBusy = false
+
+    /**
+     * Follows a rename made on the PCs ([RootRename]) and returns the folder's name. Renames ONLY while
+     * Syncthing is neither running, starting nor stopping, and no page is attached (a page keeps the
+     * folder's path: it would recreate the old folder empty). NEVER waits for Syncthing: the bridge
+     * calls it on the main thread; when the engine is busy it returns the current name, and the rename
+     * waits for the next start.
+     */
+    fun prepareRoot(): String = synchronized(rootLock) {
+        if (engine == null && !engineBusy && allowRoot == null) renameIfAgreed()
+        rootName()
+    }
+
+    /** Called with [rootLock] held, Syncthing stopped and no page attached. */
+    private fun renameIfAgreed() {
+        val storage = Environment.getExternalStorageDirectory()
+        recoverInterruptedRename(storage)
+        // The settings still point at the folder before an earlier rename: the bridge moves them first.
+        if (rootMovedFrom() != null) return
+        val current = rootName()
+        val desired = RootRename.desiredName(ShareRules.sharedRoot(storage, current)) ?: return
+        // Checked BEFORE the intent is recorded: a target that refuses never changes the name.
+        if (!RootRename.canMove(storage, current, desired)) return
+        // Then the intent (synchronously), so a rename that happens is never forgotten.
+        val old = ShareRules.sharedRoot(storage, current).path
+        if (!prefs.edit().putString(KEY_ROOT_NAME, desired).putString(KEY_ROOT_MOVED_FROM, old).commit()) return
+        if (RootRename.move(storage, current, desired) == null) {
+            prefs.edit().putString(KEY_ROOT_NAME, current).remove(KEY_ROOT_MOVED_FROM).commit()
+            return
+        }
+        Log.i(TAG, "synced folder renamed: $current -> $desired")
+    }
+
+    /**
+     * The process died between the recorded intent and the rename: the old folder still holds the sync
+     * marker and the new one does not. The name goes back to the old folder.
+     */
+    private fun recoverInterruptedRename(storage: File) {
+        val from = rootMovedFrom()?.let(::File) ?: return
+        if (from.parentFile != storage || !File(from, ".stfolder").exists()) return
+        if (File(ShareRules.sharedRoot(storage, rootName()), ".stfolder").exists()) return
+        prefs.edit().putString(KEY_ROOT_NAME, from.name).remove(KEY_ROOT_MOVED_FROM).commit()
     }
 
     fun detach() {
@@ -170,6 +232,20 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     /** Creates and starts the engine once; `null` when Syncthing cannot run (the next call retries). */
     suspend fun launchEngine(): SyncEngine? = lock.withLock {
         engine?.let { return it }
+        synchronized(rootLock) {
+            // A service-only start (no page attached) follows a rename here, before Syncthing starts.
+            if (allowRoot == null) renameIfAgreed()
+            engineBusy = true
+        }
+        try {
+            return startEngine()
+        } finally {
+            engineBusy = false
+        }
+    }
+
+    /** The body of [launchEngine], under its lock, with [engineBusy] set. */
+    private suspend fun startEngine(): SyncEngine? {
         val root = admitRoot()
         if (root == null) {
             Log.w(TAG, "Neo Quiz cannot be resolved to itself, or its old folder was not moved: sync not started")
@@ -192,7 +268,7 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
             scope.launch(Dispatchers.IO) { com.ahmedmili.neoquiz.notify.ChatNotifier.scan(appContext, root) }
         }
         created.onPaired = { prefs.edit().putBoolean(KEY_ACTIVE, true).apply() }
-        try {
+        return try {
             created.start()
             engine = created
             created
@@ -209,9 +285,17 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     /** Called by the service when it goes away. */
     suspend fun shutdown() = lock.withLock {
         val e = engine
-        engine = null
+        // Busy until Syncthing is really stopped: the folder never moves under a stopping engine.
+        synchronized(rootLock) {
+            engineBusy = true
+            engine = null
+        }
         lastState = null
-        e?.stop()
+        try {
+            e?.stop()
+        } finally {
+            engineBusy = false
+        }
     }
 
     private suspend fun ensure(): SyncEngine? {
@@ -270,6 +354,10 @@ class SyncHub private constructor(private val appContext: Context) : SyncBackend
     companion object {
         private const val TAG = "NeoSync"
         private const val KEY_ACTIVE = "active"
+        /** The synced folder's current name ([RootRename]); absent = [RootRename.DEFAULT_NAME]. */
+        private const val KEY_ROOT_NAME = "rootName"
+        /** The folder's path before the last rename, until the bridge has moved the settings' paths. */
+        private const val KEY_ROOT_MOVED_FROM = "rootMovedFrom"
 
         @Volatile private var instance: SyncHub? = null
 

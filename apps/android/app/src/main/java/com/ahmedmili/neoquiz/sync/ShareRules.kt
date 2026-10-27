@@ -18,8 +18,9 @@ data class Rate(val down: Long, val up: Long, val sample: RateSample?)
  * `apps/windows/electron/syncthing-regles.ts` (Task 6). Pure: no Android
  * class, so the JVM tests break each rule and watch it fail.
  *
- * - one folder only ([FOLDER_ID]), always at `/storage/emulated/0/Neo Quiz` ([sharedRoot]),
- *   never at a path that came from an offer or from the renderer;
+ * - one folder only ([FOLDER_ID]), always directly under `/storage/emulated/0` ([sharedRoot]), named
+ *   `Neo Quiz` or the name the PCs agree on ([RootRename]), never at a path that came from an offer
+ *   or from the renderer;
  * - a device is a device the owner PAIRED: an offer from anybody else is ignored;
  * - a device id coming from the page is validated (format AND the Luhn check
  *   characters Syncthing writes into every id) before it reaches a config;
@@ -56,12 +57,13 @@ object ShareRules {
     private val API_KEY = Regex("^[0-9a-f]{64}$")
     private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
-    /** The shared folder: `Neo Quiz` at the root of the shared [storage] (`/storage/emulated/0`, like
-        Neo Calendar's, 2026-10-04; `Documents/Neo Quiz` before, see [FolderMove]), whatever an offer or the page says. */
-    fun sharedRoot(storage: File): File = File(storage, "Neo Quiz")
+    /** The shared folder: [name] (`Neo Quiz` until a rename made on the PCs is followed, see [RootRename])
+        at the root of the shared [storage] (`/storage/emulated/0`, like Neo Calendar's, 2026-10-04;
+        `Documents/Neo Quiz` before, see [FolderMove]), whatever an offer or the page says. */
+    fun sharedRoot(storage: File, name: String = RootRename.DEFAULT_NAME): File = File(storage, name)
 
-    /** True when [real] (resolved on the disk) is exactly `Neo Quiz` directly under the resolved [storage]: a symlink pointing elsewhere is not. */
-    fun isCanonicalSharedRoot(real: File, storage: File): Boolean = real == sharedRoot(storage)
+    /** True when [real] (resolved on the disk) is exactly [name] directly under the resolved [storage]: a symlink pointing elsewhere is not. */
+    fun isCanonicalSharedRoot(real: File, storage: File, name: String = RootRename.DEFAULT_NAME): Boolean = real == sharedRoot(storage, name)
 
     /**
      * The device id and announced name a SCANNED QR code carries: Neo Quiz's

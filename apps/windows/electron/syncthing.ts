@@ -928,6 +928,9 @@ export interface OptionsGestion {
 	/** Writes the owner's choice (`desactiver` / `activer` / a first pairing
 	    that pairs on its own). Only the main process writes it. */
 	poserActif(actif: boolean): Promise<void>;
+	/** Once sync runs: publishes the shared folder's name for the other devices
+	    (`nom-racine.ts`). A failure never stops sync. */
+	publierNomRacine?(root: string): Promise<void>;
 }
 
 export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync = startSync): GestionSync {
@@ -995,6 +998,8 @@ export function creerGestionSync(o: OptionsGestion, demarrer: typeof startSync =
 				h.surEtat(e => { for (const a of abonnesEtat) a(e); });
 				h.surDonneesRecues(() => { for (const a of abonnesDonnees) a(); });
 				handle = h;
+				const racine = root;
+				void Promise.resolve(o.publierNomRacine?.(racine)).catch(e => console.warn("[syncthing] folder name not published:", e instanceof Error ? e.message : String(e)));
 				return h;
 			} catch (e) {
 				console.warn("[syncthing] unavailable:", e instanceof Error ? e.message : String(e));

@@ -36,8 +36,8 @@ const AUTRE_ID = "XJ6SOIF-RNGCUTX-2KULCG5-CEH4D3K-YNQRMY6-JT7O5CR-XXML5WU-J5ZVOA
 const CLE = "ab".repeat(32);
 
 await withSrcModule(
-	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts", "apps/windows/electron/appairage-qr.ts", "src/dashboard/sync-affichage.ts"],
-	async (regles, rest, sync, qrMod, aff) => {
+	["apps/windows/electron/syncthing-regles.ts", "apps/windows/electron/syncthing-rest.ts", "apps/windows/electron/syncthing.ts", "apps/windows/electron/appairage-qr.ts", "src/dashboard/sync-affichage.ts", "apps/windows/electron/nom-racine.ts"],
+	async (regles, rest, sync, qrMod, aff, nomRacine) => {
 		const r = makeReporter("Electron: Syncthing");
 
 		/* ───────── pure rules ───────── */
@@ -363,15 +363,19 @@ await withSrcModule(
 			const creers = [];
 			const ignores = [];
 			const faussaire = async (o) => { demarres.push(o.root); creers.push(o.creerSiAbsent); return { etat: async () => ({ actif: true }), appairer: async () => "ok", oublier: async () => {}, ignorer: async (id) => { ignores.push(id); }, surEtat: () => () => {}, surDonneesRecues: () => () => {}, stop: async () => {} }; };
+			const publies = [];
 			const fabriquer = (defaut) => sync.creerGestionSync({
 				exe: "x", home: "h", racineParDefaut: () => defaut,
 				lireRoot: async () => memoire.root ?? null, poserRoot: async (v) => { memoire.root = v; },
 				lireActif: async () => true, poserActif: async () => {}, confirmer: async () => true,
+				publierNomRacine: async (root) => { publies.push(root); },
 			}, faussaire);
 			const g1 = fabriquer(join(tmpO, "A"));
 			await g1.etat();
 			r.check("the first start pins the default folder as syncRoot", [memoire.root, demarres[0]], [join(tmpO, "A"), join(tmpO, "A")]);
 			r.check("the first pin may create the folder", creers[0], true);
+			await new Promise(ok => setTimeout(ok, 0));
+			r.check("once sync runs, the shared folder's name is published", publies, [join(tmpO, "A")]);
 			await g1.ignorer(AUTRE_ID);
 			r.check("ignorer reaches the running instance", ignores, [AUTRE_ID]);
 			{
@@ -397,6 +401,25 @@ await withSrcModule(
 			r.check("changing the default folder afterwards does not move the shared folder", [memoire.root, demarres[1]], [join(tmpO, "A"), join(tmpO, "A")]);
 			r.check("a start on an already pinned folder never recreates it", creers[1], false);
 			await g2.arreter();
+		});
+
+		/* ───────── the published folder name (the phone follows a rename) ───────── */
+		await cas(r, "nom-racine", async () => {
+			const { fichierNomRacine, contenuNomRacine, publierNomRacine } = nomRacine;
+			const id = "e45a22d9-fd2f-4226-802e-3208a698464d";
+			const racine = join(tmpO, "Efrei");
+			r.check("the file is the device's own, under .neo-quiz/root-name", fichierNomRacine(racine, id), join(racine, ".neo-quiz", "root-name", `${id}.json`));
+			r.check("an id that is not a plain file name is refused", ["../x", "a/b", "a\\b", "", "x".repeat(65), "a.json"].map(v => fichierNomRacine(racine, v)), [null, null, null, null, null, null]);
+			r.check("the content is the folder's basename", JSON.parse(contenuNomRacine(racine)), { v: 1, name: "Efrei" });
+			r.check("a drive root has no name to publish", contenuNomRacine("C:\\"), process.platform === "win32" ? null : contenuNomRacine("C:\\"));
+			mkdirSync(racine, { recursive: true });
+			r.check("first publication writes the file", await publierNomRacine(racine, id), true);
+			r.check("the bytes on disk", readFileSync(fichierNomRacine(racine, id), "utf8"), '{"v":1,"name":"Efrei"}\n');
+			r.check("unchanged: not written again", await publierNomRacine(racine, id), false);
+			r.check("no temporary file left", existsSync(fichierNomRacine(racine, id) + ".tmp"), false);
+			writeFileSync(fichierNomRacine(racine, id), '{"v":1,"name":"Neo Quiz"}\n');
+			r.check("an outdated file is rewritten", [await publierNomRacine(racine, id), readFileSync(fichierNomRacine(racine, id), "utf8")], [true, '{"v":1,"name":"Efrei"}\n']);
+			r.check("no device id: nothing written", await publierNomRacine(racine, null), false);
 		});
 
 		/* ───────── the pairing QR code that changes ───────── */

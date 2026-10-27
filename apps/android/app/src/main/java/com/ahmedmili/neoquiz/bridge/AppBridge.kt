@@ -86,9 +86,14 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val excluded = listOf(File(storage, "Android/data"), File(storage, "Android/obb")) +
         activity.getExternalFilesDirs(null).filterNotNull() + activity.externalCacheDirs.filterNotNull() + activity.obbDirs.filterNotNull()
     val perimeter = Perimeter(allowed::roots, privateDir) { excluded }
+    // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
+    // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
+    val hub = SyncHub.get(activity)
+    // A rename made on the PCs is followed first (only while Syncthing is stopped, never waiting for
+    // it, see `SyncHub.prepareRoot`), so nothing below ever sees, or recreates, the old folder.
     // The synced folder, at the root of the shared storage (2026-10-04). The old Documents/Neo Quiz
     // is moved there first, and the paths kept in the settings follow it once it is gone.
-    val documents = ShareRules.sharedRoot(storage)
+    val documents = ShareRules.sharedRoot(storage, hub.prepareRoot())
     val legacy = FolderMove.legacyRoot(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS))
     FolderMove.move(legacy, documents)
     val settings = SettingsChannel(
@@ -100,6 +105,14 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     // A tiny local file read, once, before the first call can arrive.
     runBlocking {
         if (!legacy.exists()) settings.movePaths(legacy.path, documents.path)
+        // The folder was renamed (now, or by the service alone earlier): the settings' paths follow it,
+        // even when something recreated a folder at the old place (it holds no sync marker).
+        hub.rootMovedFrom()?.let { from ->
+            if (!File(from, ".stfolder").exists()) {
+                settings.movePaths(from, documents.path)
+                hub.clearRootMovedFrom()
+            }
+        }
         settings.seedRoots()
     }
 
@@ -112,9 +125,6 @@ fun createAppBridge(activity: Activity, scope: CoroutineScope): AppBridge {
     val codeSandbox = CodeSandbox(activity, scope)
     val system = SystemChannel(perimeter, allowed, settings, FolderPickerDialog(activity, suggested), AndroidFileOpener(activity))
 
-    // The embedded Syncthing (Task 10). The hub outlives this page (the foreground service keeps it);
-    // what it holds of the page (dialog, events, perimeter) is released by `AppBridge.shutdown`.
-    val hub = SyncHub.get(activity)
     val qr = QrScanner(activity as ComponentActivity)
     // A pairing link opened the app (or arrived while it runs): the page reads it, and only fills in "Add a device".
     PairLinkRequest.listener = { bridge?.emit("sync.lienAppairage", null) }

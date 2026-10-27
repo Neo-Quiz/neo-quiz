@@ -68,10 +68,11 @@ const CLE_DOSSIERS = "folders";
 /** L'ancienne clé, au SINGULIER (tranche 1). Lue une fois, puis retirée. */
 const CLE_DOSSIER_LEGACY = "folder";
 
-/** L'identifiant et le nom du dossier par défaut — DONNÉES PERSISTÉES dans
-    les chemins du contrat (le premier segment) : jamais traduites, comme
-    `id`/`name` de tout autre dossier. RÉSERVÉ dans `lireDossiers` (voir plus
-    bas) : aucun dossier persisté ne peut plus obtenir cet id. */
+/** The default folder's id: PERSISTED DATA in the contract paths (their first
+    segment), never translated, like any other folder's `id`. RESERVED in
+    `lireDossiers` (below): no persisted folder can get this id any more. It
+    stays "Neo Quiz" when the folder itself is renamed on disk (2026-10-27,
+    "Efrei"): only the shown `name` follows the folder, see `dossierParDefaut`. */
 const ID_DOSSIER_DEFAUT = "Neo Quiz";
 
 /**
@@ -202,7 +203,9 @@ async function dossierParDefaut(): Promise<DossierQuiz | null> {
 	try {
 		const chemin = await pont().systeme.dossierDefaut();
 		if (typeof chemin !== "string" || !chemin.trim()) return null;
-		return { id: ID_DOSSIER_DEFAUT, path: normaliserChemin(chemin), name: ID_DOSSIER_DEFAUT, parDefaut: true };
+		const path = normaliserChemin(chemin);
+		// The shown name is the folder's own (a renamed "Efrei" shows "Efrei"); the id never moves.
+		return { id: ID_DOSSIER_DEFAUT, path, name: nomDeDossier(path) || ID_DOSSIER_DEFAUT, parDefaut: true };
 	} catch (e) {
 		console.warn(LOG_PREFIX, "dossier par défaut illisible:", e);
 		return null;

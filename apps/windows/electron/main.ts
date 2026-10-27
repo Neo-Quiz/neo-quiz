@@ -47,6 +47,7 @@ import {
 } from "./fenetre-maj";
 import { enregistrerCanaux } from "./canaux";
 import { cheminDossierDefaut } from "./dossier-defaut";
+import { publierNomRacine } from "./nom-racine";
 import { chargerPathRegistre } from "./process";
 import { surveillerCachesCli } from "./surveillant-cli";
 import { perimetreInitial } from "./perimetre";
@@ -937,6 +938,11 @@ if (process.argv.includes(DRAPEAU_FENETRE_MAJ)) {
 					return typeof v === "string" && path.isAbsolute(v) ? v : null;
 				},
 				poserRoot: root => reglagesOuErreur().ecrire(CLE_SYNC_ROOT, root),
+				// The folder's name, for the phone to follow a rename (`nom-racine.ts`).
+				publierNomRacine: async root => {
+					const id = await reglagesOuErreur().lire("deviceId");
+					await publierNomRacine(root, typeof id === "string" ? id : null);
+				},
 				/* Native, modal on the window, default Cancel: same pattern as the
 				   Ollama host guard (`canaux.ts`, `garderReglagesIa`). */
 				/* The pairing codes of the QR code (`appairage-qr.ts`). */
