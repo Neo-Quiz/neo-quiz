@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Changed
+- A Learn now fits about one hour: a map of the course first, one notion per step, numbers before symbols, the lab's code explained line by line, and what the class will add at the end
+
 ## [1.21.29] - 2026-10-27
 
 ### Changed

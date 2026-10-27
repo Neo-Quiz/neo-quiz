@@ -13,7 +13,7 @@
 import { createHash } from "node:crypto";
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/dashboard/generation-kind.ts"], ({ composerPrompts }, { CHAMPS_DECRITS, MOTS_INTERDITS, PASSAGES_REQUIS }, { clarifyPrompt }) => {
+await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/dashboard/generation-kind.ts"], ({ composerPrompts, ...aiClient }, { CHAMPS_DECRITS, MOTS_INTERDITS, PASSAGES_REQUIS }, { clarifyPrompt }) => {
 	const r = makeReporter("Prompts Learn / Test");
 	for (const mode of ["learn", "practice"]) {
 		const { systemPrompt } = composerPrompts("Python", { mode, count: null, type: "Mixte" });
@@ -31,7 +31,7 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	const learnCount = composerPrompts("x", { mode: "learn", count: 5 }).systemPrompt;
 	r.check("Learn with a count: exactly N question cards, the per-slice cap and 'AT MOST' slices are gone, singular for one",
 		[learnCount.includes("EXACTLY 5 question cards in total"), learnCount.includes("QUANTITY: AT MOST"), composerPrompts("x", { mode: "learn", count: 1 }).systemPrompt.includes("EXACTLY 1 question card in total")], [true, false, true]);
-	r.check("Learn without a count keeps its slice cap", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("QUANTITY: AT MOST"), true);
+	r.check("Learn without a count states a time budget, not a slice cap", composerPrompts("x", { mode: "learn", count: null }).systemPrompt.includes("QUANTITY, A TIME BUDGET: the learner has 60 minutes"), true);
 	r.check("clarify prompt: states the count and asks no count question when the request names one",
 		[clarifyPrompt("Fais 5 questions", []).system.includes("Do NOT ask about the number of questions"), clarifyPrompt("Quiz sur X", []).system.includes("Do NOT ask about the number of questions")], [true, false]);
 	/* NI PLUS NI MOINS (2026-09-30) : une question par point examinable, jamais
@@ -39,9 +39,9 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	   même jour, 1 amorce + 1 « explique » + 3 rappels par notion, quelle
 	   qu'elle soit. */
 	const learnAuto = composerPrompts("x", { mode: "learn", count: null }).systemPrompt;
-	r.check("Learn en Auto : au plus 10 tranches, questions sur les points les plus examinables", [
-		learnAuto.includes("AT MOST 10 slices") && learnAuto.includes("MOST EXAMINABLE points"),
-		/at most 20 questions|two to four questions|exactly one question with "role": "explain"/.test(learnAuto),
+	r.check("Learn en Auto : budget de 60 minutes (17 cartes, 6 tranches), questions sur les points les plus examinables", [
+		learnAuto.includes("AT MOST 17 question cards") && learnAuto.includes("AT MOST 6 slices") && learnAuto.includes("MOST EXAMINABLE points"),
+		/AT MOST 10 slices|at most 20 questions|two to four questions|exactly one question with "role": "explain"/.test(learnAuto),
 	], [true, false]);
 	r.check("le code d'une phrase va entre backticks, dans les deux modes (sinon __init__ s'affiche en gras)",
 		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes("goes between backticks in EVERY text field")), [true, true]);
@@ -57,35 +57,46 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 		["learn", "practice"].map(m => composerPrompts("x", { mode: m }).systemPrompt.includes('"flashcard": true')), [true, false]);
 	/* Spec 2026-10-07-learn-scroll §5: a generated Learn is tap-only. */
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
-	r.check("Learn: per step one etapes reading with a worked example (code and what it prints), 2 MCQ questions, never one before the reading, at most 1 flashcard",
-		['"lecture" is "etapes"', '"etapes" lists 2 to 4 SHORT paragraphs', "fully WORKED EXAMPLE", "WHAT IT PRINTS (or its result) written right under the line that prints it", '"retenir"',
-			"2 MCQ questions per slice, each with \"role\": \"recall\"", "ONE OR SEVERAL correct answers", "3 to 5 options", "The first question of the slice is easy", "at most ONE FLASHCARD per slice",
+	r.check("Learn: per step one etapes reading with a worked example (code and what it prints), 2 MCQ questions (the first redoes the worked case on other numbers), never one before the reading, at most 1 flashcard",
+		['"lecture" is "etapes"', '"etapes" lists 2 to 4 SHORT paragraphs', "a tiny CONCRETE CASE SOLVED line by line", "WHAT IT PRINTS (or its result) written right under the line that prints it", '"retenir"',
+			"2 MCQ questions per slice (none in the map), each with \"role\": \"recall\"", "ONE OR SEVERAL correct answers", "3 to 5 options", "The FIRST is the slice's worked case again with OTHER numbers", "at most ONE FLASHCARD per slice",
 			"NO QUESTION BEFORE THE READING"].filter(p => !learnP.includes(p)), []);
 	/* 2026-10-20: never a question before the lesson (owner's rule): no "pre" role is ever asked for. */
 	r.check("Learn: no question before the reading", [learnP.includes('"role": "pre", asked BEFORE'), learnP.includes("ONLY when the slice brings a genuinely NEW idea")], [false, false]);
 	/* 2026-10-09: a reading holds at most 1800 characters (it was 1200, never written down); the number is pinned here on purpose. */
 	/* 2026-10-14: a recommended maximum, no longer a wall: a reading may go past it when its notion needs it. */
-	r.check("Learn: a reading aims under 1800 characters, a recommended maximum it may exceed, written in the prompt",
-		[learnP.includes("aims to stay under 1800 characters: a RECOMMENDED maximum"), learnP.includes("SPLIT it into another slice rather than lengthen the reading"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("under 1800 characters")], [true, true, false]);
+	r.check("Learn: a reading aims under 1000 characters, a recommended maximum it may exceed, written in the prompt",
+		[learnP.includes("aims to stay under 1000 characters: a RECOMMENDED maximum"), learnP.includes("SPLIT it into another slice rather than lengthen the reading"), learnP.includes("under 1800 characters"), composerPrompts("x", { mode: "practice" }).systemPrompt.includes("under 1000 characters")], [true, true, false, false]);
 	/* 2026-10-16: a Learn teaches the lecture from zero, at the depth of the lecture. */
 	const sysL = (o) => composerPrompts("x", { mode: "learn", ...o }).systemPrompt;
-	const cap = (min) => { const m = sysL({ lectureMinutes: min }).match(/AT MOST (\d+) slices/); return m ? Number(m[1]) : null; };
-	r.check("Learn: slice cap by lecture length (absent, 60, 180, 300, 600 min and the bounds)",
-		[undefined, 60, 180, 300, 600, 15, 0, -5, NaN].map(cap), [10, 6, 9, 15, 16, 6, 10, 10, 10]);
-	r.check("Learn: every place that states the cap agrees",
-		[180, 300, undefined].map(min => { const n = cap(min); const s = sysL({ lectureMinutes: min }); return s.includes(`in at most ${n} slices`); }), [true, true, true]);
+	const budgetOf = (pace) => { const m = sysL({ paceMinutes: pace }).match(/AT MOST (\d+) question cards/); return m ? Number(m[1]) : null; };
+	const slicesOf = (pace) => { const m = sysL({ paceMinutes: pace }).match(/AT MOST (\d+) slices of 2 MCQs/); return m ? Number(m[1]) : null; };
+	r.check("Learn: question budget by pace (absent 17, 3 -> 20, 3.5 -> 17, 10 and 100 -> minimum 8, bad values -> default)",
+		[undefined, 3, 3.5, 10, 100, 0, -5, NaN].map(budgetOf), [17, 20, 17, 8, 8, 17, 17, 17]);
+	r.check("Learn: content slices follow the budget (absent 6, pace 3 -> 8, pace 10 -> 3)",
+		[undefined, 3, 10].map(slicesOf), [6, 8, 3]);
+	r.check("Learn: every place that states the budget agrees (60 minutes, map flashcards, closing slice)",
+		[undefined, 3, 10].map(pace => { const t = sysL({ paceMinutes: pace }); return [t.includes("the learner has 60 minutes"), t.includes("about 60 minutes, on the way to the class"), t.includes("EXACTLY 2 FLASHCARDS on those words and symbols, no MCQ"), t.includes("and NO question")].every(Boolean); }), [true, true, true]);
+	r.check("Learn: the pace is stated as given, a whole one without .0",
+		[sysL({ paceMinutes: 3 }).includes("about 3 minutes per question card"), sysL({}).includes("about 3.5 minutes per question card")], [true, true]);
+	r.check("Learn: no slice cap by lecture length, no lecture length sentence, retired exports gone",
+		[sysL({ lectureMinutes: 300 }) === sysL({}), /LECTURE LENGTH|This lecture lasted/.test(sysL({ lectureMinutes: 300 })), /AT MOST 10 slices|in at most 10 slices/.test(sysL({})), "LEARN_MAX_SLICES" in aiClient, "learnMaxSlices" in aiClient, aiClient.LEARN_BUDGET_MINUTES, aiClient.LEARN_DEFAULT_PACE, aiClient.LEARN_MIN_QUESTIONS, aiClient.LEARN_READING_MAX_CHARS],
+		[true, false, false, false, false, 60, 3.5, 8, 1000]);
+	r.check("Learn: the learner level defaults, and a written one replaces it",
+		[sysL({}).includes("LEARNER LEVEL: a beginner engineering student"), sysL({ learnerLevel: "knows Python lists well" }).includes("LEARNER LEVEL: knows Python lists well"), sysL({ learnerLevel: "knows Python lists well" }).includes("a beginner engineering student")], [true, true, false]);
+	r.check("Learn: slice 1 is the map (two flashcards, no MCQ), the closing slice has no question, triage and reading rules are written",
+		["\"La carte du cours\" in French", "\"The map of the course\" in English", "\"Ce que le cours va ajouter\" in French", "TRIAGE:", "SYMBOLS READ ALOUD:", "numbers first, letters after", "SENTENCES: short (at most about 20 words)", "CODE SLICES"].filter(p => !learnP.includes(p)), []);
 	r.check("Test: the lecture length is ignored; the Test prompt has no slice cap",
 		[composerPrompts("x", { mode: "practice", lectureMinutes: 300 }).systemPrompt === composerPrompts("x", { mode: "practice" }).systemPrompt, /AT MOST \d+ slices/.test(composerPrompts("x", { mode: "practice", lectureMinutes: 300 }).systemPrompt)], [true, false]);
-	r.check("Learn: the lecture length sentence only when known, formatted",
-		[sysL({}).includes("This lecture lasted"), sysL({ lectureMinutes: 300 }).includes("This lecture lasted about 5 h:"), sysL({ lectureMinutes: 90 }).includes("about 1 h 30:"), sysL({ lectureMinutes: 45 }).includes("about 45 min:"),
-			sysL({ lectureMinutes: 300 }).includes("without compressing it; a small source still never gets padded")], [false, true, true, true, true]);
-	const nouvelles = ["TERMS DEFINED AT FIRST USE", "defines it in plain words right there", "PREREQUISITES STEP", "Ce qu'il faut savoir avant", "What you need to know first", "It counts in the cap below",
-		"EACH AT MOST 3 SHORT SENTENCES", "SPLIT it into another slice", "EXPLAIN IN LEARN", "ONE line PER wrong option naming the confusion", "A flashcard's \"explain\" says why its answer holds"];
+	r.check("Learn: a lecture length (45, 90, 300 min) adds no sentence to the prompt",
+		[45, 90, 300].map(min => /This lecture lasted|without compressing it/.test(sysL({ lectureMinutes: min }))), [false, false, false]);
+	const nouvelles = ["TERMS DEFINED AT FIRST USE", "defines it in plain words right there", "PREREQUISITES, only when the course relies on something above the LEARNER LEVEL", "Ce qu'il faut savoir avant", "What you need to know first", 
+		"SENTENCES: short (at most about 20 words)", "SPLIT it into another slice", "EXPLAIN IN LEARN", "ONE line PER wrong option naming the confusion", "A flashcard's \"explain\" says why its answer holds"];
 	r.check("Learn: the new teaching rules are in the prompt", nouvelles.filter(p => !sysL({}).includes(p)), []);
 	r.check("Test: none of the new Learn rules", nouvelles.filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
 	r.check("Test explain rule unchanged", composerPrompts("x", { mode: "practice" }).systemPrompt.includes('EVERY question has "explain": why the right answer is right AND, for EACH wrong option, one short sentence saying why it is wrong.'), true);
-	r.check("Learn: several notions in a slice become bold, unnumbered parts",
-		learnP.includes("opened by a **bold** subheading (never numbered"), true);
+	r.check("Learn: one notion per content slice, two share a slice only when inseparable",
+		learnP.includes("CONTENT SLICES: ONE core notion each. Two notions share a slice only when they cannot be separated"), true);
 	/* 2026-10-09: interactive pages favour three styles the owner chose: explorable, structured course, annotated diagram.
 	   2026-10-19: the model is FREE among every relevant form and picks the best one per page, after picturing several; no default form. */
 	r.check("Learn: interactive pages offer every form, explorable, structured course and annotated diagram among them",
@@ -98,17 +109,17 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	r.check("Learn: the model chooses each page's form freely, after picturing several, never a default",
 		[learnP.includes("you are FREE"), learnP.includes("picture two or three forms"), learnP.includes("the default whenever"), learnP.includes("never the same style or the same interaction twice in a row")], [true, true, false, false]);
 	/* 2026-10-09: the readings carry ALL of the course, rephrased to be easier, never copied, and may add related knowledge. */
-	r.check("Learn: readings keep every piece of the course, rephrased, never copied, related additions allowed",
-		["EVERY piece of information", "never copy the course sentence by sentence", "REPHRASE", "ADD related knowledge"].map(m => learnP.includes(m)), [true, true, true, true]);
+	r.check("Learn: the course is triaged (core taught, rest cut and named in the closing slice), rephrased, never copied",
+		["TRIAGE: the budget does not hold the whole lecture", "CUT the rest", "Nothing cut is lost: the CLOSING SLICE names it", "REPHRASE the course to be easier than the original, never copy it"].map(m => learnP.includes(m)), [true, true, true, true]);
 	r.check("Learn: a flashcard is for a pure fact or syntax that fits one sentence, one formula or one line of code",
-		learnP.includes("whose answer fits in one sentence, one formula or one line of code"), true);
+		learnP.includes("A flashcard is ONLY on a term or a symbol that a reading has already taught, and its answer fits in one sentence, one formula or one line of code"), true);
 	/* Owner 2026-10-07: the typical Learn user did NOT follow the lecture, so
 	   the path teaches from zero and covers every notion, one slice each. */
 	/* 2026-10-10: "one slice per notion" gave 28 slices and 112 cards for one lecture PDF; a Learn is capped at LEARN_MAX_SLICES slices. */
-	r.check("Learn: assumes no prior knowledge, covers every notion of the material, in at most 10 slices",
-		[/no prior knowledge/i.test(learnP), /cover every notion of the provided material/i.test(learnP), learnP.includes("in at most 10 slices"), learnP.includes("AT MOST 10 slices"), /one slice per notion/i.test(learnP)], [true, true, true, true, false]);
+	r.check("Learn: assumes no prior knowledge, teaches from zero at the learner level, no slice cap by notion",
+		[/no prior knowledge/i.test(learnP), /teach from zero/i.test(learnP), learnP.includes("LEARNER LEVEL:"), learnP.includes("in at most 10 slices"), learnP.includes("AT MOST 10 slices"), /one slice per notion/i.test(learnP)], [true, true, true, false, false, false]);
 	r.check("Test: the no-prior-knowledge / every-notion wording is Learn-only",
-		[/no prior knowledge/i, /cover every notion of the provided material/i].map(re => re.test(composerPrompts("x", { mode: "practice" }).systemPrompt)), [false, false]);
+		[/no prior knowledge/i, /teach from zero/i].map(re => re.test(composerPrompts("x", { mode: "practice" }).systemPrompt)), [false, false]);
 	/* The clarify call of Generate (spec 2026-10-07-generate-auto-kind) carries
 	   the request and document NAMES only, and none of the quiz-format keys. */
 	r.check("Generate's clarify prompt: names only, no quiz-format key", [/mode: ?"exam"|examDurationMinutes|examAutoSubmit|examShowTimer|learnMode/.test(clarifyPrompt("x", ["a.pdf"]).system), clarifyPrompt("x", ["a.pdf"]).user.includes("- a.pdf")], [false, true]);
@@ -130,8 +141,8 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 		["5f24dfa59d5e85cb8a52cc1f656c1cedc99bdbf69c99efa1af5ec54a80362e98", "046cafd940f283a1620df1bf2ef808b69ed9a42fc400fae9d479abe15178b5d7", "ebc2a5d963985089df141850f341047ec43df1a2de9bf238d522386d4f8d0543", "657287e350c9a467f6148e1d53e4a11bf403ecdecafd67df50ad58175fadb5af"]);
 	r.check("Learn and Test: every question has a title naming its notion, never a question",
 		[learnP, composerPrompts("x", { mode: "practice" }).systemPrompt].map(p => /title: REQUIRED on every question: the notion it tests/.test(p) && p.includes("never a question")), [true, true]);
-	r.check("Learn: every reading has a hook whose form varies", /"accroche"[\s\S]*analogie[\s\S]*histoire[\s\S]*image[\s\S]*mnemo/.test(learnP) && /never the same form twice in a row/i.test(learnP), true);
-	r.check("Learn: key points are recall cards, never a recap", /"retenir"[^\n]*ALWAYS[^\n]*"cartes"/.test(learnP) && !/"forme": "recap", "items"/.test(learnP), true);
+	r.check("Learn: the hook is optional, its form among four, never on the map or the closing slice", /HOOK: OPTIONAL[\s\S]*"accroche"[\s\S]*analogie[\s\S]*histoire[\s\S]*image[\s\S]*mnemo/.test(learnP) && learnP.includes("only when one sentence really helps the notion stick") && learnP.includes("Never on the map or the closing slice"), true);
+	r.check("Learn: key points are EXACTLY 2 recall cards, never a recap", /"retenir"[^\n]*ALWAYS[^\n]*"cartes"/.test(learnP) && learnP.includes("EXACTLY 2 cards the learner tries to recall") && !learnP.includes("2 to 4 cards") && !/"forme": "recap", "items"/.test(learnP), true);
 	/* Retours du 2026-09-26 (lot B) : indices, mots clés, idiomes, cartes,
 	   classement. Chaque consigne est présente mot pour mot. */
 	for (const mode of ["learn", "practice"]) {
@@ -153,11 +164,11 @@ await withSrcModule(["src/dashboard/ai-client.ts", "src/quiz-format.ts", "src/da
 	   as `+` with `str()`) left the learner lost; the example comes first, then
 	   the contrast, never a numbered row of definitions. */
 	r.check("Learn: a reading teaches by example first, then the contrast, never through notions not taught, never numbered",
-		["TEACH BY EXAMPLE FIRST", "the FIRST paragraph is a fully WORKED EXAMPLE", "shows the CONTRAST", "NEVER explain a notion through another one the path has not taught yet", "NEVER as a numbered list", "explained by its result on the example's values"].filter(p => !learnP.includes(p)), []);
+		["a tiny CONCRETE CASE SOLVED line by line", "only after the numbers", "the contrast or the classic trap", "NEVER explain a notion through another one the path has not taught yet", "NEVER as a numbered list", "NO BLACK BOX", "explained by its result on the example's values"].filter(p => !learnP.includes(p)), []);
 	r.check("Learn: the old rule that defined an idiom by its developed equivalent is gone",
 		learnP.includes("the compact form, its result, then the developed equivalent"), false);
-	r.check("Learn : une étape qui introduit des termes a au moins une carte mémoire",
-		learnP.includes("a slice that introduces TERMS, DEFINITIONS or FACTS to memorize has one."), true);
+	r.check("Learn : une carte mémoire ne porte que sur un terme ou un symbole déjà enseigné",
+		learnP.includes("A flashcard is ONLY on a term or a symbol that a reading has already taught"), true);
 	r.check("Practice : les consignes propres au Learn restent absentes",
 		["EVERY question of the path has \"hint\"", "AT LEAST ONE flashcard"].filter(s => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(s)), []);
 	/* Glossaire (lot D, 2026-09-27) : la consigne GLOSSARY est commune aux trois
@@ -273,13 +284,13 @@ await withSrcModule(["src/dashboard/ai-client.ts"], ({ composerPrompts }) => {
 	const learnP = composerPrompts("x", { mode: "learn" }).systemPrompt;
 	/* 2026-10-10: the readings take the validated style of their notion as an html page (explorable, structured course, annotated diagram) and vary along the path; the older rules that made every reading plain steps ("ALWAYS etapes", html "MAY" / "ONLY when") are gone, so no prompt can carry both. */
 	r.check("Learn: each reading takes the style of its notion as an html page, and the styles vary",
-		[learnP.includes("ITS STYLE:"), learnP.includes("AT LEAST 8 READINGS IN 10 carry their page"), learnP.includes("the readings VARY along the path"), learnP.includes('"lecture" is ALWAYS "etapes"'), learnP.includes('MAY carry "html"'), learnP.includes("Use it ONLY when")], [true, true, true, false, false, false]);
+		[learnP.includes("ITS STYLE:"), learnP.includes("about ONE READING IN TWO carries"), learnP.includes("AT LEAST 8 READINGS IN 10"), learnP.includes('"lecture" is ALWAYS "etapes"'), learnP.includes('MAY carry "html"'), learnP.includes("Use it ONLY when")], [true, true, false, false, false, false]);
 	r.check("Practice : aucun style de lecture",
 		['"lecture"', '"retenir"', '"etapes"'].filter(p => composerPrompts("x", { mode: "practice" }).systemPrompt.includes(p)), []);
 	/* Interactive pages (2026-10-09): a reading MAY carry `html`; the rule is
 	   Learn-only and says what keeps the page safe and readable. */
 	r.check("Learn : une lecture porte `html` quand sa notion a un style (page autonome, sans réseau, thème, 60 Ko)",
-		["AT LEAST 8 READINGS IN 10 carry \"html\"", "the learner ACTS on the course", "self-contained", "no network", "--nq-bg", "60 KB", "NEVER a page that only SHOWS text"].filter(p => !learnP.includes(p)), []);
+		["about ONE READING IN TWO carries \"html\"", "the learner ACTS on the notion", "self-contained", "no network", "--nq-bg", "60 KB", "NEVER a page that only SHOWS text"].filter(p => !learnP.includes(p)), []);
 	r.check("Practice : aucune page interactive", composerPrompts("x", { mode: "practice" }).systemPrompt.includes("INTERACTIVE PAGES"), false);
 	r.done();
 });

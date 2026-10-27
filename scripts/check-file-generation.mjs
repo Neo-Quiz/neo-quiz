@@ -526,7 +526,7 @@ await withSrcModule(["src/dashboard/file-generation-app.ts", "src/host/current.t
 	r.check("an automatic line runs ONE call, read-only tools, in its folder",
 		[appels.length - avantAuto, argsAuto.includes("--dangerously-skip-permissions"), argsAuto.slice(argsAuto.indexOf("--tools"), argsAuto.indexOf("--tools") + 2), appels[avantAuto]?.dossier],
 		[1, false, ["--tools", "Read,Grep,Glob"], "R/Cours"]);
-	r.check("its frozen class-session length reaches the Learn prompt", /LECTURE LENGTH/.test(appels[avantAuto]?.stdin ?? ""), true);
+	r.check("its frozen class-session length no longer reaches the Learn prompt (a Learn is sized to a time budget)", /LECTURE LENGTH|This lecture lasted/.test(appels[avantAuto]?.stdin ?? ""), false);
 	file.fermer(file.lignes()[0].id);
 	/* Blocked by the gate: paused with the reason, no CLI, and a manual line of the same provider in another chat still starts. */
 	app.setAutoGate(async () => ({ go: false, block: { kind: "session", percent: 86 }, retryAt: Date.now() + 3_600_000 }));
