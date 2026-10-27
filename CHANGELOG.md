@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.29] - 2026-10-27
+
 ### Changed
 - Show the synced folder under its own name, and rename it on the phone when the computers renamed theirs
 
