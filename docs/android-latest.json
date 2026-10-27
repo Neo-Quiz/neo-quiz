@@ -1,8 +1,8 @@
 {
-  "versionCode": 40,
-  "versionName": "0.2.38",
-  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.38/NeoQuiz-0.2.38.apk",
-  "sha256": "eebd1ad011d9007377240e628617758e77948bfe8dbd1a5b62516c1b4cb5447b",
-  "size": 56220073,
-  "notes": "Python blocks run on your PC"
+  "versionCode": 41,
+  "versionName": "0.2.39",
+  "url": "https://github.com/Neo-Quiz/neo-quiz/releases/download/android-v0.2.39/NeoQuiz-0.2.39.apk",
+  "sha256": "e3819b8208ee8b0334827306ed26318876f16b3bb8fd3bf5b6bd4d3d2653dd70",
+  "size": 56224509,
+  "notes": "The synced folder follows a rename made on the computers (moved once at start, Syncthing stopped). The app shows the folder under its own name."
 }
