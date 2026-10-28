@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Fixed
+- The pointer is an arrow again over scrollbars, including the AI composer's
+
 ## [1.21.30] - 2026-10-27
 
 ### Changed

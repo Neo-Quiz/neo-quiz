@@ -1828,6 +1828,17 @@ label.nq-set-ligne {
 	background: transparent;
 }
 
+/* A styled scrollbar takes the cursor of the element that scrolls, not the
+   arrow of a native one: the AI composer field (`cursor: text`) showed an
+   I-beam over its own scrollbar. Measured in Electron: a `cursor` on
+   `::-webkit-scrollbar` alone changes nothing, the part under the pointer
+   (track or thumb) decides. */
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner {
+	cursor: default;
+}
+
 /* Le pouce fait 12 px de boîte mais 6 px à l'œil : la bordure TRANSPARENTE,
    découpée par `background-clip: padding-box`, tient la marge qui le fait
    flotter au lieu de coller au bord. C'est ce qui distingue une barre
