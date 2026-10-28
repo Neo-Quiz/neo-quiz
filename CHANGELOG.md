@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.31] - 2026-10-28
+
 ### Added
 - A running AI turn shows how many tokens it has produced, so a long silent reasoning visibly moves
 
