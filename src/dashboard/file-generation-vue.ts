@@ -48,7 +48,7 @@ import { formatResume } from "./usage-limit";
 import { quizModeLabel } from "./quiz-card";
 import type { Transcript } from "./transcript";
 import { peindreEtapes, resumeOutils } from "./transcript-steps";
-import { modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./transcript";
+import { jetonsProduits, modeleDeRepli, modeleDiffere, quizProgress, tempsRestant } from "./transcript";
 import { splitCardEdit } from "../explain-edit";
 import { explainMarkOf } from "./explain-chat";
 import { renderThread, renderTextOutput, threadHasLiveRow } from "./work-view";
@@ -137,11 +137,14 @@ function modeleDemande(l: LigneGeneration, tr: Transcript | null | undefined): s
 	return tr?.model ? aiProviders.libelleModele("claude-code", tr.model) : nomModeleSelectionne(l);
 }
 
-/** The summary of a running turn: "Opus 5.5 · Weighing the options… 0:12". */
-function libelleEnCours(nom: string, activite: string, ecoule: number): string {
+/** The summary of a running turn: "Opus 5.5 · Weighing the options… 0:12 ·
+    ↓ 614 tokens". The count is what the model has produced so far, as Claude
+    Code shows it: a long silent reasoning still visibly moves. */
+function libelleEnCours(nom: string, activite: string, ecoule: number, jetons = 0): string {
+	const temps = jetons > 0 ? duree(ecoule) + " · " + t("ai.work.outputTokens", { count: compterJetons(jetons) }) : duree(ecoule);
 	return nom
-		? t("ai.work.workingLine", { model: nom, activity: activite, time: duree(ecoule) })
-		: t("ai.work.workingNoModel", { activity: activite, time: duree(ecoule) });
+		? t("ai.work.workingLine", { model: nom, activity: activite, time: temps })
+		: t("ai.work.workingNoModel", { activity: activite, time: temps });
 }
 
 /** The activity next to the working line: the reasoning's size, while no
@@ -592,7 +595,7 @@ export function creerVueFile(opts: {
 		/** An alert with no Retry under it (the request was already retried on its own). */
 		sansRelance?: boolean;
 		/** A running turn's summary: the clock re-writes it each second from these. */
-		chrono?: { modele: string; activite: string; debut: number };
+		chrono?: { modele: string; activite: string; debut: number; jetons: number };
 		ouvertParDefaut: boolean;
 		/** Fills (or refreshes) the detail box of an unfolded line. */
 		detail: (corps: HTMLElement) => void;
@@ -637,7 +640,7 @@ export function creerVueFile(opts: {
 			? t("ai.safeguard.flagged", { requested: modeleDemande(l, tr), effective: repli })
 			: coupe ? (repliAuto ? t("ai.safeguard.stoppedRetried", { model: nom, fallback: aiProviders.libelleModele("claude-code", repliAuto) }) : t("ai.safeguard.stopped", { model: nom }))
 			: relance ? t("ai.safeguard.flagged", { requested: aiProviders.libelleModele("claude-code", l.demande?.repliDe ?? ""), effective: nom })
-			: vivant ? libelleEnCours(nom, activite, Date.now() - debut) : libelleFini(nom, l.resultat?.dureeMs);
+			: vivant ? libelleEnCours(nom, activite, Date.now() - debut, jetonsProduits(tr)) : libelleFini(nom, l.resultat?.dureeMs);
 		/* As Claude Code shows it: "Details: [cyber]" after a safeguard message. */
 		const details = (repli || coupe || relance) && tr.refusalCategory ? " " + t("ai.safeguard.details", { category: tr.refusalCategory }) : "";
 		const enAttente = !!vue && vue.thread.items.some(i => i.kind === "permission" && i.state === "pending");
@@ -645,7 +648,7 @@ export function creerVueFile(opts: {
 			cle: "work", icone: repli || coupe || relance ? "alert-triangle" : iconeFournisseur(l), libelle: libelle + details, alerte: !!repli || coupe || relance,
 			// Retry by hand only when nothing was retried on its own.
 			sansRelance: !!repliAuto || relance,
-			chrono: vivant ? { modele: nom, activite, debut } : undefined,
+			chrono: vivant ? { modele: nom, activite, debut, jetons: jetonsProduits(tr) } : undefined,
 			// Folded from the start, even while the turn runs: a click opens it. A pending
 				// permission is the one exception: the turn waits for it, so it must show.
 			ouvertParDefaut: enAttente,
@@ -792,6 +795,7 @@ export function creerVueFile(opts: {
 				v.libelle.dataset.modele = s.chrono.modele;
 				v.libelle.dataset.activite = s.chrono.activite;
 				v.libelle.dataset.debut = String(s.chrono.debut);
+				v.libelle.dataset.jetons = String(s.chrono.jetons);
 			} else if (v.libelle.classList.contains("qbd-ai-transcript-chrono")) {
 				v.libelle.classList.remove("qbd-ai-transcript-chrono");
 				delete v.libelle.dataset.modele;
@@ -1011,7 +1015,7 @@ export function creerVueFile(opts: {
 					el.textContent = duree(Date.now() - Number(el.dataset.debut));
 				});
 				zone.querySelectorAll<HTMLElement>(".qbd-ai-transcript-chrono[data-debut]").forEach(el => {
-					const texte = libelleEnCours(el.dataset.modele ?? "", el.dataset.activite ?? "", Date.now() - Number(el.dataset.debut));
+					const texte = libelleEnCours(el.dataset.modele ?? "", el.dataset.activite ?? "", Date.now() - Number(el.dataset.debut), Number(el.dataset.jetons) || 0);
 					if (el.textContent !== texte) el.textContent = texte;
 				});
 				zone.querySelectorAll<HTMLElement>(".qbd-ai-reponse-etape[data-modele]").forEach(el => {

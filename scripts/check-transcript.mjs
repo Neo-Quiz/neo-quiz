@@ -12,7 +12,7 @@
  */
 import { withSrcModule, makeReporter } from "./lib/load-src.mjs";
 
-await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, newClaudeChain, foldClaudeChain, claudeResultChained, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere, modeleDeRepli }) => {
+await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, transcriptVide, appliquer, claudeResultDuFlux, newClaudeChain, foldClaudeChain, claudeResultChained, quizProgress, tempsRestant, MAX_STEPS, resumeEntree, modeleDiffere, modeleDeRepli, jetonsProduits }) => {
 	const r = makeReporter("Transcript of a generation");
 	const line = (o) => JSON.stringify(o) + "\n";
 	const fold = (events) => events.reduce((t, e) => appliquer(t, e), transcriptVide());
@@ -181,6 +181,23 @@ await withSrcModule("src/dashboard/transcript.ts", ({ createTranscriptDecoder, t
 	const p = fold(createTranscriptDecoder("claude")(prive));
 	r.check("claude: private reasoning keeps its size, no text, never backwards", [p.thinking, p.thinkingTokens, p.started], ["", 4250, true]);
 	r.check("a fresh transcript has no reasoning size", transcriptVide().thinkingTokens, 0);
+	/* WHAT THE TURN PRODUCED, as Claude Code's "↓ 614 tokens" (2026-10-28): a
+	   reasoning of three minutes showed only a clock. The current message is
+	   estimated (its reasoning estimate + 4 characters per token of text and
+	   tool input), a finished one is its exact `usage.output_tokens`, and the
+	   estimate restarts with each message (the CLI's own does). */
+	const sortie = (...lignes) => fold(createTranscriptDecoder("claude")(lignes.map(line).join("")));
+	const debutMsg = { type: "stream_event", event: { type: "message_start", message: { usage: { input_tokens: 2 } } } };
+	const pense = n => ({ type: "system", subtype: "thinking_tokens", estimated_tokens: n });
+	const ecrit = s => ({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: s } } });
+	const outil = s => ({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "input_json_delta", partial_json: s } } });
+	const finMsg = (n, stop = "tool_use") => ({ type: "stream_event", event: { type: "message_delta", delta: { stop_reason: stop }, usage: { input_tokens: 32, output_tokens: n } } });
+	r.check("output: a fresh transcript has produced nothing", jetonsProduits(transcriptVide()), 0);
+	r.check("output: reasoning estimate + text and tool input at 4 chars a token", jetonsProduits(sortie(debutMsg, pense(4000), ecrit("abcdefgh"), outil("{\"a\""))), 4000 + 2 + 1);
+	r.check("output: a finished message counts its exact usage, not the estimate", jetonsProduits(sortie(debutMsg, pense(4000), ecrit("abcdefgh"), finMsg(14104))), 14104);
+	r.check("output: the next message adds its own estimate", jetonsProduits(sortie(debutMsg, pense(4000), finMsg(14104), debutMsg, pense(50), pense(150))), 14104 + 150);
+	r.check("output: a stopped message still counts, and is still a refusal", (() => { const t = sortie(debutMsg, finMsg(300, "refusal")); return [jetonsProduits(t), t.refusals]; })(), [300, 1]);
+	r.check("output: a transcript stored before the count reads 0", jetonsProduits({ ...transcriptVide(), outputTokens: undefined, outputLiveThinking: undefined, outputLiveChars: undefined }), 0);
 	// What the model read: fresh input + cache, from message_start's usage.
 	const lu = fold(createTranscriptDecoder("claude")(line({ type: "stream_event", event: { type: "message_start", message: { usage: { input_tokens: 2, cache_creation_input_tokens: 180000, cache_read_input_tokens: 2141 } } } })));
 	r.check("claude: the input read is fresh input plus cache", lu.inputTokens, 182143);

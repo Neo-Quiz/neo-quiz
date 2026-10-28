@@ -13,6 +13,9 @@ release notes.
 
 ## [Unreleased]
 
+### Added
+- A running AI turn shows how many tokens it has produced, so a long silent reasoning visibly moves
+
 ### Fixed
 - The pointer is an arrow again over scrollbars, including the AI composer's
 

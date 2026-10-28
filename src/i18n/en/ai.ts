@@ -971,6 +971,7 @@ export const EN_AI = {
 	"ai.work.workedFor": "Worked for {time}",
 	"ai.work.workingLine": "{model} · {activity} {time}",
 	"ai.work.workingNoModel": "{activity} · {time}",
+	"ai.work.outputTokens": "↓ {count} tokens",
 	"ai.work.detailsOn": "Details on {device}",
 	"ai.work.unavailable": "These details are no longer stored on this device.",
 	"ai.work.running": "Working…",

@@ -906,6 +906,7 @@ export const FR_AI: Record<keyof typeof EN_AI, string> = {
 	"ai.work.workedFor": "A travaillé {time}",
 	"ai.work.workingLine": "{model} · {activity} {time}",
 	"ai.work.workingNoModel": "{activity} · {time}",
+	"ai.work.outputTokens": "↓ {count} jetons",
 	"ai.work.detailsOn": "Détail sur {device}",
 	"ai.work.unavailable": "Ce détail n'est plus stocké sur cet appareil.",
 	"ai.work.running": "En cours…",

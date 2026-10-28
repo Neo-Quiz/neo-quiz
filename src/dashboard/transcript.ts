@@ -54,6 +54,15 @@ export type TranscriptEvent =
 	/** The size of what the model was given to read (the request and its
 	    documents), in tokens, from the first message's usage. */
 	| { kind: "input"; tokens: number }
+	/** A message of the turn begins (`message_start`): the running estimate
+	    of what it writes starts again from zero. */
+	| { kind: "outputStart" }
+	/** Characters of a tool call's input streamed so far (`input_json_delta`):
+	    written by the model, so counted in what it produced. */
+	| { kind: "outputChars"; chars: number }
+	/** A message is over (`message_delta`): the EXACT number of tokens it
+	    produced, reasoning included, replaces its running estimate. */
+	| { kind: "outputDone"; tokens: number }
 	| { kind: "text"; text: string }
 	/** A tool call: begun (`content_block_start`, name only), then its
 	    input known (the whole `assistant` message). Same `id`: one step. */
@@ -102,6 +111,13 @@ export interface Transcript {
 	thinkingTokens: number;
 	/** Tokens the model was given to read (0 until the CLI says). */
 	inputTokens: number;
+	/** Tokens produced by the messages already finished, exact (`message_delta`
+	    usage). Optional: a transcript stored before it existed has none. */
+	outputTokens?: number;
+	/** The message being written: its reasoning estimate, and the characters
+	    of text and tool input streamed, until `outputDone` gives the count. */
+	outputLiveThinking?: number;
+	outputLiveChars?: number;
 	/** When the first character of the answer arrived (`Date.now()`), to
 	    estimate the time left from the questions already written. */
 	writingSince?: number;
@@ -121,6 +137,13 @@ const MAX_CHARS = 200_000;
 export const MAX_STEPS = 300;
 const MAX_INPUT = 240;
 const MAX_DETAIL = 200;
+
+/** What the turn has produced so far, in tokens, as Claude Code counts it
+    (`↓ 614 tokens`): the finished messages exactly, the current one estimated
+    (its reasoning estimate, plus about four characters per token written). */
+export function jetonsProduits(t: Transcript): number {
+	return (t.outputTokens ?? 0) + (t.outputLiveThinking ?? 0) + Math.ceil((t.outputLiveChars ?? 0) / 4);
+}
 
 export function transcriptVide(): Transcript {
 	return { started: false, thinking: "", thinkingTokens: 0, inputTokens: 0, text: "", tools: [], toolsHidden: 0, done: false };
@@ -162,6 +185,20 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 			t.started = true;
 			// Never backwards: two runs of an answer (a retry) restart the CLI's count.
 			if (ev.total > t.thinkingTokens) t.thinkingTokens = ev.total;
+			// The CLI's estimate restarts with each message: the current one's.
+			if (ev.total > (t.outputLiveThinking ?? 0)) t.outputLiveThinking = ev.total;
+			break;
+		case "outputStart":
+			t.outputLiveThinking = 0;
+			t.outputLiveChars = 0;
+			break;
+		case "outputChars":
+			t.outputLiveChars = (t.outputLiveChars ?? 0) + ev.chars;
+			break;
+		case "outputDone":
+			t.outputTokens = (t.outputTokens ?? 0) + ev.tokens;
+			t.outputLiveThinking = 0;
+			t.outputLiveChars = 0;
 			break;
 		case "input":
 			t.started = true;
@@ -171,6 +208,7 @@ export function appliquer(t: Transcript, ev: TranscriptEvent, now: number = Date
 			t.started = true;
 			if (t.writingSince === undefined && ev.text) t.writingSince = now;
 			t.text = borner(t.text + ev.text);
+			t.outputLiveChars = (t.outputLiveChars ?? 0) + ev.text.length;
 			break;
 		case "tool": {
 			t.started = true;
@@ -396,14 +434,23 @@ function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 	const eventType = str(event.type);
 	/* A message the safeguards stopped (measured 2026-10-13: the answer was cut
 	   mid-quiz, 26 questions of 40 asked, and nothing said so on screen). */
-	if (eventType === "message_delta" && str(rec(event.delta)?.stop_reason) === "refusal") return [{ kind: "refusal" }];
+	if (eventType === "message_delta") {
+		const out: TranscriptEvent[] = [];
+		if (str(rec(event.delta)?.stop_reason) === "refusal") out.push({ kind: "refusal" });
+		// What the message produced, reasoning included (`usage.output_tokens`).
+		const produit = rec(event.usage)?.output_tokens;
+		if (typeof produit === "number" && Number.isFinite(produit) && produit >= 0) out.push({ kind: "outputDone", tokens: Math.round(produit) });
+		return out;
+	}
 	if (eventType === "message_start") {
 		// What the model read: fresh input, plus what the prompt cache served or stored.
 		const usage = rec(rec(event.message)?.usage);
-		if (!usage) return [];
+		const out: TranscriptEvent[] = [{ kind: "outputStart" }];
+		if (!usage) return out;
 		const n = (k: string): number => { const v = usage[k]; return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0; };
 		const tokens = n("input_tokens") + n("cache_creation_input_tokens") + n("cache_read_input_tokens");
-		return tokens > 0 ? [{ kind: "input", tokens: Math.round(tokens) }] : [];
+		if (tokens > 0) out.push({ kind: "input", tokens: Math.round(tokens) });
+		return out;
 	}
 	if (eventType === "content_block_delta") {
 		const delta = rec(event.delta);
@@ -415,6 +462,10 @@ function claudeEvents(line: Rec, etat: EtatDecodeur): TranscriptEvent[] {
 		if (deltaType === "thinking_delta") {
 			const text = str(delta?.thinking);
 			return text ? [{ kind: "thinking", text }] : [];
+		}
+		if (deltaType === "input_json_delta") {
+			const json = str(delta?.partial_json);
+			return json ? [{ kind: "outputChars", chars: json.length }] : [];
 		}
 		return [];
 	}
