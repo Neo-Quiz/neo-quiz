@@ -13,6 +13,8 @@ release notes.
 
 ## [Unreleased]
 
+## [1.21.32] - 2026-10-28
+
 ### Fixed
 - The open AI work no longer blinks while the model reasons
 
