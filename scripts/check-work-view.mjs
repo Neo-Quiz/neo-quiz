@@ -257,6 +257,19 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 		const vivant = document.createElement("div");
 		renderThread(vivant, fil([{ kind: "thinking", text: "", tokens: 5, started: Date.now() - 5000 }], true), deps);
 		r.check("réflexion en cours : reflet", vivant.querySelectorAll(".qbd-work-thinking-label.is-live").length, 1);
+		/* The CLI raises the private reasoning's token count about every second:
+		   the live row (never showing it) must stay the SAME node, or its dot and
+		   shine restart and the open work blinks. */
+		{
+			const garde = document.createElement("div");
+			const debut = Date.now() - 5000;
+			renderThread(garde, fil([{ kind: "thinking", text: "", tokens: 50, started: debut }], true), deps);
+			const avant = garde.firstElementChild;
+			renderThread(garde, fil([{ kind: "thinking", text: "", tokens: 4250, started: debut }], true), deps);
+			r.check("réflexion en cours : un nouveau compte de jetons garde la même ligne", garde.firstElementChild === avant, true);
+			renderThread(garde, fil([{ kind: "thinking", text: "Now a visible thought", tokens: 4300, started: debut }], true), deps);
+			r.check("réflexion en cours : un texte nouveau la reconstruit", garde.firstElementChild !== avant, true);
+		}
 		r.check("réflexion en cours : point qui pulse", vivant.querySelectorAll(".qbd-pulse-dot").length, 1);
 		r.check("réflexion en cours : la phrase suit item.started (5 s -> 2e mot)", vivant.querySelector(".qbd-work-thinking-label")?.textContent, "Reading the documents");
 		r.check("réflexion en cours : ni minuteur ni jetons", vivant.querySelectorAll(".qbd-work-elapsed,.qbd-work-tokens").length, 0);
@@ -614,7 +627,7 @@ await withSrcModule(["src/dashboard/work-view.ts", "src/host/current.ts", "src/d
 			poserIcone() {}, nomModeleSelectionne: () => "Opus 5.5", iconeFournisseur: () => "sparkles",
 			modeleRepli: () => null, libelleFini: () => "Opus 5.5 worked for 0:50",
 			activiteEnCours: () => "Thinking", libelleEnCours: () => "Opus 5.5 working",
-			texteActivite: () => "", compterJetons: String, libelleProgres: () => null,
+			texteActivite: () => "", compterJetons: String, jetonsProduits: () => 0, libelleProgres: () => null,
 			resumeOutils: () => ({ libelle: "Tools", icone: "terminal" }), peindreEtapes() {},
 		};
 		const fillStart = source.indexOf("\tfunction remplirTranscript(");

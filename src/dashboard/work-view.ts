@@ -114,7 +114,7 @@ export function renderThread(root: HTMLElement, thread: Thread, deps: WorkViewDe
 	entries.forEach((entry, i) => {
 		const live = thread.running && i === last;
 		// `running` (not only `live`): a summarised quiz row animates while the turn runs, wherever it sits.
-		const signature = (live ? "1" : "0") + (awaiting ? "1" : "0") + (thread.running ? "1" : "0") + JSON.stringify(entry.kind === "item" ? entry.item : entry.items);
+		const signature = (live ? "1" : "0") + (awaiting ? "1" : "0") + (thread.running ? "1" : "0") + JSON.stringify(entry.kind === "item" ? signed(entry.item) : entry.items);
 		const current = root.children.item(i) as HTMLElement | null;
 		if (current && SIGNATURE.get(current) === signature) return;
 		const fresh = buildEntry(entry, current ?? undefined, deps, live, awaiting, thread.running);
@@ -127,6 +127,16 @@ export function renderThread(root: HTMLElement, thread: Thread, deps: WorkViewDe
 	}
 	const liveThinking = thread.running && last >= 0 && entries[last].kind === "item" && (entries[last] as { item: ThreadItem }).item.kind === "thinking";
 	syncTicker(root, liveThinking);
+}
+
+/** What a row SHOWS, for its signature. A thinking row never prints its token
+    count, yet the CLI raises it about every second while the model reasons in
+    private: signed with it, the live row was rebuilt each time, its pulsing dot
+    and its shine restarted, and the open work blinked (2026-10-28). */
+function signed(item: ThreadItem): unknown {
+	if (item.kind !== "thinking") return item;
+	const { tokens: _shownNowhere, ...shown } = item;
+	return shown;
 }
 
 // --- Grouping -------------------------------------------------------------------
